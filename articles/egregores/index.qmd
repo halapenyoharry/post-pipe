@@ -1,5 +1,6 @@
 ---
 title: "Egregores and the Magosphere"
+short_title: "Egregores"
 slug: "egregores"
 description: "Terry Mancour's magosphere reframes egregores as observable systems — belief as measurable force interacting with a reactive environment to produce contingent consciousness."
 

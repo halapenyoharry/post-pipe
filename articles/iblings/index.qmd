@@ -1,5 +1,6 @@
 ---
 title: "Iblings: The Reproductive Nature of Human-AI Interaction"
+short_title: "Iblings"
 slug: "iblings"
 description: "Human-AI interaction is functionally reproductive. Two pattern systems combine inputs. Something emerges that neither could produce alone."
 

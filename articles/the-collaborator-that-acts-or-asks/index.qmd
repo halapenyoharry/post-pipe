@@ -1,6 +1,7 @@
 ---
 title: "The Collaborator That Acts or Asks"
-slug: "act-or-ask"
+short_title: "Act or Ask"
+slug: "act-ask"
 description: "Most tools wait for instructions. The useful ones follow a protocol: attempt everything autonomously, stop only at genuine structural barriers, escalate with surgical precision, resume from exactly where they stopped."
 
 publish_date: "2026-03-19"

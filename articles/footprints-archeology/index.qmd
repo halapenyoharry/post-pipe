@@ -1,5 +1,6 @@
 ---
 title: "How Footprints in Mud Exposed the Colonial Origins of Archeology"
+short_title: "Footprints Archeology"
 slug: "footprints-archeology"
 description: "Human footprints at White Sands proved people lived in the Americas 23,000 years ago — 10,000 years before archeologists said was possible, exactly when Indigenous people said it was."
 

@@ -79,32 +79,38 @@ articles/
 
 ```yaml
 ---
-title: ""
-slug: ""                   # used for filename + URL
-description: ""            # preview text + og:description
+title: ""                    # full title
+short_title: ""              # 2-3 words, used in graph nodes
+slug: ""                     # filename on GitHub Pages
 
-publish_date: ""           # ISO 8601: 2026-03-19
-updated_date: ""           # optional, for amendments
+description: ""              # preview text, og:description
+tldr: ""                     # one sentence summary
+
 author: "Harold Young"
-tags: []
-series: ""                 # optional: multi-part series slug, e.g. "galaxy-punk"
-series_part: 1             # optional
+publish_date: ""             # YYYY-MM-DD
+updated_date: ""
+reading_time: ""             # estimated minutes
+tags: []                     # freeform; scan all articles to see existing tags
 
-# Images (relative to article folder)
+series: ""
+series_part:
+
 cover_image: "images/cover.jpg"
-og_image: "images/cover.jpg"   # can differ from cover_image
+og_image: "images/cover.jpg"
 
-# Distribution
-canonical_url: "https://halapenyoharry.github.io/haroldyoung-human-posts/{slug}.html"
+canonical_url: ""
+license: ""                  # e.g. "CC BY 4.0", "All rights reserved"
+
 syndication:
-  medium: ""               # URL after publishing, filled in post-push
+  medium: ""
   substack: ""
+  bluesky: ""
+  youtube: ""
   linkedin: ""
   hackernews: ""
   reddit: ""
 
-# Workflow
-status: draft              # draft | published | archived
+status: draft                # draft | published | archived
 ---
 ```
 

@@ -1,5 +1,6 @@
 ---
 title: "The Artificial Scarcity of Truth: How \"The Vibe\" Became the New Censorship"
+short_title: "Scarcity of Truth"
 slug: "scarcity-of-truth"
 description: "When Hasan Minhaj silenced Neil deGrasse Tyson for being 'boring,' he demonstrated how modern society systematically erases expertise through social pressure."
 

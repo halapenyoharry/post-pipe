@@ -1,0 +1,35 @@
+---
+title: ""
+short_title: ""
+slug: ""
+
+description: ""
+tldr: ""
+
+author: "Harold Young"
+publish_date: ""
+updated_date: ""
+reading_time: ""
+tags: []
+
+series: ""
+series_part:
+
+cover_image: "images/cover.jpg"
+og_image: "images/cover.jpg"
+
+canonical_url: ""
+license: ""
+
+syndication:
+  medium: ""
+  substack: ""
+  bluesky: ""
+  youtube: ""
+  linkedin: ""
+  hackernews: ""
+  reddit: ""
+
+status: draft
+---
+

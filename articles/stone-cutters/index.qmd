@@ -1,0 +1,60 @@
+---
+title: "Cutting Stones and Decolonizing My Manager Brain"
+short_title: "Stone Cutters"
+slug: "stone-cutters"
+
+description: "The Three Stone Cutters parable isn't a gift of purpose — it's a mechanism to colonize someone's mind into giving you their soul when you're only paying for their time."
+tldr: "The 'Cathedral Builder' story is corporate colonization — the honest stone cutter who kept his soul was right all along."
+
+author: "Unknown (found by Isaac Miranda)"
+publish_date: ""
+updated_date: ""
+reading_time: "2"
+tags:
+  - leadership
+  - colonialism
+  - management
+  - labor
+
+series: ""
+series_part:
+
+cover_image: "images/cover.jpg"
+og_image: "images/cover.jpg"
+
+canonical_url: "fictional — unknown author, found by Isaac Miranda in the upcoming novel 'The Epic of Elinor Jones'"
+license: ""
+
+syndication:
+  medium: ""
+  substack: ""
+  bluesky: ""
+  youtube: ""
+  linkedin: ""
+  hackernews: ""
+  reddit: ""
+
+status: published
+---
+
+For years, I told the story of the Three Stone Cutters to my teams.
+
+You know the one. The traveler asks three men what they are doing.
+
+"I am cutting stone."
+"I am building a wall."
+"I am building a Cathedral."
+
+I used this parable to motivate people. I rewarded the "Cathedral Builders." I thought I was giving them a gift, a sense of higher purpose.
+
+But I realized later that I was just channeling the colonizers.
+
+I wasn't giving my employees purpose. I was colonizing their minds.
+
+The "Cathedral Builder" story is a mechanism to solve an industrial problem: How do you get someone to give you their soul, when you are only paying for their time?
+
+I realized I was using that story to displace their reality (the grind, the stress, the work) with the Institution's reality (Glory, Legacy, Mission). I was asking for a spiritual down payment on a financial transaction.
+
+I came to understand that the "First Man" the one who just said "I am cutting stone" was the honest one. He wasn't deluded. He was mastering his craft. He traded his skill for his living, and he kept his soul for himself.
+
+I realized that the best way to respect a "Stone Cutter" wasn't to lie to them about the wall. It was to give them the sharpest chisel money could buy, pay them what they were worth, and get out of their way.

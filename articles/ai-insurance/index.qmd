@@ -1,5 +1,6 @@
 ---
 title: "AI Oligarchs Are Driving Without Insurance"
+short_title: "AI Insurance"
 slug: "ai-insurance"
 description: "OpenAI operates machines that introduce far greater systemic risk than any vehicle, yet they are entirely exempt from liability insurance."
 

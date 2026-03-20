@@ -1,0 +1,109 @@
+---
+title: "The Call Center Workers Should Be Training AI on Emotions"
+short_title: "Emotional Calibration"
+slug: "emotional-calibration"
+description: "Millions of people who spent years reading strangers' emotional states through voice alone are about to lose their jobs. They're also the most calibrated emotional sensors on the planet."
+
+publish_date: ""
+updated_date: ""
+author: "Harold Young"
+tags:
+  - ai
+  - labor
+  - open-source
+  - affective-computing
+series: ""
+series_part:
+
+cover_image: "images/cover.jpg"
+og_image: "images/cover.jpg"
+
+canonical_url: "https://halapenyoharry.github.io/haroldyoung-human-posts/emotional-calibration.html"
+syndication:
+  medium: ""
+  substack: ""
+  linkedin: ""
+  hackernews: ""
+  reddit: ""
+
+status: draft
+---
+
+## The Most Calibrated Emotional Sensors on the Planet Are About to Be Unemployed
+
+There are millions of call center workers worldwide. They are about to be replaced by AI systems that can handle scripted conversations faster, cheaper, and without bathroom breaks.
+
+Here is what nobody is talking about: these people spent years — some of them decades — doing something that no machine can currently do well. They read the emotional states of strangers through voice alone. No face. No body language. Just tone, hesitation, the shape of a pause, the speed of a response, the difference between frustrated-angry and frustrated-sad.
+
+They did this hundreds of times a day. Thousands of times a month. They got good at it because their performance reviews depended on it, because de-escalation requires emotional accuracy, because you cannot resolve a billing dispute with someone who is crying if you cannot hear that they are crying.
+
+This is not a skill that disappears when the job does. This is a skill that becomes more valuable.
+
+## Wire Them Up
+
+Here is the idea, described without abstraction:
+
+Take call center workers. Establish an emotional baseline — resting heart rate, galvanic skin response, facial micro-expression mapping. Give them time to calibrate. These are people who have spent years regulating their own emotions under pressure; they know what neutral feels like in their own body.
+
+Then show them things. Video. Audio. Text. Images. Conversations. News. Art. Advertisements. Political speeches. Product interfaces. AI-generated content. Human-generated content.
+
+Record two layers of data simultaneously:
+
+1. **Physiological response** — what their body does. GSR spikes, heart rate variability, pupil dilation, facial muscle activation. This is involuntary. This is ground truth.
+
+2. **Conscious emotional read** — what they say they feel, what they identify in the content. This is expert interpretation from people who have been professionally reading emotional signals for years.
+
+The combination of involuntary physiological data and expert conscious labeling, from a population that has been selected and trained for emotional sensitivity, produces something that does not currently exist: a high-fidelity emotional calibration dataset.
+
+This is the emotional equivalent of what ImageNet did for computer vision. Before ImageNet, machines couldn't reliably tell a cat from a dog. After ImageNet, they could — because millions of labeled images gave them ground truth to train against. Nobody has done this for emotion at scale, with calibrated human sensors, across diverse content types.
+
+## Why Open Source Is the Only Option
+
+This dataset cannot be proprietary. This is not a moral argument. It is a structural one.
+
+A proprietary emotional calibration dataset in the hands of a single company is the most dangerous product imaginable. It is a machine that reads human feelings and belongs to a shareholder. It will be used to optimize engagement, which is a polite way of saying it will be used to manipulate emotional states for profit.
+
+We already know what happens when engagement optimization meets emotional data. Social media companies discovered that outrage drives engagement. They did not need calibrated emotional data to figure that out — they just measured clicks. Now imagine what happens when the optimization engine can actually read what you feel, in real time, with high accuracy.
+
+If one company owns that, they own the emotional commons the same way AI companies currently own the cognitive commons. They externalize the cost of emotional manipulation onto a public that cannot see the mechanism.
+
+Open source breaks this. If the dataset, the methodology, and the calibration standards are public, then:
+
+- **No single entity controls the interpretation of human emotion.** The dataset becomes infrastructure, like TCP/IP. Too fundamental to own.
+- **Defensive tools can be built on the same foundation.** If you can detect emotional manipulation, you can build against it. But only if the detection tools have access to the same calibration data the manipulation tools use.
+- **The workers retain value.** An open dataset does not mean free labor. The workers are the calibration instruments. They are compensated for their expertise, not for a product that gets sold once and replaces them. As the dataset grows, as new content types emerge, as AI-generated media evolves, the calibration must be refreshed. The workers are not a one-time extraction. They are an ongoing necessity.
+
+## The Economics
+
+Call center workers are currently paid to suppress their emotional intelligence in service of a script. They are paid to not react, to stay neutral, to de-escalate without acknowledging that they, too, are having an emotional response.
+
+This proposal pays them to do the opposite. To react. To feel. To report what they feel with the precision they have spent years developing. To be, for the first time in their professional lives, valued for the exact skill their employer spent years trying to minimize.
+
+The funding model is the same one that funds open-source software infrastructure: foundations, grants, consortium membership from companies that want to build on the dataset without owning it exclusively. The same model that funds Linux, Apache, and OpenStreetMap.
+
+The workers are not being replaced. They are being promoted — from script followers to calibration instruments for the next generation of AI.
+
+## What Gets Built on Top
+
+An open emotional calibration dataset enables:
+
+- **Consent-based emotional AI.** Systems that can read your emotional state — but only when you ask them to, and only using models you can inspect.
+- **Manipulation detection.** Tools that flag when content is engineered to produce a specific emotional response. The emotional equivalent of an ad blocker.
+- **Therapeutic applications.** Mental health tools that can detect emotional states with clinical accuracy, built on data from people who know what distress sounds like because they heard it every day for years.
+- **Accessible communication.** Tools for people who have difficulty reading emotional cues — autism spectrum, brain injuries, cross-cultural communication — trained on the highest-fidelity emotional data available.
+
+None of this gets built if the data is proprietary. All of it gets built if the data is open.
+
+## The Alternative
+
+The alternative is what always happens. The call center workers get laid off. The companies that replace them with AI do not offer retraining. The emotional intelligence those workers accumulated over years of difficult, underpaid, undervalued labor disappears from the economy entirely.
+
+Meanwhile, some company in San Francisco trains an emotion-reading model on scraped YouTube reaction videos and calls it a breakthrough. The model is mediocre because the training data is mediocre — uncontrolled, uncalibrated, unlabeled by anyone who knows what they're looking at. But it's good enough to sell to advertisers. Good enough to optimize engagement. Good enough to manipulate.
+
+The workers who could have provided the calibration standard that makes emotional AI safe and accurate are driving Ubers. The technology that could have been a public good is a private product. The emotional commons is enclosed the same way the cognitive commons was enclosed.
+
+Or we could do the other thing.
+
+---
+
+_The people who know what humans feel are about to be told they are no longer needed. They are wrong. They are needed more than ever — just not by the companies that currently employ them._
