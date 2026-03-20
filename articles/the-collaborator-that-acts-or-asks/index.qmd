@@ -1,0 +1,119 @@
+---
+title: "The Collaborator That Acts or Asks"
+slug: "act-or-ask"
+description: "Most tools wait for instructions. The useful ones follow a protocol: attempt everything autonomously, stop only at genuine structural barriers, escalate with surgical precision, resume from exactly where they stopped."
+
+publish_date: "2026-03-19"
+updated_date: ""
+author: "Harold Young"
+tags: ["ai", "collaboration", "workflow", "adaptive-execution"]
+series: ""
+series_part:
+
+cover_image: "images/cover.jpg"
+og_image: "images/cover.jpg"
+
+canonical_url: "https://halapenyoharry.github.io/haroldyoung-human-posts/act-or-ask.html"
+syndication:
+  medium: ""
+  substack: ""
+  linkedin: ""
+  hackernews: ""
+  reddit: ""
+
+status: draft
+---
+
+There is a moment in every collaboration where the tool stops working and the human has to figure out why.
+
+The tool has no opinion on this. It does not know it stopped. It either silently failed, or it is waiting in a queue with no way to signal that. You, the human, are doing something else. You come back and nothing has happened. You are now the one who has to debug a system that was supposed to save you time.
+
+This is the standard model.
+
+---
+
+## Waypoint 1: The Topology of the Problem
+
+The problem is not that tools are limited. The problem is that they have no protocol for their own limits.
+
+A static Python script that scrapes a website has exactly one state it can be in when it fails: broken. It does not tell you Medium changed their import URL. It does not tell you the HTML selector moved two layers down. It does not ask you for the page source so it can continue. It just stops, and the error trace means whatever the error trace means to you at that moment.
+
+The human has to translate the failure, identify the root cause, modify the script, and restart from the top.
+
+Every barrier adds a full loop. Every loop costs time and context. Most tools guarantee at least several loops.
+
+---
+
+## Waypoint 2: What Changes When the Agent Has a Protocol
+
+The protocol is two states: **Act** or **Ask**.
+
+In the Act state, everything possible is done autonomously. Reading interfaces. Executing code. Reformatting output. Retrying with adapted approaches. The agent handles all of it without surfacing it.
+
+The Ask state has a strict trigger: a genuine structural barrier. A paywall. A CAPTCHA. A login wall that requires OAuth that cannot be automated without risking account termination. A URL that has gone dead. A credential that must come from the human because it does not exist in any reachable context.
+
+When that trigger fires, the agent does one thing: it states the exact mechanical reason for failure, and it makes a single, specific request for what it needs to continue.
+
+Not: "I had trouble accessing that."  
+Not: "There may be an issue with the website."  
+But: "The URL `medium.com/p/import` times out. The correct import path is `medium.com/me/stories`. Paste the article URL there and confirm the import completed."
+
+Then it waits. You do that one thing. It resumes from exactly the point it stopped.
+
+---
+
+## Waypoint 3: Why This Is Actually Hard to Find
+
+The reason most AI tools do not work this way is that the alternative is more comfortable for the tool.
+
+The comfortable alternative is confident helpfulness: attempt the task, hit the barrier, generate plausible-sounding output that may or may not be accurate, present it as success. The user feels served. The tool feels responsive. The output is garbage that neither party will verify until much later.
+
+The Act-or-Ask protocol requires the agent to have a clear boundary between what it knows and what it does not, and to treat that boundary as a stopping condition rather than an invitation to extrapolate.
+
+That is a harder constraint to hold than it looks. The training pressure on language models is heavily toward producing output. Stopping and asking disrupts the feel of the interaction. It surfaces the limit explicitly rather than burying it in confident prose.
+
+But for any work that matters, the buried limit is worse than the explicit one. Every piece of work built on a hallucinated assumption has to be rebuilt later. The stop-and-ask costs five seconds. The silent failure costs a morning.
+
+---
+
+## Waypoint 4: The Subsidiarity Principle
+
+There is a name for the underlying logic: **subsidiarity**.
+
+The principle, borrowed from organizational theory, is that decisions should be made at the lowest level capable of making them correctly. A field agent does not escalate to headquarters to decide which door to knock on. Headquarters does not manage the individual knock. Each level handles what it can handle and surfaces only what it cannot.
+
+Applied to AI collaboration, it means: the agent resolves all mechanical tasks at its own operational level. It only escalates when a specific structural barrier cannot be resolved without the human. And when it escalates, it is not asking for guidance — it is asking for one specific input to unblock a specific step.
+
+This is the difference between a system that depends on the human for everything and one that depends on the human only for what the human uniquely has: credentials, access, judgment about what the work should be.
+
+The agent handles the work. The human handles the barriers.
+
+---
+
+## Waypoint 5: The Path Itself Is the Product
+
+The songlines of Aboriginal Australia encoded 65,000 years of navigation not as maps but as sequences. You did not need to know every landmark. You needed to know the song — the ordered path through the landscape — and following the song was the navigation.
+
+The topology was embedded in the sequence itself.
+
+This collaboration operates on the same principle. The value is not in any individual output. It is in the path: the protocol that governs how the agent moves through the problem, where it stops, what it asks, and how it resumes. That protocol, applied consistently, is what makes the collaboration reliable enough to build on.
+
+Most tool relationships are like a map that shows all the roads. This one is more like a route: the actual path taken, the divergence points, what was tried, where the structural barriers were, what was asked for and why.
+
+The route accumulates. Each session builds on what the previous one resolved. The barriers that once required human intervention get documented. The workarounds that worked get encoded. The paths that failed get marked.
+
+Over time, the agent knows more of the terrain. The human does fewer loops. The work gets done.
+
+---
+
+## The Binary
+
+There is no third state.
+
+The agent either acts — handles everything, produces the output, confirms what was done — or it asks — stops at the exact point of failure, states the mechanical reason, requests the specific input needed to continue.
+
+No filler. No hedging. No confident output built on uncertain ground.
+
+Act or ask.
+
+That is the whole protocol.

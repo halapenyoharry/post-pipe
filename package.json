@@ -1,0 +1,23 @@
+{
+  "name": "post-pipe",
+  "version": "1.0.0",
+  "description": "markdown in → platform post out",
+  "main": "index.js",
+  "bin": {
+    "post-pipe": "./index.js"
+  },
+  "scripts": {
+    "login:medium": "node index.js medium --login",
+    "login:substack": "node index.js substack --login",
+    "login:youtube": "node index.js youtube --login"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "dotenv": "^17.3.1",
+    "gray-matter": "^4.0.3",
+    "marked": "^12.0.0",
+    "playwright": "^1.44.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

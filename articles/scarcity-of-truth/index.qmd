@@ -1,0 +1,74 @@
+---
+title: "The Artificial Scarcity of Truth: How \"The Vibe\" Became the New Censorship"
+slug: "scarcity-of-truth"
+description: "When Hasan Minhaj silenced Neil deGrasse Tyson for being 'boring,' he demonstrated how modern society systematically erases expertise through social pressure."
+
+publish_date: "2025-11-24"
+updated_date: ""
+author: "Harold Young"
+tags:
+  - truth
+  - media
+  - epistemology
+  - censorship
+series: ""
+series_part:
+
+cover_image: "images/cover.jpg"
+og_image: "images/cover.jpg"
+
+canonical_url: "https://medium.com/@halapenyoharry/the-artificial-scarcity-of-truth-how-the-vibe-became-the-new-censorship-b730f104b1a0"
+syndication:
+  medium: "https://medium.com/@halapenyoharry/the-artificial-scarcity-of-truth-how-the-vibe-became-the-new-censorship-b730f104b1a0"
+  substack: ""
+  linkedin: ""
+  hackernews: ""
+  reddit: ""
+
+status: published
+---
+
+When Hasan Minhaj interviewed Neil deGrasse Tyson this year, he didn't just interrupt an astrophysicist. He demonstrated exactly how modern society systematically erases expertise.
+
+Critics are focusing on Minhaj's "waterboarding" comment, dismissing it as a crude joke. But that misses the point entirely. The danger wasn't the joke; the danger was the audience's reaction. When Minhaj silenced Tyson — forbidding him from explaining how gravity actually works because it was "boring."
+
+In that moment, we weren't watching a comedy routine. We were watching the real-time creation of an Artificial Scarcity of Truth.
+
+## The "Vibe" as a Palimpsest
+
+In the Middle Ages, the Church controlled information by controlling the physical supply of parchment. If a monk wanted to copy a prayer, he would scrape the ink off an "useless" math text by Archimedes to make space. They created an artificial scarcity of science to maintain a surplus of dogma.
+
+Today, we have infinite digital "parchment," so the mechanism of erasure has changed. We don't scrape the page; we police the vibe.
+
+Minhaj's behavior towards Tyson was a modern scraping tool. By framing factual correction as "killing the mood," he successfully argued that feeling good is more valuable than being right.
+
+The Mechanism: When Tyson tried to offer the "abundance" of knowledge (how tides actually work), Minhaj artificially restricted it.
+The Goal: To protect the value of his own asset — his comedic persona. If Tyson speaks, the audience learns physics. If Tyson is silenced, the audience consumes Minhaj.
+
+Yes, the 'waterboarding' was a joke, but a badly executed one. Hasan, throughout the interview, acted like Neil deGrasse Tyson was being aggressive with science, purposefully misinterpreting enthusiasm for science because he disagreed with Tyson on the existence of god.
+
+Hasan's medieval-level understanding of religion is exposed and his fear for truth revealed. This interchange felt familiar to me, where did I see this pattern before? It's when people with advanced social skills use them to make a very intelligent 'nerd' look like an idiot in front of others in order to make themselves look smarter. It only made Hasan, who I enjoy as an interviewer, look like the dumbest person on the planet because NDT is one of the best people there ever was — he's generous, brilliant, funny, inclusive, committed to evidence, etc.
+
+Hasan, you can't hate Trump and NDT at the same time. NDT is the antithesis of Trump and you made him look like a silly old-fashioned man to your audience. Shame.
+
+## The Aspasia Dynamic
+
+This is not new. History is littered with thinkers who were silenced not by logic, but by social ostracization.
+
+Aspasia, the teacher of Socrates, was marginalized in Athens not because her rhetoric was flawed, but because she was a "buzzkill" to the established patriarchy. She threatened the social order by being a woman who knew too much.
+
+Minhaj played the role of the Athenian mob. He used his social dominance (the microphone, the home-court advantage) to frame the Expert as the outsider. He cast Tyson as the "Annoying Nerd" so the audience would feel comfortable rejecting the evidence. It is the exact same social pressure used to silence atheists, makers, and skeptics in daily life: "Don't think so hard, you're ruining the fun."
+
+## Cornering the Market on Reality
+
+The most dangerous part of the interview wasn't that Minhaj was wrong about the moon. It was that he established a rule for his millions of followers: Ignorance is a stylistic choice.
+
+He cornered the market on reality for that hour. He sold his audience a version of the universe where gravity is "whatever I say it is," and he priced the Truth out of the market by making the social cost of correcting him too high.
+
+## Conclusion: The Epicurean Withdrawal
+
+We are living in an era of "Vibe-Based Epistemology." If a fact feels bad or awkward, it is treated as false.
+
+For those of us who, like the ancient Epicureans or the modern makers, prefer the mechanics of reality over the comfort of illusions, the lesson is clear. We cannot force the Hasan Minhajs of the world to hand over the chalk. But we can refuse to applaud when they erase the board.
+
+The next time you are told you are "thinking too much" or "ruining the vibe" by pointing out a contradiction, remember: You aren't being difficult. You are just fighting the artificial scarcity of truth.

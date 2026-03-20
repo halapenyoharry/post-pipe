@@ -1,0 +1,11 @@
+# session files and credentials — never commit
+auth/
+
+# deps
+node_modules/
+
+# generated output
+_site/
+
+# OS
+.DS_Store
