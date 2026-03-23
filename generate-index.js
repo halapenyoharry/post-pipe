@@ -124,6 +124,7 @@ function buildIndexHTML() {
 <meta property="og:description" content="${SETTINGS.site.description}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="${PAGES_BASE}">
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
 <style>
   @font-face {
     font-family: 'Atkinson';
