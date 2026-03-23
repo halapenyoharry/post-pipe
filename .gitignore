@@ -7,5 +7,23 @@ node_modules/
 # generated output
 _site/
 
+# feed cache — rebuilt on generate, do not commit
+.feed-cache/
+
 # OS
 .DS_Store
+
+# content — lives here locally but not in the pipeline repo
+articles/
+input/
+research/
+fonts/
+
+# design exploration
+design-mock*.html
+
+# test content
+test-articles/
+
+# archive (syncthinged to other devices)
+archive/
