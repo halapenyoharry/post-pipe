@@ -98,11 +98,11 @@ series_part:
 cover_image: "images/cover.jpg"
 og_image: "images/cover.jpg"
 
-canonical_url: ""
-license: ""                  # e.g. "CC BY 4.0", "All rights reserved"
+canonical_url: ""            # final published URL (GitHub Pages)
+license: ""                  # CC-BY-SA 4.0, etc.
 
 syndication:
-  medium: ""
+  medium: ""                 # URL where cross-posted
   substack: ""
   bluesky: ""
   youtube: ""
@@ -110,7 +110,8 @@ syndication:
   hackernews: ""
   reddit: ""
 
-status: draft                # draft | published | archived
+status: draft                # draft, published, archived
+
 ---
 ```
 

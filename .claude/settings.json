@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \":*)",
+      "Bash(say -v ?)",
+      "Bash(mdfind kokoro:*)",
+      "Read(//Users/harold/Applications/kokoro/**)",
+      "Read(//Users/harold/Projects/Kokoro-FastAPI/**)",
+      "Bash(mdfind -name Atkinson)",
+      "Bash(ls -lh /Users/harold/Projects/json-visual-viewer/public/fonts/Atkinson*)",
+      "mcp__brave-search__brave_web_search",
+      "Bash(open -a \"Visual Studio Code\" /Users/harold/Projects/post-pipe/ARCHITECTURE.md)",
+      "Bash(git -c:*)",
+      "Bash(ls /Users/harold/Projects/post-pipe/design-mock*.html)",
+      "Read(//Users/harold/Library/Application Support/Claude/local-agent-mode-sessions/266d6bb9-9133-497c-a0fc-b9d6d62c91d2/9991f80b-8f40-4f88-90e7-ef62b364efa1/local_111197a1-ead1-4f15-a31f-6ad801a704db/outputs/**)",
+      "WebSearch",
+      "Bash(gh repo:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh label:*)",
+      "Read(//Users/harold/Projects/**)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(jules --help)"
+    ],
+    "additionalDirectories": [
+      "/Users/harold/Projects"
+    ]
+  }
+}
