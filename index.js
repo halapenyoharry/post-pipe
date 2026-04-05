@@ -38,7 +38,13 @@ async function main() {
 
   let content;
   if (fileArg) {
-    content = fs.readFileSync(path.resolve(fileArg), 'utf8');
+    const fullPath = path.resolve(fileArg);
+    // If it's a directory, pass the path directly (for folder-based articles)
+    if (fs.statSync(fullPath).isDirectory()) {
+      content = fullPath; 
+    } else {
+      content = fs.readFileSync(fullPath, 'utf8');
+    }
   } else {
     content = fs.readFileSync(0, 'utf8'); // stdin
   }

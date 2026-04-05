@@ -19,10 +19,27 @@
       "Bash(gh label:*)",
       "Read(//Users/harold/Projects/**)",
       "Bash(echo \"exit: $?\")",
-      "Bash(jules --help)"
+      "Bash(jules --help)",
+      "Bash(jules remote:*)",
+      "Bash(node -e \"const s=require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\); const j=JSON.parse\\(s\\); console.log\\(JSON.stringify\\(j.feeds, null, 2\\)\\)\")",
+      "Bash(npm install:*)",
+      "Read(//Users/harold/Posts/**)",
+      "Bash(cp -r /Users/harold/Projects/post-pipe/articles/ai-insurance ~/Posts/)",
+      "Bash(cp -r /Users/harold/Projects/post-pipe/articles/effortless-action ~/Posts/)",
+      "Bash(cp -r /Users/harold/Projects/post-pipe/articles/egregores ~/Posts/)",
+      "Bash(cp -r /Users/harold/Projects/post-pipe/articles/emotional-calibration ~/Posts/)",
+      "Bash(cp -r /Users/harold/Projects/post-pipe/articles/footprints-archeology ~/Posts/)",
+      "Read(//Users/harold/.claude/**)"
     ],
     "additionalDirectories": [
-      "/Users/harold/Projects"
+      "/Users/harold/Projects",
+      "/Users/harold/Posts/art-is-pattern",
+      "/Users/harold/Posts/public-risk-private-gain",
+      "/Users/harold/Posts/append-only-mind",
+      "/Users/harold/Posts/dread-signal-creativity",
+      "/Users/harold/Posts/erasure-of-the-expert",
+      "/Users/harold/Posts/smile-end-of-world",
+      "/Users/harold/.claude"
     ]
   }
 }

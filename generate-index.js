@@ -96,6 +96,7 @@ const ICONS = {
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
   crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 20h20v2H2zM4 18l2-12 4 5 2-7 2 7 4-5 2 12z"/></svg>',
   globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
   medium: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg>',
@@ -111,6 +112,7 @@ const ICONS = {
 
 function buildIndexHTML() {
   const d3Source = fs.readFileSync(D3_PATH, 'utf8');
+  const ttsSource = fs.readFileSync(path.join(__dirname, 'tts.js'), 'utf8');
   const fontB64 = fs.readFileSync(FONT_PATH).toString('base64');
   const fontBoldB64 = fs.readFileSync(FONT_BOLD_PATH).toString('base64');
   const settingsJSON = JSON.stringify(SETTINGS);
@@ -237,12 +239,28 @@ function buildIndexHTML() {
   }
 
   /* Voice dropdown */
-  #voice-select {
+  #voice-select, #engine-select {
     background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(100, 255, 218, 0.2);
     color: var(--accent); padding: 4px 8px; font-size: 12px; font-family: 'Atkinson', sans-serif;
     border-radius: 4px; max-width: 140px; cursor: pointer;
   }
-  #voice-select:focus { outline: none; border-color: var(--accent); }
+  #engine-select { max-width: 110px; }
+  #voice-select:focus, #engine-select:focus { outline: none; border-color: var(--accent); }
+  #tts-params { display: flex; align-items: center; gap: 6px; }
+  #tts-params label { font-size: 10px; color: var(--text); text-transform: uppercase; letter-spacing: 0.05em; }
+  #tts-params input[type=range] {
+    width: 60px; height: 4px; -webkit-appearance: none; background: rgba(100,255,218,0.2);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  #tts-params input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+  }
+  #tts-params select {
+    background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(100, 255, 218, 0.2);
+    color: var(--accent); padding: 2px 6px; font-size: 11px; font-family: 'Atkinson', sans-serif;
+    border-radius: 3px; cursor: pointer;
+  }
 
   /* ── Progress bar ── */
   #reader-progress { height: 3px; background: rgba(148, 163, 184, 0.1); flex-shrink: 0; }
@@ -302,9 +320,9 @@ function buildIndexHTML() {
   #reader-body strong { color: var(--text-bright); font-weight: 600; }
   #reader-body a { color: var(--accent); text-decoration: none; }
   #reader-body a:hover { text-decoration: underline; }
-  #reader-body .current-sentence {
+  #reader-body .tts-active {
     background: rgba(100, 255, 218, 0.15); color: var(--accent);
-    padding: 1px 3px; transition: all 0.3s;
+    padding: 1px 3px; border-radius: 2px; transition: background 0.3s;
   }
 
   /* Copy feedback toast */
@@ -343,7 +361,9 @@ function buildIndexHTML() {
       <button class="tb" id="btnPlay" title="Play">${ICONS.play}<span class="tb-tooltip">Play</span></button>
       <button class="tb" id="btnPause" style="display:none" title="Pause">${ICONS.pause}<span class="tb-tooltip">Pause</span></button>
       <button class="tb" id="btnStop" style="display:none" title="Stop">${ICONS.stop}<span class="tb-tooltip">Stop</span></button>
-      <select id="voice-select"><option>Loading voices...</option></select>
+      <select id="engine-select" title="TTS Engine"></select>
+      <select id="voice-select" title="Voice"><option>Loading...</option></select>
+      <div id="tts-params"></div>
     </div>
 
     <div class="toolbar-separator"></div>
@@ -372,6 +392,9 @@ function buildIndexHTML() {
 
 <script>
 ${d3Source}
+</script>
+<script>
+${ttsSource}
 </script>
 <script>
 // ── Settings (injected at build) ──
@@ -429,6 +452,7 @@ function openReader(article) {
 }
 
 function closeReader() {
+  if (window.TTS) window.TTS.stop();
   document.getElementById('reader-panel').classList.remove('open');
   document.getElementById('reader-overlay').style.display = 'none';
   document.getElementById('frontmatter-panel').classList.remove('open');
@@ -440,15 +464,22 @@ function buildSyndicationLinks(article) {
   const container = document.getElementById('syndication-links');
   container.innerHTML = '';
 
-  // Canonical (GitHub Pages) — always present
+  // Copy canonical URL button — for Medium import etc.
   const canonUrl = article.canonical_url || article.url;
-  const canonBtn = document.createElement('a');
-  canonBtn.href = canonUrl;
-  canonBtn.target = '_blank';
-  canonBtn.rel = 'noopener';
-  canonBtn.className = 'tb synd-link canonical';
-  canonBtn.innerHTML = ICONS.globe + '<span class="tb-tooltip">Canonical</span>';
-  container.appendChild(canonBtn);
+  const copyUrlBtn = document.createElement('button');
+  copyUrlBtn.className = 'tb synd-link canonical';
+  copyUrlBtn.innerHTML = ICONS.link + '<span class="tb-tooltip">Copy URL</span>';
+  copyUrlBtn.onclick = async (e) => {
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(canonUrl);
+      const toast = document.getElementById('copy-toast');
+      toast.textContent = 'URL copied';
+      toast.classList.add('show');
+      setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Copied to clipboard'; }, 2000);
+    } catch(err) { console.error('Copy URL failed:', err); }
+  };
+  container.appendChild(copyUrlBtn);
 
   // Other syndication links
   const synd = article.syndication || {};
@@ -548,42 +579,153 @@ document.getElementById('btnExport').onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 
-// ── TTS (placeholder — loads tts-reader.js if present) ──
-// TTS integration point: tts-reader.js should expose window.TTS = { play, pause, stop, voices }
-document.getElementById('btnPlay').onclick = () => {
-  if (window.TTS && window.TTS.play) {
-    window.TTS.play(document.getElementById('reader-body'));
-    document.getElementById('btnPlay').style.display = 'none';
-    document.getElementById('btnPause').style.display = 'flex';
-    document.getElementById('btnStop').style.display = 'flex';
-  }
-};
-document.getElementById('btnPause').onclick = () => {
-  if (window.TTS && window.TTS.pause) window.TTS.pause();
-  document.getElementById('btnPause').style.display = 'none';
-  document.getElementById('btnPlay').style.display = 'flex';
-};
-document.getElementById('btnStop').onclick = () => {
-  if (window.TTS && window.TTS.stop) window.TTS.stop();
-  document.getElementById('btnPlay').style.display = 'flex';
-  document.getElementById('btnPause').style.display = 'none';
-  document.getElementById('btnStop').style.display = 'none';
-};
+// ── TTS integration (registry-based) ──
+// tts.js registers engines with self-described capabilities.
+// UI adapts: engine picker, voice picker, and parameter controls render from capabilities.
 
-// Populate voice dropdown from TTS provider
-function loadVoices() {
-  const sel = document.getElementById('voice-select');
-  if (window.TTS && window.TTS.voices) {
-    const voices = window.TTS.voices();
-    sel.innerHTML = voices.map(v =>
-      '<option value="' + v.id + '">' + v.label + '</option>'
+(function wireTTS() {
+  if (!window.TTS) return;
+  const T = window.TTS;
+  const btnPlay = document.getElementById('btnPlay');
+  const btnPause = document.getElementById('btnPause');
+  const btnStop = document.getElementById('btnStop');
+  const engineSel = document.getElementById('engine-select');
+  const voiceSel = document.getElementById('voice-select');
+  const paramsDiv = document.getElementById('tts-params');
+
+  // ── Populate engine dropdown ──
+  function refreshEngines() {
+    const engines = T.engines();
+    engineSel.innerHTML = engines.map(e =>
+      '<option value="' + e.id + '"' + (e.id === T.selected() ? ' selected' : '') + '>' + e.label + '</option>'
     ).join('');
-  } else {
-    sel.innerHTML = '<option>No TTS</option>';
   }
-}
-// Try loading voices after a short delay (TTS module may load async)
-setTimeout(loadVoices, 1000);
+
+  // ── Populate voice dropdown for current engine ──
+  function refreshVoices() {
+    const voices = T.voices();
+    if (!voices.length) {
+      voiceSel.innerHTML = '<option>Default</option>';
+      return;
+    }
+    // Group by language if voices have .lang
+    const hasLang = voices.some(v => v.lang);
+    if (hasLang) {
+      const groups = {};
+      voices.forEach(v => {
+        const lang = v.lang || 'other';
+        (groups[lang] = groups[lang] || []).push(v);
+      });
+      let html = '';
+      for (const [lang, vs] of Object.entries(groups).sort()) {
+        html += '<optgroup label="' + lang + '">';
+        html += vs.map(v => '<option value="' + v.id + '">' + v.label + '</option>').join('');
+        html += '</optgroup>';
+      }
+      voiceSel.innerHTML = html;
+    } else {
+      voiceSel.innerHTML = voices.map(v =>
+        '<option value="' + v.id + '">' + v.label + '</option>'
+      ).join('');
+    }
+  }
+
+  // ── Build parameter controls from capabilities ──
+  function refreshParams() {
+    paramsDiv.innerHTML = '';
+    const caps = T.capabilities();
+    for (const [key, spec] of Object.entries(caps)) {
+      if (!spec || key === 'voice') continue; // voice has its own dropdown
+      if (spec.type === 'range') {
+        const wrap = document.createElement('label');
+        wrap.textContent = spec.label + ' ';
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = spec.min;
+        input.max = spec.max;
+        input.step = spec.step || 0.1;
+        input.value = T.get(key) !== undefined ? T.get(key) : spec.default;
+        input.title = spec.label + ': ' + input.value;
+        input.oninput = function () {
+          T.set(key, parseFloat(this.value));
+          this.title = spec.label + ': ' + this.value;
+        };
+        wrap.appendChild(input);
+        paramsDiv.appendChild(wrap);
+      } else if (spec.type === 'select') {
+        const wrap = document.createElement('label');
+        wrap.textContent = spec.label + ' ';
+        const sel = document.createElement('select');
+        sel.innerHTML = spec.options.map(o =>
+          '<option value="' + o.value + '"' + (o.value === (T.get(key) || spec.default) ? ' selected' : '') + '>' + o.label + '</option>'
+        ).join('');
+        sel.onchange = function () { T.set(key, this.value); };
+        wrap.appendChild(sel);
+        paramsDiv.appendChild(wrap);
+      }
+    }
+  }
+
+  // ── Button state ──
+  function updateButtons(state) {
+    if (state === 'playing') {
+      btnPlay.style.display = 'none';
+      btnPause.style.display = 'flex';
+      btnStop.style.display = 'flex';
+    } else if (state === 'paused') {
+      btnPlay.style.display = 'flex';
+      btnPause.style.display = 'none';
+      btnStop.style.display = 'flex';
+    } else if (state === 'loading') {
+      btnPlay.style.display = 'none';
+      btnPause.style.display = 'none';
+      btnStop.style.display = 'flex';
+    } else {
+      btnPlay.style.display = 'flex';
+      btnPause.style.display = 'none';
+      btnStop.style.display = 'none';
+    }
+  }
+
+  // ── Wire events ──
+  T.on('state', updateButtons);
+  T.on('progress', function (d) {
+    const pct = d.total ? (d.index / d.total * 100) : 0;
+    document.getElementById('reader-progress-fill').style.width = pct + '%';
+  });
+  T.on('capabilitiesChanged', function () {
+    refreshVoices();
+    refreshParams();
+  });
+
+  // ── Engine change ──
+  engineSel.onchange = function () {
+    T.select(this.value);
+    refreshVoices();
+    refreshParams();
+  };
+
+  // ── Voice change ──
+  voiceSel.onchange = function () { T.set('voice', this.value); };
+
+  // ── Play / Pause / Stop ──
+  btnPlay.onclick = () => {
+    const body = document.getElementById('reader-body');
+    T.play(body, { scrollContainer: body });
+  };
+  btnPause.onclick = () => T.pause();
+  btnStop.onclick = () => T.stop();
+
+  // ── Init ──
+  refreshEngines();
+  refreshVoices();
+  refreshParams();
+
+  // Browser voices load async
+  if (window.speechSynthesis) {
+    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+  }
+})();
 
 // ── D3 Graph ──
 

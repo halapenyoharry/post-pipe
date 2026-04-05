@@ -10,5 +10,7 @@
 			"path": "../../Writing"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "post-pipe"
+	}
 }
