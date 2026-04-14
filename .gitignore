@@ -9,3 +9,12 @@ _site/
 
 # OS
 .DS_Store
+
+# IDE
+.claude/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+pb_data/
