@@ -90,5 +90,45 @@
     "node_published": "#3498db",
     "node_draft": "#7f8c8d",
     "tag_color": "#f39c12"
-  }
+  },
+
+  "feed_cache_ttl": 3600,
+
+  "feeds": [
+    {
+      "url": "https://aeon.co/feed",
+      "label": "Aeon",
+      "enabled": false,
+      "inject_tags": ["aeon"],
+      "source_of_truth": "feed"
+    },
+    {
+      "url": "https://feeds.propublica.org/propublica/main",
+      "label": "ProPublica",
+      "enabled": false,
+      "inject_tags": ["propublica"],
+      "source_of_truth": "feed"
+    },
+    {
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "label": "Al Jazeera",
+      "enabled": false,
+      "inject_tags": ["aljazeera"],
+      "source_of_truth": "feed"
+    },
+    {
+      "url": "https://feeds.dw.com/rss/rss_en_all",
+      "label": "Deutsche Welle",
+      "enabled": false,
+      "inject_tags": ["dw"],
+      "source_of_truth": "feed"
+    },
+    {
+      "url": "https://restofworld.org/feed/latest",
+      "label": "Rest of World",
+      "enabled": false,
+      "inject_tags": ["restofworld"],
+      "source_of_truth": "feed"
+    }
+  ]
 }

@@ -9,6 +9,8 @@ const fs   = require('fs');
 const path = require('path');
 const matter = require('gray-matter');
 
+const { loadFeedItems } = require('./platforms/feed-ingester');
+
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
 const ARTICLES_DIR = path.resolve(__dirname, SETTINGS.content_dir);
 const SITE_DIR     = path.join(__dirname, '_site');
@@ -797,15 +799,33 @@ fetch('./feed.json?v=' + Date.now())
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-const articles = loadArticles();
-console.log(`Found ${articles.length} article(s)`);
+async function main() {
+  const articles = loadArticles();
+  console.log(`Found ${articles.length} local article(s)`);
 
-const feed = buildFeed(articles);
+  const feedItems = await loadFeedItems(SETTINGS);
+  console.log(`Found ${feedItems.length} feed item(s)`);
 
-if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
+  // Merge and sort by date descending
+  const allArticles = [...articles, ...feedItems].sort((a, b) => {
+    const da = new Date(a.date_published || 0);
+    const db = new Date(b.date_published || 0);
+    return db - da;
+  });
 
-fs.writeFileSync(path.join(SITE_DIR, 'feed.json'), JSON.stringify(feed, null, 2));
-fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
+  const feed = buildFeed(allArticles);
 
-console.log(`Generated _site/feed.json (${feed.items.length} items)`);
-console.log('Generated _site/index.html');
+  if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
+
+  fs.writeFileSync(path.join(SITE_DIR, 'feed.json'), JSON.stringify(feed, null, 2));
+  fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
+
+  console.log(`Generated _site/feed.json (${feed.items.length} items)`);
+  console.log('Generated _site/index.html');
+}
+
+main().catch(err => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
+
