@@ -9,6 +9,8 @@ const fs   = require('fs');
 const path = require('path');
 const matter = require('gray-matter');
 
+require('dotenv').config({ path: path.join(__dirname, 'auth/.env') });
+
 const { loadFeedItems } = require('./platforms/feed-ingester');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
@@ -392,6 +394,15 @@ function buildIndexHTML() {
 
 <script>
 ${d3Source}
+</script>
+<script>
+// ── TTS Config (injected at build) ──
+window.TTS_CONFIG = {
+  geminiApiKey: '${process.env.GEMINI_API_KEY || ''}',
+  geminiVoices: ${JSON.stringify(SETTINGS.tts?.engines?.gemini?.voices || [])},
+  geminiModel: '${SETTINGS.tts?.engines?.gemini?.model || 'gemini-2.5-flash-preview-tts'}',
+  geminiDefaultVoice: '${SETTINGS.tts?.engines?.gemini?.defaultVoice || 'Kore'}'
+};
 </script>
 <script>
 ${ttsSource}

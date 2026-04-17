@@ -63,12 +63,41 @@
         "voices": "auto"
       },
       "gemini": {
-        "enabled": false,
-        "label": "Gemini (Vertex AI)",
-        "note": "Generates cached mp3 per article. Requires GEMINI_API_KEY in auth/.env.",
+        "enabled": true,
+        "label": "Google Gemini",
+        "model": "gemini-2.5-flash-preview-tts",
+        "defaultVoice": "Kore",
         "voices": [
-          { "id": "Journey", "label": "Journey", "lang": "en-US" },
-          { "id": "Studio", "label": "Studio", "lang": "en-US" }
+          { "id": "Zephyr", "label": "Zephyr — Bright", "lang": "multi" },
+          { "id": "Puck", "label": "Puck — Upbeat", "lang": "multi" },
+          { "id": "Kore", "label": "Kore — Firm", "lang": "multi" },
+          { "id": "Aoede", "label": "Aoede — Breezy", "lang": "multi" },
+          { "id": "Charon", "label": "Charon — Informative", "lang": "multi" },
+          { "id": "Fenrir", "label": "Fenrir — Excitable", "lang": "multi" },
+          { "id": "Leda", "label": "Leda — Youthful", "lang": "multi" },
+          { "id": "Orus", "label": "Orus — Firm", "lang": "multi" },
+          { "id": "Callirrhoe", "label": "Callirrhoe — Easy-going", "lang": "multi" },
+          { "id": "Enceladus", "label": "Enceladus — Breathy", "lang": "multi" },
+          { "id": "Iapetus", "label": "Iapetus — Clear", "lang": "multi" },
+          { "id": "Umbriel", "label": "Umbriel — Easy-going", "lang": "multi" },
+          { "id": "Algieba", "label": "Algieba — Smooth", "lang": "multi" },
+          { "id": "Despina", "label": "Despina — Smooth", "lang": "multi" },
+          { "id": "Erinome", "label": "Erinome — Clear", "lang": "multi" },
+          { "id": "Algenib", "label": "Algenib — Gravelly", "lang": "multi" },
+          { "id": "Rasalgethi", "label": "Rasalgethi — Informative", "lang": "multi" },
+          { "id": "Laomedeia", "label": "Laomedeia — Upbeat", "lang": "multi" },
+          { "id": "Achernar", "label": "Achernar — Soft", "lang": "multi" },
+          { "id": "Alnilam", "label": "Alnilam — Firm", "lang": "multi" },
+          { "id": "Schedar", "label": "Schedar — Even", "lang": "multi" },
+          { "id": "Gacrux", "label": "Gacrux — Mature", "lang": "multi" },
+          { "id": "Pulcherrima", "label": "Pulcherrima — Forward", "lang": "multi" },
+          { "id": "Achird", "label": "Achird — Friendly", "lang": "multi" },
+          { "id": "Zubenelgenubi", "label": "Zubenelgenubi — Casual", "lang": "multi" },
+          { "id": "Vindemiatrix", "label": "Vindemiatrix — Gentle", "lang": "multi" },
+          { "id": "Sadachbia", "label": "Sadachbia — Lively", "lang": "multi" },
+          { "id": "Sadaltager", "label": "Sadaltager — Knowledgeable", "lang": "multi" },
+          { "id": "Sulafat", "label": "Sulafat — Warm", "lang": "multi" },
+          { "id": "Autonoe", "label": "Autonoe — Bright", "lang": "multi" }
         ]
       }
     }

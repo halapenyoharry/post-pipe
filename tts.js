@@ -650,4 +650,160 @@
     }
   })();
 
+  // ── Gemini TTS Engine ──────────────────────────────────────────────────────
+  (function registerGemini() {
+    const cfg = window.TTS_CONFIG || {};
+    const apiKey = cfg.geminiApiKey || '';
+    const voiceList = cfg.geminiVoices || [];
+    const defaultModel = cfg.geminiModel || 'gemini-2.5-flash-preview-tts';
+    const defaultVoice = cfg.geminiDefaultVoice || 'Kore';
+
+    let audioCtx = null;
+    let currentSource = null;
+    let pausedAt = 0;
+    let startedAt = 0;
+    let pausedBuffer = null;
+    let paused = false;
+    let resumeResolve = null;
+
+    function getAudioCtx() {
+      if (!audioCtx || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      }
+      return audioCtx;
+    }
+
+    function pcmToWav(pcmBuffer) {
+      const numChannels = 1, sampleRate = 24000, bitDepth = 16;
+      const byteRate = sampleRate * numChannels * (bitDepth / 8);
+      const blockAlign = numChannels * (bitDepth / 8);
+      const dataLen = pcmBuffer.byteLength;
+      const buffer = new ArrayBuffer(44 + dataLen);
+      const view = new DataView(buffer);
+      const write = (off, str) => [...str].forEach((c, i) => view.setUint8(off + i, c.charCodeAt(0)));
+      const writeU32 = (off, v) => view.setUint32(off, v, true);
+      const writeU16 = (off, v) => view.setUint16(off, v, true);
+      write(0, 'RIFF'); writeU32(4, 36 + dataLen); write(8, 'WAVE');
+      write(12, 'fmt '); writeU32(16, 16); writeU16(20, 1);
+      writeU16(22, numChannels); writeU32(24, sampleRate); writeU32(28, byteRate);
+      writeU16(32, blockAlign); writeU16(34, bitDepth);
+      write(36, 'data'); writeU32(40, dataLen);
+      new Uint8Array(buffer).set(new Uint8Array(pcmBuffer), 44);
+      return buffer;
+    }
+
+    async function fetchAudio(text, params) {
+      const voice = params.voice || defaultVoice;
+      const model = params.model || defaultModel;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const body = {
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+        }
+      };
+      let attempts = 0;
+      while (attempts < 3) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const json = await res.json();
+        const b64 = json?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (b64) {
+          const raw = atob(b64);
+          const pcm = new Uint8Array(raw.length);
+          for (let i = 0; i < raw.length; i++) pcm[i] = raw.charCodeAt(i);
+          return pcm.buffer;
+        }
+        attempts++;
+      }
+      throw new Error('Gemini TTS: no audio returned after 3 attempts');
+    }
+
+    async function playBuffer(pcmBuffer) {
+      const ctx = getAudioCtx();
+      const wav = pcmToWav(pcmBuffer);
+      const audioBuffer = await ctx.decodeAudioData(wav);
+      return new Promise((resolve, reject) => {
+        currentSource = ctx.createBufferSource();
+        currentSource.buffer = audioBuffer;
+        currentSource.connect(ctx.destination);
+        currentSource.onended = () => { currentSource = null; resolve(); };
+        pausedBuffer = audioBuffer;
+        startedAt = ctx.currentTime;
+        pausedAt = 0;
+        paused = false;
+        currentSource.start(0);
+      });
+    }
+
+    window.TTS.register({
+      id: 'gemini',
+      label: 'Google Gemini',
+
+      capabilities: {
+        voice: { type: 'voice', label: 'Voice', default: defaultVoice },
+        model: {
+          type: 'select',
+          label: 'Model',
+          default: defaultModel,
+          options: [
+            { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash' },
+            { value: 'gemini-2.5-pro-preview-tts',   label: 'Gemini 2.5 Pro' },
+            { value: 'gemini-3.1-flash-tts-preview',  label: 'Gemini 3.1 Flash' }
+          ]
+        }
+      },
+
+      init: async function(params) {
+        if (!apiKey) throw new Error('Gemini TTS: no API key. Set GEMINI_API_KEY in auth/.env and rebuild.');
+        getAudioCtx();
+      },
+
+      speak: async function(text, params) {
+        if (paused) {
+          await new Promise(r => { resumeResolve = r; });
+        }
+        const pcm = await fetchAudio(text, params);
+        await playBuffer(pcm);
+      },
+
+      voices: function() {
+        return voiceList.map(v => ({ id: v.id, label: v.label, lang: v.lang }));
+      },
+
+      pause: function() {
+        if (!audioCtx || !currentSource) return;
+        pausedAt = audioCtx.currentTime - startedAt;
+        currentSource.stop();
+        currentSource = null;
+        paused = true;
+      },
+
+      resume: function() {
+        if (!paused || !pausedBuffer) return;
+        const ctx = getAudioCtx();
+        currentSource = ctx.createBufferSource();
+        currentSource.buffer = pausedBuffer;
+        currentSource.connect(ctx.destination);
+        startedAt = ctx.currentTime - pausedAt;
+        currentSource.start(0, pausedAt);
+        currentSource.onended = () => { currentSource = null; };
+        paused = false;
+        if (resumeResolve) { resumeResolve(); resumeResolve = null; }
+      },
+
+      stop: function() {
+        if (currentSource) { try { currentSource.stop(); } catch(e) {} currentSource = null; }
+        paused = false;
+        pausedBuffer = null;
+        pausedAt = 0;
+        if (resumeResolve) { resumeResolve(); resumeResolve = null; }
+      }
+    });
+  })();
+
 })();
