@@ -12,7 +12,7 @@
     "display": "harold young [humxn]"
   },
 
-  "content_dir": "./articles",
+  "content_dir": "~/Posts",
 
   "canonical": {
     "base": "https://halapenyoharry.github.io/haroldyoung-human-posts",

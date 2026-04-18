@@ -7,14 +7,14 @@
 
 const fs   = require('fs');
 const path = require('path');
-const matter = require('gray-matter');
 
 require('dotenv').config({ path: path.join(__dirname, 'auth/.env') });
 
 const { loadFeedItems } = require('./platforms/feed-ingester');
+const { ingestFolder }  = require('./ingest');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
-const ARTICLES_DIR = path.resolve(__dirname, SETTINGS.content_dir);
+const CONTENT_ROOT = resolveHome(SETTINGS.content_dir);
 const SITE_DIR     = path.join(__dirname, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
 const D3_PATH      = path.join(__dirname, 'node_modules/d3/dist/d3.min.js');
@@ -22,56 +22,93 @@ const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.wo
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
 const PAGES_BASE   = SETTINGS.site.base_url;
 
-// ─── Scan articles ───────────────────────────────────────────────────────────
+function resolveHome(p) {
+  if (!p) return p;
+  if (p.startsWith('~')) return path.join(process.env.HOME, p.slice(1));
+  return path.resolve(__dirname, p);
+}
+
+// ─── Scan content via ingester ──────────────────────────────────────────────
 
 if (!fs.existsSync(COVERS_DIR)) fs.mkdirSync(COVERS_DIR, { recursive: true });
 
-function loadArticles() {
-  const slugs = fs.readdirSync(ARTICLES_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name);
+// Status → graph visual bucket. `bloomed` (finished but not publicly posted)
+// reads as published in the graph; graph only has two colors today. TODO
+// for a third tier if distinguishing bloomed-private from published-public
+// becomes useful.
+function statusBucket(c) {
+  if (c.status === 'published') return 'published';
+  if (c.syndication?.canonical) return 'published';
+  if (c.status === 'bloomed')   return 'published';
+  return 'draft';
+}
 
-  const articles = [];
-  for (const dir of slugs) {
-    const qmdPath = path.join(ARTICLES_DIR, dir, 'index.qmd');
-    if (!fs.existsSync(qmdPath)) continue;
-
-    const raw = fs.readFileSync(qmdPath, 'utf8');
-    const { data: fm } = matter(raw);
-    if (!fm.title || !fm.slug) continue;
-
+function loadLocalContent() {
+  const { contents } = ingestFolder(CONTENT_ROOT);
+  const items = [];
+  for (const c of contents) {
+    // Copy cover into _site/covers/ if present. Use a relative URL so the
+    // viewer works both locally (python http.server) and on GH Pages.
     let imageUrl = '';
-    if (fm.cover_image) {
-      const srcPath = path.join(ARTICLES_DIR, dir, fm.cover_image);
+    if (c.cover) {
+      const srcPath = path.join(CONTENT_ROOT, c.id, c.cover);
       if (fs.existsSync(srcPath)) {
         const ext = path.extname(srcPath);
-        const destName = `${fm.slug}${ext}`;
+        const destName = `${c.id}${ext}`;
         fs.copyFileSync(srcPath, path.join(COVERS_DIR, destName));
-        imageUrl = `${PAGES_BASE}/covers/${destName}`;
+        imageUrl = `covers/${destName}`;
       }
     }
 
-    articles.push({
-      id: `${PAGES_BASE}/${fm.slug}.html`,
-      url: `${PAGES_BASE}/${fm.slug}.html`,
-      title: fm.title,
-      short_title: fm.short_title || '',
-      summary: fm.description || '',
-      tldr: fm.tldr || '',
+    const pagesUrl = `${PAGES_BASE}/${c.id}.html`;
+    const bucket   = statusBucket(c);
+
+    items.push({
+      id: pagesUrl,
+      url: pagesUrl,
+      title: c.title,
+      short_title: c.short_title || '',
+      summary: c.summary || '',
+      tldr: c.summary || '',
       image: imageUrl,
-      date_published: fm.publish_date ? new Date(fm.publish_date).toISOString() : undefined,
-      reading_time: fm.reading_time || '',
-      tags: fm.tags || [],
-      series: fm.series || '',
-      series_part: fm.series_part || null,
-      license: fm.license || '',
-      canonical_url: fm.canonical_url || `${PAGES_BASE}/${fm.slug}.html`,
-      syndication: fm.syndication || {},
-      _status: fm.status || 'draft',
+      date_published: c.written ? toIsoDate(c.written) : undefined,
+      reading_time: c.reading_time || '',
+      tags: c.tags || [],
+      series: c.series || '',
+      series_part: c.series_part || null,
+      license: c.license || '',
+      canonical_url: c.syndication?.canonical || pagesUrl,
+      syndication: c.syndication || {},
+      _status: bucket,
+      // New-schema fields — graph and future renderers consume these:
+      kind: c.kind,
+      substrate: c.substrate,
+      seed: c.seed,
+      topology: c.topology || [],
+      energy: c.energy,
+      forms: {
+        current: c.forms_current,
+        potential: c.forms_potential || [],
+        companions: c.forms_companions || [],
+      },
+      connected_to: c.connected_to || [],
+      note: c.note,
+      todos: c.todos || [],
+      schema: c.schema,
     });
   }
+  return items;
+}
 
-  return articles;
+// Frontmatter dates come in many shapes ("2025", "2026-03", "2026-03-18").
+// Pad to a full ISO so JS Date parses consistently.
+function toIsoDate(s) {
+  if (!s) return undefined;
+  const str = String(s).trim();
+  if (/^\d{4}$/.test(str))        return new Date(`${str}-01-01T00:00:00Z`).toISOString();
+  if (/^\d{4}-\d{2}$/.test(str))  return new Date(`${str}-01T00:00:00Z`).toISOString();
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
 // ─── Build feed.json ─────────────────────────────────────────────────────────
@@ -415,6 +452,84 @@ const ICONS = ${JSON.stringify(ICONS)};
 // ── State ──
 let currentArticle = null;
 
+// ── Substrate renderers ──
+// Dispatches reader-body rendering based on content.kind. Essays fetch their
+// rendered HTML from GitHub Pages (existing path). Other substrates render
+// inline from metadata or display a graceful placeholder.
+function renderSubstrate(article, body, headerHTML) {
+  const kind = article.kind || 'essay';
+
+  if (kind === 'essay' || kind === 'multi') {
+    // Multi treats essay as primary; companions listed in placeholder
+    fetch(article.url).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const h1 = doc.querySelector('h1');
+      if (h1) h1.remove();
+      const content = doc.querySelector('body') ? doc.querySelector('body').innerHTML : html;
+      body.innerHTML = headerHTML + content + renderCompanions(article);
+      body.scrollTop = 0;
+    }).catch(() => {
+      body.innerHTML = headerHTML + renderPlaceholder(article, 'Rendered article not yet published to GitHub Pages.');
+      body.scrollTop = 0;
+    });
+    return;
+  }
+
+  if (kind === 'image') {
+    const img = article.image
+      ? '<img src="' + article.image + '" style="max-width:100%;height:auto;border-radius:4px;display:block;margin:0 auto;">'
+      : '<p style="color:#666;">No image resolved.</p>';
+    body.innerHTML = headerHTML + img + renderMetadata(article);
+    body.scrollTop = 0;
+    return;
+  }
+
+  // audio, video, archive, fragment, unexplored — placeholder for now
+  body.innerHTML = headerHTML + renderPlaceholder(article) + renderMetadata(article);
+  body.scrollTop = 0;
+}
+
+function renderPlaceholder(article, reason) {
+  const r = reason || 'This substrate ("' + (article.kind || 'unknown') + '") is not yet renderable in the viewer.';
+  let html = '<div style="padding:24px;border:1px dashed var(--border);border-radius:6px;background:rgba(17,24,39,0.4);">';
+  html += '<p style="color:var(--accent);font-weight:600;margin-bottom:8px;">' + r + '</p>';
+  if (article.todos && article.todos.length) {
+    html += '<p style="color:#f39c12;font-size:13px;">Pending: ' + article.todos.join(', ') + '</p>';
+  }
+  html += '<p style="color:#888;font-size:13px;margin-top:12px;">The folder exists at <code>~/Posts/' + article.id + '/</code>.</p>';
+  html += '</div>';
+  return html;
+}
+
+function renderCompanions(article) {
+  const companions = (article.forms && article.forms.companions) || [];
+  if (!companions.length) return '';
+  let html = '<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);">';
+  html += '<div style="color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">also exists as</div>';
+  html += '<div style="color:var(--text);font-size:14px;">' + companions.map(c => '<span class="fm-tag">' + c + '</span>').join(' ') + '</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderMetadata(article) {
+  const rows = [];
+  if (article.seed)     rows.push(['seed',     article.seed]);
+  if (article.tldr)     rows.push(['tldr',     article.tldr]);
+  if (article.topology && article.topology.length) rows.push(['topology', article.topology.join(' · ')]);
+  if (article.energy)   rows.push(['energy',   article.energy]);
+  if (article.note)     rows.push(['note',     article.note]);
+  if (!rows.length) return '';
+  let html = '<div style="margin-top:32px;padding:20px;background:rgba(17,24,39,0.4);border-radius:6px;">';
+  for (const [label, value] of rows) {
+    html += '<div class="fm-row"><span class="fm-label">' + label + '</span><span class="fm-value">' + value + '</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 // ── Reader ──
 function openReader(article) {
   currentArticle = article;
@@ -430,20 +545,13 @@ function openReader(article) {
   headerHTML += '<div class="article-title">' + (article.title || article.label) + '</div>';
   headerHTML += '<div class="article-byline">by <a href="' + SETTINGS.author.url + '" target="_blank" rel="noopener">' + SETTINGS.author.display + '</a></div>';
   if (metaParts.length) headerHTML += '<div class="article-meta">' + metaParts.join(' · ') + '</div>';
+  if (article.kind && article.kind !== 'essay') {
+    headerHTML += '<div class="article-meta" style="margin-top:4px;opacity:0.7;">substrate: ' + article.kind + '</div>';
+  }
   headerHTML += '</div>';
 
-  // Fetch article HTML and inject
-  fetch(article.url).then(r => r.text()).then(html => {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    // Remove the title from fetched content (we render our own)
-    const h1 = doc.querySelector('h1');
-    if (h1) h1.remove();
-    const content = doc.querySelector('body') ? doc.querySelector('body').innerHTML : html;
-    body.innerHTML = headerHTML + content;
-    body.scrollTop = 0;
-  }).catch(() => {
-    body.innerHTML = headerHTML + '<p style="color:#666;">Could not load article content.</p>';
-  });
+  // Dispatch by substrate kind
+  renderSubstrate(article, body, headerHTML);
 
   // Build syndication links
   buildSyndicationLinks(article);
@@ -768,6 +876,16 @@ function feedToGraph(feed) {
       syndication: item.syndication || {},
       size: 60,
       color: status === 'published' ? '${SETTINGS.theme.node_published}' : '${SETTINGS.theme.node_draft}',
+      // New-schema fields:
+      kind: item.kind || 'essay',
+      substrate: item.substrate || 'essay',
+      seed: item.seed || '',
+      topology: item.topology || [],
+      energy: item.energy || '',
+      connected_to: item.connected_to || [],
+      forms: item.forms || {},
+      note: item.note || '',
+      todos: item.todos || [],
     });
 
     for (const tag of (item.tags || [])) {
@@ -877,38 +995,62 @@ class PostGraph {
         d._r = Math.max(bubbleW, bubbleH) / 2;
 
       } else {
-        const cardW = 180, cardH = 140;
         const status = d.color === '${SETTINGS.theme.node_draft}' ? 'draft' : 'published';
-        const bgColor = status === 'draft' ? '#2a2a3e' : '#1e3a5f';
-        const bgImage = d.image
-          ? 'linear-gradient(' + (status === 'draft' ? 'rgba(42,42,62,0.85),rgba(42,42,62,0.85)' : 'rgba(30,58,95,0.85),rgba(30,58,95,0.85)') + '), url(\\'' + d.image + '\\')'
-          : bgColor;
         const borderColor = status === 'draft' ? '#555' : '${SETTINGS.theme.node_published}';
-        const desc = d.description || '';
 
-        el.append('foreignObject')
-          .attr('width', cardW).attr('height', cardH)
-          .attr('x', -cardW / 2).attr('y', -cardH / 2)
-          .append('xhtml:div')
-          .attr('xmlns', 'http://www.w3.org/1999/xhtml')
-          .style('width', cardW + 'px').style('height', cardH + 'px')
-          .style('background', bgImage)
-          .style('background-size', 'cover')
-          .style('background-position', 'center')
-          .style('border', '1.5px solid ' + borderColor)
-          .style('border-radius', '4px')
-          .style('padding', '10px 12px')
-          .style('box-sizing', 'border-box')
-          .style('overflow', 'hidden')
-          .style('font-family', "'Atkinson', sans-serif")
-          .style('cursor', 'pointer')
-          .html((() => {
-            const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
-            return '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;">' + (d.title || d.label) + '</span>' +
-              (preview ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;">' + preview + '</span>' : '');
-          })());
+        if (d.kind === 'image' && d.image) {
+          // Image substrate: let the image be an image. No text overlay,
+          // title as a small caption beneath.
+          const cardW = 180, cardH = 180;
+          el.append('foreignObject')
+            .attr('width', cardW).attr('height', cardH + 24)
+            .attr('x', -cardW / 2).attr('y', -cardH / 2)
+            .append('xhtml:div')
+            .attr('xmlns', 'http://www.w3.org/1999/xhtml')
+            .style('width', cardW + 'px')
+            .style('font-family', "'Atkinson', sans-serif")
+            .style('cursor', 'pointer')
+            .html(
+              '<div style="width:' + cardW + 'px;height:' + cardH + 'px;' +
+                'background:#000 url(\\'' + d.image + '\\') center/cover no-repeat;' +
+                'border:1.5px solid ' + borderColor + ';border-radius:4px;"></div>' +
+              '<div style="font-size:11px;color:rgba(255,255,255,0.6);' +
+                'text-align:center;margin-top:4px;line-height:1.2;">' +
+                (d.short_title || d.title || d.label) + '</div>'
+            );
+          d._r = cardH / 2 + 12;
+        } else {
+          const cardW = 180, cardH = 140;
+          const bgColor = status === 'draft' ? '#2a2a3e' : '#1e3a5f';
+          const bgImage = d.image
+            ? 'linear-gradient(' + (status === 'draft' ? 'rgba(42,42,62,0.85),rgba(42,42,62,0.85)' : 'rgba(30,58,95,0.85),rgba(30,58,95,0.85)') + '), url(\\'' + d.image + '\\')'
+            : bgColor;
+          const desc = d.description || '';
 
-        d._r = Math.max(cardW, cardH) / 2;
+          el.append('foreignObject')
+            .attr('width', cardW).attr('height', cardH)
+            .attr('x', -cardW / 2).attr('y', -cardH / 2)
+            .append('xhtml:div')
+            .attr('xmlns', 'http://www.w3.org/1999/xhtml')
+            .style('width', cardW + 'px').style('height', cardH + 'px')
+            .style('background', bgImage)
+            .style('background-size', 'cover')
+            .style('background-position', 'center')
+            .style('border', '1.5px solid ' + borderColor)
+            .style('border-radius', '4px')
+            .style('padding', '10px 12px')
+            .style('box-sizing', 'border-box')
+            .style('overflow', 'hidden')
+            .style('font-family', "'Atkinson', sans-serif")
+            .style('cursor', 'pointer')
+            .html((() => {
+              const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
+              return '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;">' + (d.title || d.label) + '</span>' +
+                (preview ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;">' + preview + '</span>' : '');
+            })());
+
+          d._r = Math.max(cardW, cardH) / 2;
+        }
       }
     });
 
@@ -1015,8 +1157,10 @@ fetch('./feed.json?v=' + Date.now())
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const articles = loadArticles();
-  console.log(`Found ${articles.length} local article(s)`);
+  const articles = loadLocalContent();
+  console.log(`Ingested ${articles.length} local content item(s) from ${CONTENT_ROOT}`);
+  const withTodos = articles.filter(a => a.todos.length).length;
+  if (withTodos) console.log(`  (${withTodos} flagged with TODO files — see ${CONTENT_ROOT}/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
 
   const feedItems = await loadFeedItems(SETTINGS);
   console.log(`Found ${feedItems.length} feed item(s)`);
