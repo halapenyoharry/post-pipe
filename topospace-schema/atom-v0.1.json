@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1",
+  "id": "posts/smith-decolonizing-methodologies",
+  "label": "Decolonizing Methodologies",
+  "substrate": "essay",
+  "content": {
+    "path": "~/Posts/smith-decolonizing-methodologies/",
+    "kind": "folder",
+    "body": "index.md",
+    "cover": "cover.jpg"
+  },
+  "annotations": {
+    "note": null,
+    "energy": null
+  },
+  "derived": {
+    "written": null,
+    "updated": null,
+    "word_count": null
+  }
+}

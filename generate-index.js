@@ -144,7 +144,11 @@ const ICONS = {
   linkedin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
   hackernews: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 0v24h24V0H0zm12.8 13.2V19h-1.6v-5.8L7.5 5.4h1.8l2.7 5.7 2.7-5.7h1.8l-3.7 7.8z"/></svg>',
   reddit: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>',
-  bluesky: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.785 2.627 3.6 3.476 6.178 3.126-3.976.665-7.416 2.282-2.99 7.088C8.35 25.136 10.603 19.869 12 17.292c1.397 2.577 3.328 7.523 8.188 3.169 4.426-4.806.986-6.423-2.99-7.088 2.578.35 5.393-.499 6.178-3.126C23.622 9.418 24 4.458 24 3.768c0-.688-.139-1.86-.902-2.203-.659-.3-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8z"/></svg>'
+  bluesky: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.785 2.627 3.6 3.476 6.178 3.126-3.976.665-7.416 2.282-2.99 7.088C8.35 25.136 10.603 19.869 12 17.292c1.397 2.577 3.328 7.523 8.188 3.169 4.426-4.806.986-6.423-2.99-7.088 2.578.35 5.393-.499 6.178-3.126C23.622 9.418 24 4.458 24 3.768c0-.688-.139-1.86-.902-2.203-.659-.3-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8z"/></svg>',
+  // Smartphone-ish rectangle — indicates phone (node-expand) mode
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="3" width="10" height="18" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/></svg>',
+  // Side-by-side split — indicates sidebar mode
+  sidebar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="14" y1="4" x2="14" y2="20"/></svg>'
 };
 
 // ─── Build index.html ────────────────────────────────────────────────────────
@@ -229,6 +233,24 @@ function buildIndexHTML() {
   #reader-panel.open { right: 0; }
   @media (max-width: 900px) {
     #reader-panel { width: 100vw; right: -100vw; }
+  }
+
+  /* Phone mode: pops up from the tapped node, expands down-right */
+  #reader-panel.phone-mode {
+    top: 0; left: 0; right: auto; width: 400px; height: 80vh;
+    border-left: none;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    transform-origin: top left;
+    transition: transform 0.4s cubic-bezier(0.2, 0, 0.2, 1),
+                opacity 0.3s ease;
+  }
+  @media (max-width: 900px) {
+    #reader-panel.phone-mode {
+      width: min(400px, 92vw);
+      height: min(80vh, 720px);
+    }
   }
 
   /* ── Toolbar ── */
@@ -411,6 +433,7 @@ function buildIndexHTML() {
       <button class="tb" id="btnFrontmatter" title="Article details">${ICONS.info}<span class="tb-tooltip">Details</span></button>
       <button class="tb" id="btnExport" title="Export markdown">${ICONS.download}<span class="tb-tooltip">Export</span></button>
       <button class="tb" id="btnCopy" title="Copy to clipboard">${ICONS.copy}<span class="tb-tooltip">Copy</span></button>
+      <button class="tb" id="btnSwapMode" title="Swap to sidebar">${ICONS.sidebar}<span class="tb-tooltip">Sidebar</span></button>
     </div>
 
     <div class="toolbar-separator"></div>
@@ -451,6 +474,9 @@ const ICONS = ${JSON.stringify(ICONS)};
 
 // ── State ──
 let currentArticle = null;
+let readerMode    = 'node';      // 'node' | 'sidebar' — default is node-expand
+let hiddenNodeEl  = null;        // <g> DOM element of the node we're hiding
+let readerGeometry = null;       // { finalLeft, finalTop, phoneW, phoneH } for reverse animation
 
 // ── Substrate renderers ──
 // Dispatches reader-body rendering based on content.kind. Essays fetch their
@@ -531,10 +557,19 @@ function renderMetadata(article) {
 }
 
 // ── Reader ──
-function openReader(article) {
+// Two open paths: node-expand (default) or sidebar slide-in.
+// populateReaderContent fills in header, body, syndication, frontmatter — same
+// for both modes.
+function openReader(article, event) {
+  const useNodeMode = readerMode === 'node' && event && event.currentTarget;
+  if (useNodeMode) openAsNodeExpand(article, event.currentTarget);
+  else             openAsSidebar(article);
+  populateReaderContent(article);
+  updateSwapButton();
+}
+
+function populateReaderContent(article) {
   currentArticle = article;
-  const panel = document.getElementById('reader-panel');
-  const overlay = document.getElementById('reader-overlay');
   const body = document.getElementById('reader-body');
 
   // Build article header
@@ -550,33 +585,179 @@ function openReader(article) {
   }
   headerHTML += '</div>';
 
-  // Dispatch by substrate kind
   renderSubstrate(article, body, headerHTML);
-
-  // Build syndication links
   buildSyndicationLinks(article);
-
-  // Build frontmatter panel
   buildFrontmatter(article);
 
-  // Show
-  panel.classList.add('open');
-  overlay.style.display = 'block';
-
-  // Scroll progress
   body.onscroll = () => {
     const pct = body.scrollTop / (body.scrollHeight - body.clientHeight) * 100;
     document.getElementById('reader-progress-fill').style.width = Math.min(pct, 100) + '%';
   };
 }
 
+function openAsSidebar(article) {
+  const panel = document.getElementById('reader-panel');
+  const overlay = document.getElementById('reader-overlay');
+  panel.classList.remove('phone-mode');
+  resetPanelInlineStyles(panel);
+  panel.classList.add('open');
+  overlay.style.background = '';  // dim overlay for sidebar
+  overlay.style.display = 'block';
+  hiddenNodeEl = null;
+  readerGeometry = null;
+}
+
+function openAsNodeExpand(article, nodeEl) {
+  const panel = document.getElementById('reader-panel');
+  const overlay = document.getElementById('reader-overlay');
+
+  // Freeze the simulation so the node we're hiding doesn't drift
+  if (window._postGraph) window._postGraph.simulation.stop();
+
+  // Hide the clicked node's visual — the reader IS the node now
+  nodeEl.style.opacity = '0';
+  hiddenNodeEl = nodeEl;
+
+  const nodeRect = nodeEl.getBoundingClientRect();
+
+  // Phone geometry: 400×80vh, nudged to stay on-screen
+  const phoneW = Math.min(400, window.innerWidth - 32);
+  const phoneH = Math.min(window.innerHeight * 0.8, window.innerHeight - 40);
+  const margin = 16;
+
+  let finalLeft = nodeRect.left;
+  let finalTop  = nodeRect.top;
+  if (finalLeft + phoneW > window.innerWidth - margin) finalLeft = window.innerWidth - phoneW - margin;
+  if (finalTop  + phoneH > window.innerHeight - margin) finalTop  = window.innerHeight - phoneH - margin;
+  if (finalLeft < margin) finalLeft = margin;
+  if (finalTop  < margin) finalTop  = margin;
+
+  readerGeometry = { finalLeft, finalTop, phoneW, phoneH };
+
+  // Set up starting position: panel is sized to phone dimensions but scaled
+  // down to match the node rect, positioned at final location. The translate
+  // offsets place the scaled panel exactly over the node.
+  const startScaleX = Math.max(nodeRect.width / phoneW, 0.05);
+  const startScaleY = Math.max(nodeRect.height / phoneH, 0.05);
+  const startTx     = nodeRect.left - finalLeft;
+  const startTy     = nodeRect.top  - finalTop;
+
+  // No dim in phone mode — it would obscure the graph we're preserving
+  overlay.style.background = 'transparent';
+  overlay.style.display = 'block';
+
+  resetPanelInlineStyles(panel);
+  panel.classList.add('phone-mode');
+  panel.style.top    = finalTop  + 'px';
+  panel.style.left   = finalLeft + 'px';
+  panel.style.width  = phoneW + 'px';
+  panel.style.height = phoneH + 'px';
+  panel.style.transform = 'translate(' + startTx + 'px,' + startTy + 'px) scale(' + startScaleX + ',' + startScaleY + ')';
+  panel.style.opacity = '0.3';
+  panel.classList.add('open');
+
+  // Force reflow so the transition takes effect
+  panel.offsetHeight;
+
+  // Animate to final
+  panel.style.transform = 'translate(0,0) scale(1,1)';
+  panel.style.opacity = '1';
+}
+
+function resetPanelInlineStyles(panel) {
+  panel.style.cssText = '';
+}
+
 function closeReader() {
   if (window.TTS) window.TTS.stop();
-  document.getElementById('reader-panel').classList.remove('open');
-  document.getElementById('reader-overlay').style.display = 'none';
-  document.getElementById('frontmatter-panel').classList.remove('open');
-  document.getElementById('btnFrontmatter').classList.remove('active');
-  currentArticle = null;
+
+  const panel   = document.getElementById('reader-panel');
+  const overlay = document.getElementById('reader-overlay');
+  const resumeSimulation = () => {
+    if (window._postGraph) window._postGraph.simulation.alpha(0.05).restart();
+  };
+
+  const finish = () => {
+    panel.classList.remove('open', 'phone-mode');
+    resetPanelInlineStyles(panel);
+    overlay.style.display = 'none';
+    overlay.style.background = '';
+    document.getElementById('frontmatter-panel').classList.remove('open');
+    document.getElementById('btnFrontmatter').classList.remove('active');
+    if (hiddenNodeEl) {
+      hiddenNodeEl.style.opacity = '1';
+      hiddenNodeEl = null;
+      resumeSimulation();
+    }
+    readerGeometry = null;
+    currentArticle = null;
+  };
+
+  if (panel.classList.contains('phone-mode') && hiddenNodeEl && readerGeometry) {
+    // Reverse: animate back to the hidden node's current position
+    const rect = hiddenNodeEl.getBoundingClientRect();
+    const { finalLeft, finalTop, phoneW, phoneH } = readerGeometry;
+    const endScaleX = Math.max(rect.width  / phoneW, 0.05);
+    const endScaleY = Math.max(rect.height / phoneH, 0.05);
+    const endTx = rect.left - finalLeft;
+    const endTy = rect.top  - finalTop;
+    panel.style.transform = 'translate(' + endTx + 'px,' + endTy + 'px) scale(' + endScaleX + ',' + endScaleY + ')';
+    panel.style.opacity = '0';
+    setTimeout(finish, 400);
+  } else {
+    finish();
+  }
+}
+
+function swapReaderMode() {
+  const panel   = document.getElementById('reader-panel');
+  const overlay = document.getElementById('reader-overlay');
+  const inPhoneMode = panel.classList.contains('phone-mode');
+
+  if (inPhoneMode) {
+    // Phone → sidebar: restore node visibility, resume simulation, slide from right
+    if (hiddenNodeEl) {
+      hiddenNodeEl.style.opacity = '1';
+      hiddenNodeEl = null;
+      if (window._postGraph) window._postGraph.simulation.alpha(0.05).restart();
+    }
+    readerGeometry = null;
+    panel.classList.remove('phone-mode');
+    resetPanelInlineStyles(panel);
+    panel.classList.add('open');
+    overlay.style.background = '';  // dim
+    readerMode = 'sidebar';
+  } else {
+    // Sidebar → phone: center-ish popup (no anchor node)
+    panel.classList.remove('open');
+    resetPanelInlineStyles(panel);
+    panel.classList.add('phone-mode');
+    const phoneW = Math.min(400, window.innerWidth - 32);
+    const phoneH = Math.min(window.innerHeight * 0.8, window.innerHeight - 40);
+    panel.style.top    = '10vh';
+    panel.style.left   = ((window.innerWidth - phoneW) / 2) + 'px';
+    panel.style.width  = phoneW + 'px';
+    panel.style.height = phoneH + 'px';
+    panel.style.transform = 'translate(0,0) scale(0.85,0.85)';
+    panel.style.opacity = '0';
+    panel.classList.add('open');
+    panel.offsetHeight;
+    panel.style.transform = 'translate(0,0) scale(1,1)';
+    panel.style.opacity = '1';
+    overlay.style.background = 'transparent';
+    overlay.style.display = 'block';
+    readerMode = 'node';
+  }
+  updateSwapButton();
+}
+
+function updateSwapButton() {
+  const btn = document.getElementById('btnSwapMode');
+  if (!btn) return;
+  const panel = document.getElementById('reader-panel');
+  const inPhone = panel.classList.contains('phone-mode');
+  btn.innerHTML = (inPhone ? ICONS.sidebar : ICONS.phone) +
+    '<span class="tb-tooltip">' + (inPhone ? 'Sidebar' : 'Phone') + '</span>';
 }
 
 function buildSyndicationLinks(article) {
@@ -664,6 +845,7 @@ function buildFrontmatter(article) {
 
 document.getElementById('btnClose').onclick = closeReader;
 document.getElementById('reader-overlay').onclick = closeReader;
+document.getElementById('btnSwapMode').onclick = swapReaderMode;
 
 document.getElementById('btnFrontmatter').onclick = () => {
   const panel = document.getElementById('frontmatter-panel');
@@ -1057,7 +1239,7 @@ class PostGraph {
     probe.remove();
 
     nodes.filter(d => d.type === 'article')
-      .on('click', (event, d) => { openReader(d); })
+      .on('click', (event, d) => { openReader(d, event); })
       .on('mouseover', (event, d) => {
         this.tooltip.style.display = 'block';
         this.tooltip.querySelector('.title').textContent = d.title || d.label;
@@ -1142,7 +1324,9 @@ fetch('./feed.json?v=' + Date.now())
   .then(r => r.json())
   .then(feed => {
     const graph = new PostGraph('graph');
+    window._postGraph = graph;
     graph.render(feedToGraph(feed));
+    updateSwapButton();
   })
   .catch(err => {
     const el = document.getElementById('error');

@@ -1,0 +1,512 @@
+{
+  "meta": {
+    "schema_name": "post-pipe unified publishing schema",
+    "version": "0.1",
+    "derived_from": "../research/pub-platform-schema-res.md",
+    "purpose": "Single source schema synthesized from the union of all destination platforms. Adapters consume this and produce platform-specific payloads.",
+    "layer_legend": {
+      "content": "Lives in the folder as a file (body, image, etc.)",
+      "annotation": "Set by the human via the node inspector — only the user knows it",
+      "derived": "Computed by the tool from content, annotations, or filesystem"
+    }
+  },
+
+  "source_schema": {
+
+    "text_content": {
+      "description": "The written body and its platform-shaped variants",
+      "fields": {
+
+        "title": {
+          "layer": "annotation",
+          "fallback": "first H1 of body",
+          "purpose": "Headline of the piece",
+          "required_by": ["medium", "substack", "tumblr", "linkedin"],
+          "platforms": {
+            "medium":    { "field": "title", "max_chars": 100, "supported": true,  "notes": "Synthesized from H1 if >100 chars" },
+            "substack":  { "field": "title", "max_chars": null, "supported": true, "notes": "Generates the URL slug" },
+            "bluesky":   { "field": null, "max_chars": null, "supported": false,    "notes": "No title concept; inline only" },
+            "twitter":   { "field": null, "max_chars": null, "supported": false,    "notes": "Inline only" },
+            "facebook":  { "field": null, "max_chars": null, "supported": false,    "notes": "Collapsed into message body" },
+            "instagram": { "field": null, "max_chars": null, "supported": false,    "notes": "Unsupported" },
+            "tumblr":    { "field": "title", "max_chars": null, "supported": true,  "notes": "Primary on text posts" },
+            "threads":   { "field": null, "max_chars": null, "supported": false,    "notes": "Inline only" },
+            "linkedin":  { "field": "content.article.title", "max_chars": 150, "supported": true, "notes": "Required for article posts" },
+            "mastodon":  { "field": "spoiler_text", "max_chars": null, "supported": true, "notes": "Creative mapping — collapses body behind warning" }
+          }
+        },
+
+        "subtitle": {
+          "layer": "annotation",
+          "fallback": null,
+          "purpose": "Sub-headline / dek",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "field": "subtitle", "max_chars": null, "supported": true,  "notes": "Inferred from markdown if not set" },
+            "substack":  { "field": "subtitle", "max_chars": null, "supported": true,  "notes": null },
+            "bluesky":   { "field": null, "max_chars": null, "supported": false,        "notes": null },
+            "twitter":   { "field": null, "max_chars": null, "supported": false,        "notes": null },
+            "facebook":  { "field": null, "max_chars": null, "supported": false,        "notes": null },
+            "instagram": { "field": null, "max_chars": null, "supported": false,        "notes": null },
+            "tumblr":    { "field": null, "max_chars": null, "supported": false,        "notes": null },
+            "threads":   { "field": null, "max_chars": null, "supported": false,        "notes": null },
+            "linkedin":  { "field": "headline", "max_chars": null, "supported": true,  "notes": "Often merged into commentary or description" },
+            "mastodon":  { "field": null, "max_chars": null, "supported": false,        "notes": null }
+          }
+        },
+
+        "body": {
+          "layer": "content",
+          "fallback": null,
+          "purpose": "The full long-form text — the piece itself",
+          "required_by": ["medium", "substack", "linkedin", "tumblr", "facebook"],
+          "platforms": {
+            "medium":    { "field": "content", "max_chars": null, "format": ["markdown","html"], "supported": true,  "notes": "Markdown or HTML accepted" },
+            "substack":  { "field": "body_html", "max_chars": null, "format": ["html"], "supported": true,         "notes": "HTML only via API; markdown not parsed" },
+            "bluesky":   { "field": "text", "max_chars": 3000, "format": ["plain-text"], "supported": true,        "notes": "Plain text + facets array; 300 graphemes hard cap" },
+            "twitter":   { "field": "text", "max_chars": 280, "format": ["plain-text"], "supported": true,         "notes": "25,000 with X Premium long_post" },
+            "facebook":  { "field": "message", "max_chars": 63206, "format": ["plain-text"], "supported": true,    "notes": "Markdown stripped; algorithm penalizes >280 chars" },
+            "instagram": { "field": "caption", "max_chars": 2200, "format": ["plain-text"], "supported": true,     "notes": "Truncated to 125 chars in UI before '...more'" },
+            "tumblr":    { "field": "content", "max_chars": null, "format": ["npf_blocks"], "supported": true,     "notes": "4096 chars per block, max 1000 blocks" },
+            "threads":   { "field": "text", "max_chars": 500, "format": ["plain-text"], "supported": true,        "notes": "Emojis count by UTF-8 bytes" },
+            "linkedin":  { "field": "content.article", "max_chars": 125000, "format": ["plain-text"], "supported": true, "notes": "Feed posts capped at 3,000; articles 125k" },
+            "mastodon":  { "field": "status", "max_chars": 500, "format": ["plain-text"], "supported": true,      "notes": "Instance-dependent; some allow 5000+" }
+          }
+        },
+
+        "body_micro": {
+          "layer": "derived",
+          "fallback": "auto-truncate body to 280 chars",
+          "purpose": "Twitter-shaped short variant",
+          "required_by": ["twitter"],
+          "annotation_override": true,
+          "platforms": {
+            "twitter":   { "max_chars": 280, "notes": "Free tier; longer with Premium" }
+          }
+        },
+
+        "body_short": {
+          "layer": "derived",
+          "fallback": "auto-truncate body to 300 graphemes",
+          "purpose": "Bluesky-shaped short variant",
+          "required_by": ["bluesky"],
+          "annotation_override": true,
+          "platforms": {
+            "bluesky":   { "max_chars": 3000, "max_graphemes": 300, "notes": "Grapheme count is the hard cap, not char count" }
+          }
+        },
+
+        "body_threads_short": {
+          "layer": "derived",
+          "fallback": "auto-truncate body to 500 chars",
+          "purpose": "Threads / Mastodon-default short variant",
+          "required_by": ["threads", "mastodon"],
+          "annotation_override": true,
+          "platforms": {
+            "threads":   { "max_chars": 500, "notes": "Hard cap" },
+            "mastodon":  { "max_chars": 500, "notes": "Default; instance can override" }
+          }
+        },
+
+        "body_caption": {
+          "layer": "derived",
+          "fallback": "auto-truncate body to 2200, front-loaded for the 125-char preview",
+          "purpose": "Instagram caption variant",
+          "required_by": ["instagram"],
+          "annotation_override": true,
+          "platforms": {
+            "instagram": { "max_chars": 2200, "preview_truncation_at": 125, "notes": "Top-heavy formatting essential" }
+          }
+        }
+      }
+    },
+
+    "media": {
+      "description": "Visual and audio assets",
+      "fields": {
+
+        "featured_image": {
+          "layer": "content",
+          "fallback": "look for featured.* at folder root",
+          "purpose": "The primary visual associated with the piece",
+          "required_by": ["medium", "substack", "facebook", "instagram", "threads", "linkedin"],
+          "platforms": {
+            "medium":    { "field": "image", "supported": true,  "dimensions": "unknown", "notes": "Multipart upload to Images resource; jpeg/png/gif/tiff" },
+            "substack":  { "field": "cover", "supported": true,  "dimensions": "unknown", "notes": "Set via UI; programmatic access unstable" },
+            "bluesky":   { "field": "embed.images[]", "supported": true, "dimensions": "unknown", "notes": "Upload blob first, attach reference" },
+            "twitter":   { "field": "media[]", "supported": true, "dimensions": "1200x675", "notes": "Upload via legacy v1.1 endpoint, then attach IDs" },
+            "facebook":  { "field": "attached_media", "supported": true, "dimensions": "1080x1080", "notes": "Max 30MB" },
+            "instagram": { "field": "media container", "supported": true, "dimensions": "1080x1350", "notes": "REQUIRES PUBLIC URL — API will not accept bytes; aspect ratio 4:5 to 1.91:1" },
+            "tumblr":    { "field": "image block (NPF)", "supported": true, "dimensions": "1280x1920", "notes": "Max 20MB" },
+            "threads":   { "field": "image_url", "supported": true, "dimensions": "1080x1080", "notes": "REQUIRES PUBLIC URL; max 8MB; aspect ratio max 10:1" },
+            "linkedin":  { "field": "thumbnail", "supported": true, "dimensions": "1200x627", "notes": "Must register Image Asset URN via Images API first" },
+            "mastodon":  { "field": "media_ids[]", "supported": true, "dimensions": "1200x630", "notes": "Up to 4 attachments" }
+          }
+        },
+
+        "featured_image_alt_text": {
+          "layer": "annotation",
+          "fallback": null,
+          "purpose": "Accessibility text for the primary image",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": false, "notes": "Limited alt support" },
+            "substack":  { "supported": true, "notes": null },
+            "bluesky":   { "supported": true, "notes": null },
+            "twitter":   { "supported": true, "notes": null },
+            "facebook":  { "supported": true, "notes": null },
+            "instagram": { "supported": true, "notes": null },
+            "tumblr":    { "supported": true, "notes": null },
+            "threads":   { "supported": true, "notes": null },
+            "linkedin":  { "supported": true, "notes": null },
+            "mastodon":  { "supported": true, "notes": null }
+          }
+        },
+
+        "featured_image_public_url": {
+          "layer": "derived",
+          "fallback": "upload featured_image to public mirror; cache returned URL",
+          "purpose": "Public HTTPS URL required for platforms that can't accept image bytes directly",
+          "required_by": ["instagram", "threads"],
+          "notes": "This is the architectural wrinkle for local-first folders: IG/Threads cannot consume a local file; the adapter must upload to S3, GH Pages, or similar before publishing"
+        },
+
+        "inline_media": {
+          "layer": "content",
+          "fallback": "scan body for image refs; locate files in folder",
+          "purpose": "Images, audio, video embedded inside the body",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": true,  "notes": "Markdown or HTML; embeds for video/audio" },
+            "substack":  { "supported": true,  "notes": "HTML img tags" },
+            "bluesky":   { "supported": true,  "notes": "Union embed — images OR external link, usually not both" },
+            "twitter":   { "supported": true,  "notes": "Up to 4 images per post; 1 video" },
+            "facebook":  { "supported": true,  "notes": "Multi-photo, video up to 10GB / 240 min" },
+            "instagram": { "supported": true,  "notes": "Up to 10 per carousel" },
+            "tumblr":    { "supported": true,  "notes": "Multiple image blocks; audio blocks; video blocks" },
+            "threads":   { "supported": true,  "notes": "Up to 20 per carousel" },
+            "linkedin":  { "supported": true,  "notes": "Up to 25 images per article; no video in articles" },
+            "mastodon":  { "supported": true,  "notes": "Up to 4 attachments; images, video, audio" }
+          }
+        }
+      }
+    },
+
+    "discovery_metadata": {
+      "description": "How readers find and categorize the post",
+      "fields": {
+
+        "tags": {
+          "layer": "annotation",
+          "fallback": null,
+          "purpose": "Topic tags for discovery",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "field": "tags[]", "max_count": 3,  "format": "array", "notes": "Only first 3 used; tags >25 chars ignored" },
+            "substack":  { "field": "tags[]", "max_count": null, "format": "array", "notes": "Sections/tags via publication settings" },
+            "bluesky":   { "field": "facets/tags[]", "max_count": 8, "format": "array", "notes": "Distinct from inline #hashtags in facets" },
+            "twitter":   { "field": "inline #", "max_count": null, "format": "inline", "notes": "Consumes char count; <6 chars ideal" },
+            "facebook":  { "field": "inline #", "max_count": null, "format": "inline", "notes": null },
+            "instagram": { "field": "inline #", "max_count": 30, "format": "inline", "notes": "API rejects >30 hashtags" },
+            "tumblr":    { "field": "tags[]", "max_count": 30, "format": "array", "notes": "Only first 20 indexed for search" },
+            "threads":   { "field": "topic_tag", "max_count": 1, "format": "single", "notes": "Single tag only; standard hashtags treated as plain text" },
+            "linkedin":  { "field": "inline # in commentary", "max_count": 5, "format": "inline", "notes": "3-5 recommended" },
+            "mastodon":  { "field": "inline # in status", "max_count": null, "format": "inline", "notes": null }
+          }
+        },
+
+        "topic_tag": {
+          "layer": "derived",
+          "fallback": "tags[0]",
+          "purpose": "Single tag for platforms that allow only one (Threads)",
+          "required_by": ["threads"]
+        },
+
+        "canonical_url": {
+          "layer": "derived",
+          "fallback": "URL of first published copy",
+          "purpose": "SEO-correct attribution to the original publication",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": true,  "where_set": "Story Settings > Advanced > Custom Canonical Link", "notes": "Available via API or buried UI setting" },
+            "substack":  { "supported": true,  "where_set": "Settings > SEO Options > Post URL", "notes": "Must be set manually; inaccessible via email-to-post" },
+            "bluesky":   { "supported": false, "where_set": null, "notes": "External link facet only" },
+            "twitter":   { "supported": false, "where_set": null, "notes": "Links count as 23 chars regardless" },
+            "facebook":  { "supported": false, "where_set": null, "notes": "Raw link in message only" },
+            "instagram": { "supported": false, "where_set": null, "notes": "Caption links unclickable; link-in-bio only" },
+            "tumblr":    { "supported": true,  "where_set": "API parameter: source_url", "notes": "Best native canonical support of any platform" },
+            "threads":   { "supported": false, "where_set": null, "notes": "Raw link in text or link_attachment" },
+            "linkedin":  { "supported": true,  "where_set": "API parameter: content.article.source", "notes": "Manual injection only; no URL scraping" },
+            "mastodon":  { "supported": false, "where_set": null, "notes": "Raw link in text" }
+          }
+        },
+
+        "external_links": {
+          "layer": "derived",
+          "fallback": "scan body for URLs",
+          "purpose": "Count and list of external links in body — Threads enforces a cap",
+          "required_by": ["threads"],
+          "notes": "Threads rejects posts with more than 5 unique links"
+        }
+      }
+    },
+
+    "publishing_control": {
+      "description": "Who sees it, when, under what terms",
+      "fields": {
+
+        "paywall_state": {
+          "layer": "annotation",
+          "fallback": "free",
+          "purpose": "Free / paid / paywalled status",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": true,  "notes": "Mapped via license + publishStatus (public/draft/unlisted)" },
+            "substack":  { "supported": true,  "notes": "Free / paid / founding-member tiers" },
+            "bluesky":   { "supported": false, "notes": null },
+            "twitter":   { "supported": false, "notes": null },
+            "facebook":  { "supported": false, "notes": null },
+            "instagram": { "supported": false, "notes": null },
+            "tumblr":    { "supported": true,  "notes": "Tumblr Post+" },
+            "threads":   { "supported": false, "notes": null },
+            "linkedin":  { "supported": false, "notes": null },
+            "mastodon":  { "supported": false, "notes": null }
+          }
+        },
+
+        "visibility": {
+          "layer": "annotation",
+          "fallback": "public",
+          "purpose": "Public / unlisted / private / direct",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": true,  "notes": "publishStatus: public, draft, unlisted" },
+            "mastodon":  { "supported": true,  "notes": "visibility: public, unlisted, private, direct" },
+            "linkedin":  { "supported": true,  "notes": "Targeted organic posts to specific audiences (min 300 members)" },
+            "bluesky":   { "supported": false, "notes": "Public only at protocol level" },
+            "twitter":   { "supported": false, "notes": "Account-level only" },
+            "facebook":  { "supported": false, "notes": "Page-level only" },
+            "instagram": { "supported": false, "notes": "Account-level only" },
+            "substack":  { "supported": false, "notes": "Paywall handles access" },
+            "tumblr":    { "supported": true,  "notes": "State: published, draft, queue, private" },
+            "threads":   { "supported": false, "notes": null }
+          }
+        },
+
+        "schedule_at": {
+          "layer": "annotation",
+          "fallback": null,
+          "purpose": "ISO timestamp for delayed publication",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": false, "notes": null },
+            "substack":  { "supported": true,  "notes": "Native in UI; unstable via unofficial API" },
+            "bluesky":   { "supported": false, "notes": "createdAt is sort key, not server schedule" },
+            "twitter":   { "supported": true,  "notes": "Requires Ads API or third-party; not standard" },
+            "facebook":  { "supported": true,  "notes": "scheduled_publish_time UNIX timestamp" },
+            "instagram": { "supported": true,  "notes": "Via Meta Business APIs" },
+            "tumblr":    { "supported": true,  "notes": "Native queue support" },
+            "threads":   { "supported": false, "notes": null },
+            "linkedin":  { "supported": false, "notes": "DRAFT lifecycleState only; no native scheduling" },
+            "mastodon":  { "supported": true,  "notes": "scheduled_at ISO 8601" }
+          }
+        },
+
+        "publication_or_section": {
+          "layer": "annotation",
+          "fallback": null,
+          "purpose": "Posting under a named publication or section, not personal feed",
+          "required_by": [],
+          "platforms": {
+            "medium":    { "supported": true,  "notes": "Writers submit drafts; editors publish public" },
+            "substack":  { "supported": true,  "notes": "Sections in publication settings" },
+            "linkedin":  { "supported": true,  "notes": "Targeted audiences" },
+            "tumblr":    { "supported": true,  "notes": "Primary or secondary blogs" },
+            "bluesky":   { "supported": false, "notes": null },
+            "twitter":   { "supported": false, "notes": null },
+            "facebook":  { "supported": false, "notes": null },
+            "instagram": { "supported": false, "notes": null },
+            "threads":   { "supported": false, "notes": null },
+            "mastodon":  { "supported": false, "notes": null }
+          }
+        }
+      }
+    },
+
+    "structure": {
+      "description": "How the post is composed beyond a single body",
+      "fields": {
+
+        "is_thread": {
+          "layer": "annotation",
+          "fallback": false,
+          "purpose": "Whether this piece is intended as a multi-post thread",
+          "required_by": [],
+          "platforms": {
+            "bluesky":   { "supported": true,  "notes": "replyRef with root + parent strong refs" },
+            "twitter":   { "supported": true,  "notes": "in_reply_to_tweet_id chain" },
+            "mastodon":  { "supported": true,  "notes": "in_reply_to_id chain" },
+            "threads":   { "supported": true,  "notes": "Multi-item carousel containers" },
+            "medium":    { "supported": false, "notes": null },
+            "substack":  { "supported": false, "notes": null },
+            "facebook":  { "supported": false, "notes": null },
+            "instagram": { "supported": false, "notes": null },
+            "tumblr":    { "supported": false, "notes": null },
+            "linkedin":  { "supported": false, "notes": null }
+          }
+        },
+
+        "thread_chunks": {
+          "layer": "derived",
+          "fallback": "split body at paragraph boundaries to fit per-platform char budget",
+          "purpose": "Array of body slices when is_thread=true",
+          "required_by": ["bluesky", "twitter", "mastodon"],
+          "annotation_override": true,
+          "notes": "User can override auto-chunking with explicit splits"
+        }
+      }
+    }
+  },
+
+  "platforms": {
+    "medium": {
+      "tier": 3,
+      "automation_status": "withdrawn",
+      "publishing_method": "manual paste (web UI)",
+      "auth": "personal_token (legacy only — no new tokens issued)",
+      "endpoint": "https://api.medium.com/v1",
+      "key_quirks": [
+        "API repo archived March 2023",
+        "Title >100 chars stripped and synthesized from H1",
+        "Writers in publications can only submit drafts"
+      ]
+    },
+    "substack": {
+      "tier": 3,
+      "automation_status": "undocumented (walled garden)",
+      "publishing_method": "email-to-post (lossy) or manual paste",
+      "auth": "session_cookie (third-party reverse-engineered)",
+      "endpoint": "https://{publication}.substack.com/api/v1/posts (unofficial)",
+      "key_quirks": [
+        "No public writing API by design",
+        "Email-to-post strips HTML and ignores markdown",
+        "Canonical URL must be set manually after draft creation"
+      ]
+    },
+    "bluesky": {
+      "tier": 1,
+      "automation_status": "active",
+      "publishing_method": "AT Protocol API",
+      "auth": "session_cookie",
+      "endpoint": "app.bsky.feed.post",
+      "key_quirks": [
+        "Plain text + facets array with UTF-16 byte offsets",
+        "300 grapheme hard cap (not chars)",
+        "Embed is union — images OR external link, not both"
+      ]
+    },
+    "twitter": {
+      "tier": 3,
+      "automation_status": "paywalled",
+      "publishing_method": "API (paid tiers)",
+      "auth": "oauth2",
+      "endpoint": "POST /2/tweets",
+      "key_quirks": [
+        "Free tier dead; Basic $100/mo (3k writes); Pro $5000/mo (100k)",
+        "long_post (25k chars) requires X Premium account",
+        "Media still uses legacy v1.1 upload endpoint"
+      ]
+    },
+    "facebook": {
+      "tier": 2,
+      "automation_status": "active",
+      "publishing_method": "Meta Graph API",
+      "auth": "oauth2 (pages_manage_posts + pages_read_engagement)",
+      "endpoint": "POST /{page-id}/feed",
+      "key_quirks": [
+        "63k char limit but engagement collapses past 280",
+        "Markdown completely stripped",
+        "Rate limit: 200 × engaged-users per 24h"
+      ]
+    },
+    "instagram": {
+      "tier": 2,
+      "automation_status": "active",
+      "publishing_method": "Graph API (two-stage container + publish)",
+      "auth": "oauth2 (Pro account linked to FB Page)",
+      "endpoint": "POST /{ig-user-id}/media",
+      "key_quirks": [
+        "Requires PUBLIC URL for media — API will not accept bytes",
+        "Aspect ratio must be 4:5 to 1.91:1",
+        "Cannot post pure text; media is mandatory",
+        "250 posts per 24h cap"
+      ]
+    },
+    "tumblr": {
+      "tier": 1,
+      "automation_status": "active",
+      "publishing_method": "Tumblr API (NPF)",
+      "auth": "oauth2",
+      "endpoint": "POST /v2/blog/{blog-identifier}/posts",
+      "key_quirks": [
+        "Body must be chunked into NPF blocks (4096 chars each, max 1000)",
+        "Best native canonical URL support (source_url parameter)",
+        "Only first 20 tags indexed for search"
+      ]
+    },
+    "threads": {
+      "tier": 1,
+      "automation_status": "active",
+      "publishing_method": "Threads API (container + publish, like IG)",
+      "auth": "oauth2",
+      "endpoint": "POST /{threads-user-id}/threads",
+      "key_quirks": [
+        "Hard limit of 5 unique links per post",
+        "Only 1 topic_tag allowed",
+        "500 char limit; emojis count by UTF-8 bytes"
+      ]
+    },
+    "linkedin": {
+      "tier": 2,
+      "automation_status": "active",
+      "publishing_method": "Posts API (replaces deprecated ugcPosts)",
+      "auth": "oauth2",
+      "endpoint": "POST /v2/posts",
+      "key_quirks": [
+        "Articles 125k chars; feed posts only 3k",
+        "Image Asset URN must be registered before posting article",
+        "No URL scraping — canonical must be explicitly injected"
+      ]
+    },
+    "mastodon": {
+      "tier": 1,
+      "automation_status": "active",
+      "publishing_method": "Mastodon REST API",
+      "auth": "oauth2 (per-instance)",
+      "endpoint": "POST /api/v1/statuses",
+      "key_quirks": [
+        "Federated — must route to user's specific instance",
+        "Char limit instance-dependent (500 default; 5000+ on some)",
+        "IDs are opaque strings — never parse as integers"
+      ]
+    }
+  },
+
+  "automation_tiers": {
+    "tier_1_full_automation": {
+      "description": "Free, active APIs — adapter can publish without human in the loop",
+      "platforms": ["bluesky", "tumblr", "threads", "mastodon"],
+      "build_priority": "first — these validate the architecture cheapest"
+    },
+    "tier_2_assisted_automation": {
+      "description": "APIs work but carry friction — public-URL upload, engagement throttling, multi-stage flows",
+      "platforms": ["facebook", "instagram", "linkedin"],
+      "build_priority": "second — require external dependencies (image hosting, OAuth setup)"
+    },
+    "tier_3_manual_handoff": {
+      "description": "No usable API — tool generates a paste-ready file and the human publishes via web UI",
+      "platforms": ["medium", "substack", "twitter"],
+      "build_priority": "anytime — the work is formatting, not API integration"
+    }
+  }
+}

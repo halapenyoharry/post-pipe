@@ -1,0 +1,22 @@
+{
+  "nature": "work",
+  "status": "active",
+  "vision": "A cohesive system for converting markdown content into structured, platform-specific outputs.",
+  "tags": [
+    "markdown",
+    "publishing",
+    "content-pipeline",
+    "automation"
+  ],
+  "energy": "Steady and structured; multiple files indicate ongoing refinement and integration.",
+  "original_name": "post-pipe",
+  "slug": "post-pipe",
+  "machine": "lothal.local",
+  "path": "/Users/harold/Projects/post-pipe",
+  "appearance": {
+    "primary_color": "#1b200a",
+    "accent_color": "#0dd8db",
+    "source": "manual"
+  },
+  "$schema": "https://vortex.local/schemas/project-bible.schema.json"
+}
