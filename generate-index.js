@@ -219,8 +219,6 @@ function buildIndexHTML() {
   /* Injected React Components CSS */
   ${reactCss}
 </style>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 </head>
 <body>
 <div id="error"></div>
@@ -254,7 +252,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, React, ReactDOM } = window.PostPipeComponents;
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);

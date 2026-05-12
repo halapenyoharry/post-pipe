@@ -9,15 +9,6 @@ export default defineConfig({
       entry: path.resolve(__dirname, 'src/index.jsx'),
       name: 'PostPipeComponents',
       fileName: (format) => `post-pipe-components.${format}.js`
-    },
-    rollupOptions: {
-      external: ['react', 'react-dom'],
-      output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        }
-      }
     }
   }
 });
