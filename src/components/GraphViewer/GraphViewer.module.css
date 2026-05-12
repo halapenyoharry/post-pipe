@@ -1,0 +1,87 @@
+.graphContainer {
+  --gv-width: 100vw;
+  --gv-height: 100vh;
+  --gv-node-draft: #555;
+  --gv-node-published: #2ecc71;
+  --gv-tag-color: #f39c12;
+  --gv-tooltip-bg: #16213e;
+  --gv-tooltip-border: #0f3460;
+  --gv-tooltip-title: #fff;
+  --gv-tooltip-desc: #aaa;
+  --gv-tooltip-date: #666;
+  --gv-accent: #64ffda;
+
+  width: var(--gv-width);
+  height: var(--gv-height);
+  position: relative;
+  overflow: hidden;
+}
+
+.graphContainer :global(svg) {
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.graphContainer :global(.node) {
+  cursor: pointer;
+  overflow: visible;
+}
+
+.graphContainer :global(.node text) {
+  fill: #ccc;
+  pointer-events: none;
+  font-family: 'Atkinson', sans-serif;
+}
+
+.graphContainer :global(.link) {
+  stroke: #555;
+  stroke-opacity: 0.4;
+  stroke-width: 1.5;
+}
+
+.graphContainer :global(.link.highlighted) {
+  stroke: var(--gv-accent);
+  stroke-opacity: 0.8;
+  stroke-width: 2;
+}
+
+.graphContainer :global(.node.dimmed) {
+  opacity: 0.2;
+}
+
+.graphContainer :global(.tag-active rect),
+.graphContainer :global(.tag-active ellipse) {
+  filter: drop-shadow(0 0 6px var(--gv-accent));
+}
+
+.tooltip {
+  position: fixed;
+  display: none;
+  background: var(--gv-tooltip-bg);
+  border: 1px solid var(--gv-tooltip-border);
+  padding: 12px 16px;
+  border-radius: 6px;
+  max-width: 320px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 10;
+  font-family: 'Atkinson', sans-serif;
+}
+
+.tooltipTitle {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--gv-tooltip-title);
+}
+
+.tooltipDesc {
+  color: var(--gv-tooltip-desc);
+  font-size: 13px;
+}
+
+.tooltipDate {
+  color: var(--gv-tooltip-date);
+  font-size: 11px;
+  margin-top: 6px;
+}

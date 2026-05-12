@@ -1,0 +1,120 @@
+.ttsGroup {
+  --tts-accent: #64ffda;
+  --tts-bg: rgba(17, 24, 39, 0.9);
+  --tts-border: rgba(100, 255, 218, 0.2);
+  --tts-text: #e0e0e0;
+
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tb {
+  background: transparent;
+  border: 1px solid var(--tts-border);
+  color: var(--tts-accent);
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-family: 'Atkinson', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tb:hover {
+  background: rgba(100, 255, 218, 0.1);
+  border-color: var(--tts-accent);
+}
+
+.tb :global(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.tbTooltip {
+  display: none;
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #16213e;
+  color: #ccc;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.tb:hover .tbTooltip {
+  display: block;
+}
+
+.select {
+  background: var(--tts-bg);
+  border: 1px solid var(--tts-border);
+  color: var(--tts-accent);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: 'Atkinson', sans-serif;
+  border-radius: 4px;
+  max-width: 140px;
+  cursor: pointer;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--tts-accent);
+}
+
+.params {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.params label {
+  font-size: 10px;
+  color: var(--tts-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.params input[type=range] {
+  width: 60px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: rgba(100,255,218,0.2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.params input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--tts-accent);
+  cursor: pointer;
+}
+
+.params select {
+  background: var(--tts-bg);
+  border: 1px solid var(--tts-border);
+  color: var(--tts-accent);
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: 'Atkinson', sans-serif;
+  border-radius: 3px;
+  cursor: pointer;
+}

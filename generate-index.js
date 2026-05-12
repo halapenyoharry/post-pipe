@@ -150,11 +150,17 @@ const ICONS = {
 // ─── Build index.html ────────────────────────────────────────────────────────
 
 function buildIndexHTML() {
-  const d3Source = fs.readFileSync(D3_PATH, 'utf8');
   const ttsSource = fs.readFileSync(path.join(__dirname, 'tts.js'), 'utf8');
   const fontB64 = fs.readFileSync(FONT_PATH).toString('base64');
   const fontBoldB64 = fs.readFileSync(FONT_BOLD_PATH).toString('base64');
   const settingsJSON = JSON.stringify(SETTINGS);
+
+  const reactCss = fs.existsSync(path.join(__dirname, 'dist/post-pipe.css'))
+    ? fs.readFileSync(path.join(__dirname, 'dist/post-pipe.css'), 'utf8')
+    : '';
+  const reactJs = fs.existsSync(path.join(__dirname, 'dist/post-pipe-components.umd.js'))
+    ? fs.readFileSync(path.join(__dirname, 'dist/post-pipe-components.umd.js'), 'utf8')
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -187,253 +193,41 @@ function buildIndexHTML() {
     --text: ${SETTINGS.theme.text};
     --text-bright: ${SETTINGS.theme.text_bright};
     --border: ${SETTINGS.theme.border};
+
+    /* Variables mapped for the new React Components */
+    --gv-node-draft: ${SETTINGS.theme.node_draft};
+    --gv-node-published: ${SETTINGS.theme.node_published};
+    --gv-tag-color: ${SETTINGS.theme.tag_color};
+    --gv-accent: ${SETTINGS.theme.accent};
+
+    --rp-bg: ${SETTINGS.theme.bg};
+    --rp-surface: ${SETTINGS.theme.surface};
+    --rp-border: ${SETTINGS.theme.border};
+    --rp-accent: ${SETTINGS.theme.accent};
+    --rp-text: ${SETTINGS.theme.text};
+    --rp-text-bright: ${SETTINGS.theme.text_bright};
+
+    --tts-accent: ${SETTINGS.theme.accent};
+    --tts-text: ${SETTINGS.theme.text};
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: var(--bg); color: var(--text); font-family: 'Atkinson', sans-serif; overflow: hidden; }
 
-  /* ── Graph ── */
-  #graph { width: 100vw; height: 100vh; }
-  .node { cursor: pointer; overflow: visible; }
-  .node text { fill: #ccc; pointer-events: none; font-family: 'Atkinson', sans-serif; }
-  svg { overflow: visible; user-select: none; -webkit-user-select: none; }
-  .link { stroke: #555; stroke-opacity: 0.4; stroke-width: 1.5; }
-  .link.highlighted { stroke: var(--accent); stroke-opacity: 0.8; stroke-width: 2; }
-  .node.dimmed { opacity: 0.2; }
-  .tag-active rect, .tag-active ellipse { filter: drop-shadow(0 0 6px var(--accent)); }
-
-  #tooltip {
-    position: fixed; display: none; background: #16213e; border: 1px solid #0f3460;
-    padding: 12px 16px; border-radius: 6px; max-width: 320px; font-size: 14px;
-    pointer-events: none; z-index: 10;
-  }
-  #tooltip .title { font-weight: 600; margin-bottom: 4px; color: #fff; }
-  #tooltip .desc { color: #aaa; font-size: 13px; }
-  #tooltip .date { color: #666; font-size: 11px; margin-top: 6px; }
   #error { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #e74c3c; font-size: 18px; }
 
-  /* ── Reader overlay ── */
-  #reader-overlay {
-    display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.5); z-index: 100; cursor: pointer;
-  }
-
-  /* ── Reader panel ── */
-  #reader-panel {
-    position: fixed; top: 0; right: -55vw; width: 55vw; height: 100vh;
-    background: var(--surface); border-left: 1px solid var(--border);
-    z-index: 101; display: flex; flex-direction: column; overflow: hidden;
-    font-family: 'Atkinson', sans-serif;
-    transition: right 0.3s ease;
-  }
-  #reader-panel.open { right: 0; }
-  @media (max-width: 900px) {
-    #reader-panel { width: 100vw; right: -100vw; }
-  }
-
-  /* ── Toolbar ── */
-  #reader-toolbar {
-    padding: 8px 16px; background: rgba(17, 24, 39, 0.95);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-  .toolbar-group {
-    display: flex; align-items: center; gap: 4px;
-  }
-  .toolbar-separator {
-    width: 1px; height: 24px; background: rgba(100, 255, 218, 0.15); margin: 0 8px;
-  }
-  .toolbar-spacer { flex: 1; }
-
-  .tb {
-    background: transparent; border: 1px solid rgba(100, 255, 218, 0.2);
-    color: var(--accent); width: 36px; height: 36px; cursor: pointer;
-    font-family: 'Atkinson', sans-serif; display: flex; align-items: center;
-    justify-content: center; border-radius: 4px; transition: all 0.2s;
-    position: relative; flex-shrink: 0;
-  }
-  .tb:hover { background: rgba(100, 255, 218, 0.1); border-color: var(--accent); }
-  .tb.active { background: rgba(100, 255, 218, 0.15); border-color: var(--accent); }
-  .tb.close-btn { border-color: rgba(239, 68, 68, 0.3); color: #ef4444; }
-  .tb.close-btn:hover { background: rgba(239, 68, 68, 0.1); border-color: #ef4444; }
-  .tb svg { width: 18px; height: 18px; }
-
-  .tb-tooltip {
-    display: none; position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%);
-    background: #16213e; color: #ccc; font-size: 11px; padding: 3px 8px; border-radius: 3px;
-    white-space: nowrap; z-index: 200; pointer-events: none;
-  }
-  .tb:hover .tb-tooltip { display: block; }
-
-  /* Syndication link icons */
-  .synd-link { width: 28px; height: 28px; border: none; opacity: 0.5; }
-  .synd-link:hover { opacity: 1; border: none; background: transparent; }
-  .synd-link svg { width: 14px; height: 14px; }
-  .synd-link.canonical { opacity: 1; position: relative; }
-  .synd-link.canonical::after {
-    content: ''; position: absolute; top: -2px; right: -2px;
-    width: 10px; height: 10px; background: var(--accent);
-    border-radius: 50%;
-  }
-
-  /* Voice dropdown */
-  #voice-select, #engine-select {
-    background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(100, 255, 218, 0.2);
-    color: var(--accent); padding: 4px 8px; font-size: 12px; font-family: 'Atkinson', sans-serif;
-    border-radius: 4px; max-width: 140px; cursor: pointer;
-  }
-  #engine-select { max-width: 110px; }
-  #voice-select:focus, #engine-select:focus { outline: none; border-color: var(--accent); }
-  #tts-params { display: flex; align-items: center; gap: 6px; }
-  #tts-params label { font-size: 10px; color: var(--text); text-transform: uppercase; letter-spacing: 0.05em; }
-  #tts-params input[type=range] {
-    width: 60px; height: 4px; -webkit-appearance: none; background: rgba(100,255,218,0.2);
-    border-radius: 2px; outline: none; cursor: pointer;
-  }
-  #tts-params input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
-    background: var(--accent); cursor: pointer;
-  }
-  #tts-params select {
-    background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(100, 255, 218, 0.2);
-    color: var(--accent); padding: 2px 6px; font-size: 11px; font-family: 'Atkinson', sans-serif;
-    border-radius: 3px; cursor: pointer;
-  }
-
-  /* ── Progress bar ── */
-  #reader-progress { height: 3px; background: rgba(148, 163, 184, 0.1); flex-shrink: 0; }
-  #reader-progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
-
-  /* ── Frontmatter disclosure ── */
-  #frontmatter-panel {
-    display: none; padding: 16px 40px; background: rgba(17, 24, 39, 0.5);
-    border-bottom: 1px solid var(--border); font-size: 13px;
-    max-height: 300px; overflow-y: auto;
-  }
-  #frontmatter-panel.open { display: block; }
-  .fm-row { display: flex; gap: 12px; padding: 4px 0; border-bottom: 1px solid rgba(100, 255, 218, 0.05); }
-  .fm-label { color: var(--accent); min-width: 100px; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .fm-value { color: var(--text); }
-  .fm-tag {
-    display: inline-block; background: rgba(243, 156, 18, 0.15); color: #f39c12;
-    padding: 2px 8px; border-radius: 10px; font-size: 11px; margin: 1px 2px;
-  }
-  .fm-synd-link { color: var(--accent); text-decoration: none; font-size: 12px; }
-  .fm-synd-link:hover { text-decoration: underline; }
-
-  /* ── Reader body ── */
-  #reader-body {
-    flex: 1; overflow-y: auto; padding: 32px 40px 48px; line-height: 1.9;
-    font-size: 15px; color: var(--text);
-  }
-  #reader-body::-webkit-scrollbar { width: 8px; }
-  #reader-body::-webkit-scrollbar-track { background: rgba(17, 24, 39, 0.5); }
-  #reader-body::-webkit-scrollbar-thumb { background: rgba(100, 255, 218, 0.3); border-radius: 4px; }
-
-  /* Article header in body */
-  .article-header { margin-bottom: 32px; }
-  .article-title {
-    font-size: 28px; font-weight: 700; color: #fff; line-height: 1.3;
-    margin-bottom: 12px;
-  }
-  .article-byline {
-    font-size: 14px; color: rgba(100, 255, 218, 0.7); margin-bottom: 4px;
-  }
-  .article-byline a { color: var(--accent); text-decoration: none; }
-  .article-byline a:hover { text-decoration: underline; }
-  .article-meta { font-size: 13px; color: #666; }
-
-  /* Article content */
-  #reader-body h1, #reader-body h2, #reader-body h3 { color: var(--text-bright); margin: 28px 0 12px; font-weight: 600; }
-  #reader-body h2 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-  #reader-body h3 { font-size: 16px; }
-  #reader-body p { margin-bottom: 16px; }
-  #reader-body blockquote {
-    border-left: 3px solid var(--accent); padding: 12px 20px; margin: 16px 0;
-    background: rgba(100, 255, 218, 0.03); font-style: italic;
-  }
-  #reader-body ul, #reader-body ol { padding-left: 24px; margin-bottom: 16px; }
-  #reader-body li { margin-bottom: 8px; }
-  #reader-body em { color: var(--text-bright); }
-  #reader-body strong { color: var(--text-bright); font-weight: 600; }
-  #reader-body a { color: var(--accent); text-decoration: none; }
-  #reader-body a:hover { text-decoration: underline; }
-  #reader-body .tts-active {
-    background: rgba(100, 255, 218, 0.15); color: var(--accent);
-    padding: 1px 3px; border-radius: 2px; transition: background 0.3s;
-  }
-
-  /* Copy feedback toast */
-  #copy-toast {
-    position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: var(--bg);
-    padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600;
-    z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none;
-  }
-  #copy-toast.show { opacity: 1; }
-
-  /* Print */
-  @media print {
-    #graph, #tooltip, #reader-overlay, #reader-toolbar, #reader-progress,
-    #frontmatter-panel, #copy-toast { display: none !important; }
-    #reader-panel {
-      position: static !important; width: 100% !important; height: auto !important;
-      background: #fff !important; border: none !important;
-    }
-    #reader-body {
-      color: #222 !important; padding: 0 !important; overflow: visible !important;
-    }
-    .article-title { color: #000 !important; }
-    .article-byline { color: #555 !important; }
-  }
+  /* Injected React Components CSS */
+  ${reactCss}
 </style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 </head>
 <body>
-<div id="graph"></div>
-<div id="tooltip"><div class="title"></div><div class="desc"></div><div class="date"></div></div>
 <div id="error"></div>
-
-<div id="reader-overlay"></div>
-<div id="reader-panel">
-  <div id="reader-toolbar">
-    <div class="toolbar-group" id="tts-controls">
-      <button class="tb" id="btnPlay" title="Play">${ICONS.play}<span class="tb-tooltip">Play</span></button>
-      <button class="tb" id="btnPause" style="display:none" title="Pause">${ICONS.pause}<span class="tb-tooltip">Pause</span></button>
-      <button class="tb" id="btnStop" style="display:none" title="Stop">${ICONS.stop}<span class="tb-tooltip">Stop</span></button>
-      <select id="engine-select" title="TTS Engine"></select>
-      <select id="voice-select" title="Voice"><option>Loading...</option></select>
-      <div id="tts-params"></div>
-    </div>
-
-    <div class="toolbar-separator"></div>
-
-    <div class="toolbar-group">
-      <button class="tb" id="btnFrontmatter" title="Article details">${ICONS.info}<span class="tb-tooltip">Details</span></button>
-      <button class="tb" id="btnExport" title="Export markdown">${ICONS.download}<span class="tb-tooltip">Export</span></button>
-      <button class="tb" id="btnCopy" title="Copy to clipboard">${ICONS.copy}<span class="tb-tooltip">Copy</span></button>
-    </div>
-
-    <div class="toolbar-separator"></div>
-
-    <div class="toolbar-group" id="syndication-links"></div>
-
-    <div class="toolbar-spacer"></div>
-
-    <button class="tb close-btn" id="btnClose" title="Close">${ICONS.close}<span class="tb-tooltip">Close</span></button>
-  </div>
-
-  <div id="reader-progress"><div id="reader-progress-fill"></div></div>
-  <div id="frontmatter-panel"></div>
-  <div id="reader-body"></div>
-</div>
-
-<div id="copy-toast">Copied to clipboard</div>
+<div id="app-root"></div>
 
 <script>
-${d3Source}
-</script>
-<script>
-// ── TTS Config (injected at build) ──
+// ── TTS Config ──
 window.TTS_CONFIG = {
   geminiApiKey: '${process.env.GEMINI_API_KEY || ''}',
   geminiVoices: ${JSON.stringify(SETTINGS.tts?.engines?.gemini?.voices || [])},
@@ -445,710 +239,63 @@ window.TTS_CONFIG = {
 ${ttsSource}
 </script>
 <script>
-// ── Settings (injected at build) ──
-const SETTINGS = ${settingsJSON};
-const ICONS = ${JSON.stringify(ICONS)};
-
-// ── State ──
-let currentArticle = null;
-
-// ── Substrate renderers ──
-// Dispatches reader-body rendering based on content.kind. Essays fetch their
-// rendered HTML from GitHub Pages (existing path). Other substrates render
-// inline from metadata or display a graceful placeholder.
-function renderSubstrate(article, body, headerHTML) {
-  const kind = article.kind || 'essay';
-
-  if (kind === 'essay' || kind === 'multi') {
-    // Multi treats essay as primary; companions listed in placeholder
-    fetch(article.url).then(r => {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
-    }).then(html => {
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const h1 = doc.querySelector('h1');
-      if (h1) h1.remove();
-      const content = doc.querySelector('body') ? doc.querySelector('body').innerHTML : html;
-      body.innerHTML = headerHTML + content + renderCompanions(article);
-      body.scrollTop = 0;
-    }).catch(() => {
-      body.innerHTML = headerHTML + renderPlaceholder(article, 'Rendered article not yet published to GitHub Pages.');
-      body.scrollTop = 0;
-    });
-    return;
-  }
-
-  if (kind === 'image') {
-    const img = article.image
-      ? '<img src="' + article.image + '" style="max-width:100%;height:auto;border-radius:4px;display:block;margin:0 auto;">'
-      : '<p style="color:#666;">No image resolved.</p>';
-    body.innerHTML = headerHTML + img + renderMetadata(article);
-    body.scrollTop = 0;
-    return;
-  }
-
-  // audio, video, archive, fragment, unexplored — placeholder for now
-  body.innerHTML = headerHTML + renderPlaceholder(article) + renderMetadata(article);
-  body.scrollTop = 0;
-}
-
-function renderPlaceholder(article, reason) {
-  const r = reason || 'This substrate ("' + (article.kind || 'unknown') + '") is not yet renderable in the viewer.';
-  let html = '<div style="padding:24px;border:1px dashed var(--border);border-radius:6px;background:rgba(17,24,39,0.4);">';
-  html += '<p style="color:var(--accent);font-weight:600;margin-bottom:8px;">' + r + '</p>';
-  if (article.todos && article.todos.length) {
-    html += '<p style="color:#f39c12;font-size:13px;">Pending: ' + article.todos.join(', ') + '</p>';
-  }
-  html += '<p style="color:#888;font-size:13px;margin-top:12px;">The folder exists at <code>~/Posts/' + article.id + '/</code>.</p>';
-  html += '</div>';
-  return html;
-}
-
-function renderCompanions(article) {
-  const companions = (article.forms && article.forms.companions) || [];
-  if (!companions.length) return '';
-  let html = '<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);">';
-  html += '<div style="color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">also exists as</div>';
-  html += '<div style="color:var(--text);font-size:14px;">' + companions.map(c => '<span class="fm-tag">' + c + '</span>').join(' ') + '</div>';
-  html += '</div>';
-  return html;
-}
-
-function renderMetadata(article) {
-  const rows = [];
-  if (article.seed)     rows.push(['seed',     article.seed]);
-  if (article.tldr)     rows.push(['tldr',     article.tldr]);
-  if (article.topology && article.topology.length) rows.push(['topology', article.topology.join(' · ')]);
-  if (article.energy)   rows.push(['energy',   article.energy]);
-  if (article.note)     rows.push(['note',     article.note]);
-  if (!rows.length) return '';
-  let html = '<div style="margin-top:32px;padding:20px;background:rgba(17,24,39,0.4);border-radius:6px;">';
-  for (const [label, value] of rows) {
-    html += '<div class="fm-row"><span class="fm-label">' + label + '</span><span class="fm-value">' + value + '</span></div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-// ── Reader ──
-function openReader(article) {
-  currentArticle = article;
-  const panel = document.getElementById('reader-panel');
-  const overlay = document.getElementById('reader-overlay');
-  const body = document.getElementById('reader-body');
-
-  // Build article header
-  const dateStr = article.date ? new Date(article.date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-  const metaParts = [dateStr, article.reading_time].filter(Boolean);
-
-  let headerHTML = '<div class="article-header">';
-  headerHTML += '<div class="article-title">' + (article.title || article.label) + '</div>';
-  headerHTML += '<div class="article-byline">by <a href="' + SETTINGS.author.url + '" target="_blank" rel="noopener">' + SETTINGS.author.display + '</a></div>';
-  if (metaParts.length) headerHTML += '<div class="article-meta">' + metaParts.join(' · ') + '</div>';
-  if (article.kind && article.kind !== 'essay') {
-    headerHTML += '<div class="article-meta" style="margin-top:4px;opacity:0.7;">substrate: ' + article.kind + '</div>';
-  }
-  headerHTML += '</div>';
-
-  // Dispatch by substrate kind
-  renderSubstrate(article, body, headerHTML);
-
-  // Build syndication links
-  buildSyndicationLinks(article);
-
-  // Build frontmatter panel
-  buildFrontmatter(article);
-
-  // Show
-  panel.classList.add('open');
-  overlay.style.display = 'block';
-
-  // Scroll progress
-  body.onscroll = () => {
-    const pct = body.scrollTop / (body.scrollHeight - body.clientHeight) * 100;
-    document.getElementById('reader-progress-fill').style.width = Math.min(pct, 100) + '%';
-  };
-}
-
-function closeReader() {
-  if (window.TTS) window.TTS.stop();
-  document.getElementById('reader-panel').classList.remove('open');
-  document.getElementById('reader-overlay').style.display = 'none';
-  document.getElementById('frontmatter-panel').classList.remove('open');
-  document.getElementById('btnFrontmatter').classList.remove('active');
-  currentArticle = null;
-}
-
-function buildSyndicationLinks(article) {
-  const container = document.getElementById('syndication-links');
-  container.innerHTML = '';
-
-  // Copy canonical URL button — for Medium import etc.
-  const canonUrl = article.canonical_url || article.url;
-  const copyUrlBtn = document.createElement('button');
-  copyUrlBtn.className = 'tb synd-link canonical';
-  copyUrlBtn.innerHTML = ICONS.link + '<span class="tb-tooltip">Copy URL</span>';
-  copyUrlBtn.onclick = async (e) => {
-    e.preventDefault();
-    try {
-      await navigator.clipboard.writeText(canonUrl);
-      const toast = document.getElementById('copy-toast');
-      toast.textContent = 'URL copied';
-      toast.classList.add('show');
-      setTimeout(() => { toast.classList.remove('show'); toast.textContent = 'Copied to clipboard'; }, 2000);
-    } catch(err) { console.error('Copy URL failed:', err); }
-  };
-  container.appendChild(copyUrlBtn);
-
-  // Other syndication links
-  const synd = article.syndication || {};
-  const iconMap = SETTINGS.toolbar.syndication_icons;
-  for (const [platform, url] of Object.entries(synd)) {
-    if (!url) continue;
-    const cfg = iconMap[platform];
-    if (!cfg) continue;
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.className = 'tb synd-link';
-    a.innerHTML = (ICONS[cfg.icon] || ICONS.globe) + '<span class="tb-tooltip">' + cfg.label + '</span>';
-    container.appendChild(a);
-  }
-}
-
-function buildFrontmatter(article) {
-  const panel = document.getElementById('frontmatter-panel');
-  const fields = SETTINGS.frontmatter_display;
-  let html = '';
-
-  for (const field of fields) {
-    let value = '';
-    switch (field) {
-      case 'publish_date':
-        if (article.date) value = new Date(article.date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        break;
-      case 'updated_date':
-        if (article.updated_date) value = article.updated_date;
-        break;
-      case 'reading_time':
-        value = article.reading_time || '';
-        break;
-      case 'tags':
-        if (article.tags && article.tags.length) {
-          value = article.tags.map(t => '<span class="fm-tag">' + t + '</span>').join(' ');
-        }
-        break;
-      case 'series':
-        value = article.series || '';
-        break;
-      case 'license':
-        value = article.license || '';
-        break;
-      case 'syndication':
-        const synd = article.syndication || {};
-        const links = Object.entries(synd).filter(([,url]) => url);
-        if (links.length) {
-          value = links.map(([p, url]) => '<a class="fm-synd-link" href="' + url + '" target="_blank">' + p + '</a>').join(' · ');
-        }
-        break;
-    }
-    if (!value) continue;
-    html += '<div class="fm-row"><span class="fm-label">' + field.replace(/_/g, ' ') + '</span><span class="fm-value">' + value + '</span></div>';
-  }
-
-  panel.innerHTML = html || '<div class="fm-row"><span class="fm-value" style="color:#666;">No metadata available.</span></div>';
-}
-
-// ── Toolbar actions ──
-
-document.getElementById('btnClose').onclick = closeReader;
-document.getElementById('reader-overlay').onclick = closeReader;
-
-document.getElementById('btnFrontmatter').onclick = () => {
-  const panel = document.getElementById('frontmatter-panel');
-  const btn = document.getElementById('btnFrontmatter');
-  panel.classList.toggle('open');
-  btn.classList.toggle('active');
-};
-
-document.getElementById('btnCopy').onclick = async () => {
-  if (!currentArticle) return;
-  const body = document.getElementById('reader-body');
-  const license = SETTINGS.export.license_header.replace('{{canonical_url}}', currentArticle.canonical_url || currentArticle.url);
-  const text = license + '\\n\\n---\\n\\n' + body.innerText;
+// ── Settings ──
+window.SETTINGS = ${settingsJSON};
+</script>
+<script>
+// ── React Components Library ──
+${reactJs}
+</script>
+<script>
+// ── Vanilla Orchestrator ──
+(async function initApp() {
   try {
-    await navigator.clipboard.writeText(text);
-    const toast = document.getElementById('copy-toast');
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
-  } catch(e) { console.error('Copy failed:', e); }
-};
+    const res = await fetch('./feed.json?v=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const feed = await res.json();
 
-document.getElementById('btnExport').onclick = () => {
-  if (!currentArticle) return;
-  const body = document.getElementById('reader-body');
-  const license = SETTINGS.export.license_header.replace('{{canonical_url}}', currentArticle.canonical_url || currentArticle.url);
-  const text = license + '\\n\\n---\\n\\n' + body.innerText;
-  const blob = new Blob([text], { type: 'text/markdown' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (currentArticle.id.split('/').pop().replace('.html', '') || 'article') + '.md';
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
+    const { GraphViewer, ReaderPanel, TTS } = window.PostPipeComponents;
 
-// ── TTS integration (registry-based) ──
-// tts.js registers engines with self-described capabilities.
-// UI adapts: engine picker, voice picker, and parameter controls render from capabilities.
+    function App() {
+      const [selectedArticle, setSelectedArticle] = React.useState(null);
 
-(function wireTTS() {
-  if (!window.TTS) return;
-  const T = window.TTS;
-  const btnPlay = document.getElementById('btnPlay');
-  const btnPause = document.getElementById('btnPause');
-  const btnStop = document.getElementById('btnStop');
-  const engineSel = document.getElementById('engine-select');
-  const voiceSel = document.getElementById('voice-select');
-  const paramsDiv = document.getElementById('tts-params');
-
-  // ── Populate engine dropdown ──
-  function refreshEngines() {
-    const engines = T.engines();
-    engineSel.innerHTML = engines.map(e =>
-      '<option value="' + e.id + '"' + (e.id === T.selected() ? ' selected' : '') + '>' + e.label + '</option>'
-    ).join('');
-  }
-
-  // ── Populate voice dropdown for current engine ──
-  function refreshVoices() {
-    const voices = T.voices();
-    if (!voices.length) {
-      voiceSel.innerHTML = '<option>Default</option>';
-      return;
-    }
-    // Group by language if voices have .lang
-    const hasLang = voices.some(v => v.lang);
-    if (hasLang) {
-      const groups = {};
-      voices.forEach(v => {
-        const lang = v.lang || 'other';
-        (groups[lang] = groups[lang] || []).push(v);
-      });
-      let html = '';
-      for (const [lang, vs] of Object.entries(groups).sort()) {
-        html += '<optgroup label="' + lang + '">';
-        html += vs.map(v => '<option value="' + v.id + '">' + v.label + '</option>').join('');
-        html += '</optgroup>';
-      }
-      voiceSel.innerHTML = html;
-    } else {
-      voiceSel.innerHTML = voices.map(v =>
-        '<option value="' + v.id + '">' + v.label + '</option>'
-      ).join('');
-    }
-  }
-
-  // ── Build parameter controls from capabilities ──
-  function refreshParams() {
-    paramsDiv.innerHTML = '';
-    const caps = T.capabilities();
-    for (const [key, spec] of Object.entries(caps)) {
-      if (!spec || key === 'voice') continue; // voice has its own dropdown
-      if (spec.type === 'range') {
-        const wrap = document.createElement('label');
-        wrap.textContent = spec.label + ' ';
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.min = spec.min;
-        input.max = spec.max;
-        input.step = spec.step || 0.1;
-        input.value = T.get(key) !== undefined ? T.get(key) : spec.default;
-        input.title = spec.label + ': ' + input.value;
-        input.oninput = function () {
-          T.set(key, parseFloat(this.value));
-          this.title = spec.label + ': ' + this.value;
-        };
-        wrap.appendChild(input);
-        paramsDiv.appendChild(wrap);
-      } else if (spec.type === 'select') {
-        const wrap = document.createElement('label');
-        wrap.textContent = spec.label + ' ';
-        const sel = document.createElement('select');
-        sel.innerHTML = spec.options.map(o =>
-          '<option value="' + o.value + '"' + (o.value === (T.get(key) || spec.default) ? ' selected' : '') + '>' + o.label + '</option>'
-        ).join('');
-        sel.onchange = function () { T.set(key, this.value); };
-        wrap.appendChild(sel);
-        paramsDiv.appendChild(wrap);
-      }
-    }
-  }
-
-  // ── Button state ──
-  function updateButtons(state) {
-    if (state === 'playing') {
-      btnPlay.style.display = 'none';
-      btnPause.style.display = 'flex';
-      btnStop.style.display = 'flex';
-    } else if (state === 'paused') {
-      btnPlay.style.display = 'flex';
-      btnPause.style.display = 'none';
-      btnStop.style.display = 'flex';
-    } else if (state === 'loading') {
-      btnPlay.style.display = 'none';
-      btnPause.style.display = 'none';
-      btnStop.style.display = 'flex';
-    } else {
-      btnPlay.style.display = 'flex';
-      btnPause.style.display = 'none';
-      btnStop.style.display = 'none';
-    }
-  }
-
-  // ── Wire events ──
-  T.on('state', updateButtons);
-  T.on('progress', function (d) {
-    const pct = d.total ? (d.index / d.total * 100) : 0;
-    document.getElementById('reader-progress-fill').style.width = pct + '%';
-  });
-  T.on('capabilitiesChanged', function () {
-    refreshVoices();
-    refreshParams();
-  });
-
-  // ── Engine change ──
-  engineSel.onchange = function () {
-    T.select(this.value);
-    refreshVoices();
-    refreshParams();
-  };
-
-  // ── Voice change ──
-  voiceSel.onchange = function () { T.set('voice', this.value); };
-
-  // ── Play / Pause / Stop ──
-  btnPlay.onclick = () => {
-    const body = document.getElementById('reader-body');
-    T.play(body, { scrollContainer: body });
-  };
-  btnPause.onclick = () => T.pause();
-  btnStop.onclick = () => T.stop();
-
-  // ── Init ──
-  refreshEngines();
-  refreshVoices();
-  refreshParams();
-
-  // Browser voices load async
-  if (window.speechSynthesis) {
-    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
-  }
-})();
-
-// ── D3 Graph ──
-
-function feedToGraph(feed) {
-  const nodes = [];
-  const links = [];
-  const tagNodes = new Map();
-
-  for (const item of feed.items) {
-    const slug = item.url.split('/').pop().replace('.html', '');
-    const status = item._status || 'draft';
-
-    nodes.push({
-      id: slug,
-      label: slug,
-      title: item.title,
-      short_title: item.short_title || '',
-      type: 'article',
-      url: item.url,
-      description: item.summary || '',
-      tldr: item.tldr || '',
-      image: item.image || '',
-      date: item.date_published ? item.date_published.split('T')[0] : '',
-      reading_time: item.reading_time || '',
-      tags: item.tags || [],
-      series: item.series || '',
-      license: item.license || '',
-      canonical_url: item.canonical_url || item.url,
-      syndication: item.syndication || {},
-      size: 60,
-      color: status === 'published' ? '${SETTINGS.theme.node_published}' : '${SETTINGS.theme.node_draft}',
-      // New-schema fields:
-      kind: item.kind || 'essay',
-      substrate: item.substrate || 'essay',
-      seed: item.seed || '',
-      topology: item.topology || [],
-      energy: item.energy || '',
-      connected_to: item.connected_to || [],
-      forms: item.forms || {},
-      note: item.note || '',
-      todos: item.todos || [],
-    });
-
-    for (const tag of (item.tags || [])) {
-      if (!tagNodes.has(tag)) {
-        tagNodes.set(tag, {
-          id: 'tag:' + tag,
-          label: tag,
-          type: 'tag',
-          size: 30,
-          color: '${SETTINGS.theme.tag_color}',
-        });
-      }
-      links.push({ source: slug, target: 'tag:' + tag });
-    }
-  }
-
-  nodes.push(...tagNodes.values());
-  return { nodes, links };
-}
-
-class PostGraph {
-  constructor(containerId) {
-    this.container = document.getElementById(containerId);
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
-    this.tooltip = document.getElementById('tooltip');
-    this.init();
-  }
-
-  init() {
-    this.svg = d3.select(this.container).append('svg')
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .call(d3.zoom().on('zoom', (event) => {
-        this.g.attr('transform', event.transform);
-      }))
-      .on('dblclick.zoom', null);
-
-    this.g = this.svg.append('g');
-
-    this.simulation = d3.forceSimulation()
-      .force('link', d3.forceLink().id(d => d.id).distance(160))
-      .force('charge', d3.forceManyBody().strength(-500))
-      .force('collide', d3.forceCollide().radius(d => (d._r || d.size / 2) + 8).strength(0.9))
-      .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-      .velocityDecay(0.85)
-      .alphaDecay(0.05);
-
-    window.addEventListener('resize', () => {
-      this.width = window.innerWidth;
-      this.height = window.innerHeight;
-      this.svg.attr('width', this.width).attr('height', this.height);
-      this.simulation.force('center', d3.forceCenter(this.width / 2, this.height / 2));
-      this.simulation.alpha(0.1).restart();
-    });
-  }
-
-  render(data) {
-    const links = this.g.selectAll('.link')
-      .data(data.links)
-      .enter().append('line')
-      .attr('class', 'link');
-
-    const nodes = this.g.selectAll('.node')
-      .data(data.nodes)
-      .enter().append('g')
-      .attr('class', 'node')
-      .call(d3.drag()
-        .on('start', (event, d) => {
-          if (!event.active) this.simulation.alphaTarget(0.3).restart();
-          d.fx = d.x; d.fy = d.y;
-        })
-        .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
-        .on('end', (event, d) => {
-          if (!event.active) this.simulation.alphaTarget(0);
-          d.fx = null; d.fy = null;
+      return React.createElement(React.Fragment, null,
+        React.createElement(GraphViewer, {
+          feedData: feed,
+          onNodeSelect: (article) => setSelectedArticle(article)
+        }),
+        React.createElement(ReaderPanel, {
+          article: selectedArticle,
+          onClose: () => setSelectedArticle(null),
+          settings: window.SETTINGS
         })
       );
+    }
 
-    const probe = this.svg.append('text')
-      .style('font-family', "'Atkinson', sans-serif")
-      .style('visibility', 'hidden');
+    const root = ReactDOM.createRoot(document.getElementById('app-root'));
+    root.render(React.createElement(App));
 
-    nodes.each(function(d) {
-      const el = d3.select(this);
-
-      if (d.type === 'tag') {
-        const fontSize = 14;
-        const padX = 14, padY = 8;
-        probe.style('font-size', fontSize + 'px').style('font-weight', '400');
-        probe.text(d.label);
-        const textW = probe.node().getComputedTextLength();
-        const bubbleW = textW + padX * 2;
-        const bubbleH = fontSize * 1.4 + padY * 2;
-
-        el.append('rect')
-          .attr('x', -bubbleW / 2).attr('y', -bubbleH / 2)
-          .attr('width', bubbleW).attr('height', bubbleH)
-          .attr('rx', bubbleH / 2).attr('ry', bubbleH / 2)
-          .attr('fill', d.color).attr('opacity', 0.7);
-        el.append('text')
-          .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-          .attr('fill', '#1a1a2e')
-          .style('font-size', fontSize + 'px').style('font-weight', '400')
-          .style('pointer-events', 'none')
-          .text(d.label);
-        d._r = Math.max(bubbleW, bubbleH) / 2;
-
-      } else {
-        const status = d.color === '${SETTINGS.theme.node_draft}' ? 'draft' : 'published';
-        const borderColor = status === 'draft' ? '#555' : '${SETTINGS.theme.node_published}';
-
-        if (d.kind === 'image' && d.image) {
-          // Image substrate: let the image be an image. No text overlay,
-          // title as a small caption beneath.
-          const cardW = 180, cardH = 180;
-          el.append('foreignObject')
-            .attr('width', cardW).attr('height', cardH + 24)
-            .attr('x', -cardW / 2).attr('y', -cardH / 2)
-            .append('xhtml:div')
-            .attr('xmlns', 'http://www.w3.org/1999/xhtml')
-            .style('width', cardW + 'px')
-            .style('font-family', "'Atkinson', sans-serif")
-            .style('cursor', 'pointer')
-            .html(
-              '<div style="width:' + cardW + 'px;height:' + cardH + 'px;' +
-                'background:#000 url(\\'' + d.image + '\\') center/cover no-repeat;' +
-                'border:1.5px solid ' + borderColor + ';border-radius:4px;"></div>' +
-              '<div style="font-size:11px;color:rgba(255,255,255,0.6);' +
-                'text-align:center;margin-top:4px;line-height:1.2;">' +
-                (d.short_title || d.title || d.label) + '</div>'
-            );
-          d._r = cardH / 2 + 12;
-        } else {
-          const cardW = 180, cardH = 140;
-          const bgColor = status === 'draft' ? '#2a2a3e' : '#1e3a5f';
-          const bgImage = d.image
-            ? 'linear-gradient(' + (status === 'draft' ? 'rgba(42,42,62,0.85),rgba(42,42,62,0.85)' : 'rgba(30,58,95,0.85),rgba(30,58,95,0.85)') + '), url(\\'' + d.image + '\\')'
-            : bgColor;
-          const desc = d.description || '';
-
-          el.append('foreignObject')
-            .attr('width', cardW).attr('height', cardH)
-            .attr('x', -cardW / 2).attr('y', -cardH / 2)
-            .append('xhtml:div')
-            .attr('xmlns', 'http://www.w3.org/1999/xhtml')
-            .style('width', cardW + 'px').style('height', cardH + 'px')
-            .style('background', bgImage)
-            .style('background-size', 'cover')
-            .style('background-position', 'center')
-            .style('border', '1.5px solid ' + borderColor)
-            .style('border-radius', '4px')
-            .style('padding', '10px 12px')
-            .style('box-sizing', 'border-box')
-            .style('overflow', 'hidden')
-            .style('font-family', "'Atkinson', sans-serif")
-            .style('cursor', 'pointer')
-            .html((() => {
-              const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
-              return '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;">' + (d.title || d.label) + '</span>' +
-                (preview ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;">' + preview + '</span>' : '');
-            })());
-
-          d._r = Math.max(cardW, cardH) / 2;
-        }
+    // We will mount TTS manually inside the reader panel via a Portal or separate root
+    // after the reader panel mounts (using MutationObserver to find the mount point).
+    const observer = new MutationObserver(() => {
+      const ttsMount = document.getElementById('tts-mount-point');
+      if (ttsMount && !ttsMount.dataset.mounted) {
+        ttsMount.dataset.mounted = 'true';
+        const ttsRoot = ReactDOM.createRoot(ttsMount);
+        // The reader body is the element we want to scroll/read
+        const readerBody = document.querySelector('[class*="ReaderPanel_body"]');
+        const ref = { current: readerBody };
+        ttsRoot.render(React.createElement(TTS, { targetRef: ref }));
       }
     });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    probe.remove();
-
-    nodes.filter(d => d.type === 'article')
-      .on('click', (event, d) => { openReader(d); })
-      .on('mouseover', (event, d) => {
-        this.tooltip.style.display = 'block';
-        this.tooltip.querySelector('.title').textContent = d.title || d.label;
-        this.tooltip.querySelector('.desc').textContent = d.description || '';
-        this.tooltip.querySelector('.date').textContent = d.date || '';
-      })
-      .on('mousemove', (event) => {
-        this.tooltip.style.left = (event.clientX + 16) + 'px';
-        this.tooltip.style.top = (event.clientY + 16) + 'px';
-      })
-      .on('mouseout', () => { this.tooltip.style.display = 'none'; });
-
-    // Tag click: arrange connected articles around tag, dim everything else
-    // Click same tag again to restore
-    let activeTag = null;
-
-    nodes.filter(d => d.type === 'tag')
-      .on('click', (event, d) => {
-        event.stopPropagation();
-        if (activeTag === d.id) {
-          // Restore
-          activeTag = null;
-          nodes.classed('dimmed', false).classed('tag-active', false);
-          links.classed('highlighted', false);
-          this.simulation.force('x', null).force('y', null);
-          this.simulation.alpha(0.4).restart();
-        } else {
-          activeTag = d.id;
-          // Find connected article IDs
-          const connected = new Set(
-            data.links.filter(l => {
-              const sid = typeof l.source === 'object' ? l.source.id : l.source;
-              const tid = typeof l.target === 'object' ? l.target.id : l.target;
-              return sid === d.id || tid === d.id;
-            }).map(l => {
-              const sid = typeof l.source === 'object' ? l.source.id : l.source;
-              const tid = typeof l.target === 'object' ? l.target.id : l.target;
-              return sid === d.id ? tid : sid;
-            })
-          );
-          connected.add(d.id);
-
-          nodes.classed('dimmed', nd => !connected.has(nd.id));
-          nodes.classed('tag-active', nd => nd.id === d.id);
-          links.classed('highlighted', l => {
-            const sid = typeof l.source === 'object' ? l.source.id : l.source;
-            const tid = typeof l.target === 'object' ? l.target.id : l.target;
-            return sid === d.id || tid === d.id;
-          });
-
-          // Pull connected nodes toward tag center
-          const cx = this.width / 2, cy = this.height / 2;
-          this.simulation
-            .force('x', d3.forceX(nd => connected.has(nd.id) ? cx : (nd.x < cx ? cx - 500 : cx + 500)).strength(nd => connected.has(nd.id) ? 0.3 : 0.15))
-            .force('y', d3.forceY(cy).strength(nd => connected.has(nd.id) ? 0.3 : 0.1));
-          this.simulation.alpha(0.6).restart();
-        }
-      });
-
-    // Click background to clear tag selection
-    this.svg.on('click', () => {
-      if (activeTag) {
-        activeTag = null;
-        nodes.classed('dimmed', false).classed('tag-active', false);
-        links.classed('highlighted', false);
-        this.simulation.force('x', null).force('y', null);
-        this.simulation.alpha(0.4).restart();
-      }
-    });
-
-    this.simulation.nodes(data.nodes).on('tick', () => {
-      links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-           .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-      nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-    });
-    this.simulation.force('link').links(data.links);
-  }
-}
-
-// ── Load ──
-fetch('./feed.json?v=' + Date.now())
-  .then(r => r.json())
-  .then(feed => {
-    const graph = new PostGraph('graph');
-    graph.render(feedToGraph(feed));
-  })
-  .catch(err => {
+  } catch(err) {
     const el = document.getElementById('error');
     el.style.display = 'block';
     el.textContent = 'Failed to load feed: ' + err.message;
-  });
+  }
+})();
 </script>
 </body>
 </html>`;
