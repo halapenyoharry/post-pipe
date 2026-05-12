@@ -1,0 +1,248 @@
+flowchart TB
+
+%% ═══════════════════════════════════════════════════════════════════
+%% BUILD PHASE, runs when `node generate-index.js` is invoked
+%% ═══════════════════════════════════════════════════════════════════
+
+subgraph BUILD["Build phase: node generate-index.js"]
+    direction TB
+
+    settings["settings.json<br/>(site metadata, theme, TTS config,<br/>toolbar config, frontmatter_display,<br/>export license header, content_dir)"]
+    envfile["auth/.env<br/>(GEMINI_API_KEY)"]
+
+    subgraph INGEST["ingest.js, folder → Content[]"]
+        walk["walk content root,<br/>skip dotfolders + authors + node_modules"]
+        detect["substrate detector<br/>(audio/video/image/text → kind)"]
+        readfm["frontmatter.json reader"]
+        readqmd["index.qmd YAML reader"]
+        findbody["body resolver<br/>(index.md, index.qmd, index.html, fallback)"]
+        findcover["cover resolver<br/>(cover.* → images/cover.* → art-* → sole image)"]
+        findmedia["media resolver<br/>(audio + srt + txt + timings, video)"]
+        buildg2["builder: gen2 frontmatter.json"]
+        buildqmd["builder: legacy qmd"]
+        buildunstr["builder: unstructured"]
+    end
+
+    subgraph FEED_SOURCES["platforms/feed-ingester.js ⊕<br/>(RSS/JSON feed fetcher + cache,<br/>.feed-cache/)"]
+        feedfetch["fetch external feeds"]
+        feedparse["parse XML/JSON"]
+        feedcache["cache results"]
+    end
+
+    subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + renderer + data transformer)"]
+        direction TB
+        loadlocal["loadLocalContent()<br/>local Content → JSON Feed items"]
+        covercopy["cover image copy<br/>into _site/covers/"]
+        toiso["toIsoDate() date normalizer"]
+        statusbucket["statusBucket()<br/>(status → draft/published for graph color)"]
+        buildfeed["buildFeed() JSON Feed 1.1"]
+        icons["inline SVG icon library<br/>(play, pause, stop, medium,<br/>substack, youtube, etc.)"]
+        buildhtml["buildIndexHTML() ⊕<br/>(reads D3 + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
+        mergesort["merge local + feed, sort by date"]
+        writefiles["write feed.json + index.html<br/>to _site/"]
+    end
+
+    settings --> loadlocal
+    settings --> buildhtml
+    envfile --> buildhtml
+    walk --> detect
+    walk --> readfm
+    walk --> readqmd
+    readfm --> buildg2
+    readqmd --> buildqmd
+    walk --> buildunstr
+    buildg2 --> loadlocal
+    buildqmd --> loadlocal
+    buildunstr --> loadlocal
+    findbody --> buildg2
+    findbody --> buildqmd
+    findbody --> buildunstr
+    findcover --> buildg2
+    findcover --> buildqmd
+    findcover --> buildunstr
+    findmedia --> buildg2
+    findmedia --> buildqmd
+    findmedia --> buildunstr
+    detect --> buildg2
+    detect --> buildunstr
+    loadlocal --> covercopy
+    loadlocal --> toiso
+    loadlocal --> statusbucket
+    loadlocal --> mergesort
+    feedfetch --> feedparse
+    feedparse --> feedcache
+    feedcache --> mergesort
+    mergesort --> buildfeed
+    buildfeed --> writefiles
+    icons --> buildhtml
+    buildhtml --> writefiles
+end
+
+%% ═══════════════════════════════════════════════════════════════════
+%% ARTIFACTS, what the build phase produces
+%% ═══════════════════════════════════════════════════════════════════
+
+subgraph SITE["_site/ (build output)"]
+    feedjson["feed.json<br/>JSON Feed 1.1 + extended schema"]
+    indexhtml["index.html ⊕⊕⊕<br/>(single 425KB file contains:<br/>graph renderer, reader panel,<br/>TTS integration, CSS, fonts,<br/>D3 library, tts.js, SVG icons,<br/>runtime settings)"]
+    covers["covers/ (copied cover images)"]
+end
+
+writefiles --> feedjson
+writefiles --> indexhtml
+covercopy --> covers
+
+%% ═══════════════════════════════════════════════════════════════════
+%% RUNTIME PHASE, what happens when a user opens index.html
+%% ═══════════════════════════════════════════════════════════════════
+
+subgraph RUNTIME["Runtime phase: browser loads _site/index.html"]
+    direction TB
+
+    subgraph GRAPH["Graph module ⊕<br/>(inline in index.html, ~800 lines)"]
+        loadfeed["fetch feed.json at load"]
+        feedtograph["feedToGraph()<br/>items → nodes + tag-nodes + links"]
+        postgraph["class PostGraph ⊕<br/>(rendering + interaction + state)"]
+        forcesim["d3 force simulation<br/>(link, charge, collide, center)"]
+        zoom["d3 zoom behavior"]
+        drag["d3 drag behavior"]
+        articlenode["article node renderer<br/>(card with title + preview OR image card)"]
+        tagnode["tag node renderer<br/>(pill with label)"]
+        hover["hover handler<br/>(tooltip with title + desc + date)"]
+        clickart["article click handler<br/>→ openReader()"]
+        clicktag["tag click handler ⊕<br/>(pull connected nodes, dim others,<br/>highlight links, click again to restore,<br/>click background to clear)"]
+        resize["window resize handler"]
+    end
+
+    subgraph READER["Reader panel ⊕<br/>(inline in index.html, ~500 lines)"]
+        direction TB
+        openreader["openReader() dispatcher"]
+        openphone["openAsNodeExpand()<br/>(freeze sim, hide node,<br/>geometry math, animate scale-up)"]
+        opensidebar["openAsSidebar()<br/>(slide from right, dim overlay)"]
+        swap["swapReaderMode()<br/>(phone ↔ sidebar)"]
+        closereader["closeReader()<br/>(animate back to node OR<br/>slide right, resume sim,<br/>reset styles, restore node)"]
+
+        subgraph SUBSTRATE_RENDER["renderSubstrate() ⊕<br/>dispatch by kind"]
+            renderessay["essay/multi: fetch url,<br/>parse HTML, strip h1, inject"]
+            renderimage["image: large img or placeholder"]
+            renderother["audio/video/archive/fragment:<br/>placeholder + metadata"]
+            rendercomp["renderCompanions()"]
+            rendermeta["renderMetadata()<br/>(seed, tldr, topology, energy, note)"]
+            renderplace["renderPlaceholder()"]
+        end
+
+        subgraph TOOLBAR["Reader toolbar ⊕"]
+            tts_controls["TTS controls slot"]
+            btnfm["frontmatter disclosure toggle"]
+            btnexport["export markdown (.md download)"]
+            btncopy["copy to clipboard"]
+            btnswap["swap phone↔sidebar"]
+            btnclose["close"]
+            syndlinks["syndication link buttons<br/>(copy URL + platform icons)"]
+        end
+
+        frontmatter["frontmatter panel ⊕<br/>(tags, date, reading time,<br/>series, license, syndication)"]
+        article_header["article header<br/>(title, byline, date, kind)"]
+        progress["scroll progress bar<br/>(updates on body scroll + TTS progress)"]
+        copytoast["copy feedback toast"]
+    end
+
+    subgraph TTS["TTS module ⊕<br/>(tts.js, injected into index.html)"]
+        tts_registry["engine registry<br/>(pluggable engines,<br/>self-describe capabilities)"]
+        engine_picker["engine dropdown"]
+        voice_picker["voice dropdown<br/>(grouped by lang if available)"]
+        param_controls["param controls<br/>(range sliders + selects<br/>built from capabilities)"]
+        playback["play/pause/stop state machine"]
+        progress_emit["emit progress events<br/>(word/sentence index)"]
+        highlight["highlight current text<br/>in reader-body"]
+        engine_browser["browser speechSynthesis engine"]
+        engine_gemini["Gemini TTS engine<br/>(uses GEMINI_API_KEY)"]
+    end
+
+    loadfeed --> feedtograph
+    feedtograph --> postgraph
+    postgraph --> forcesim
+    postgraph --> zoom
+    postgraph --> drag
+    postgraph --> articlenode
+    postgraph --> tagnode
+    postgraph --> hover
+    postgraph --> clickart
+    postgraph --> clicktag
+    postgraph --> resize
+    clickart --> openreader
+    openreader --> openphone
+    openreader --> opensidebar
+    openreader --> SUBSTRATE_RENDER
+    openreader --> TOOLBAR
+    openreader --> frontmatter
+    openreader --> article_header
+    swap -.-> openphone
+    swap -.-> opensidebar
+    btnswap --> swap
+    btnclose --> closereader
+    tts_controls --> TTS
+    playback --> highlight
+    playback --> progress_emit
+    progress_emit --> progress
+    tts_registry --> engine_browser
+    tts_registry --> engine_gemini
+    engine_picker --> tts_registry
+    voice_picker --> tts_registry
+    param_controls --> tts_registry
+end
+
+feedjson -.->|fetched at load| loadfeed
+indexhtml -.->|loaded by browser| RUNTIME
+
+%% ═══════════════════════════════════════════════════════════════════
+%% PUBLISHING PHASE, optional, user-invoked
+%% ═══════════════════════════════════════════════════════════════════
+
+subgraph PUB["Publishing phase: node index.js <platform> <file>"]
+    direction TB
+    cli["index.js CLI dispatcher ⊕<br/>(argparse + stdin + platform routing)"]
+
+    subgraph PLATFORMS["platforms/"]
+        medium["medium.js<br/>(playwright automation,<br/>session in auth/medium-session.json)"]
+        substack["substack.js<br/>(playwright automation)"]
+        youtube["youtube.js<br/>(video upload)"]
+        ghpages["github-pages.js<br/>(render + commit to Pages branch)"]
+    end
+
+    cli --> medium
+    cli --> substack
+    cli --> youtube
+    cli --> ghpages
+end
+
+%% ═══════════════════════════════════════════════════════════════════
+%% USER CONTENT (external, lives at ~/Posts/)
+%% ═══════════════════════════════════════════════════════════════════
+
+subgraph USER_CONTENT["~/Posts/ (user corpus, external to repo)"]
+    direction TB
+    gen2["{slug}/ with frontmatter.json<br/>+ index.md + cover + media<br/>(Gen 2, rich)"]
+    legacy["{slug}/ with index.qmd<br/>(legacy YAML)"]
+    unstr["{slug}/ with just a file<br/>(unstructured, flagged scattered)"]
+    todos["_TODO*.md files<br/>(migration markers)"]
+end
+
+USER_CONTENT -->|walked by| walk
+USER_CONTENT -.->|source for| PUB
+
+%% ═══════════════════════════════════════════════════════════════════
+%% CROSS-CUTTING: what the system implicitly assumes
+%% ═══════════════════════════════════════════════════════════════════
+
+subgraph IMPLICIT["Implicit conventions, not enforced"]
+    conv1["data contract: feed.json shape<br/>(JSON Feed 1.1 + extended fields)"]
+    conv2["render contract: index.html<br/>consumes feed.json at load"]
+    conv3["viewer state: window._postGraph<br/>(global, used to freeze sim<br/>during node-expand reader)"]
+    conv4["styling: CSS vars from settings.json<br/>(theme.bg, theme.accent, etc.)"]
+    conv5["TTS engines register themselves<br/>via window.TTS at script load"]
+    conv6["_site/ is git-tracked<br/>and the deploy surface"]
+end
+
+classDef collapsed fill:#3a1f3a,stroke:#f39c12,color:#eee
+class GENIDX,buildhtml,indexhtml,GRAPH,postgraph,clicktag,READER,SUBSTRATE_RENDER,TOOLBAR,frontmatter,TTS,cli,FEED_SOURCES collapsed
