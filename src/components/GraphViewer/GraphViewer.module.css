@@ -55,7 +55,17 @@
   filter: drop-shadow(0 0 6px var(--gv-accent));
 }
 
+/* Tooltip is rendered as a sibling of .graphContainer, so it does not
+   inherit the --gv-tooltip-* custom properties declared there. Declare
+   the defaults locally so the tooltip always has a background. Host
+   pages can still override via :root if they want. */
 .tooltip {
+  --gv-tooltip-bg: #16213e;
+  --gv-tooltip-border: #0f3460;
+  --gv-tooltip-title: #fff;
+  --gv-tooltip-desc: #aaa;
+  --gv-tooltip-date: #666;
+
   position: fixed;
   display: none;
   background: var(--gv-tooltip-bg);
