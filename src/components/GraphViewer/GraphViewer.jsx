@@ -65,29 +65,40 @@ function feedToGraph(feed, config = {}) {
   return { nodes, links };
 }
 
-// LOD threshold: below this zoom scale, hide description, show title only.
-const LOD_TITLE_ONLY = 0.6;
+// Zoom-aware level of detail. Three levels of precision built into the
+// graph: at deep zoom-out the node is just the slug; closer in, the
+// short_title; closer still, the full card.
+const LOD_SLUG_ONLY = 0.4;
+const LOD_TITLE_ONLY = 0.7;
+function getLOD(scale) {
+  if (scale < LOD_SLUG_ONLY) return 'slug';
+  if (scale < LOD_TITLE_ONLY) return 'title';
+  return 'full';
+}
 
 // Build the inner HTML for an article node's foreignObject div.
 // Pure function of node data + view state, no side effects.
 function renderArticleNodeHTML(d, view, colors) {
-  const { borderColor, bgImage, bgColor } = colors;
+  const { borderColor, bgImage } = colors;
   const { hovered, pinned, scale } = view;
   const expanded = hovered || pinned;
 
-  const cardW = pinned ? 220 : 180;
-  const cardH = pinned ? 180 : 140;
+  // Three sizes: default / hovered (slightly bigger) / pinned (bigger still).
+  let cardW, cardH;
+  if (pinned) { cardW = 230; cardH = 190; }
+  else if (hovered) { cardW = 200; cardH = 160; }
+  else { cardW = 180; cardH = 140; }
 
   // Image-kind nodes keep their image-card look (no text morphing).
   if (d.kind === 'image' && d.image) {
-    const imgH = pinned ? 220 : 180;
+    const imgH = pinned ? 230 : hovered ? 200 : 180;
     return {
       width: cardW,
       height: imgH + 24,
       html: (
         '<div style="width:' + cardW + 'px;height:' + imgH + 'px;' +
           'background:#000 url(\'' + d.image + '\') center/cover no-repeat;' +
-          'border:1.5px solid ' + borderColor + ';border-radius:4px;"></div>' +
+          'border:' + (pinned ? '2px' : '1.5px') + ' solid ' + (pinned ? '#64ffda' : borderColor) + ';border-radius:4px;"></div>' +
         '<div style="font-size:11px;color:rgba(255,255,255,0.6);' +
           'text-align:center;margin-top:4px;line-height:1.2;">' +
           (d.short_title || d.title || d.label) + '</div>' +
@@ -96,36 +107,47 @@ function renderArticleNodeHTML(d, view, colors) {
     };
   }
 
-  // Article body card.
-  // - expanded → full description, scrollable in place.
-  // - LOD title-only → just the title, larger.
-  // - default → title + truncated description preview.
+  // Article body card. Inner content depends on state and LOD level.
   let inner;
   if (expanded) {
+    // Hover/pin: full title + scrollable description in place.
     const desc = d.description || '';
     inner =
       '<div style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:6px;">' +
         (d.title || d.label) +
       '</div>' +
       (desc
-        ? '<div class="rp-scroll" style="font-size:13px;color:rgba(255,255,255,0.78);line-height:1.45;max-height:' + (cardH - 56) + 'px;overflow-y:auto;padding-right:4px;">' + desc + '</div>'
+        ? '<div class="rp-scroll" style="font-size:13px;color:rgba(255,255,255,0.78);line-height:1.45;max-height:' + (cardH - 60) + 'px;overflow-y:auto;padding-right:4px;-webkit-user-select:text;user-select:text;">' + desc + '</div>'
         : '');
-  } else if (scale < LOD_TITLE_ONLY) {
-    // Title-only at low zoom — slightly larger font.
-    inner =
-      '<div style="font-size:18px;font-weight:700;color:#fff;line-height:1.25;text-align:center;display:flex;align-items:center;justify-content:center;height:100%;">' +
-        (d.short_title || d.title || d.label) +
-      '</div>';
   } else {
-    const desc = d.description || '';
-    const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
-    inner =
-      '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;">' + (d.title || d.label) + '</span>' +
-      (preview
-        ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;">' + preview + '</span>'
-        : '');
+    const lod = getLOD(scale);
+    if (lod === 'slug') {
+      // Deepest zoom-out: just the slug at large font.
+      inner =
+        '<div style="font-size:22px;font-weight:700;color:#fff;line-height:1.2;text-align:center;display:flex;align-items:center;justify-content:center;height:100%;-webkit-user-select:none;user-select:none;">' +
+          d.label +
+        '</div>';
+    } else if (lod === 'title') {
+      // Mid zoom: short_title or title.
+      inner =
+        '<div style="font-size:18px;font-weight:700;color:#fff;line-height:1.25;text-align:center;display:flex;align-items:center;justify-content:center;height:100%;-webkit-user-select:none;user-select:none;">' +
+          (d.short_title || d.title || d.label) +
+        '</div>';
+    } else {
+      // Close zoom: full card with title + truncated description preview.
+      const desc = d.description || '';
+      const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
+      inner =
+        '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;-webkit-user-select:none;user-select:none;">' + (d.title || d.label) + '</span>' +
+        (preview
+          ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;-webkit-user-select:none;user-select:none;">' + preview + '</span>'
+          : '');
+    }
   }
 
+  // Cursor: grab everywhere by default so the user knows the whole node is
+  // draggable. When hovered/pinned and over the scrollable text, the inner
+  // .rp-scroll div overrides cursor to text via user-select:text.
   return {
     width: cardW,
     height: cardH,
@@ -134,8 +156,8 @@ function renderArticleNodeHTML(d, view, colors) {
         'background:' + bgImage + ';background-size:cover;background-position:center;' +
         'border:' + (pinned ? '2px' : '1.5px') + ' solid ' + (pinned ? '#64ffda' : borderColor) + ';' +
         'border-radius:4px;padding:10px 12px;box-sizing:border-box;overflow:hidden;' +
-        'font-family:\'Atkinson\', sans-serif;cursor:' + (expanded ? 'default' : 'pointer') + ';' +
-        'transition:width 0.2s ease, height 0.2s ease, border-color 0.2s ease;">' +
+        'font-family:\'Atkinson\', sans-serif;cursor:grab;' +
+        '-webkit-user-select:none;user-select:none;">' +
         inner +
         (pinned ? popoutIconHTML() : '') +
       '</div>'
@@ -143,14 +165,14 @@ function renderArticleNodeHTML(d, view, colors) {
 }
 
 // Popout icon — clicked to open the side reader. Marked with data-popout="1"
-// so the SVG-level click handler can route to onNodeSelect.
+// so the click handler can route to onNodeSelect rather than pin/drag.
 function popoutIconHTML() {
   return (
     '<div data-popout="1" title="Open in reader" ' +
-      'style="position:absolute;top:6px;right:6px;width:22px;height:22px;' +
-        'background:rgba(17,24,39,0.85);border:1px solid rgba(100,255,218,0.45);' +
-        'border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;">' +
-      '<svg data-popout="1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64ffda" stroke-width="2">' +
+      'style="position:absolute;top:6px;right:6px;width:24px;height:24px;' +
+        'background:rgba(17,24,39,0.92);border:1px solid rgba(100,255,218,0.55);' +
+        'border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;">' +
+      '<svg data-popout="1" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64ffda" stroke-width="2.2" style="pointer-events:none;">' +
         '<path d="M14 3h7v7"/><path d="M21 3l-9 9"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>' +
       '</svg>' +
     '</div>'
@@ -170,6 +192,7 @@ export function GraphViewer({ feedData, onNodeSelect }) {
   const pinnedIdRef = useRef(null);
   const hoveredIdRef = useRef(null);
   const zoomScaleRef = useRef(1);
+  const currentLodRef = useRef('full');
 
   useEffect(() => {
     if (!feedData || !containerRef.current) return;
@@ -197,16 +220,19 @@ export function GraphViewer({ feedData, onNodeSelect }) {
 
     const g = svg.append('g');
 
-    // Zoom — repaints node text content on LOD threshold crossings, never
-    // touches the simulation.
+    // Zoom — repaints node text content only when crossing an LOD boundary;
+    // never touches the simulation. Wheel events that originate inside an
+    // expanded node's scrollable area are stopPropagation-ed (see render
+    // helper below), so this zoom handler doesn't receive them.
     const zoom = d3.zoom().on('zoom', (event) => {
       g.attr('transform', event.transform);
       const newScale = event.transform.k;
-      const oldScale = zoomScaleRef.current;
       zoomScaleRef.current = newScale;
-      const crossedThreshold =
-        (oldScale < LOD_TITLE_ONLY) !== (newScale < LOD_TITLE_ONLY);
-      if (crossedThreshold) renderAllArticleBodies();
+      const newLod = getLOD(newScale);
+      if (newLod !== currentLodRef.current) {
+        currentLodRef.current = newLod;
+        renderAllArticleBodies();
+      }
     });
     svg.call(zoom).on('dblclick.zoom', null);
 
@@ -240,16 +266,19 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       .attr('class', 'node')
       .call(d3.drag()
         .on('start', (event, d) => {
-          // Heat the simulation just enough for the tick callback to
-          // update the dragged node's transform. After initial settle
-          // every other node has fx/fy set, so they cannot move — only
-          // this node responds to the new fx/fy below.
-          if (!event.active) simulation.alphaTarget(0.05).restart();
+          // Wake the simulation so the tick callback updates the dragged
+          // node's transform. After initial settle, every other node has
+          // fx/fy set — they cannot move regardless of forces. Only this
+          // node responds (because we keep rewriting its fx/fy below).
+          simulation.alpha(0.3).restart();
           d.fx = d.x; d.fy = d.y;
         })
-        .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+        .on('drag', (event, d) => {
+          d.fx = event.x; d.fy = event.y;
+        })
         .on('end', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0);
+          // Pin the node where it was dropped. fx/fy stays set so it
+          // remains there permanently.
           d.fx = d.x; d.fy = d.y;
         })
       );
@@ -308,8 +337,6 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       const pinned = pinnedIdRef.current === d.id;
       const view = { hovered, pinned, scale: zoomScaleRef.current };
       const { width: w, height: h, html } = renderArticleNodeHTML(d, view, colorsFor(d));
-      const fo = d3.select(this !== undefined ? this : null);
-      // Find the foreignObject for this datum.
       const sel = nodes.filter(nd => nd.id === d.id).select('foreignObject.article-fo');
       sel.attr('width', w).attr('height', h).attr('x', -w / 2).attr('y', -h / 2)
         .html(
@@ -317,6 +344,10 @@ export function GraphViewer({ feedData, onNodeSelect }) {
             html +
           '</div>'
         );
+      // Stop wheel events that originate inside the in-node scrollable area
+      // from reaching the SVG-level zoom handler. The browser's default
+      // scroll behavior on overflow-y:auto still fires.
+      sel.selectAll('.rp-scroll').on('wheel', (e) => e.stopPropagation());
       d._r = Math.max(w, h) / 2;
     }
 
