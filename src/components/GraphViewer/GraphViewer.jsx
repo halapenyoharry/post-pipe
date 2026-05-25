@@ -1,6 +1,8 @@
 import React, { useRef, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
+import { TextView } from '../NodeView';
 
 // Transform the raw feed JSON into graph nodes and links.
 function feedToGraph(feed, config = {}) {
@@ -76,108 +78,12 @@ function getLOD(scale) {
   return 'full';
 }
 
-// Build the inner HTML for an article node's foreignObject div.
-// Pure function of node data + view state, no side effects.
-function renderArticleNodeHTML(d, view, colors) {
-  const { borderColor, bgImage } = colors;
-  const { hovered, pinned, scale } = view;
-  const expanded = hovered || pinned;
-
-  // Three sizes: default / hovered (slightly bigger) / pinned (bigger still).
-  let cardW, cardH;
-  if (pinned) { cardW = 230; cardH = 190; }
-  else if (hovered) { cardW = 200; cardH = 160; }
-  else { cardW = 180; cardH = 140; }
-
-  // Image-kind nodes keep their image-card look (no text morphing).
-  if (d.kind === 'image' && d.image) {
-    const imgH = pinned ? 230 : hovered ? 200 : 180;
-    return {
-      width: cardW,
-      height: imgH + 24,
-      html: (
-        '<div style="width:' + cardW + 'px;height:' + imgH + 'px;' +
-          'background:#000 url(\'' + d.image + '\') center/cover no-repeat;' +
-          'border:' + (pinned ? '2px' : '1.5px') + ' solid ' + (pinned ? '#64ffda' : borderColor) + ';border-radius:4px;"></div>' +
-        '<div style="font-size:11px;color:rgba(255,255,255,0.6);' +
-          'text-align:center;margin-top:4px;line-height:1.2;">' +
-          (d.short_title || d.title || d.label) + '</div>' +
-        (pinned ? popoutIconHTML() : '')
-      )
-    };
-  }
-
-  // Article body card. Inner content depends on state and LOD level.
-  let inner;
-  if (expanded) {
-    // Hover shows the summary. Pin shows the full article body if it has
-    // been fetched yet (loaded lazily on pin — see loadFullContent).
-    const useFullArticle = pinned && d._fullContent;
-    const contentBody = useFullArticle ? d._fullContent : (d.description || '');
-    inner =
-      '<div style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:6px;-webkit-user-select:none;user-select:none;">' +
-        (d.title || d.label) +
-      '</div>' +
-      (contentBody
-        ? '<div class="rp-scroll" style="font-size:' + (useFullArticle ? '11px' : '13px') + ';color:rgba(255,255,255,0.78);line-height:1.45;max-height:' + (cardH - 56) + 'px;overflow-y:auto;padding-right:6px;-webkit-user-select:text;user-select:text;">' + contentBody + '</div>'
-        : '');
-  } else {
-    const lod = getLOD(scale);
-    if (lod === 'slug') {
-      // Slug-LOD: card content is empty. The floating <text class="slug-label">
-      // overlay (sibling of the foreignObject in the parent g) provides the
-      // counter-scaled label at constant on-screen size — see updateSlugLabels.
-      inner = '';
-    } else if (lod === 'title') {
-      // Mid zoom: short_title or title.
-      inner =
-        '<div style="font-size:18px;font-weight:700;color:#fff;line-height:1.25;text-align:center;display:flex;align-items:center;justify-content:center;height:100%;-webkit-user-select:none;user-select:none;">' +
-          (d.short_title || d.title || d.label) +
-        '</div>';
-    } else {
-      // Close zoom: full card with title + truncated description preview.
-      const desc = d.description || '';
-      const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
-      inner =
-        '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;-webkit-user-select:none;user-select:none;">' + (d.title || d.label) + '</span>' +
-        (preview
-          ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;-webkit-user-select:none;user-select:none;">' + preview + '</span>'
-          : '');
-    }
-  }
-
-  // Cursor: grab everywhere by default so the user knows the whole node is
-  // draggable. When hovered/pinned and over the scrollable text, the inner
-  // .rp-scroll div overrides cursor to text via user-select:text.
-  return {
-    width: cardW,
-    height: cardH,
-    html:
-      '<div style="position:relative;width:' + cardW + 'px;height:' + cardH + 'px;' +
-        'background:' + bgImage + ';background-size:cover;background-position:center;' +
-        'border:' + (pinned ? '2px' : '1.5px') + ' solid ' + (pinned ? '#64ffda' : borderColor) + ';' +
-        'border-radius:4px;padding:10px 12px;box-sizing:border-box;overflow:hidden;' +
-        'font-family:\'Atkinson\', sans-serif;cursor:grab;' +
-        '-webkit-user-select:none;user-select:none;">' +
-        inner +
-        (pinned ? popoutIconHTML() : '') +
-      '</div>'
-  };
-}
-
-// Popout icon — clicked to open the side reader. Marked with data-popout="1"
-// so the click handler can route to onNodeSelect rather than pin/drag.
-function popoutIconHTML() {
-  return (
-    '<div data-popout="1" title="Open in reader" ' +
-      'style="position:absolute;top:6px;right:6px;width:24px;height:24px;' +
-        'background:rgba(17,24,39,0.92);border:1px solid rgba(100,255,218,0.55);' +
-        'border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;">' +
-      '<svg data-popout="1" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64ffda" stroke-width="2.2" style="pointer-events:none;">' +
-        '<path d="M14 3h7v7"/><path d="M21 3l-9 9"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>' +
-      '</svg>' +
-    '</div>'
-  );
+// Card dimensions per view state. Returned to both GraphViewer (which sizes
+// the foreignObject) and the host wrapper (which sizes the React mount).
+function cardSizeFor({ hovered, pinned }) {
+  if (pinned) return { width: 230, height: 190 };
+  if (hovered) return { width: 200, height: 160 };
+  return { width: 180, height: 140 };
 }
 
 export function GraphViewer({ feedData, onNodeSelect }) {
@@ -367,40 +273,56 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     const slugWidthPerFontUnit = maxSlugWidthAtProbe / SLUG_PROBE_SIZE;
     probe.remove();
 
-    // Build the colors lookup once.
-    function colorsFor(d) {
-      const isDraft = d.color === config.nodeDraftColor;
-      const borderColor = isDraft ? '#555' : config.nodePublishedColor;
-      const bgColor = isDraft ? '#2a2a3e' : '#1e3a5f';
-      const bgImage = d.image
-        ? "linear-gradient(" + (isDraft ? "rgba(42,42,62,0.85),rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85),rgba(30,58,95,0.85)") + "), url('" + d.image + "')"
-        : bgColor;
-      return { borderColor, bgColor, bgImage };
-    }
+    // One React root per article node, mounted inside that node's
+    // foreignObject. Keyed by node id. Roots are unmounted on cleanup so we
+    // don't leak across feedData changes. The React tree inside each root
+    // is pure — TextView is presentational; D3 still owns all events on
+    // the parent <g>.
+    const reactRoots = new Map();
+    nodes.filter(d => d.type === 'article').each(function(d) {
+      const fo = d3.select(this).select('foreignObject.article-fo').node();
+      // React needs an HTML element to mount into (not the SVG foreignObject
+      // itself). Append a single xhtml wrapper inside.
+      const wrapper = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+      wrapper.style.width = '100%';
+      wrapper.style.height = '100%';
+      fo.appendChild(wrapper);
+      reactRoots.set(d.id, { root: createRoot(wrapper), fo, wrapper });
+    });
 
-    // Paint one article node's foreignObject based on its current state.
+    // Paint one article node's lens based on its current state. Sizes the
+    // foreignObject and re-renders the TextView with fresh props.
     function renderArticleBody(d) {
       if (d.type !== 'article') return;
+      const entry = reactRoots.get(d.id);
+      if (!entry) return;
       const hovered = hoveredIdRef.current === d.id;
       const pinned = pinnedIdRef.current === d.id;
-      const view = { hovered, pinned, scale: zoomScaleRef.current };
-      const { width: w, height: h, html } = renderArticleNodeHTML(d, view, colorsFor(d));
-      const sel = nodes.filter(nd => nd.id === d.id).select('foreignObject.article-fo');
-      sel.attr('width', w).attr('height', h).attr('x', -w / 2).attr('y', -h / 2)
-        .html(
-          '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + w + 'px;height:' + h + 'px;">' +
-            html +
-          '</div>'
-        );
+      const lod = getLOD(zoomScaleRef.current);
+      const { width: w, height: h } = cardSizeFor({ hovered, pinned });
+
+      d3.select(entry.fo)
+        .attr('width', w).attr('height', h)
+        .attr('x', -w / 2).attr('y', -h / 2);
+      entry.wrapper.style.width = w + 'px';
+      entry.wrapper.style.height = h + 'px';
+
+      entry.root.render(
+        React.createElement(TextView, {
+          article: d,
+          width: w,
+          height: h,
+          viewState: { hovered, pinned, lod },
+          fullContent: d._fullContent || null
+        })
+      );
       d._r = Math.max(w, h) / 2;
     }
 
     // Block wheel events from inside any article node from reaching the
-    // SVG zoom handler. Attached ONCE on the foreignObject element (not
-    // on the inner .rp-scroll) so wheel anywhere over the card — title,
-    // padding, or scrollable text — is consumed. The browser's default
-    // overflow-scroll behavior on .rp-scroll still fires because we
-    // only stop propagation, not the default action.
+    // SVG zoom handler. Attached on the foreignObject so wheel anywhere
+    // inside the card is consumed; the browser's default scroll on
+    // .rp-scroll still fires because we only stop propagation.
     nodes.filter(d => d.type === 'article').select('foreignObject.article-fo')
       .on('wheel', (e) => e.stopPropagation());
 
@@ -601,6 +523,13 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     return () => {
       simulation.stop();
       window.removeEventListener('resize', handleResize);
+      // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
+      // would try to reconcile against a detached DOM tree on the next
+      // effect run. Defer the unmount so it doesn't fire inside a render.
+      reactRoots.forEach(({ root }) => {
+        queueMicrotask(() => root.unmount());
+      });
+      reactRoots.clear();
     };
     // Deliberately depend only on feedData — onNodeSelect changes are
     // handled through onNodeSelectRef without rebuilding the simulation.
