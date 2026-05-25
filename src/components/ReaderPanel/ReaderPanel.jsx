@@ -8,6 +8,9 @@ export function ReaderPanel({ article, onClose, settings }) {
   const [contentHtml, setContentHtml] = useState('');
   const [scrollProgress, setScrollProgress] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
+  // Reader always leaves the graph visible — `wide` toggles between
+  // narrow (~50% on small / 38% on big) and wide (~70% / 55%).
+  const [wide, setWide] = useState(false);
   const bodyRef = useRef(null);
 
   // Derive initial state when article changes
@@ -107,7 +110,7 @@ export function ReaderPanel({ article, onClose, settings }) {
         className={`${styles.overlay} ${isOpen ? styles.open : ''}`}
         onClick={onClose}
       />
-      <div className={`${styles.panel} ${isOpen ? styles.open : ''}`}>
+      <div className={`${styles.panel} ${isOpen ? styles.open : ''} ${wide ? styles.wide : ''}`}>
         <div className={styles.toolbar}>
           {/* TTS Toolbar Placeholder - We will mount the TTS component here or externally */}
           <div id="tts-mount-point" className={styles.toolbarGroup}></div>
@@ -132,6 +135,14 @@ export function ReaderPanel({ article, onClose, settings }) {
               onClick={handleCopy}
               title="Copy to clipboard"
               dangerouslySetInnerHTML={{ __html: `${ICONS.copy}<span class="${styles.tbTooltip}">Copy</span>` }}
+            />
+            <button
+              className={`${styles.tb} ${wide ? styles.active : ''}`}
+              onClick={() => setWide(w => !w)}
+              title={wide ? 'Shrink reader' : 'Widen reader'}
+              dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">${wide
+                ? '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>'
+                : '<polyline points="3 9 3 3 9 3"/><polyline points="21 15 21 21 15 21"/><line x1="3" y1="3" x2="10" y2="10"/><line x1="21" y1="21" x2="14" y2="14"/>'}</svg><span class="${styles.tbTooltip}">${wide ? 'Shrink' : 'Widen'}</span>` }}
             />
           </div>
 

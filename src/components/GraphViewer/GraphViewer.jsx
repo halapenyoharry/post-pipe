@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 
@@ -44,7 +44,7 @@ function feedToGraph(feed, config = {}) {
       forms: item.forms || {},
       note: item.note || '',
       todos: item.todos || [],
-      originalItem: item // Keep the original for emitting to ReaderPanel
+      originalItem: item
     });
 
     for (const tag of (item.tags || [])) {
@@ -65,21 +65,111 @@ function feedToGraph(feed, config = {}) {
   return { nodes, links };
 }
 
+// LOD threshold: below this zoom scale, hide description, show title only.
+const LOD_TITLE_ONLY = 0.6;
+
+// Build the inner HTML for an article node's foreignObject div.
+// Pure function of node data + view state, no side effects.
+function renderArticleNodeHTML(d, view, colors) {
+  const { borderColor, bgImage, bgColor } = colors;
+  const { hovered, pinned, scale } = view;
+  const expanded = hovered || pinned;
+
+  const cardW = pinned ? 220 : 180;
+  const cardH = pinned ? 180 : 140;
+
+  // Image-kind nodes keep their image-card look (no text morphing).
+  if (d.kind === 'image' && d.image) {
+    const imgH = pinned ? 220 : 180;
+    return {
+      width: cardW,
+      height: imgH + 24,
+      html: (
+        '<div style="width:' + cardW + 'px;height:' + imgH + 'px;' +
+          'background:#000 url(\'' + d.image + '\') center/cover no-repeat;' +
+          'border:1.5px solid ' + borderColor + ';border-radius:4px;"></div>' +
+        '<div style="font-size:11px;color:rgba(255,255,255,0.6);' +
+          'text-align:center;margin-top:4px;line-height:1.2;">' +
+          (d.short_title || d.title || d.label) + '</div>' +
+        (pinned ? popoutIconHTML() : '')
+      )
+    };
+  }
+
+  // Article body card.
+  // - expanded → full description, scrollable in place.
+  // - LOD title-only → just the title, larger.
+  // - default → title + truncated description preview.
+  let inner;
+  if (expanded) {
+    const desc = d.description || '';
+    inner =
+      '<div style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:6px;">' +
+        (d.title || d.label) +
+      '</div>' +
+      (desc
+        ? '<div class="rp-scroll" style="font-size:13px;color:rgba(255,255,255,0.78);line-height:1.45;max-height:' + (cardH - 56) + 'px;overflow-y:auto;padding-right:4px;">' + desc + '</div>'
+        : '');
+  } else if (scale < LOD_TITLE_ONLY) {
+    // Title-only at low zoom — slightly larger font.
+    inner =
+      '<div style="font-size:18px;font-weight:700;color:#fff;line-height:1.25;text-align:center;display:flex;align-items:center;justify-content:center;height:100%;">' +
+        (d.short_title || d.title || d.label) +
+      '</div>';
+  } else {
+    const desc = d.description || '';
+    const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
+    inner =
+      '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;">' + (d.title || d.label) + '</span>' +
+      (preview
+        ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;">' + preview + '</span>'
+        : '');
+  }
+
+  return {
+    width: cardW,
+    height: cardH,
+    html:
+      '<div style="position:relative;width:' + cardW + 'px;height:' + cardH + 'px;' +
+        'background:' + bgImage + ';background-size:cover;background-position:center;' +
+        'border:' + (pinned ? '2px' : '1.5px') + ' solid ' + (pinned ? '#64ffda' : borderColor) + ';' +
+        'border-radius:4px;padding:10px 12px;box-sizing:border-box;overflow:hidden;' +
+        'font-family:\'Atkinson\', sans-serif;cursor:' + (expanded ? 'default' : 'pointer') + ';' +
+        'transition:width 0.2s ease, height 0.2s ease, border-color 0.2s ease;">' +
+        inner +
+        (pinned ? popoutIconHTML() : '') +
+      '</div>'
+  };
+}
+
+// Popout icon — clicked to open the side reader. Marked with data-popout="1"
+// so the SVG-level click handler can route to onNodeSelect.
+function popoutIconHTML() {
+  return (
+    '<div data-popout="1" title="Open in reader" ' +
+      'style="position:absolute;top:6px;right:6px;width:22px;height:22px;' +
+        'background:rgba(17,24,39,0.85);border:1px solid rgba(100,255,218,0.45);' +
+        'border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;">' +
+      '<svg data-popout="1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64ffda" stroke-width="2">' +
+        '<path d="M14 3h7v7"/><path d="M21 3l-9 9"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>' +
+      '</svg>' +
+    '</div>'
+  );
+}
+
 export function GraphViewer({ feedData, onNodeSelect }) {
   const containerRef = useRef(null);
-  const tooltipRef = useRef(null);
   const svgRef = useRef(null);
-  const simulationRef = useRef(null);
-  const resizeHandlerRef = useRef(null);
 
-  const [tooltipData, setTooltipData] = useState({
-    show: false,
-    x: 0,
-    y: 0,
-    title: '',
-    desc: '',
-    date: ''
-  });
+  // Stable refs for callbacks so the simulation never rebuilds on prop change.
+  const onNodeSelectRef = useRef(onNodeSelect);
+  useEffect(() => { onNodeSelectRef.current = onNodeSelect; }, [onNodeSelect]);
+
+  // View state lives in refs because it must not trigger React re-renders or
+  // re-run the useEffect that owns the simulation.
+  const pinnedIdRef = useRef(null);
+  const hoveredIdRef = useRef(null);
+  const zoomScaleRef = useRef(1);
 
   useEffect(() => {
     if (!feedData || !containerRef.current) return;
@@ -88,8 +178,6 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     let width = container.clientWidth;
     let height = container.clientHeight;
 
-    // We pass CSS var values via config mapping or defaults,
-    // but the actual coloring will be handled via inline styles in DOM mutation
     const computedStyles = getComputedStyle(container);
     const config = {
       nodeDraftColor: computedStyles.getPropertyValue('--gv-node-draft').trim() || '#555',
@@ -99,20 +187,28 @@ export function GraphViewer({ feedData, onNodeSelect }) {
 
     const data = feedToGraph(feedData, config);
 
-    // Clear previous D3 rendering if re-running
     d3.select(container).selectAll('svg').remove();
 
     const svg = d3.select(container).append('svg')
       .attr('width', width)
-      .attr('height', height)
-      .call(d3.zoom().on('zoom', (event) => {
-        g.attr('transform', event.transform);
-      }))
-      .on('dblclick.zoom', null);
+      .attr('height', height);
 
     svgRef.current = svg;
 
     const g = svg.append('g');
+
+    // Zoom — repaints node text content on LOD threshold crossings, never
+    // touches the simulation.
+    const zoom = d3.zoom().on('zoom', (event) => {
+      g.attr('transform', event.transform);
+      const newScale = event.transform.k;
+      const oldScale = zoomScaleRef.current;
+      zoomScaleRef.current = newScale;
+      const crossedThreshold =
+        (oldScale < LOD_TITLE_ONLY) !== (newScale < LOD_TITLE_ONLY);
+      if (crossedThreshold) renderAllArticleBodies();
+    });
+    svg.call(zoom).on('dblclick.zoom', null);
 
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(160))
@@ -122,22 +218,17 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       .velocityDecay(0.85)
       .alphaDecay(0.05);
 
-    simulationRef.current = simulation;
-
-    // Handle resize
+    // Resize: rescale the SVG canvas only. Never restart the simulation —
+    // node positions in graph-space stay fixed; only the viewport changes.
     const handleResize = () => {
       if (!containerRef.current) return;
       width = containerRef.current.clientWidth;
       height = containerRef.current.clientHeight;
       svg.attr('width', width).attr('height', height);
-      simulation.force('center', d3.forceCenter(width / 2, height / 2));
-      simulation.alpha(0.1).restart();
     };
-
     window.addEventListener('resize', handleResize);
-    resizeHandlerRef.current = handleResize;
 
-    // Render nodes & links
+    // Render links + nodes.
     const links = g.selectAll('.link')
       .data(data.links)
       .enter().append('line')
@@ -149,23 +240,27 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       .attr('class', 'node')
       .call(d3.drag()
         .on('start', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0.3).restart();
+          // Heat the simulation just enough for the tick callback to
+          // update the dragged node's transform. After initial settle
+          // every other node has fx/fy set, so they cannot move — only
+          // this node responds to the new fx/fy below.
+          if (!event.active) simulation.alphaTarget(0.05).restart();
           d.fx = d.x; d.fy = d.y;
         })
         .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
         .on('end', (event, d) => {
           if (!event.active) simulation.alphaTarget(0);
-          d.fx = null; d.fy = null;
+          d.fx = d.x; d.fy = d.y;
         })
       );
 
+    // Tag-node rendering uses a probe to size the bubble.
     const probe = svg.append('text')
       .style('font-family', "'Atkinson', sans-serif")
       .style('visibility', 'hidden');
 
     nodes.each(function(d) {
       const el = d3.select(this);
-
       if (d.type === 'tag') {
         const fontSize = 14;
         const padX = 14, padY = 8;
@@ -187,97 +282,94 @@ export function GraphViewer({ feedData, onNodeSelect }) {
           .style('pointer-events', 'none')
           .text(d.label);
         d._r = Math.max(bubbleW, bubbleH) / 2;
-
       } else {
-        const isDraft = d.color === config.nodeDraftColor;
-        const borderColor = isDraft ? '#555' : config.nodePublishedColor;
-
-        if (d.kind === 'image' && d.image) {
-          const cardW = 180, cardH = 180;
-          el.append('foreignObject')
-            .attr('width', cardW).attr('height', cardH + 24)
-            .attr('x', -cardW / 2).attr('y', -cardH / 2)
-            .append('xhtml:div')
-            .attr('xmlns', 'http://www.w3.org/1999/xhtml')
-            .style('width', cardW + 'px')
-            .style('font-family', "'Atkinson', sans-serif")
-            .style('cursor', 'pointer')
-            .html(
-              '<div style="width:' + cardW + 'px;height:' + cardH + 'px;' +
-                "background:#000 url('" + d.image + "') center/cover no-repeat;" +
-                'border:1.5px solid ' + borderColor + ';border-radius:4px;"></div>' +
-              '<div style="font-size:11px;color:rgba(255,255,255,0.6);' +
-                'text-align:center;margin-top:4px;line-height:1.2;">' +
-                (d.short_title || d.title || d.label) + '</div>'
-            );
-          d._r = cardH / 2 + 12;
-        } else {
-          const cardW = 180, cardH = 140;
-          const bgColor = isDraft ? '#2a2a3e' : '#1e3a5f';
-          const bgImage = d.image
-            ? "linear-gradient(" + (isDraft ? "rgba(42,42,62,0.85),rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85),rgba(30,58,95,0.85)") + "), url('" + d.image + "')"
-            : bgColor;
-          const desc = d.description || '';
-
-          el.append('foreignObject')
-            .attr('width', cardW).attr('height', cardH)
-            .attr('x', -cardW / 2).attr('y', -cardH / 2)
-            .append('xhtml:div')
-            .attr('xmlns', 'http://www.w3.org/1999/xhtml')
-            .style('width', cardW + 'px').style('height', cardH + 'px')
-            .style('background', bgImage)
-            .style('background-size', 'cover')
-            .style('background-position', 'center')
-            .style('border', '1.5px solid ' + borderColor)
-            .style('border-radius', '4px')
-            .style('padding', '10px 12px')
-            .style('box-sizing', 'border-box')
-            .style('overflow', 'hidden')
-            .style('font-family', "'Atkinson', sans-serif")
-            .style('cursor', 'pointer')
-            .html((() => {
-              const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
-              return '<span style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;">' + (d.title || d.label) + '</span>' +
-                (preview ? '<br><span style="zoom:0.65;font-size:15px;color:rgba(255,255,255,0.35);line-height:1.3;font-style:italic;">' + preview + '</span>' : '');
-            })());
-
-          d._r = Math.max(cardW, cardH) / 2;
-        }
+        // Article nodes get a foreignObject that we'll re-fill on state change.
+        el.append('foreignObject').attr('class', 'article-fo');
+        d._r = 100; // upper bound for collision radius; refined after first render
       }
     });
-
     probe.remove();
 
+    // Build the colors lookup once.
+    function colorsFor(d) {
+      const isDraft = d.color === config.nodeDraftColor;
+      const borderColor = isDraft ? '#555' : config.nodePublishedColor;
+      const bgColor = isDraft ? '#2a2a3e' : '#1e3a5f';
+      const bgImage = d.image
+        ? "linear-gradient(" + (isDraft ? "rgba(42,42,62,0.85),rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85),rgba(30,58,95,0.85)") + "), url('" + d.image + "')"
+        : bgColor;
+      return { borderColor, bgColor, bgImage };
+    }
+
+    // Paint one article node's foreignObject based on its current state.
+    function renderArticleBody(d) {
+      if (d.type !== 'article') return;
+      const hovered = hoveredIdRef.current === d.id;
+      const pinned = pinnedIdRef.current === d.id;
+      const view = { hovered, pinned, scale: zoomScaleRef.current };
+      const { width: w, height: h, html } = renderArticleNodeHTML(d, view, colorsFor(d));
+      const fo = d3.select(this !== undefined ? this : null);
+      // Find the foreignObject for this datum.
+      const sel = nodes.filter(nd => nd.id === d.id).select('foreignObject.article-fo');
+      sel.attr('width', w).attr('height', h).attr('x', -w / 2).attr('y', -h / 2)
+        .html(
+          '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + w + 'px;height:' + h + 'px;">' +
+            html +
+          '</div>'
+        );
+      d._r = Math.max(w, h) / 2;
+    }
+
+    function renderAllArticleBodies() {
+      data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
+    }
+
+    // Initial paint.
+    renderAllArticleBodies();
+
+    // Hover / click handlers.
     nodes.filter(d => d.type === 'article')
+      .on('mouseenter', (event, d) => {
+        hoveredIdRef.current = d.id;
+        renderArticleBody(d);
+      })
+      .on('mouseleave', (event, d) => {
+        if (hoveredIdRef.current === d.id) hoveredIdRef.current = null;
+        renderArticleBody(d);
+      })
       .on('click', (event, d) => {
-        if (onNodeSelect) {
-          // Emit the selected article's raw object to parent for ReaderPanel
-          onNodeSelect(d.originalItem || d);
+        // If the click landed on the popout icon, open the reader.
+        const target = event.target;
+        const isPopout = target && (target.dataset?.popout === '1' ||
+                                    target.closest?.('[data-popout="1"]'));
+        if (isPopout) {
+          event.stopPropagation();
+          if (onNodeSelectRef.current) {
+            onNodeSelectRef.current(d.originalItem || d);
+          }
+          return;
         }
-      })
-      .on('mouseover', (event, d) => {
-        setTooltipData({
-          show: true,
-          x: event.clientX + 16,
-          y: event.clientY + 16,
-          title: d.title || d.label,
-          desc: d.description || '',
-          date: d.date || ''
-        });
-      })
-      .on('mousemove', (event) => {
-        setTooltipData(prev => ({
-          ...prev,
-          x: event.clientX + 16,
-          y: event.clientY + 16
-        }));
-      })
-      .on('mouseout', () => {
-        setTooltipData(prev => ({ ...prev, show: false }));
+        // Otherwise, toggle pin on this node.
+        event.stopPropagation();
+        const prevPinned = pinnedIdRef.current;
+        if (prevPinned === d.id) {
+          pinnedIdRef.current = null;
+          renderArticleBody(d);
+        } else {
+          pinnedIdRef.current = d.id;
+          renderArticleBody(d);
+          // Bring the pinned node to the top of the SVG stack so its
+          // slight expansion doesn't get obscured by neighbors.
+          nodes.filter(nd => nd.id === d.id).raise();
+          if (prevPinned) {
+            const prev = data.nodes.find(nd => nd.id === prevPinned);
+            if (prev) renderArticleBody(prev);
+          }
+        }
       });
 
+    // Tag click: highlight only — no rearrangement, no simulation restart.
     let activeTag = null;
-
     nodes.filter(d => d.type === 'tag')
       .on('click', (event, d) => {
         event.stopPropagation();
@@ -285,8 +377,6 @@ export function GraphViewer({ feedData, onNodeSelect }) {
           activeTag = null;
           nodes.classed('dimmed', false).classed('tag-active', false);
           links.classed('highlighted', false);
-          simulation.force('x', null).force('y', null);
-          simulation.alpha(0.4).restart();
         } else {
           activeTag = d.id;
           const connected = new Set(
@@ -301,7 +391,6 @@ export function GraphViewer({ feedData, onNodeSelect }) {
             })
           );
           connected.add(d.id);
-
           nodes.classed('dimmed', nd => !connected.has(nd.id));
           nodes.classed('tag-active', nd => nd.id === d.id);
           links.classed('highlighted', l => {
@@ -309,25 +398,26 @@ export function GraphViewer({ feedData, onNodeSelect }) {
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
             return sid === d.id || tid === d.id;
           });
-
-          const cx = width / 2, cy = height / 2;
-          simulation
-            .force('x', d3.forceX(nd => connected.has(nd.id) ? cx : (nd.x < cx ? cx - 500 : cx + 500)).strength(nd => connected.has(nd.id) ? 0.3 : 0.15))
-            .force('y', d3.forceY(cy).strength(nd => connected.has(nd.id) ? 0.3 : 0.1));
-          simulation.alpha(0.6).restart();
         }
       });
 
+    // Background click: unpin any pinned node, clear any active tag.
     svg.on('click', () => {
       if (activeTag) {
         activeTag = null;
         nodes.classed('dimmed', false).classed('tag-active', false);
         links.classed('highlighted', false);
-        simulation.force('x', null).force('y', null);
-        simulation.alpha(0.4).restart();
+      }
+      if (pinnedIdRef.current) {
+        const prev = data.nodes.find(nd => nd.id === pinnedIdRef.current);
+        pinnedIdRef.current = null;
+        if (prev) renderArticleBody(prev);
       }
     });
 
+    // Simulation tick → position nodes. When alpha falls below alphaMin,
+    // D3 stops automatically. We never call .restart() anywhere — once
+    // settled, the graph stays still until the page is reloaded.
     simulation.nodes(data.nodes).on('tick', () => {
       links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
@@ -335,35 +425,24 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     });
     simulation.force('link').links(data.links);
 
+    // When the simulation ends, freeze every node by copying x/y to fx/fy.
+    // Any later interaction (drag, etc.) keeps positions stable.
+    simulation.on('end', () => {
+      data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
+    });
+
     return () => {
       simulation.stop();
-      if (resizeHandlerRef.current) {
-        window.removeEventListener('resize', resizeHandlerRef.current);
-      }
+      window.removeEventListener('resize', handleResize);
     };
-  }, [feedData, onNodeSelect]);
+    // Deliberately depend only on feedData — onNodeSelect changes are
+    // handled through onNodeSelectRef without rebuilding the simulation.
+  }, [feedData]);
 
   return (
-    <>
-      <div
-        ref={containerRef}
-        className={styles.graphContainer}
-      />
-      {tooltipData.show && (
-        <div
-          ref={tooltipRef}
-          className={styles.tooltip}
-          style={{
-            display: 'block',
-            left: tooltipData.x,
-            top: tooltipData.y
-          }}
-        >
-          <div className={styles.tooltipTitle}>{tooltipData.title}</div>
-          <div className={styles.tooltipDesc}>{tooltipData.desc}</div>
-          <div className={styles.tooltipDate}>{tooltipData.date}</div>
-        </div>
-      )}
-    </>
+    <div
+      ref={containerRef}
+      className={styles.graphContainer}
+    />
   );
 }

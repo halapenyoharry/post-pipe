@@ -1,3 +1,6 @@
+/* Overlay is intentionally non-opaque and click-through. The graph must
+   remain visible AND interactive behind the reader. Closing the reader
+   is done via the toolbar close button. */
 .overlay {
   display: none;
   position: fixed;
@@ -5,9 +8,9 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.18);
   z-index: 100;
-  cursor: pointer;
+  pointer-events: none;
 }
 
 .overlay.open {
@@ -21,7 +24,8 @@
   --rp-accent: #64ffda;
   --rp-text: #e0e0e0;
   --rp-text-bright: #fff;
-  --rp-width: 55vw;
+  /* Default narrow width — graph always visible behind. */
+  --rp-width: 38vw;
   --rp-toolbar-bg: rgba(17, 24, 39, 0.95);
 
   position: fixed;
@@ -36,17 +40,31 @@
   flex-direction: column;
   overflow: hidden;
   font-family: 'Atkinson', sans-serif;
-  transition: right 0.3s ease;
+  transition: right 0.3s ease, width 0.3s ease;
 }
 
 .panel.open {
   right: 0;
 }
 
+/* Wide state — toggled via the widen button. */
+.panel.wide {
+  --rp-width: 55vw;
+}
+
+/* On smaller windows, reader is bigger but never full-screen.
+   Hard cap is 70vw so the graph always has space. */
+@media (max-width: 1200px) {
+  .panel { --rp-width: 50vw; }
+  .panel.wide { --rp-width: 65vw; }
+}
 @media (max-width: 900px) {
-  .panel {
-    --rp-width: 100vw;
-  }
+  .panel { --rp-width: 60vw; }
+  .panel.wide { --rp-width: 70vw; }
+}
+@media (max-width: 600px) {
+  .panel { --rp-width: 70vw; }
+  .panel.wide { --rp-width: 70vw; }
 }
 
 .toolbar {

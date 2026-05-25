@@ -4,11 +4,6 @@
   --gv-node-draft: #555;
   --gv-node-published: #2ecc71;
   --gv-tag-color: #f39c12;
-  --gv-tooltip-bg: #16213e;
-  --gv-tooltip-border: #0f3460;
-  --gv-tooltip-title: #fff;
-  --gv-tooltip-desc: #aaa;
-  --gv-tooltip-date: #666;
   --gv-accent: #64ffda;
 
   width: var(--gv-width);
@@ -48,6 +43,7 @@
 
 .graphContainer :global(.node.dimmed) {
   opacity: 0.2;
+  transition: opacity 0.2s ease;
 }
 
 .graphContainer :global(.tag-active rect),
@@ -55,43 +51,14 @@
   filter: drop-shadow(0 0 6px var(--gv-accent));
 }
 
-/* Tooltip is rendered as a sibling of .graphContainer, so it does not
-   inherit the --gv-tooltip-* custom properties declared there. Declare
-   the defaults locally so the tooltip always has a background. Host
-   pages can still override via :root if they want. */
-.tooltip {
-  --gv-tooltip-bg: #16213e;
-  --gv-tooltip-border: #0f3460;
-  --gv-tooltip-title: #fff;
-  --gv-tooltip-desc: #aaa;
-  --gv-tooltip-date: #666;
-
-  position: fixed;
-  display: none;
-  background: var(--gv-tooltip-bg);
-  border: 1px solid var(--gv-tooltip-border);
-  padding: 12px 16px;
-  border-radius: 6px;
-  max-width: 320px;
-  font-size: 14px;
-  pointer-events: none;
-  z-index: 10;
-  font-family: 'Atkinson', sans-serif;
+/* Scrollbar styling for the in-node scrollable description in hover/pin state. */
+.graphContainer :global(.rp-scroll)::-webkit-scrollbar {
+  width: 4px;
 }
-
-.tooltipTitle {
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--gv-tooltip-title);
+.graphContainer :global(.rp-scroll)::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.tooltipDesc {
-  color: var(--gv-tooltip-desc);
-  font-size: 13px;
-}
-
-.tooltipDate {
-  color: var(--gv-tooltip-date);
-  font-size: 11px;
-  margin-top: 6px;
+.graphContainer :global(.rp-scroll)::-webkit-scrollbar-thumb {
+  background: rgba(100, 255, 218, 0.3);
+  border-radius: 2px;
 }
