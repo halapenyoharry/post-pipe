@@ -10927,9 +10927,15 @@ function _o({ feedData: e, onNodeSelect: t }) {
 		};
 		window.addEventListener("resize", v);
 		let y = h.selectAll(".link").data(p.links).enter().append("line").attr("class", "link"), b = h.selectAll(".node").data(p.nodes).enter().append("g").attr("class", "node").call(cn().on("start", (e, t) => {
-			_.alpha(.3).restart(), t.fx = t.x, t.fy = t.y;
+			t.fx = t.x, t.fy = t.y;
 		}).on("drag", (e, t) => {
-			t.fx = e.x, t.fy = e.y;
+			t.x = e.x, t.y = e.y, t.fx = e.x, t.fy = e.y, b.filter((e) => e.id === t.id).attr("transform", "translate(" + e.x + "," + e.y + ")"), y.each(function(e) {
+				let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
+				if (n === t.id || r === t.id) {
+					let t = typeof e.source == "object" ? e.source.x : 0, n = typeof e.source == "object" ? e.source.y : 0, r = typeof e.target == "object" ? e.target.x : 0, i = typeof e.target == "object" ? e.target.y : 0;
+					qt(this).attr("x1", t).attr("y1", n).attr("x2", r).attr("y2", i);
+				}
+			});
 		}).on("end", (e, t) => {
 			t.fx = t.x, t.fy = t.y;
 		})), x = m.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden");
@@ -10955,18 +10961,20 @@ function _o({ feedData: e, onNodeSelect: t }) {
 				hovered: o.current === e.id,
 				pinned: a.current === e.id,
 				scale: s.current
-			}, ee(e)), i = b.filter((t) => t.id === e.id).select("foreignObject.article-fo");
-			i.attr("width", t).attr("height", n).attr("x", -t / 2).attr("y", -n / 2).html("<div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"width:" + t + "px;height:" + n + "px;\">" + r + "</div>"), i.selectAll(".rp-scroll").on("wheel", (e) => e.stopPropagation()), e._r = Math.max(t, n) / 2;
+			}, ee(e));
+			b.filter((t) => t.id === e.id).select("foreignObject.article-fo").attr("width", t).attr("height", n).attr("x", -t / 2).attr("y", -n / 2).html("<div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"width:" + t + "px;height:" + n + "px;\">" + r + "</div>"), e._r = Math.max(t, n) / 2;
 		}
+		b.filter((e) => e.type === "article").select("foreignObject.article-fo").on("wheel", (e) => e.stopPropagation());
 		function C() {
 			p.nodes.forEach((e) => {
 				e.type === "article" && S(e);
 			});
 		}
-		C(), b.filter((e) => e.type === "article").on("mouseenter", (e, t) => {
-			o.current = t.id, S(t);
-		}).on("mouseleave", (e, t) => {
-			o.current === t.id && (o.current = null), S(t);
+		C(), b.filter((e) => e.type === "article").on("mouseover", (e, t) => {
+			o.current !== t.id && (o.current = t.id, S(t));
+		}).on("mouseout", (e, t) => {
+			let n = e.relatedTarget;
+			n && e.currentTarget.contains(n) || o.current === t.id && (o.current = null, S(t));
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {

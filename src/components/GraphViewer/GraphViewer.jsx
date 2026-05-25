@@ -266,19 +266,30 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       .attr('class', 'node')
       .call(d3.drag()
         .on('start', (event, d) => {
-          // Wake the simulation so the tick callback updates the dragged
-          // node's transform. After initial settle, every other node has
-          // fx/fy set — they cannot move regardless of forces. Only this
-          // node responds (because we keep rewriting its fx/fy below).
-          simulation.alpha(0.3).restart();
+          // Bypass the simulation entirely. We don't restart d3-force —
+          // dragging directly updates this node's transform and its
+          // incident link endpoints below. Nothing else in the graph
+          // moves, period.
           d.fx = d.x; d.fy = d.y;
         })
         .on('drag', (event, d) => {
+          d.x = event.x; d.y = event.y;
           d.fx = event.x; d.fy = event.y;
+          nodes.filter(nd => nd.id === d.id)
+            .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
+          links.each(function(l) {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            if (sid === d.id || tid === d.id) {
+              const sx = typeof l.source === 'object' ? l.source.x : 0;
+              const sy = typeof l.source === 'object' ? l.source.y : 0;
+              const tx = typeof l.target === 'object' ? l.target.x : 0;
+              const ty = typeof l.target === 'object' ? l.target.y : 0;
+              d3.select(this).attr('x1', sx).attr('y1', sy).attr('x2', tx).attr('y2', ty);
+            }
+          });
         })
         .on('end', (event, d) => {
-          // Pin the node where it was dropped. fx/fy stays set so it
-          // remains there permanently.
           d.fx = d.x; d.fy = d.y;
         })
       );
@@ -344,12 +355,17 @@ export function GraphViewer({ feedData, onNodeSelect }) {
             html +
           '</div>'
         );
-      // Stop wheel events that originate inside the in-node scrollable area
-      // from reaching the SVG-level zoom handler. The browser's default
-      // scroll behavior on overflow-y:auto still fires.
-      sel.selectAll('.rp-scroll').on('wheel', (e) => e.stopPropagation());
       d._r = Math.max(w, h) / 2;
     }
+
+    // Block wheel events from inside any article node from reaching the
+    // SVG zoom handler. Attached ONCE on the foreignObject element (not
+    // on the inner .rp-scroll) so wheel anywhere over the card — title,
+    // padding, or scrollable text — is consumed. The browser's default
+    // overflow-scroll behavior on .rp-scroll still fires because we
+    // only stop propagation, not the default action.
+    nodes.filter(d => d.type === 'article').select('foreignObject.article-fo')
+      .on('wheel', (e) => e.stopPropagation());
 
     function renderAllArticleBodies() {
       data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
@@ -358,15 +374,25 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     // Initial paint.
     renderAllArticleBodies();
 
-    // Hover / click handlers.
+    // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
+    // because the foreignObject's inner HTML gets replaced on re-render
+    // and mouseenter sometimes fails to re-fire on the new content.
+    // We guard with relatedTarget so child-to-child cursor moves inside
+    // the same node don't toggle the state.
     nodes.filter(d => d.type === 'article')
-      .on('mouseenter', (event, d) => {
+      .on('mouseover', (event, d) => {
+        if (hoveredIdRef.current === d.id) return;
         hoveredIdRef.current = d.id;
         renderArticleBody(d);
       })
-      .on('mouseleave', (event, d) => {
-        if (hoveredIdRef.current === d.id) hoveredIdRef.current = null;
-        renderArticleBody(d);
+      .on('mouseout', (event, d) => {
+        const related = event.relatedTarget;
+        // Still inside this node g? Ignore.
+        if (related && event.currentTarget.contains(related)) return;
+        if (hoveredIdRef.current === d.id) {
+          hoveredIdRef.current = null;
+          renderArticleBody(d);
+        }
       })
       .on('click', (event, d) => {
         // If the click landed on the popout icon, open the reader.
