@@ -327,9 +327,9 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.
         el.append('foreignObject').attr('class', 'article-fo');
-        // Slug label overlay — visible only at slug-LOD, font-size set
-        // inversely to zoom so the label stays a constant size on screen
-        // regardless of how far out the user has zoomed.
+        // Slug label overlay — visible only at slug-LOD. Font-size set
+        // dynamically in updateSlugLabels so the longest slug fits the
+        // current viewport width.
         el.append('text')
           .attr('class', 'slug-label')
           .attr('text-anchor', 'middle')
@@ -347,6 +347,24 @@ export function GraphViewer({ feedData, onNodeSelect }) {
         d._r = 100; // upper bound for collision radius; refined after first render
       }
     });
+
+    // Measure the longest slug's text width at a probe font-size so we can
+    // compute the font-size that makes the longest slug exactly fit the
+    // viewport. Done once at setup since slug strings are static.
+    const SLUG_PROBE_SIZE = 100;
+    probe.style('font-family', "'Atkinson', sans-serif")
+      .style('font-weight', '700')
+      .style('font-size', SLUG_PROBE_SIZE + 'px');
+    let maxSlugWidthAtProbe = 1;
+    data.nodes.forEach(d => {
+      if (d.type === 'article') {
+        probe.text(d.label);
+        const w = probe.node().getComputedTextLength();
+        if (w > maxSlugWidthAtProbe) maxSlugWidthAtProbe = w;
+      }
+    });
+    // Width contributed by one unit of font-size = (max width at probe) / probe size.
+    const slugWidthPerFontUnit = maxSlugWidthAtProbe / SLUG_PROBE_SIZE;
     probe.remove();
 
     // Build the colors lookup once.
@@ -390,10 +408,10 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
     }
 
-    // Slug-label overlay: shown only at slug-LOD, with font-size counter-scaled
-    // to the current zoom so the on-screen text size stays roughly constant
-    // (~22px). Hidden when the node is hovered or pinned, since the expanded
-    // card has its own title and the overlay would just clutter.
+    // Slug-label overlay: shown only at slug-LOD. Font-size is chosen so the
+    // LONGEST slug exactly fits the viewport width — all slugs share that
+    // size for consistency. As large as it can get without overflowing.
+    // Hidden when the node is hovered or pinned.
     function updateSlugLabels(scale) {
       const showAny = scale < LOD_SLUG_ONLY;
       const labels = nodes.filter(d => d.type === 'article').select('.slug-label');
@@ -401,12 +419,19 @@ export function GraphViewer({ feedData, onNodeSelect }) {
         labels.style('display', 'none');
         return;
       }
-      // Counter-scale: font-size in SVG units = baseSize / k, so the on-screen
-      // size renders at baseSize regardless of zoom. Cap high enough that
-      // the label stays ~22px on-screen even at very deep zoom-out (~0.09x).
-      const fontSize = Math.min(22 / Math.max(scale, 0.08), 280);
+      // Target on-screen font size: longest slug fills viewport_width * margin.
+      // longest_slug_width_on_screen = slugWidthPerFontUnit * font_size_screen
+      // font_size_screen = viewport * margin / slugWidthPerFontUnit
+      const viewportPx = containerRef.current
+        ? containerRef.current.clientWidth
+        : window.innerWidth;
+      const margin = 0.9;
+      const screenFontSize = (viewportPx * margin) / slugWidthPerFontUnit;
+      // Convert to SVG units so it survives the zoom transform and renders
+      // at the chosen on-screen size: svg_font_size * k = screen_font_size.
+      const svgFontSize = screenFontSize / Math.max(scale, 0.01);
       labels
-        .style('font-size', fontSize + 'px')
+        .style('font-size', svgFontSize + 'px')
         .style('display', d => (d.id === hoveredIdRef.current || d.id === pinnedIdRef.current) ? 'none' : null);
     }
 

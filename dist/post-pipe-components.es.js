@@ -10919,7 +10919,7 @@ function _o({ feedData: e, onNodeSelect: t }) {
 			let t = e.transform.k;
 			s.current = t;
 			let n = ho(t);
-			n !== c.current && (c.current = n, C()), te(t);
+			n !== c.current && (c.current = n, ne()), re(t);
 		});
 		m.call(g).on("dblclick.zoom", null);
 		let _ = qa().force("link", Ra().id((e) => e.id).distance(160)).force("charge", Ja().strength(-500)).force("collide", Fa().radius((e) => (e._r || e.size / 2) + 8).strength(.9)).force("center", la(l / 2, u / 2)).velocityDecay(.85).alphaDecay(.05), v = () => {
@@ -10946,8 +10946,18 @@ function _o({ feedData: e, onNodeSelect: t }) {
 				let n = x.node().getComputedTextLength() + 28, r = 35.599999999999994;
 				t.append("rect").attr("x", -n / 2).attr("y", -r / 2).attr("width", n).attr("height", r).attr("rx", r / 2).attr("ry", r / 2).attr("fill", e.color).attr("opacity", .7), t.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("fill", "#1a1a2e").style("font-size", "14px").style("font-weight", "400").style("pointer-events", "none").text(e.label), e._r = Math.max(n, r) / 2;
 			} else t.append("foreignObject").attr("class", "article-fo"), t.append("text").attr("class", "slug-label").attr("text-anchor", "middle").attr("dominant-baseline", "central").style("fill", "#fff").style("font-family", "'Atkinson', sans-serif").style("font-weight", "700").style("pointer-events", "none").style("paint-order", "stroke").style("stroke", "#000").style("stroke-width", "4px").style("stroke-opacity", "0.75").style("display", "none").text(e.label), e._r = 100;
-		}), x.remove();
-		function ee(e) {
+		}), x.style("font-family", "'Atkinson', sans-serif").style("font-weight", "700").style("font-size", "100px");
+		let ee = 1;
+		p.nodes.forEach((e) => {
+			if (e.type === "article") {
+				x.text(e.label);
+				let t = x.node().getComputedTextLength();
+				t > ee && (ee = t);
+			}
+		});
+		let S = ee / 100;
+		x.remove();
+		function C(e) {
 			let t = e.color === f.nodeDraftColor, n = t ? "#555" : f.nodePublishedColor, r = t ? "#2a2a3e" : "#1e3a5f";
 			return {
 				borderColor: n,
@@ -10955,73 +10965,73 @@ function _o({ feedData: e, onNodeSelect: t }) {
 				bgImage: e.image ? "linear-gradient(" + (t ? "rgba(42,42,62,0.85),rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85),rgba(30,58,95,0.85)") + "), url('" + e.image + "')" : r
 			};
 		}
-		function S(e) {
+		function te(e) {
 			if (e.type !== "article") return;
 			let { width: t, height: n, html: r } = go(e, {
 				hovered: o.current === e.id,
 				pinned: a.current === e.id,
 				scale: s.current
-			}, ee(e));
+			}, C(e));
 			b.filter((t) => t.id === e.id).select("foreignObject.article-fo").attr("width", t).attr("height", n).attr("x", -t / 2).attr("y", -n / 2).html("<div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"width:" + t + "px;height:" + n + "px;\">" + r + "</div>"), e._r = Math.max(t, n) / 2;
 		}
 		b.filter((e) => e.type === "article").select("foreignObject.article-fo").on("wheel", (e) => e.stopPropagation());
-		function C() {
+		function ne() {
 			p.nodes.forEach((e) => {
-				e.type === "article" && S(e);
+				e.type === "article" && te(e);
 			});
 		}
-		function te(e) {
-			let t = e < po, n = b.filter((e) => e.type === "article").select(".slug-label");
+		function re(e) {
+			let t = e < po, r = b.filter((e) => e.type === "article").select(".slug-label");
 			if (!t) {
-				n.style("display", "none");
+				r.style("display", "none");
 				return;
 			}
-			let r = Math.min(22 / Math.max(e, .08), 280);
-			n.style("font-size", r + "px").style("display", (e) => e.id === o.current || e.id === a.current ? "none" : null);
+			let i = (n.current ? n.current.clientWidth : window.innerWidth) * .9 / S / Math.max(e, .01);
+			r.style("font-size", i + "px").style("display", (e) => e.id === o.current || e.id === a.current ? "none" : null);
 		}
-		let ne = /* @__PURE__ */ new Map();
-		function re(e) {
-			return ne.has(e.id) ? (e._fullContent = ne.get(e.id), Promise.resolve()) : fetch(e.url).then((e) => {
+		let w = /* @__PURE__ */ new Map();
+		function ie(e) {
+			return w.has(e.id) ? (e._fullContent = w.get(e.id), Promise.resolve()) : fetch(e.url).then((e) => {
 				if (!e.ok) throw Error("HTTP " + e.status);
 				return e.text();
 			}).then((t) => {
 				let n = new DOMParser().parseFromString(t, "text/html"), r = n.querySelector("h1");
 				r && r.remove();
 				let i = n.querySelector("body") ? n.querySelector("body").innerHTML : t;
-				ne.set(e.id, i), e._fullContent = i;
+				w.set(e.id, i), e._fullContent = i;
 			}).catch(() => {
-				ne.set(e.id, null), e._fullContent = null;
+				w.set(e.id, null), e._fullContent = null;
 			});
 		}
-		C(), te(s.current), b.filter((e) => e.type === "article").on("mouseover", (e, t) => {
-			o.current !== t.id && (o.current = t.id, S(t), te(s.current));
+		ne(), re(s.current), b.filter((e) => e.type === "article").on("mouseover", (e, t) => {
+			o.current !== t.id && (o.current = t.id, te(t), re(s.current));
 		}).on("mouseout", (e, t) => {
 			let n = e.relatedTarget;
-			n && e.currentTarget.contains(n) || o.current === t.id && (o.current = null, S(t), te(s.current));
+			n && e.currentTarget.contains(n) || o.current === t.id && (o.current = null, te(t), re(s.current));
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {
-				e.stopPropagation(), i.current && i.current(t.originalItem || t), a.current === t.id && (a.current = null, o.current = null, S(t), te(s.current));
+				e.stopPropagation(), i.current && i.current(t.originalItem || t), a.current === t.id && (a.current = null, o.current = null, te(t), re(s.current));
 				return;
 			}
 			e.stopPropagation();
 			let r = a.current;
-			if (r === t.id) a.current = null, S(t), te(s.current);
+			if (r === t.id) a.current = null, te(t), re(s.current);
 			else {
-				if (a.current = t.id, S(t), b.filter((e) => e.id === t.id).raise(), r) {
+				if (a.current = t.id, te(t), b.filter((e) => e.id === t.id).raise(), r) {
 					let e = p.nodes.find((e) => e.id === r);
-					e && S(e);
+					e && te(e);
 				}
-				te(s.current), re(t).then(() => {
-					a.current === t.id && S(t);
+				re(s.current), ie(t).then(() => {
+					a.current === t.id && te(t);
 				});
 			}
 		});
-		let w = null;
+		let ae = null;
 		return b.filter((e) => e.type === "tag").on("click", (e, t) => {
-			if (e.stopPropagation(), w === t.id) w = null, b.classed("dimmed", !1).classed("tag-active", !1), y.classed("highlighted", !1);
+			if (e.stopPropagation(), ae === t.id) ae = null, b.classed("dimmed", !1).classed("tag-active", !1), y.classed("highlighted", !1);
 			else {
-				w = t.id;
+				ae = t.id;
 				let e = new Set(p.links.filter((e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id || r === t.id;
@@ -11035,13 +11045,13 @@ function _o({ feedData: e, onNodeSelect: t }) {
 				});
 			}
 		}), m.on("click", () => {
-			w && (w = null, b.classed("dimmed", !1).classed("tag-active", !1), y.classed("highlighted", !1));
+			ae && (ae = null, b.classed("dimmed", !1).classed("tag-active", !1), y.classed("highlighted", !1));
 			let e = !!a.current;
 			if (a.current) {
 				let e = p.nodes.find((e) => e.id === a.current);
-				a.current = null, e && S(e);
+				a.current = null, e && te(e);
 			}
-			e && te(s.current);
+			e && re(s.current);
 		}), _.nodes(p.nodes).on("tick", () => {
 			y.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), b.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")");
 		}), _.force("link").links(p.links), _.on("end", () => {
