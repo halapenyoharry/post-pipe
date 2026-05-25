@@ -110,23 +110,24 @@ function renderArticleNodeHTML(d, view, colors) {
   // Article body card. Inner content depends on state and LOD level.
   let inner;
   if (expanded) {
-    // Hover/pin: full title + scrollable description in place.
-    const desc = d.description || '';
+    // Hover shows the summary. Pin shows the full article body if it has
+    // been fetched yet (loaded lazily on pin — see loadFullContent).
+    const useFullArticle = pinned && d._fullContent;
+    const contentBody = useFullArticle ? d._fullContent : (d.description || '');
     inner =
-      '<div style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:6px;">' +
+      '<div style="font-size:15px;font-weight:700;color:#fff;line-height:1.3;margin-bottom:6px;-webkit-user-select:none;user-select:none;">' +
         (d.title || d.label) +
       '</div>' +
-      (desc
-        ? '<div class="rp-scroll" style="font-size:13px;color:rgba(255,255,255,0.78);line-height:1.45;max-height:' + (cardH - 60) + 'px;overflow-y:auto;padding-right:4px;-webkit-user-select:text;user-select:text;">' + desc + '</div>'
+      (contentBody
+        ? '<div class="rp-scroll" style="font-size:' + (useFullArticle ? '11px' : '13px') + ';color:rgba(255,255,255,0.78);line-height:1.45;max-height:' + (cardH - 56) + 'px;overflow-y:auto;padding-right:6px;-webkit-user-select:text;user-select:text;">' + contentBody + '</div>'
         : '');
   } else {
     const lod = getLOD(scale);
     if (lod === 'slug') {
-      // Deepest zoom-out: just the slug at large font.
-      inner =
-        '<div style="font-size:22px;font-weight:700;color:#fff;line-height:1.2;text-align:center;display:flex;align-items:center;justify-content:center;height:100%;-webkit-user-select:none;user-select:none;">' +
-          d.label +
-        '</div>';
+      // Slug-LOD: card content is empty. The floating <text class="slug-label">
+      // overlay (sibling of the foreignObject in the parent g) provides the
+      // counter-scaled label at constant on-screen size — see updateSlugLabels.
+      inner = '';
     } else if (lod === 'title') {
       // Mid zoom: short_title or title.
       inner =
@@ -221,9 +222,9 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     const g = svg.append('g');
 
     // Zoom — repaints node text content only when crossing an LOD boundary;
-    // never touches the simulation. Wheel events that originate inside an
-    // expanded node's scrollable area are stopPropagation-ed (see render
-    // helper below), so this zoom handler doesn't receive them.
+    // never touches the simulation. Also updates the slug-label overlay's
+    // font-size on every zoom event so the on-screen label size stays
+    // constant as the user zooms in/out.
     const zoom = d3.zoom().on('zoom', (event) => {
       g.attr('transform', event.transform);
       const newScale = event.transform.k;
@@ -233,6 +234,7 @@ export function GraphViewer({ feedData, onNodeSelect }) {
         currentLodRef.current = newLod;
         renderAllArticleBodies();
       }
+      updateSlugLabels(newScale);
     });
     svg.call(zoom).on('dblclick.zoom', null);
 
@@ -325,6 +327,23 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.
         el.append('foreignObject').attr('class', 'article-fo');
+        // Slug label overlay — visible only at slug-LOD, font-size set
+        // inversely to zoom so the label stays a constant size on screen
+        // regardless of how far out the user has zoomed.
+        el.append('text')
+          .attr('class', 'slug-label')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .style('fill', '#fff')
+          .style('font-family', "'Atkinson', sans-serif")
+          .style('font-weight', '700')
+          .style('pointer-events', 'none')
+          .style('paint-order', 'stroke')
+          .style('stroke', '#000')
+          .style('stroke-width', '4px')
+          .style('stroke-opacity', '0.75')
+          .style('display', 'none')
+          .text(d.label);
         d._r = 100; // upper bound for collision radius; refined after first render
       }
     });
@@ -371,8 +390,58 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
     }
 
+    // Slug-label overlay: shown only at slug-LOD, with font-size counter-scaled
+    // to the current zoom so the on-screen text size stays roughly constant
+    // (~22px). Hidden when the node is hovered or pinned, since the expanded
+    // card has its own title and the overlay would just clutter.
+    function updateSlugLabels(scale) {
+      const showAny = scale < LOD_SLUG_ONLY;
+      const labels = nodes.filter(d => d.type === 'article').select('.slug-label');
+      if (!showAny) {
+        labels.style('display', 'none');
+        return;
+      }
+      // Counter-scale: font-size in SVG units = baseSize / k, so the on-screen
+      // size renders at baseSize regardless of zoom. Cap high enough that
+      // the label stays ~22px on-screen even at very deep zoom-out (~0.09x).
+      const fontSize = Math.min(22 / Math.max(scale, 0.08), 280);
+      labels
+        .style('font-size', fontSize + 'px')
+        .style('display', d => (d.id === hoveredIdRef.current || d.id === pinnedIdRef.current) ? 'none' : null);
+    }
+
+    // Article-content fetch cache. Keyed by node id. Value is the body HTML
+    // (with <h1> removed) or null on fetch failure.
+    const articleContentCache = new Map();
+    function loadFullContent(d) {
+      if (articleContentCache.has(d.id)) {
+        d._fullContent = articleContentCache.get(d.id);
+        return Promise.resolve();
+      }
+      return fetch(d.url)
+        .then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        })
+        .then(html => {
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          const h1 = doc.querySelector('h1');
+          if (h1) h1.remove();
+          const bodyHtml = doc.querySelector('body')
+            ? doc.querySelector('body').innerHTML
+            : html;
+          articleContentCache.set(d.id, bodyHtml);
+          d._fullContent = bodyHtml;
+        })
+        .catch(() => {
+          articleContentCache.set(d.id, null);
+          d._fullContent = null;
+        });
+    }
+
     // Initial paint.
     renderAllArticleBodies();
+    updateSlugLabels(zoomScaleRef.current);
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
     // because the foreignObject's inner HTML gets replaced on re-render
@@ -384,44 +453,58 @@ export function GraphViewer({ feedData, onNodeSelect }) {
         if (hoveredIdRef.current === d.id) return;
         hoveredIdRef.current = d.id;
         renderArticleBody(d);
+        updateSlugLabels(zoomScaleRef.current);
       })
       .on('mouseout', (event, d) => {
         const related = event.relatedTarget;
-        // Still inside this node g? Ignore.
         if (related && event.currentTarget.contains(related)) return;
         if (hoveredIdRef.current === d.id) {
           hoveredIdRef.current = null;
           renderArticleBody(d);
+          updateSlugLabels(zoomScaleRef.current);
         }
       })
       .on('click', (event, d) => {
-        // If the click landed on the popout icon, open the reader.
         const target = event.target;
         const isPopout = target && (target.dataset?.popout === '1' ||
                                     target.closest?.('[data-popout="1"]'));
         if (isPopout) {
+          // Open the side reader AND return this node to its default size.
           event.stopPropagation();
           if (onNodeSelectRef.current) {
             onNodeSelectRef.current(d.originalItem || d);
           }
+          if (pinnedIdRef.current === d.id) {
+            pinnedIdRef.current = null;
+            // Also clear hover so the node truly returns to default.
+            hoveredIdRef.current = null;
+            renderArticleBody(d);
+            updateSlugLabels(zoomScaleRef.current);
+          }
           return;
         }
-        // Otherwise, toggle pin on this node.
+        // Toggle pin on this node.
         event.stopPropagation();
         const prevPinned = pinnedIdRef.current;
         if (prevPinned === d.id) {
           pinnedIdRef.current = null;
           renderArticleBody(d);
+          updateSlugLabels(zoomScaleRef.current);
         } else {
           pinnedIdRef.current = d.id;
           renderArticleBody(d);
-          // Bring the pinned node to the top of the SVG stack so its
-          // slight expansion doesn't get obscured by neighbors.
           nodes.filter(nd => nd.id === d.id).raise();
           if (prevPinned) {
             const prev = data.nodes.find(nd => nd.id === prevPinned);
             if (prev) renderArticleBody(prev);
           }
+          updateSlugLabels(zoomScaleRef.current);
+          // Fetch full article body so the pinned node becomes a mini-reader.
+          // Re-render when content arrives, but only if this node is still
+          // the pinned one (user might have unpinned in the meantime).
+          loadFullContent(d).then(() => {
+            if (pinnedIdRef.current === d.id) renderArticleBody(d);
+          });
         }
       });
 
@@ -465,11 +548,13 @@ export function GraphViewer({ feedData, onNodeSelect }) {
         nodes.classed('dimmed', false).classed('tag-active', false);
         links.classed('highlighted', false);
       }
+      const hadPinned = !!pinnedIdRef.current;
       if (pinnedIdRef.current) {
         const prev = data.nodes.find(nd => nd.id === pinnedIdRef.current);
         pinnedIdRef.current = null;
         if (prev) renderArticleBody(prev);
       }
+      if (hadPinned) updateSlugLabels(zoomScaleRef.current);
     });
 
     // Simulation tick → position nodes. When alpha falls below alphaMin,
