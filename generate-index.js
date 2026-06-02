@@ -211,7 +211,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, React, ReactDOM } = window.PostPipeComponents;
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
@@ -220,6 +220,9 @@ ${reactJs}
         React.createElement(GraphViewer, {
           feedData: feed,
           onNodeSelect: (article) => setSelectedArticle(article)
+        }),
+        React.createElement(FeedZ, {
+          sources: feed._sources || []
         }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
@@ -262,15 +265,16 @@ ${reactJs}
 
 async function main() {
   const entries = buildAdapterEntries();
-  const items = await loadCorpus(entries);
+  const { items, sources } = await loadCorpus(entries);
 
-  console.log(`Aggregated ${items.length} item(s) from ${entries.length} source(s)`);
+  console.log(`Aggregated ${items.length} item(s) from ${sources.length} source(s)`);
   const withTodos = items.filter(a => (a.todos || []).length).length;
   if (withTodos) {
     console.log(`  (${withTodos} flagged with TODO files — see ~/Posts/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
   }
 
   const feed = buildFeed(items);
+  feed._sources = sources;
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 

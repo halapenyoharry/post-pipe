@@ -1,0 +1,179 @@
+/* FeedZ — feed list panel.
+   Floats top-left by default; collapses to a small handle. */
+
+.panel {
+  --fz-bg: rgba(17, 24, 39, 0.92);
+  --fz-border: rgba(100, 255, 218, 0.2);
+  --fz-text: #e0e0e0;
+  --fz-muted: rgba(224, 224, 224, 0.55);
+  --fz-accent: #64ffda;
+
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  min-width: 220px;
+  max-width: 320px;
+  background: var(--fz-bg);
+  border: 1px solid var(--fz-border);
+  border-radius: 6px;
+  font-family: 'Atkinson', sans-serif;
+  color: var(--fz-text);
+  backdrop-filter: blur(6px);
+}
+
+.handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--fz-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  border-radius: 6px;
+}
+
+.handle:hover {
+  color: var(--fz-accent);
+}
+
+.handleLabel {
+  flex: 1;
+}
+
+.collapsed {
+  /* When collapsed, only the handle is rendered. */
+}
+
+.body {
+  border-top: 1px solid var(--fz-border);
+  padding: 4px 0 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.body::-webkit-scrollbar {
+  width: 4px;
+}
+.body::-webkit-scrollbar-thumb {
+  background: rgba(100, 255, 218, 0.3);
+  border-radius: 2px;
+}
+
+.folder + .folder {
+  margin-top: 6px;
+}
+
+.folderHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 12px;
+  background: transparent;
+  border: none;
+  color: var(--fz-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+}
+
+.folderHeading:hover {
+  color: var(--fz-text);
+}
+
+.folderChevron {
+  width: 12px;
+  display: inline-block;
+}
+
+.folderCount {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.row:hover {
+  background: rgba(100, 255, 218, 0.05);
+}
+
+.row.failed .swatch {
+  opacity: 0.35;
+}
+
+.row.failed .title {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  color: var(--fz-text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+a.title:hover {
+  color: var(--fz-accent);
+  text-decoration: underline;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--fz-muted);
+  margin-top: 1px;
+}
+
+.type {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dot {
+  opacity: 0.6;
+}
