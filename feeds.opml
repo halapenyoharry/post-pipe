@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  post-pipe corpus subscription list.
+
+  This file is hand-editable (or maintainable in any OPML reader). Each
+  <outline> with an xmlUrl is one source the aggregator will load and merge
+  into the corpus.
+
+  Supported type attributes: local | rss | atom | json
+  Optional extensions: customColor (CSS color override; otherwise resolved
+  automatically via theme-color / favicon / hash fallback).
+
+  The local entry below points the LocalFolderAdapter at the user's content
+  folder. The xmlUrl uses a local:// scheme so it's distinguishable from
+  network feeds; the actual path is the part after local:// (~/-prefixed
+  paths are resolved against $HOME).
+
+  Add external feeds by appending more <outline> entries. Folders are
+  supported via nested <outline> containers without xmlUrl.
+-->
+<opml version="2.0">
+  <head>
+    <title>post-pipe corpus</title>
+  </head>
+  <body>
+    <outline type="local"
+             text="My Writing"
+             title="My Writing"
+             xmlUrl="local://~/Posts"/>
+  </body>
+</opml>

@@ -9,30 +9,65 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, 'auth/.env') });
 
 const LocalFolderAdapter = require('./src/adapters/LocalFolderAdapter');
+const RssAdapter         = require('./src/adapters/RssAdapter');
+const AtomAdapter        = require('./src/adapters/AtomAdapter');
+const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
 const { loadCorpus }     = require('./src/aggregator');
+const { parseOpml }      = require('./src/lib/opml');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
 const SITE_DIR     = path.join(__dirname, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
 const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
+const OPML_PATH    = path.join(__dirname, SETTINGS.feeds_opml_path || 'feeds.opml');
 const PAGES_BASE   = SETTINGS.site.base_url;
 
-// One entry for now: the local content folder. OPML reading (plan step 4)
-// will replace this hand-built list with parsed feed entries.
+// Registry of adapter modules keyed by OPML type attribute.
+const ADAPTERS = {
+  local:       LocalFolderAdapter,
+  rss:         RssAdapter,
+  atom:        AtomAdapter,
+  json:        JsonFeedAdapter,
+  'json-feed': JsonFeedAdapter,
+};
+
+// Read feeds.opml and turn each entry into an {adapter, config} pair the
+// aggregator can consume. The local entry's xmlUrl is parsed as a path:
+// 'local://~/Posts' → '~/Posts'.
 function buildAdapterEntries() {
-  return [
-    {
-      adapter: LocalFolderAdapter,
-      config: {
-        id: `local://${SETTINGS.content_dir}`,
-        title: SETTINGS.site.title,
-        path: SETTINGS.content_dir,
-        pagesBase: PAGES_BASE,
-        coversDir: COVERS_DIR,
-      },
-    },
-  ];
+  if (!fs.existsSync(OPML_PATH)) {
+    throw new Error(`feeds.opml not found at ${OPML_PATH}`);
+  }
+  const opml = parseOpml(fs.readFileSync(OPML_PATH, 'utf8'));
+
+  return opml.map(entry => {
+    const adapter = ADAPTERS[entry.type];
+    if (!adapter) {
+      console.warn(`[generate-index] unknown adapter type "${entry.type}" for ${entry.xmlUrl}; skipping`);
+      return null;
+    }
+    return { adapter, config: configFor(entry) };
+  }).filter(Boolean);
+}
+
+function configFor(entry) {
+  const base = {
+    id: entry.xmlUrl,
+    title: entry.title,
+    htmlUrl: entry.htmlUrl,
+    customColor: entry.customColor,
+    folder: entry.folder,
+  };
+  if (entry.type === 'local') {
+    return {
+      ...base,
+      path: entry.xmlUrl.replace(/^local:\/\//, ''),
+      pagesBase: PAGES_BASE,
+      coversDir: COVERS_DIR,
+    };
+  }
+  return { ...base, xmlUrl: entry.xmlUrl };
 }
 
 // ─── Build feed.json ─────────────────────────────────────────────────────────
@@ -229,8 +264,6 @@ async function main() {
   const entries = buildAdapterEntries();
   const items = await loadCorpus(entries);
 
-  // Surface ingest summary in the build log. Reach into the local entry's
-  // item set (the only source for now) for the TODO count.
   console.log(`Aggregated ${items.length} item(s) from ${entries.length} source(s)`);
   const withTodos = items.filter(a => (a.todos || []).length).length;
   if (withTodos) {
