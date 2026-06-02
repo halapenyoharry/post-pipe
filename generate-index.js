@@ -1,114 +1,38 @@
 // generate-index.js
-// Reads all articles' frontmatter → produces feed.json + index.html
-// feed.json is the single source of truth — index.html fetches it at load time
-// Settings loaded from settings.json for personalization
+// Orchestrates the build: ask the aggregator for the merged corpus, write
+// _site/feed.json + _site/index.html.
 // Run: node generate-index.js
-// Output: _site/index.html, _site/feed.json
 
 const fs   = require('fs');
 const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, 'auth/.env') });
 
-const { loadFeedItems } = require('./platforms/feed-ingester');
-const { ingestFolder }  = require('./ingest');
+const LocalFolderAdapter = require('./src/adapters/LocalFolderAdapter');
+const { loadCorpus }     = require('./src/aggregator');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
-const CONTENT_ROOT = resolveHome(SETTINGS.content_dir);
 const SITE_DIR     = path.join(__dirname, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
-const D3_PATH      = path.join(__dirname, 'node_modules/d3/dist/d3.min.js');
 const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
 const PAGES_BASE   = SETTINGS.site.base_url;
 
-function resolveHome(p) {
-  if (!p) return p;
-  if (p.startsWith('~')) return path.join(process.env.HOME, p.slice(1));
-  return path.resolve(__dirname, p);
-}
-
-// ─── Scan content via ingester ──────────────────────────────────────────────
-
-if (!fs.existsSync(COVERS_DIR)) fs.mkdirSync(COVERS_DIR, { recursive: true });
-
-// Status → graph visual bucket. `bloomed` (finished but not publicly posted)
-// reads as published in the graph; graph only has two colors today. TODO
-// for a third tier if distinguishing bloomed-private from published-public
-// becomes useful.
-function statusBucket(c) {
-  if (c.status === 'published') return 'published';
-  if (c.syndication?.canonical) return 'published';
-  if (c.status === 'bloomed')   return 'published';
-  return 'draft';
-}
-
-function loadLocalContent() {
-  const { contents } = ingestFolder(CONTENT_ROOT);
-  const items = [];
-  for (const c of contents) {
-    // Copy cover into _site/covers/ if present. Use a relative URL so the
-    // viewer works both locally (python http.server) and on GH Pages.
-    let imageUrl = '';
-    if (c.cover) {
-      const srcPath = path.join(CONTENT_ROOT, c.id, c.cover);
-      if (fs.existsSync(srcPath)) {
-        const ext = path.extname(srcPath);
-        const destName = `${c.id}${ext}`;
-        fs.copyFileSync(srcPath, path.join(COVERS_DIR, destName));
-        imageUrl = `covers/${destName}`;
-      }
-    }
-
-    const pagesUrl = `${PAGES_BASE}/${c.id}.html`;
-    const bucket   = statusBucket(c);
-
-    items.push({
-      id: pagesUrl,
-      url: pagesUrl,
-      title: c.title,
-      short_title: c.short_title || '',
-      summary: c.summary || '',
-      tldr: c.summary || '',
-      image: imageUrl,
-      date_published: c.written ? toIsoDate(c.written) : undefined,
-      reading_time: c.reading_time || '',
-      tags: c.tags || [],
-      series: c.series || '',
-      series_part: c.series_part || null,
-      license: c.license || '',
-      canonical_url: c.syndication?.canonical || pagesUrl,
-      syndication: c.syndication || {},
-      _status: bucket,
-      // New-schema fields — graph and future renderers consume these:
-      kind: c.kind,
-      substrate: c.substrate,
-      seed: c.seed,
-      topology: c.topology || [],
-      energy: c.energy,
-      forms: {
-        current: c.forms_current,
-        potential: c.forms_potential || [],
-        companions: c.forms_companions || [],
+// One entry for now: the local content folder. OPML reading (plan step 4)
+// will replace this hand-built list with parsed feed entries.
+function buildAdapterEntries() {
+  return [
+    {
+      adapter: LocalFolderAdapter,
+      config: {
+        id: `local://${SETTINGS.content_dir}`,
+        title: SETTINGS.site.title,
+        path: SETTINGS.content_dir,
+        pagesBase: PAGES_BASE,
+        coversDir: COVERS_DIR,
       },
-      connected_to: c.connected_to || [],
-      note: c.note,
-      todos: c.todos || [],
-      schema: c.schema,
-    });
-  }
-  return items;
-}
-
-// Frontmatter dates come in many shapes ("2025", "2026-03", "2026-03-18").
-// Pad to a full ISO so JS Date parses consistently.
-function toIsoDate(s) {
-  if (!s) return undefined;
-  const str = String(s).trim();
-  if (/^\d{4}$/.test(str))        return new Date(`${str}-01-01T00:00:00Z`).toISOString();
-  if (/^\d{4}-\d{2}$/.test(str))  return new Date(`${str}-01T00:00:00Z`).toISOString();
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? undefined : d.toISOString();
+    },
+  ];
 }
 
 // ─── Build feed.json ─────────────────────────────────────────────────────────
@@ -302,22 +226,18 @@ ${reactJs}
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const articles = loadLocalContent();
-  console.log(`Ingested ${articles.length} local content item(s) from ${CONTENT_ROOT}`);
-  const withTodos = articles.filter(a => a.todos.length).length;
-  if (withTodos) console.log(`  (${withTodos} flagged with TODO files — see ${CONTENT_ROOT}/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
+  const entries = buildAdapterEntries();
+  const items = await loadCorpus(entries);
 
-  const feedItems = await loadFeedItems(SETTINGS);
-  console.log(`Found ${feedItems.length} feed item(s)`);
+  // Surface ingest summary in the build log. Reach into the local entry's
+  // item set (the only source for now) for the TODO count.
+  console.log(`Aggregated ${items.length} item(s) from ${entries.length} source(s)`);
+  const withTodos = items.filter(a => (a.todos || []).length).length;
+  if (withTodos) {
+    console.log(`  (${withTodos} flagged with TODO files — see ~/Posts/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
+  }
 
-  // Merge and sort by date descending
-  const allArticles = [...articles, ...feedItems].sort((a, b) => {
-    const da = new Date(a.date_published || 0);
-    const db = new Date(b.date_published || 0);
-    return db - da;
-  });
-
-  const feed = buildFeed(allArticles);
+  const feed = buildFeed(items);
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 

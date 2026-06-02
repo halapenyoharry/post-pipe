@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
-import { TextView } from '../NodeView';
+import { lensFor } from '../NodeView';
 
 // Transform the raw feed JSON into graph nodes and links.
 function feedToGraph(feed, config = {}) {
@@ -307,8 +307,9 @@ export function GraphViewer({ feedData, onNodeSelect }) {
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
 
+      const Lens = lensFor(d.kind);
       entry.root.render(
-        React.createElement(TextView, {
+        React.createElement(Lens, {
           article: d,
           width: w,
           height: h,

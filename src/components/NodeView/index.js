@@ -18,3 +18,4 @@
  * grows beyond a single visual.
  */
 export { TextView } from './TextView';
+export { lensFor } from './registry';
