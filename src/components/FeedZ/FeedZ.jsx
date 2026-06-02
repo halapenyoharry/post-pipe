@@ -1,123 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styles from './FeedZ.module.css';
 
 /**
- * FeedZ — read-only display of the feeds that compose the current corpus.
+ * FeedZ — pill-shaped feed list across a side of the viewport.
  *
- * Reads the `_sources` array embedded in feed.json by the build aggregator.
- * Shows each feed with its color swatch, title, item count, and link to
- * its home page. Folders (from OPML) are rendered as collapsible groups.
+ * Each feed is a small dimmed pill: a color dot, the feed name, an
+ * integrated item count. Tap a pill to hide/unhide that feed's items in
+ * the graph (without rebuilding the layout). A "+" pill at the end lets
+ * you paste a feed URL — the component generates the OPML snippet to
+ * the clipboard so you can add it to feeds.opml and rerun the build.
  *
- * Editing the OPML — adding, removing, renaming feeds — happens in
- * dedicated OPML tools (NetNewsWire, Reeder, Inoreader, hand-editing).
- * Run `node generate-index.js` to refresh after edits.
+ * Editing remains an OPML-tool job; this component is just a helper for
+ * the common "add one" case.
  *
  * Props:
- *   sources: array from feed._sources, each { id, title, type, color,
- *            home_page_url, folder, itemCount, ok }
+ *   sources        — array from feed._sources
+ *   hiddenSources  — Set<string> of source ids currently hidden
+ *   onToggleSource — (sourceId) => void
  */
-export function FeedZ({ sources }) {
-  const [collapsed, setCollapsed] = useState(false);
-
+export function FeedZ({ sources, hiddenSources, onToggleSource }) {
   if (!sources || sources.length === 0) return null;
 
-  // Group by folder for display.
-  const grouped = groupByFolder(sources);
+  const hidden = hiddenSources || new Set();
 
   return (
-    <div className={`${styles.panel} ${collapsed ? styles.collapsed : ''}`}>
-      <button
-        className={styles.handle}
-        onClick={() => setCollapsed(c => !c)}
-        title={collapsed ? 'Show feeds' : 'Hide feeds'}
-      >
-        <span className={styles.handleLabel}>
-          {sources.length} feed{sources.length === 1 ? '' : 's'}
-        </span>
-      </button>
-      {!collapsed && (
-        <div className={styles.body}>
-          {grouped.map(({ folder, items }) => (
-            <FolderGroup key={folder || '__root'} folder={folder} items={items} />
-          ))}
-        </div>
-      )}
+    <div className={styles.bar}>
+      {sources.map(src => (
+        <FeedPill
+          key={src.id}
+          source={src}
+          hidden={hidden.has(src.id)}
+          onToggle={() => onToggleSource && onToggleSource(src.id)}
+        />
+      ))}
+      <AddPill />
     </div>
   );
 }
 
-function FolderGroup({ folder, items }) {
-  const [open, setOpen] = useState(true);
-
+function FeedPill({ source, hidden, onToggle }) {
+  const title = source.title || source.id;
+  const ok = source.ok !== false;
   return (
-    <div className={styles.folder}>
-      {folder && (
+    <button
+      className={`${styles.pill} ${hidden ? styles.hidden : ''} ${!ok ? styles.failed : ''}`}
+      onClick={onToggle}
+      title={hidden ? `Show ${title}` : `Hide ${title}`}
+      style={{ '--pill-color': source.color }}
+    >
+      <span className={styles.dot} aria-hidden="true" />
+      <span className={styles.title}>{title}</span>
+      <span className={styles.count}>{source.itemCount}</span>
+    </button>
+  );
+}
+
+function AddPill() {
+  const [open, setOpen] = useState(false);
+  const [toast, setToast] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (open && inputRef.current) inputRef.current.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const url = (inputRef.current?.value || '').trim();
+    if (!url) return;
+    const snippet = buildOutline(url);
+    try {
+      await navigator.clipboard.writeText(snippet);
+      setToast('Copied — paste into feeds.opml, then rerun the build');
+    } catch (_) {
+      setToast(`Could not copy. Snippet: ${snippet}`);
+    }
+    if (inputRef.current) inputRef.current.value = '';
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <>
         <button
-          className={styles.folderHeading}
-          onClick={() => setOpen(o => !o)}
+          className={`${styles.pill} ${styles.addPill}`}
+          onClick={() => setOpen(true)}
+          title="Add a feed (clipboard helper)"
         >
-          <span className={styles.folderChevron}>{open ? '▾' : '▸'}</span>
-          <span>{folder}</span>
-          <span className={styles.folderCount}>{items.length}</span>
+          <span className={styles.plus}>+</span>
         </button>
-      )}
-      {open && (
-        <ul className={styles.list}>
-          {items.map(src => (
-            <SourceRow key={src.id} source={src} />
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function SourceRow({ source }) {
-  const labelTitle = source.title || source.id;
-  return (
-    <li className={`${styles.row} ${source.ok === false ? styles.failed : ''}`}>
-      <span
-        className={styles.swatch}
-        style={{ backgroundColor: source.color }}
-        aria-hidden="true"
-      />
-      <div className={styles.rowText}>
-        {source.home_page_url ? (
-          <a
-            className={styles.title}
-            href={source.home_page_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={labelTitle}
-          >
-            {labelTitle}
-          </a>
-        ) : (
-          <span className={styles.title} title={labelTitle}>{labelTitle}</span>
-        )}
-        <span className={styles.meta}>
-          <span className={styles.type}>{source.type}</span>
-          <span className={styles.dot}>·</span>
-          <span className={styles.count}>{source.itemCount}</span>
-        </span>
-      </div>
-    </li>
-  );
-}
-
-function groupByFolder(sources) {
-  const buckets = new Map();
-  for (const s of sources) {
-    const key = s.folder || '';
-    if (!buckets.has(key)) buckets.set(key, []);
-    buckets.get(key).push(s);
+        {toast && <div className={styles.toast}>{toast}</div>}
+      </>
+    );
   }
-  // Top-level (root) first, then folders alphabetically.
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => {
-      if (a === '') return -1;
-      if (b === '') return 1;
-      return a.localeCompare(b);
-    })
-    .map(([folder, items]) => ({ folder, items }));
+
+  return (
+    <>
+      <form className={`${styles.pill} ${styles.addOpen}`} onSubmit={handleSubmit}>
+        <input
+          ref={inputRef}
+          type="url"
+          placeholder="feed URL…"
+          className={styles.addInput}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+        />
+      </form>
+      {toast && <div className={styles.toast}>{toast}</div>}
+    </>
+  );
+}
+
+// Construct an OPML <outline> for a URL. We leave the type attribute off
+// so the parser's detectType() heuristic runs — that's usually right for
+// well-known feed extensions, and the user can edit if it isn't.
+function buildOutline(url) {
+  const safeUrl = url.replace(/"/g, '&quot;');
+  return `<outline text="${urlToLabel(url)}" title="${urlToLabel(url)}" xmlUrl="${safeUrl}"/>`;
+}
+
+function urlToLabel(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch (_) {
+    return url;
+  }
 }

@@ -46,6 +46,7 @@ function feedToGraph(feed, config = {}) {
       forms: item.forms || {},
       note: item.note || '',
       todos: item.todos || [],
+      _source: item._source || null,
       originalItem: item
     });
 
@@ -67,6 +68,25 @@ function feedToGraph(feed, config = {}) {
   return { nodes, links };
 }
 
+// Walk article nodes + links and toggle their display based on whether
+// the item's source is currently in the hidden set. Pure DOM mutation,
+// no simulation involvement — node positions stay locked.
+function applyVisibility(svg, hiddenSet) {
+  const isHiddenArticle = (d) =>
+    d && d.type === 'article' && d._source && hiddenSet.has(d._source.id);
+
+  svg.selectAll('.node')
+    .style('display', (d) => isHiddenArticle(d) ? 'none' : null);
+
+  svg.selectAll('.link')
+    .style('display', (l) => {
+      const sNode = typeof l.source === 'object' ? l.source : null;
+      const tNode = typeof l.target === 'object' ? l.target : null;
+      if (isHiddenArticle(sNode) || isHiddenArticle(tNode)) return 'none';
+      return null;
+    });
+}
+
 // Zoom-aware level of detail. Three levels of precision built into the
 // graph: at deep zoom-out the node is just the slug; closer in, the
 // short_title; closer still, the full card.
@@ -86,7 +106,7 @@ function cardSizeFor({ hovered, pinned }) {
   return { width: 180, height: 140 };
 }
 
-export function GraphViewer({ feedData, onNodeSelect }) {
+export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -100,6 +120,18 @@ export function GraphViewer({ feedData, onNodeSelect }) {
   const hoveredIdRef = useRef(null);
   const zoomScaleRef = useRef(1);
   const currentLodRef = useRef('full');
+  const hiddenSourcesRef = useRef(new Set());
+
+  // Apply visibility from outside the main simulation effect, so toggling
+  // a feed never rebuilds the graph. We query the SVG via d3 directly and
+  // flip display/visibility on the existing nodes and links.
+  useEffect(() => {
+    hiddenSourcesRef.current = hiddenSources instanceof Set
+      ? hiddenSources
+      : new Set(hiddenSources || []);
+    if (!svgRef.current) return;
+    applyVisibility(svgRef.current, hiddenSourcesRef.current);
+  }, [hiddenSources]);
 
   useEffect(() => {
     if (!feedData || !containerRef.current) return;
@@ -390,6 +422,7 @@ export function GraphViewer({ feedData, onNodeSelect }) {
     // Initial paint.
     renderAllArticleBodies();
     updateSlugLabels(zoomScaleRef.current);
+    applyVisibility(svg, hiddenSourcesRef.current);
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
     // because the foreignObject's inner HTML gets replaced on re-render

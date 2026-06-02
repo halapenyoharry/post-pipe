@@ -215,14 +215,27 @@ ${reactJs}
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
+      const [hiddenSources, setHiddenSources] = React.useState(new Set());
+
+      const toggleSource = React.useCallback((sourceId) => {
+        setHiddenSources(prev => {
+          const next = new Set(prev);
+          if (next.has(sourceId)) next.delete(sourceId);
+          else next.add(sourceId);
+          return next;
+        });
+      }, []);
 
       return React.createElement(React.Fragment, null,
         React.createElement(GraphViewer, {
           feedData: feed,
-          onNodeSelect: (article) => setSelectedArticle(article)
+          onNodeSelect: (article) => setSelectedArticle(article),
+          hiddenSources: hiddenSources
         }),
         React.createElement(FeedZ, {
-          sources: feed._sources || []
+          sources: feed._sources || [],
+          hiddenSources: hiddenSources,
+          onToggleSource: toggleSource
         }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
