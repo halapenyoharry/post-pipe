@@ -11647,18 +11647,21 @@ function Oo({ targetRef: e }) {
 	}) : null;
 }
 var ko = {
-	bar: "_bar_ojxnl_6",
-	pill: "_pill_ojxnl_18",
-	hidden: "_hidden_ojxnl_44",
-	title: "_title_ojxnl_48",
-	failed: "_failed_ojxnl_52",
-	dot: "_dot_ojxnl_52",
-	count: "_count_ojxnl_77",
-	addPill: "_addPill_ojxnl_86",
-	plus: "_plus_ojxnl_92",
-	addOpen: "_addOpen_ojxnl_103",
-	addInput: "_addInput_ojxnl_107",
-	toast: "_toast_ojxnl_124"
+	bar: "_bar_m6nqd_6",
+	pill: "_pill_m6nqd_18",
+	hidden: "_hidden_m6nqd_44",
+	title: "_title_m6nqd_48",
+	failed: "_failed_m6nqd_52",
+	dot: "_dot_m6nqd_52",
+	count: "_count_m6nqd_77",
+	addPill: "_addPill_m6nqd_86",
+	plus: "_plus_m6nqd_92",
+	addOpen: "_addOpen_m6nqd_103",
+	addInput: "_addInput_m6nqd_110",
+	addClose: "_addClose_m6nqd_127",
+	addSubmit: "_addSubmit_m6nqd_143",
+	ready: "_ready_m6nqd_164",
+	toast: "_toast_m6nqd_175"
 };
 //#endregion
 //#region src/components/FeedZ/FeedZ.jsx
@@ -11698,40 +11701,61 @@ function jo({ source: e, hidden: t, onToggle: n }) {
 	});
 }
 function Mo() {
-	let [e, t] = (0, O.useState)(!1), [n, r] = (0, O.useState)(""), i = (0, O.useRef)(null);
-	return (0, O.useEffect)(() => {
-		e && i.current && i.current.focus();
+	let [e, t] = (0, O.useState)(!1), [n, r] = (0, O.useState)(""), [i, a] = (0, O.useState)(""), o = (0, O.useRef)(null);
+	(0, O.useEffect)(() => {
+		e && o.current && o.current.focus();
 	}, [e]), (0, O.useEffect)(() => {
-		if (!n) return;
-		let e = setTimeout(() => r(""), 3500);
+		if (!i) return;
+		let e = setTimeout(() => a(""), 4500);
 		return () => clearTimeout(e);
-	}, [n]), e ? /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsx)("form", {
+	}, [i]);
+	let s = No(n), c = async (e) => {
+		if (e && e.preventDefault(), !s) return;
+		let i = B(n.trim());
+		try {
+			await navigator.clipboard.writeText(i), a("Copied. Paste into feeds.opml and rerun the build.");
+		} catch {
+			a(`Could not copy automatically. Snippet: ${i}`);
+		}
+		r(""), t(!1);
+	}, l = () => {
+		r(""), t(!1);
+	};
+	return e ? /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsxs)("form", {
 		className: `${ko.pill} ${ko.addOpen}`,
-		onSubmit: async (e) => {
-			e.preventDefault();
-			let n = (i.current?.value || "").trim();
-			if (!n) return;
-			let a = No(n);
-			try {
-				await navigator.clipboard.writeText(a), r("Copied — paste into feeds.opml, then rerun the build");
-			} catch {
-				r(`Could not copy. Snippet: ${a}`);
-			}
-			i.current && (i.current.value = ""), t(!1);
-		},
-		children: /* @__PURE__ */ (0, N.jsx)("input", {
-			ref: i,
-			type: "url",
-			placeholder: "feed URL…",
-			className: ko.addInput,
-			onBlur: () => setTimeout(() => t(!1), 150),
-			onKeyDown: (e) => {
-				e.key === "Escape" && t(!1);
-			}
-		})
-	}), n && /* @__PURE__ */ (0, N.jsx)("div", {
+		onSubmit: c,
+		children: [
+			/* @__PURE__ */ (0, N.jsx)("input", {
+				ref: o,
+				type: "url",
+				placeholder: "paste a feed URL…",
+				className: ko.addInput,
+				value: n,
+				onChange: (e) => r(e.target.value),
+				onKeyDown: (e) => {
+					e.key === "Escape" && l();
+				}
+			}),
+			/* @__PURE__ */ (0, N.jsx)("button", {
+				type: "button",
+				className: ko.addClose,
+				onClick: l,
+				title: "Cancel",
+				"aria-label": "Cancel",
+				children: "×"
+			}),
+			/* @__PURE__ */ (0, N.jsx)("button", {
+				type: "submit",
+				className: `${ko.addSubmit} ${s ? ko.ready : ""}`,
+				disabled: !s,
+				title: s ? "Copy OPML snippet to clipboard" : "Enter a URL first",
+				"aria-label": "Add feed",
+				children: "+"
+			})
+		]
+	}), i && /* @__PURE__ */ (0, N.jsx)("div", {
 		className: ko.toast,
-		children: n
+		children: i
 	})] }) : /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsx)("button", {
 		className: `${ko.pill} ${ko.addPill}`,
 		onClick: () => t(!0),
@@ -11740,16 +11764,26 @@ function Mo() {
 			className: ko.plus,
 			children: "+"
 		})
-	}), n && /* @__PURE__ */ (0, N.jsx)("div", {
+	}), i && /* @__PURE__ */ (0, N.jsx)("div", {
 		className: ko.toast,
-		children: n
+		children: i
 	})] });
 }
 function No(e) {
-	let t = e.replace(/"/g, "&quot;");
-	return `<outline text="${B(e)}" title="${B(e)}" xmlUrl="${t}"/>`;
+	let t = (e || "").trim();
+	if (!t) return !1;
+	try {
+		let e = new URL(t);
+		return e.protocol === "http:" || e.protocol === "https:";
+	} catch {
+		return !1;
+	}
 }
 function B(e) {
+	let t = e.replace(/"/g, "&quot;");
+	return `<outline text="${Po(e)}" title="${Po(e)}" xmlUrl="${t}"/>`;
+}
+function Po(e) {
 	try {
 		return new URL(e).hostname.replace(/^www\./, "");
 	} catch {

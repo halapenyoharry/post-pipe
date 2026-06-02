@@ -57,6 +57,7 @@ function FeedPill({ source, hidden, onToggle }) {
 
 function AddPill() {
   const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('');
   const [toast, setToast] = useState('');
   const inputRef = useRef(null);
 
@@ -66,22 +67,28 @@ function AddPill() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(''), 3500);
+    const t = setTimeout(() => setToast(''), 4500);
     return () => clearTimeout(t);
   }, [toast]);
 
+  const urlIsValid = isLikelyUrl(value);
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const url = (inputRef.current?.value || '').trim();
-    if (!url) return;
-    const snippet = buildOutline(url);
+    if (e) e.preventDefault();
+    if (!urlIsValid) return;
+    const snippet = buildOutline(value.trim());
     try {
       await navigator.clipboard.writeText(snippet);
-      setToast('Copied — paste into feeds.opml, then rerun the build');
+      setToast('Copied. Paste into feeds.opml and rerun the build.');
     } catch (_) {
-      setToast(`Could not copy. Snippet: ${snippet}`);
+      setToast(`Could not copy automatically. Snippet: ${snippet}`);
     }
-    if (inputRef.current) inputRef.current.value = '';
+    setValue('');
+    setOpen(false);
+  };
+
+  const close = () => {
+    setValue('');
     setOpen(false);
   };
 
@@ -106,15 +113,41 @@ function AddPill() {
         <input
           ref={inputRef}
           type="url"
-          placeholder="feed URL…"
+          placeholder="paste a feed URL…"
           className={styles.addInput}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') close(); }}
         />
+        <button
+          type="button"
+          className={styles.addClose}
+          onClick={close}
+          title="Cancel"
+          aria-label="Cancel"
+        >×</button>
+        <button
+          type="submit"
+          className={`${styles.addSubmit} ${urlIsValid ? styles.ready : ''}`}
+          disabled={!urlIsValid}
+          title={urlIsValid ? 'Copy OPML snippet to clipboard' : 'Enter a URL first'}
+          aria-label="Add feed"
+        >+</button>
       </form>
       {toast && <div className={styles.toast}>{toast}</div>}
     </>
   );
+}
+
+function isLikelyUrl(s) {
+  const trimmed = (s || '').trim();
+  if (!trimmed) return false;
+  try {
+    const u = new URL(trimmed);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
 }
 
 // Construct an OPML <outline> for a URL. We leave the type attribute off

@@ -101,7 +101,10 @@
 }
 
 .addOpen {
-  padding: 0 4px 0 8px;
+  padding: 0 4px 0 10px;
+  /* Wide enough for typical feed URLs; grows on roomy viewports, never
+     overflows tiny ones. */
+  width: clamp(280px, 50vw, 560px);
 }
 
 .addInput {
@@ -111,12 +114,60 @@
   color: #e0e0e0;
   font-family: inherit;
   font-size: 12px;
-  width: 240px;
+  flex: 1;
+  min-width: 0;
   height: 100%;
 }
 
 .addInput::placeholder {
   color: rgba(224, 224, 224, 0.4);
+}
+
+/* Close (×) — small, neutral. Cancel without submitting. */
+.addClose {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(224, 224, 224, 0.5);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  font-family: inherit;
+}
+.addClose:hover {
+  color: #e0e0e0;
+}
+
+/* Submit (+) — appears greyed until the input parses as a URL, then
+   lights up green so the "ready to add" signal is unmistakable. */
+.addSubmit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  background: rgba(100, 255, 218, 0.08);
+  border: 1px solid rgba(100, 255, 218, 0.25);
+  border-radius: 999px;
+  color: rgba(100, 255, 218, 0.45);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.addSubmit:disabled {
+  cursor: not-allowed;
+}
+.addSubmit.ready {
+  background: rgba(46, 204, 113, 0.85);
+  border-color: rgba(46, 204, 113, 1);
+  color: #0a1f12;
+}
+.addSubmit.ready:hover {
+  background: #2ecc71;
 }
 
 /* ─── Toast ─── */
@@ -127,13 +178,15 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
-  padding: 8px 14px;
-  background: rgba(17, 24, 39, 0.95);
-  border: 1px solid rgba(100, 255, 218, 0.35);
+  padding: 12px 22px;
+  background: rgba(17, 24, 39, 0.96);
+  border: 1px solid rgba(46, 204, 113, 0.55);
+  border-left: 3px solid #2ecc71;
   border-radius: 4px;
   color: #e0e0e0;
   font-family: 'Atkinson', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   pointer-events: none;
   backdrop-filter: blur(6px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
