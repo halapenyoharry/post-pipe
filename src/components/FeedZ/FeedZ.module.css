@@ -170,23 +170,132 @@
   background: #2ecc71;
 }
 
-/* ─── Toast ─── */
+/* ─── Result panel (sticky, opens right under the pill bar) ─── */
 
-.toast {
+.resultPanel {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 48px;                /* directly below the pill bar */
+  left: 12px;
+  right: 12px;
   z-index: 60;
-  padding: 12px 22px;
-  background: rgba(17, 24, 39, 0.96);
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 14px 18px 14px 20px;
+  background: rgba(17, 24, 39, 0.97);
   border: 1px solid rgba(46, 204, 113, 0.55);
   border-left: 3px solid #2ecc71;
-  border-radius: 4px;
+  border-radius: 6px;
   color: #e0e0e0;
   font-family: 'Atkinson', sans-serif;
   font-size: 13px;
-  pointer-events: none;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.resultClose {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(224, 224, 224, 0.5);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  font-family: inherit;
+}
+.resultClose:hover { color: #e0e0e0; }
+
+.resultTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2ecc71;
+  margin-bottom: 4px;
+}
+
+.resultUrl {
+  font-size: 12px;
+  color: rgba(224, 224, 224, 0.55);
+  margin-bottom: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultSection {
+  margin-bottom: 10px;
+}
+.resultSection:last-child {
+  margin-bottom: 0;
+}
+
+.resultLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(100, 255, 218, 0.75);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.resultBox {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  padding: 6px 6px 6px 10px;
+}
+
+.code {
+  flex: 1;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  color: #e0e0e0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  align-self: center;
+}
+
+.codeInline {
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: rgba(224, 224, 224, 0.85);
+}
+
+.copyBtn {
+  background: rgba(46, 204, 113, 0.18);
+  border: 1px solid rgba(46, 204, 113, 0.55);
+  border-radius: 3px;
+  color: #2ecc71;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  align-self: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.copyBtn:hover {
+  background: rgba(46, 204, 113, 0.32);
+  color: #0a1f12;
+}
+.copyBtn.copied {
+  background: #2ecc71;
+  color: #0a1f12;
+  border-color: #2ecc71;
+}
+
+.resultHint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(224, 224, 224, 0.55);
+  line-height: 1.4;
 }

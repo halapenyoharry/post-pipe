@@ -58,31 +58,21 @@ function FeedPill({ source, hidden, onToggle }) {
 function AddPill() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
-  const [toast, setToast] = useState('');
+  // pendingUrl is the URL the user just submitted; the result panel stays
+  // open (sticky) until they explicitly dismiss it. No auto-fade.
+  const [pendingUrl, setPendingUrl] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(''), 4500);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   const urlIsValid = isLikelyUrl(value);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     if (e) e.preventDefault();
     if (!urlIsValid) return;
-    const snippet = buildOutline(value.trim());
-    try {
-      await navigator.clipboard.writeText(snippet);
-      setToast('Copied. Paste into feeds.opml and rerun the build.');
-    } catch (_) {
-      setToast(`Could not copy automatically. Snippet: ${snippet}`);
-    }
+    setPendingUrl(value.trim());
     setValue('');
     setOpen(false);
   };
@@ -92,50 +82,118 @@ function AddPill() {
     setOpen(false);
   };
 
-  if (!open) {
-    return (
-      <>
+  return (
+    <>
+      {!open ? (
         <button
           className={`${styles.pill} ${styles.addPill}`}
           onClick={() => setOpen(true)}
-          title="Add a feed (clipboard helper)"
+          title="Add a feed"
         >
           <span className={styles.plus}>+</span>
         </button>
-        {toast && <div className={styles.toast}>{toast}</div>}
-      </>
-    );
-  }
+      ) : (
+        <form className={`${styles.pill} ${styles.addOpen}`} onSubmit={handleSubmit}>
+          <input
+            ref={inputRef}
+            type="url"
+            placeholder="paste a feed URL…"
+            className={styles.addInput}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') close(); }}
+          />
+          <button
+            type="button"
+            className={styles.addClose}
+            onClick={close}
+            title="Cancel"
+            aria-label="Cancel"
+          >×</button>
+          <button
+            type="submit"
+            className={`${styles.addSubmit} ${urlIsValid ? styles.ready : ''}`}
+            disabled={!urlIsValid}
+            title={urlIsValid ? 'Continue' : 'Enter a URL first'}
+            aria-label="Add feed"
+          >+</button>
+        </form>
+      )}
+      {pendingUrl && (
+        <AddResultPanel
+          url={pendingUrl}
+          onDismiss={() => setPendingUrl(null)}
+        />
+      )}
+    </>
+  );
+}
+
+// Sticky result panel — opens right below the pill bar (where the user
+// just clicked) and stays until dismissed. Shows both ways to actually
+// install the feed:
+//   1. CLI command (runs add-feed.js, which appends to OPML and rebuilds)
+//   2. OPML snippet (for hand-editing or external OPML tools)
+// Each line has its own "Copy" button so there's no ambiguity about
+// which one ended up on the clipboard.
+function AddResultPanel({ url, onDismiss }) {
+  const [copied, setCopied] = useState('');
+  const snippet = buildOutline(url);
+  const cliCommand = `node add-feed.js ${shell(url)}`;
+
+  const copy = async (text, label) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(c => c === label ? '' : c), 1500);
+    } catch (_) { /* clipboard denied; user can copy manually */ }
+  };
 
   return (
-    <>
-      <form className={`${styles.pill} ${styles.addOpen}`} onSubmit={handleSubmit}>
-        <input
-          ref={inputRef}
-          type="url"
-          placeholder="paste a feed URL…"
-          className={styles.addInput}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Escape') close(); }}
-        />
-        <button
-          type="button"
-          className={styles.addClose}
-          onClick={close}
-          title="Cancel"
-          aria-label="Cancel"
-        >×</button>
-        <button
-          type="submit"
-          className={`${styles.addSubmit} ${urlIsValid ? styles.ready : ''}`}
-          disabled={!urlIsValid}
-          title={urlIsValid ? 'Copy OPML snippet to clipboard' : 'Enter a URL first'}
-          aria-label="Add feed"
-        >+</button>
-      </form>
-      {toast && <div className={styles.toast}>{toast}</div>}
-    </>
+    <div className={styles.resultPanel}>
+      <button
+        className={styles.resultClose}
+        onClick={onDismiss}
+        title="Dismiss"
+        aria-label="Dismiss"
+      >×</button>
+      <div className={styles.resultTitle}>Add this feed</div>
+      <div className={styles.resultUrl} title={url}>{url}</div>
+
+      <div className={styles.resultSection}>
+        <div className={styles.resultLabel}>One-step (recommended)</div>
+        <div className={styles.resultBox}>
+          <code className={styles.code}>{cliCommand}</code>
+          <button
+            className={`${styles.copyBtn} ${copied === 'cli' ? styles.copied : ''}`}
+            onClick={() => copy(cliCommand, 'cli')}
+          >
+            {copied === 'cli' ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <div className={styles.resultHint}>
+          Paste in your terminal — it appends to feeds.opml and rebuilds.
+          Then refresh this page.
+        </div>
+      </div>
+
+      <div className={styles.resultSection}>
+        <div className={styles.resultLabel}>Or add manually</div>
+        <div className={styles.resultBox}>
+          <code className={styles.code}>{snippet}</code>
+          <button
+            className={`${styles.copyBtn} ${copied === 'opml' ? styles.copied : ''}`}
+            onClick={() => copy(snippet, 'opml')}
+          >
+            {copied === 'opml' ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <div className={styles.resultHint}>
+          Paste before <code className={styles.codeInline}>&lt;/body&gt;</code>{' '}
+          in feeds.opml, then run <code className={styles.codeInline}>node generate-index.js</code>.
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -148,6 +206,12 @@ function isLikelyUrl(s) {
   } catch (_) {
     return false;
   }
+}
+
+// Shell-quote a URL for safe inclusion in the CLI command suggestion.
+// Single-quote everything and escape any embedded single quote.
+function shell(s) {
+  return `'${String(s).replace(/'/g, `'\\''`)}'`;
 }
 
 // Construct an OPML <outline> for a URL. We leave the type attribute off
