@@ -26,6 +26,7 @@
     <outline type="local"
              text="My Writing"
              title="My Writing"
-             xmlUrl="local://~/Posts"/>
+             xmlUrl="local://~/Posts"
+             customColor="#2ecc71"/>
   </body>
 </opml>

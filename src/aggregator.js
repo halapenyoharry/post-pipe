@@ -1,30 +1,42 @@
-// Aggregator — runs N adapters and merges their items into one corpus.
-//
-// Adapters run concurrently. Each item is stamped with a `_source` extension
-// recording which feed it came from (id, title, type). A `color` slot is
-// reserved on `_source` so a later PR can attach per-feed colors without
-// changing the adapter interface or the item shape further.
-//
-// Currently called with a single LocalFolderAdapter entry. As soon as OPML
-// reading lands (plan step 4), this is what consumes the parsed entries.
+// Aggregator — runs N adapters, resolves each feed's color, merges items.
+
+const { detectFeedColor } = require('./adapters/detectFeedColor');
+const { ColorCache }      = require('./lib/colorCache');
 
 /**
  * @param {Array<{ adapter, config }>} entries
+ * @param {Object} [options]
+ * @param {string} [options.colorCachePath]  defaults to './.feed-cache/colors.json'
  * @returns {Promise<JsonFeedItem[]>}  merged, sorted-by-date items
  */
-async function loadCorpus(entries) {
+async function loadCorpus(entries, options = {}) {
+  const cache = new ColorCache(options.colorCachePath || './.feed-cache/colors.json');
+
+  // Phase 1: fetch items from every adapter concurrently.
   const results = await Promise.all(
     entries.map(({ adapter, config }) =>
       adapter.load(config).then(result => ({ adapter, config, ...result }))
     )
   );
 
-  const stamped = results.flatMap(({ adapter, config, items, feedMeta }) => {
+  // Phase 2: resolve colors (cache hits skip the network).
+  await Promise.all(results.map(async (r) => {
+    const feedId = r.feedMeta.id || r.config.id;
+    let color = cache.get(feedId);
+    if (!color) {
+      color = await detectFeedColor(r.feedMeta, r.config.customColor);
+      cache.set(feedId, color);
+    }
+    r.color = color;
+  }));
+
+  // Phase 3: stamp every item with its source provenance.
+  const stamped = results.flatMap(({ adapter, config, items, feedMeta, color }) => {
     const source = {
       id: feedMeta.id || config.id,
       title: feedMeta.title || config.title,
       type: adapter.id,
-      color: null,           // populated in a later PR
+      color,
     };
     return items.map(item => ({ ...item, _source: source }));
   });

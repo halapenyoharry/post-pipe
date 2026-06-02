@@ -27,12 +27,15 @@ export function TextView({ article, width, height, viewState, fullContent }) {
   const useFullArticle = pinned && !!fullContent;
 
   // The "draft vs published" distinction maps to the bucket the graph
-  // ingester chose. Same logic as legacy renderArticleNodeHTML.
+  // ingester chose. Used to tint backgrounds. Per-source color (when
+  // provided via article._source.color) overrides the border so each
+  // feed has its own visual identity.
   const isDraft = !(
     article._status === 'published' ||
     article._status === 'bloomed' ||
     !!(article.syndication && article.syndication.canonical)
   );
+  const sourceColor = article._source && article._source.color;
 
   // Image-kind nodes are a different visual: photo card with caption.
   if (article.kind === 'image' && article.image) {
@@ -72,7 +75,10 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         height,
         background: bgImage || bgColor,
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'center',
+        // Source-color tints the border. Pinned state still wins (accent
+        // color via the .pinned class) for selection clarity.
+        ...(sourceColor && !pinned ? { borderColor: sourceColor } : {})
       }}
     >
       <CardContent

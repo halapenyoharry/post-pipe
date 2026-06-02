@@ -10828,7 +10828,7 @@ var uo = { graphContainer: "_graphContainer_7uvsx_1" }, M = {
 	t.exports = fo();
 })))();
 function po({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
-	let { hovered: a = !1, pinned: o = !1, lod: s = "full" } = r || {}, c = a || o, l = o && !!i, u = !(e._status === "published" || e._status === "bloomed" || e.syndication && e.syndication.canonical);
+	let { hovered: a = !1, pinned: o = !1, lod: s = "full" } = r || {}, c = a || o, l = o && !!i, u = !(e._status === "published" || e._status === "bloomed" || e.syndication && e.syndication.canonical), d = e._source && e._source.color;
 	if (e.kind === "image" && e.image) return /* @__PURE__ */ (0, N.jsx)(ho, {
 		article: e,
 		width: t,
@@ -10837,7 +10837,7 @@ function po({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 		hovered: a,
 		isDraft: u
 	});
-	let d = u ? "rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85)", f = e.image ? `linear-gradient(${d},${d}), url('${e.image}')` : "", p = u ? "#2a2a3e" : "#1e3a5f";
+	let f = u ? "rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85)", p = e.image ? `linear-gradient(${f},${f}), url('${e.image}')` : "", m = u ? "#2a2a3e" : "#1e3a5f";
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: [
 			M.card,
@@ -10848,9 +10848,10 @@ function po({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 		style: {
 			width: t,
 			height: n,
-			background: f || p,
+			background: p || m,
 			backgroundSize: "cover",
-			backgroundPosition: "center"
+			backgroundPosition: "center",
+			...d && !o ? { borderColor: d } : {}
 		},
 		children: [/* @__PURE__ */ (0, N.jsx)(mo, {
 			article: e,
