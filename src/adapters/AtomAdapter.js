@@ -38,6 +38,8 @@ function normalizeEntry(e) {
   const summary = extractText(e.summary) || stripTags(extractText(e.content)).slice(0, 400);
   const contentHtml = extractText(e.content) || extractText(e.summary) || null;
   const authors = (e.author || []).map(a => ({ name: extractText(a.name) || '' })).filter(a => a.name);
+  const image = extractImage(e);
+  const tags  = (e.category || []).map(c => c['@_term']).filter(Boolean);
 
   return {
     id: e.id || url,
@@ -46,13 +48,15 @@ function normalizeEntry(e) {
     short_title: '',
     summary,
     tldr: summary,
-    image: extractImage(e),
+    image,
     content_html: contentHtml,
     date_published: parseDate(e.published || e.updated),
-    tags: (e.category || []).map(c => c['@_term']).filter(Boolean),
+    tags,
     authors,
     canonical_url: url,
     kind: 'text',
+    attachments: image ? [{ url: image, mime_type: 'image/*', _role: 'cover' }] : [],
+    _references: tags.map(value => ({ type: 'tag', value })),
   };
 }
 

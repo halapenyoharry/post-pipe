@@ -50,6 +50,8 @@ function normalizeItem(it) {
   const summary = description.replace(/<[^>]+>/g, '').slice(0, 400);
   const author = (typeof it['dc:creator'] === 'string' ? it['dc:creator']
                 : typeof it.author === 'string' ? it.author : '') || '';
+  const image = extractImage(it);
+  const tags  = extractCategories(it.category);
 
   return {
     id,
@@ -58,13 +60,15 @@ function normalizeItem(it) {
     short_title: '',
     summary,
     tldr: summary,
-    image: extractImage(it),
+    image,
     content_html: it['content:encoded'] || it.description || null,
     date_published: parseDate(it.pubDate || it['dc:date']),
-    tags: extractCategories(it.category),
+    tags,
     authors: author ? [{ name: author }] : [],
     canonical_url: url,
     kind: 'text',
+    attachments: image ? [{ url: image, mime_type: 'image/*', _role: 'cover' }] : [],
+    _references: tags.map(value => ({ type: 'tag', value })),
   };
 }
 

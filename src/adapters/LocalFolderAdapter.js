@@ -55,6 +55,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
   const pagesUrl = `${pagesBase}/${c.id}.html`;
   const bucket   = statusBucket(c);
 
+  const tags = c.tags || [];
+
   return {
     id: pagesUrl,
     url: pagesUrl,
@@ -65,16 +67,27 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     image: imageUrl,
     date_published: c.written ? toIsoDate(c.written) : undefined,
     reading_time: c.reading_time || '',
-    tags: c.tags || [],
+    tags,
     series: c.series || '',
     series_part: c.series_part || null,
     license: c.license || '',
     canonical_url: c.syndication?.canonical || pagesUrl,
     syndication: c.syndication || {},
+    // JSON Feed 1.1 standard: per-item attachments. Each carries a _role
+    // extension distinguishing how the item uses the file — 'cover' for
+    // the node background, 'inline' for embedded media, 'reference' for
+    // shared/external media that other items might also reference.
+    attachments: buildAttachments(c, imageUrl),
     _status: bucket,
-    // Project schema fields the graph and TextView consume. (Underscore-
-    // prefixing of these to match JSON Feed extension conventions is a
-    // separate, breaking refactor — see plan step 7.)
+    // Generalized references — every "thing the item points to that other
+    // items can also point to" lives here, typed. Tags are the first
+    // case; future case includes images-as-edges (type: 'image'),
+    // people, places, dates. Code that still wants just tags keeps
+    // reading `tags` (above) for compatibility.
+    _references: tags.map(value => ({ type: 'tag', value })),
+    // Project schema fields the graph and TextView consume. Underscore-
+    // prefixing them to match JSON Feed conventions is a breaking
+    // refactor for another day.
     kind: c.kind,
     substrate: c.substrate,
     seed: c.seed,
@@ -90,6 +103,33 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     todos: c.todos || [],
     schema: c.schema,
   };
+}
+
+// Build the attachments array for an item. Today the only attachment is
+// the cover image; later this fans out to inline media and shared
+// references — but the shape is already set so adding them is additive.
+function buildAttachments(c, imageUrl) {
+  const out = [];
+  if (imageUrl) {
+    out.push({
+      url: imageUrl,
+      mime_type: mimeFromExt(imageUrl),
+      _role: 'cover',
+    });
+  }
+  return out;
+}
+
+function mimeFromExt(url) {
+  const ext = path.extname(url).toLowerCase();
+  return ({
+    '.png':  'image/png',
+    '.jpg':  'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif':  'image/gif',
+    '.webp': 'image/webp',
+    '.svg':  'image/svg+xml',
+  })[ext] || 'application/octet-stream';
 }
 
 function copyCoverIfPresent(c, rootPath, coversDir) {

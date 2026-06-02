@@ -35,6 +35,19 @@ function normalizeItem(it) {
   // JSON Feed items are already in our target shape; pass through and fill
   // common fallbacks.
   const url = it.url || it.external_url || '';
+  const image = it.image || it.banner_image || '';
+  const tags = it.tags || [];
+  // Preserve any incoming attachments. Add the cover image as a synthetic
+  // attachment if there isn't one already.
+  const attachments = Array.isArray(it.attachments) ? [...it.attachments] : [];
+  if (image && !attachments.some(a => a.url === image)) {
+    attachments.push({ url: image, mime_type: 'image/*', _role: 'cover' });
+  }
+  // Preserve any incoming _references; derive from tags if absent.
+  const _references = Array.isArray(it._references)
+    ? it._references
+    : tags.map(value => ({ type: 'tag', value }));
+
   return {
     id: it.id || url,
     url,
@@ -42,14 +55,16 @@ function normalizeItem(it) {
     short_title: it.short_title || '',
     summary: it.summary || '',
     tldr: it.summary || '',
-    image: it.image || it.banner_image || '',
+    image,
     content_html: it.content_html || null,
     content_text: it.content_text || null,
     date_published: it.date_published || undefined,
-    tags: it.tags || [],
+    tags,
     authors: it.authors || (it.author ? [it.author] : []),
     canonical_url: it.url || it.external_url || '',
     kind: it._kind || it.kind || 'text',
+    attachments,
+    _references,
   };
 }
 
