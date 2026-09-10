@@ -20,7 +20,12 @@ function feedToGraph(feed, config = {}) {
 
     nodes.push({
       id: slug,
-      label: slug,
+      // The zoomed-out label. Was the raw slug, which for a feed item is
+      // something like '26090107054.htm' — unreadable, and the reason the
+      // far-zoom view was a wall of noise.
+      label: (item.labels && item.labels.short) || slug,
+      labelMedium: (item.labels && item.labels.medium) || slug,
+      labelFull: item.title || slug,
       title: item.title,
       short_title: item.short_title || '',
       type: 'article',
@@ -407,14 +412,40 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         labels.style('display', 'none');
         return;
       }
-      // Target on-screen font size: longest slug fills viewport_width * margin.
-      // longest_slug_width_on_screen = slugWidthPerFontUnit * font_size_screen
-      // font_size_screen = viewport * margin / slugWidthPerFontUnit
+      // Size the label so the longest one fits the viewport — but bounded at
+      // both ends. Unbounded, this formula divides the viewport by the longest
+      // label's width, so a corpus of SHORT labels produced enormous type, and
+      // then divided it again by the zoom scale. At far zoom that gave 280px
+      // words stacked on top of each other: the wall of overlapping text.
       const viewportPx = containerRef.current
         ? containerRef.current.clientWidth
         : window.innerWidth;
       const margin = 0.9;
-      const screenFontSize = (viewportPx * margin) / slugWidthPerFontUnit;
+      const MIN_LABEL_PX = 11;   // below this it is decoration, not a label
+      const MAX_LABEL_PX = 26;   // above this one label owns the screen
+      const fitted = (viewportPx * margin) / Math.max(slugWidthPerFontUnit, 1);
+      const screenFontSize = Math.max(MIN_LABEL_PX, Math.min(MAX_LABEL_PX, fitted));
+
+      // Density: labels are only useful while they do not collide. Estimate the
+      // on-screen room each node has from the graph's own extent, and if a label
+      // cannot fit in it, show none rather than a smear. Reading the shape is
+      // the point at this zoom; reading the words is what zooming in is for.
+      const articles = data.nodes.filter(d => d.type === 'article');
+      let spacingOk = true;
+      if (articles.length > 1) {
+        const xs = articles.map(d => d.x || 0);
+        const ys = articles.map(d => d.y || 0);
+        const w = (Math.max(...xs) - Math.min(...xs)) * scale;
+        const h = (Math.max(...ys) - Math.min(...ys)) * scale;
+        const roomPerNode = Math.sqrt(Math.max(w * h, 1) / articles.length);
+        const labelWidthPx = slugWidthPerFontUnit * screenFontSize;
+        spacingOk = roomPerNode > labelWidthPx * 0.55;
+      }
+      if (!spacingOk) {
+        labels.style('display', 'none');
+        return;
+      }
+
       // Convert to SVG units so it survives the zoom transform and renders
       // at the chosen on-screen size: svg_font_size * k = screen_font_size.
       const svgFontSize = screenFontSize / Math.max(scale, 0.01);

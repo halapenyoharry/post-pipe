@@ -83,6 +83,7 @@ export function TextView({ article, width, height, viewState, fullContent }) {
     >
       <CardContent
         article={article}
+        height={height}
         viewState={viewState}
         expanded={expanded}
         useFullArticle={useFullArticle}
@@ -93,15 +94,33 @@ export function TextView({ article, width, height, viewState, fullContent }) {
   );
 }
 
-function CardContent({ article, viewState, expanded, useFullArticle, fullContent }) {
+// Below this height, a title pinned above the body costs more than it gives:
+// it takes a third of the card and leaves a slot too short to read in.
+const COMPACT_HEIGHT = 260;
+
+function CardContent({ article, height, viewState, expanded, useFullArticle, fullContent }) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
     const body = useFullArticle ? fullContent : (article.description || '');
+    const title = article.title || article.label;
+
+    // In a small card the title scrolls away with the text instead of holding
+    // a fixed band at the top. You have already read it by the time you start
+    // scrolling, and the card is too short to spend 36px on remembering it.
+    if (height && height < COMPACT_HEIGHT) {
+      return (
+        <div className={`${styles.scroll} ${styles.scrollFull} ${useFullArticle ? styles.full : ''} rp-scroll`}>
+          <div className={styles.titleScrolling}>{title}</div>
+          {body && <div dangerouslySetInnerHTML={{ __html: body }} />}
+        </div>
+      );
+    }
+
     return (
       <>
         <div className={styles.title}>
-          {article.title || article.label}
+          {title}
         </div>
         {body && (
           <div
@@ -123,7 +142,10 @@ function CardContent({ article, viewState, expanded, useFullArticle, fullContent
   if (viewState.lod === 'title') {
     return (
       <div className={styles.titleCentered}>
-        {article.short_title || article.title || article.label}
+        {/* labelMedium already prefers an authored short_title and falls back
+            to a four-word reduction, so a long news headline stops being a
+            wall of text in a card with room for a phrase. */}
+        {article.labelMedium || article.short_title || article.title || article.label}
       </div>
     );
   }

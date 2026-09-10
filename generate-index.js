@@ -71,6 +71,7 @@ function configFor(entry) {
 }
 
 const { buildEdges } = require('./src/corpus/buildEdges');
+const { labelLadder } = require('./src/corpus/titleNucleus');
 
 // ─── TTS exposure ────────────────────────────────────────────────────────────
 // settings.json distinguishes an engine being *available* (it ships, it works)
@@ -395,6 +396,15 @@ async function main() {
   const withTodos = items.filter(a => (a.todos || []).length).length;
   if (withTodos) {
     console.log(`  (${withTodos} flagged with TODO files — see ~/Posts/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
+  }
+
+  // Every item gets a label ladder: two words, four words, the whole title.
+  // Computed here rather than in the viewer so it costs nothing at render, is
+  // identical every time, and applies uniformly to every adapter — an RSS item
+  // whose slug is '26090107054.htm' needs this far more than a hand-written
+  // piece with an authored short_title does.
+  for (const item of items) {
+    item.labels = labelLadder(item);
   }
 
   const feed = buildFeed(items);
