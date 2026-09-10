@@ -1,6 +1,6 @@
 // Aggregator — runs N adapters, resolves each feed's color, merges items.
 
-const { detectFeedColor } = require('./adapters/detectFeedColor');
+const { detectExplicitFeedColor, hashFeedColor } = require('./adapters/detectFeedColor');
 const { ColorCache }      = require('./lib/colorCache');
 
 /**
@@ -25,16 +25,31 @@ async function loadCorpus(entries, options = {}) {
     )
   );
 
-  // Phase 2: resolve colors (cache hits skip the network).
+  // Phase 2: resolve colors.
+  //
+  // Two passes, because the two halves of the cascade have different needs. A
+  // feed's own color (OPML override, or the site's theme-color) is independent
+  // of every other feed, so those resolve in parallel and cache hits skip the
+  // network entirely. A generated color is only meaningful relative to the
+  // others — hashing feeds in isolation once produced three greens 7 degrees
+  // apart — so those are handed out one at a time, each avoiding the hues
+  // already spoken for.
   await Promise.all(results.map(async (r) => {
     const feedId = r.feedMeta.id || r.config.id;
-    let color = cache.get(feedId);
-    if (!color) {
-      color = await detectFeedColor(r.feedMeta, r.config.customColor);
-      cache.set(feedId, color);
-    }
-    r.color = color;
+    const cached = cache.get(feedId);
+    if (cached) { r.color = cached; return; }
+    r.color = await detectExplicitFeedColor(r.feedMeta, r.config.customColor);
   }));
+
+  const taken = results.map((r) => r.color).filter(Boolean);
+  for (const r of results) {
+    if (r.color) continue;
+    r.color = hashFeedColor(r.feedMeta, taken);
+    taken.push(r.color);
+  }
+  for (const r of results) {
+    cache.set(r.feedMeta.id || r.config.id, r.color);
+  }
 
   // Phase 3: build the sources list (what FeedZ shows) and stamp every
   // item with its source provenance.
