@@ -28,5 +28,7 @@
              title="My Writing"
              xmlUrl="local://~/Posts"
              customColor="#2ecc71"/>
+      <outline text="ScienceDaily" title="ScienceDaily" xmlUrl="https://www.sciencedaily.com/rss/all.xml"/>
+      <outline text="ProPublica" title="ProPublica" xmlUrl="https://www.propublica.org/feeds/propublica/main"/>
   </body>
 </opml>
