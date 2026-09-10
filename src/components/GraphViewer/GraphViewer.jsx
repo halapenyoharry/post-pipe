@@ -106,13 +106,24 @@ function cardSizeFor({ hovered, pinned }) {
   return { width: 180, height: 140 };
 }
 
-export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
+export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
 
   // Stable refs for callbacks so the simulation never rebuilds on prop change.
   const onNodeSelectRef = useRef(onNodeSelect);
   useEffect(() => { onNodeSelectRef.current = onNodeSelect; }, [onNodeSelect]);
+
+  // Same reason as onNodeSelect: the store must be reachable from D3 handlers
+  // without becoming a dependency that rebuilds the simulation.
+  const viewStateRef = useRef(viewState);
+  useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
+
+  // Where a node's arrangement is filed. Articles key by their item id — the
+  // permalink — so the arrangement survives a rebuild that renumbers or
+  // reorders everything. Tag and topology nodes key by their own synthetic id,
+  // which is already stable.
+  const persistKey = (d) => (d.originalItem && d.originalItem.id) || d.id;
 
   // View state lives in refs because it must not trigger React re-renders or
   // re-run the useEffect that owns the simulation.
@@ -176,6 +187,19 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
     });
     svg.call(zoom).on('dblclick.zoom', null);
 
+    // Restore anything the reader has already placed. Setting fx/fy pins the
+    // node, so the simulation lays out only what has never been positioned and
+    // arranges the rest around the reader's choices rather than over them.
+    if (viewStateRef.current) {
+      for (const d of data.nodes) {
+        const saved = viewStateRef.current.nodeState(persistKey(d));
+        if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+          d.x = saved.x; d.y = saved.y;
+          d.fx = saved.x; d.fy = saved.y;
+        }
+      }
+    }
+
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(160))
       .force('charge', d3.forceManyBody().strength(-500))
@@ -215,6 +239,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
         .on('drag', (event, d) => {
           d.x = event.x; d.y = event.y;
           d.fx = event.x; d.fy = event.y;
+          if (viewStateRef.current) {
+            viewStateRef.current.setNodePosition(persistKey(d), event.x, event.y, { transient: true });
+          }
           nodes.filter(nd => nd.id === d.id)
             .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
           links.each(function(l) {
@@ -231,6 +258,12 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
         })
         .on('end', (event, d) => {
           d.fx = d.x; d.fy = d.y;
+          // One history entry for the whole drag, not one per frame.
+          const vs = viewStateRef.current;
+          if (vs) {
+            vs.setNodePosition(persistKey(d), d.x, d.y, { transient: true });
+            vs.commit();
+          }
         })
       );
 
@@ -541,17 +574,41 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
     // Simulation tick → position nodes. When alpha falls below alphaMin,
     // D3 stops automatically. We never call .restart() anywhere — once
     // settled, the graph stays still until the page is reloaded.
-    simulation.nodes(data.nodes).on('tick', () => {
+    // Painting positions is separate from the simulation advancing them.
+    // Node transforms used to be written only inside the tick handler, which
+    // silently assumed a tick would always happen. It does not: d3-timer runs
+    // on requestAnimationFrame, and a page in a hidden tab or a collapsed pane
+    // gets no frames at all. A reader whose whole arrangement is already saved
+    // needs no simulation — and would have got a graph stacked at the origin.
+    function applyPositions() {
       links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-    });
+    }
+
+    simulation.nodes(data.nodes).on('tick', applyPositions);
     simulation.force('link').links(data.links);
+
+    // Paint once now, from whatever positions were restored or seeded, so the
+    // first frame is correct with or without the simulation ever running.
+    applyPositions();
 
     // When the simulation ends, freeze every node by copying x/y to fx/fy.
     // Any later interaction (drag, etc.) keeps positions stable.
     simulation.on('end', () => {
       data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
+      // The layout the simulation settled on is itself an arrangement worth
+      // keeping — otherwise every reload reshuffles a graph the reader has
+      // started to learn the shape of. Recorded without history: the reader
+      // did not do this, so there is nothing for them to undo.
+      const vs = viewStateRef.current;
+      if (vs) {
+        for (const d of data.nodes) {
+          if (!vs.nodeState(persistKey(d))) {
+            vs.setNodePosition(persistKey(d), d.x, d.y, { silent: true });
+          }
+        }
+      }
     });
 
     return () => {

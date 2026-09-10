@@ -158,12 +158,36 @@ function createViewState(opts = {}) {
   // A change mid-gesture. Dragging a node emits a change per frame; one undo
   // should take back the whole drag, not one pixel of it. Callers make their
   // transient changes with this and call commit() when the gesture ends.
-  let gestureBase = null;
   function updateTransient(producer) {
     if (gestureBase === null) gestureBase = clone(state);
     const next = clone(state);
     producer(next);
     state = next;
+    notify();
+    scheduleSave();
+  }
+
+  // Baseline for an in-progress gesture; see updateTransient/commit below.
+  let gestureBase = null;
+
+  // A change the reader did not make, and therefore cannot want to take back:
+  // the layout the simulation settled on, a migration, a default filled in.
+  // Persisted, but invisible to history — and it must not disturb a gesture
+  // in progress either, or the next commit() would fold it into the reader's
+  // undo entry.
+  function updateSilent(producer) {
+    const next = clone(state);
+    producer(next);
+    state = next;
+    // If a gesture is open, the silent change has to land in its baseline too.
+    // commit() records the difference between baseline and now; without this,
+    // a layout that settled mid-drag would be inside that difference, and
+    // undoing the drag would throw the layout away with it.
+    if (gestureBase !== null) {
+      const base = clone(gestureBase);
+      producer(base);
+      gestureBase = base;
+    }
     notify();
     scheduleSave();
   }
@@ -220,6 +244,7 @@ function createViewState(opts = {}) {
 
     update,
     updateTransient,
+    updateSilent,
     commit,
     undo,
     redo,
@@ -234,14 +259,16 @@ function createViewState(opts = {}) {
 
     nodeState(id) { return state.nodes[id] || null; },
 
-    setNodePosition(id, x, y, { transient = false } = {}) {
-      (transient ? updateTransient : update)((s) => {
+    setNodePosition(id, x, y, { transient = false, silent = false } = {}) {
+      const apply = silent ? updateSilent : transient ? updateTransient : update;
+      apply((s) => {
         s.nodes[id] = { ...(s.nodes[id] || {}), x, y, t: now() };
       });
     },
 
-    setNodeSize(id, w, h, { transient = false } = {}) {
-      (transient ? updateTransient : update)((s) => {
+    setNodeSize(id, w, h, { transient = false, silent = false } = {}) {
+      const apply = silent ? updateSilent : transient ? updateTransient : update;
+      apply((s) => {
         s.nodes[id] = { ...(s.nodes[id] || {}), w, h, t: now() };
       });
     },
@@ -309,3 +336,9 @@ module.exports = {
   hostParamsBackend,
   VERSION,
 };
+
+// Browser global, for the static page which inlines this file the way it
+// inlines tts.js. Same module, no build step, no second copy.
+if (typeof window !== "undefined") {
+  window.ViewState = { createViewState, memoryBackend, localStorageBackend, hostParamsBackend, VERSION };
+}

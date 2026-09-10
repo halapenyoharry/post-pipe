@@ -201,3 +201,18 @@ test('writes during a gesture are coalesced rather than one per frame', async ()
   await s.flush();
   assert.ok(saves <= 2, `expected the drag to coalesce, got ${saves} writes`);
 });
+
+test('a silent write persists without entering history or disturbing a gesture', async () => {
+  const s = mk(); await s.ready();
+  s.setLayout('radial');                                  // the reader's act
+  s.setNodePosition('a', 1, 1, { transient: true });      // mid-gesture
+  s.setNodePosition('settled', 9, 9, { silent: true });   // the simulation's act
+  s.commit();
+
+  assert.strictEqual(s.nodeState('settled').x, 9, 'silently written state is present');
+  s.undo();
+  assert.strictEqual(s.nodeState('a'), null, 'the gesture came back');
+  assert.strictEqual(s.nodeState('settled').x, 9, 'the silent write was not swept up in it');
+  s.undo();
+  assert.strictEqual(s.state.layout, 'force');
+});

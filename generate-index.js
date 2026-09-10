@@ -145,6 +145,7 @@ const ICONS = {
 
 function buildIndexHTML() {
   const ttsSource = fs.readFileSync(path.join(__dirname, 'tts.js'), 'utf8');
+  const viewStateSource = fs.readFileSync(path.join(__dirname, 'src/lib/viewState.js'), 'utf8');
   const fontB64 = fs.readFileSync(FONT_PATH).toString('base64');
   const fontBoldB64 = fs.readFileSync(FONT_BOLD_PATH).toString('base64');
   const settingsJSON = JSON.stringify(SETTINGS);
@@ -228,6 +229,9 @@ window.TTS_CONFIG = {
 ${geminiConfigBlock()}};
 </script>
 <script>
+${viewStateSource.replace(/module\.exports[\s\S]*?};/, '')}
+</script>
+<script>
 ${ttsSource}
 </script>
 <script>
@@ -248,35 +252,107 @@ ${reactJs}
 
     const { GraphViewer, ReaderPanel, TTS, FeedZ, React, ReactDOM } = window.PostPipeComponents;
 
+    // Where the reader's arrangement lives. Namespaced by corpus so pointing
+    // this page at a different feed does not inherit somebody else's layout.
+    const viewState = window.ViewState.createViewState({
+      backend: window.ViewState.localStorageBackend('post-pipe:viewstate'),
+      corpusId: feed.feed_url || feed.home_page_url || 'corpus'
+    });
+
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
-      const [hiddenSources, setHiddenSources] = React.useState(new Set());
+      const [hydrated, setHydrated] = React.useState(false);
+      const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
 
-      const toggleSource = React.useCallback((sourceId) => {
-        setHiddenSources(prev => {
-          const next = new Set(prev);
-          if (next.has(sourceId)) next.delete(sourceId);
-          else next.add(sourceId);
-          return next;
+      // The graph must not lay out before the stored arrangement is loaded, or
+      // it settles nodes into positions the reader already moved. So the whole
+      // graph waits on hydration rather than restoring after the fact.
+      React.useEffect(function () {
+        let off = null;
+        viewState.ready().then(function () {
+          viewState.prune((feed.items || []).map(function (i) { return i.id; }));
+          off = viewState.subscribe(bump);
+          setHydrated(true);
         });
+        return function () { if (off) off(); };
       }, []);
+
+      React.useEffect(function () {
+        function onKey(e) {
+          const meta = e.metaKey || e.ctrlKey;
+          if (!meta || e.key.toLowerCase() !== 'z') return;
+          e.preventDefault();
+          if (e.shiftKey) viewState.redo();
+          else viewState.undo();
+        }
+        window.addEventListener('keydown', onKey);
+        return function () { window.removeEventListener('keydown', onKey); };
+      }, []);
+
+      const hiddenSources = React.useMemo(function () {
+        return new Set(viewState.state.hiddenSources);
+      }, [viewState.state.hiddenSources]);
+
+      const toggleSource = React.useCallback(function (sourceId) {
+        viewState.toggleSource(sourceId);
+      }, []);
+
+      if (!hydrated) return null;
 
       return React.createElement(React.Fragment, null,
         React.createElement(GraphViewer, {
           feedData: feed,
-          onNodeSelect: (article) => setSelectedArticle(article),
-          hiddenSources: hiddenSources
+          onNodeSelect: function (article) {
+            if (article && article.originalItem) viewState.markSeen(article.originalItem.id);
+            setSelectedArticle(article);
+          },
+          hiddenSources: hiddenSources,
+          viewState: viewState
         }),
         React.createElement(FeedZ, {
           sources: feed._sources || [],
           hiddenSources: hiddenSources,
           onToggleSource: toggleSource
         }),
+        React.createElement(HistoryControls, null),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
-          onClose: () => setSelectedArticle(null),
+          onClose: function () { setSelectedArticle(null); },
           settings: window.SETTINGS
         })
+      );
+    }
+
+    // Previous / next through the reader's own arrangement.
+    function HistoryControls() {
+      const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
+      React.useEffect(function () { return viewState.subscribe(bump); }, []);
+
+      function btn(label, title, enabled, onClick) {
+        return React.createElement('button', {
+          title: title,
+          disabled: !enabled,
+          onClick: onClick,
+          style: {
+            width: '30px', height: '30px', borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.14)',
+            background: 'rgba(20,22,30,0.72)',
+            color: enabled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)',
+            cursor: enabled ? 'pointer' : 'default',
+            font: '15px/1 system-ui, sans-serif',
+            backdropFilter: 'blur(6px)'
+          }
+        }, label);
+      }
+
+      return React.createElement('div', {
+        style: {
+          position: 'fixed', bottom: '14px', left: '14px',
+          display: 'flex', gap: '6px', zIndex: 40
+        }
+      },
+        btn('\u21A9', 'Undo (Cmd+Z)', viewState.canUndo, function () { viewState.undo(); }),
+        btn('\u21AA', 'Redo (Cmd+Shift+Z)', viewState.canRedo, function () { viewState.redo(); })
       );
     }
 
