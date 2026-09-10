@@ -180,11 +180,35 @@
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
+  // Which engines the reader is allowed to see, and which one starts selected.
+  // Both come from settings.json via window.TTS_CONFIG. An engine that is not
+  // exposed still registers — it works if something selects it deliberately —
+  // it simply never appears in the picker. That is the difference between an
+  // engine being available and being offered to whoever was handed this page.
+  function exposedIds() {
+    const cfg = window.TTS_CONFIG || {};
+    return Array.isArray(cfg.exposedEngines) ? cfg.exposedEngines : null;
+  }
+
+  function isExposed(id) {
+    const allow = exposedIds();
+    return allow === null ? true : allow.indexOf(id) !== -1;
+  }
+
   window.TTS = {
     register: function (engine) {
       registry[engine.id] = engine;
-      // Auto-select first registered engine
-      if (!activeId) {
+      // Auto-select the configured default when it shows up; otherwise the
+      // first exposed engine. Never auto-select a hidden one — landing on a
+      // billed engine because it happened to register first is the bug this
+      // whole split exists to prevent.
+      // Engines register in whatever order their IIFEs run. Rather than try to
+      // predict who is coming, take the first exposed one that shows up and
+      // upgrade to the configured default if and when it appears. Always
+      // terminates, and never lands on a hidden engine.
+      const preferred = (window.TTS_CONFIG || {}).defaultEngine;
+      const claim = !activeId || (engine.id === preferred && activeId !== preferred);
+      if (claim && isExposed(engine.id)) {
         activeId = engine.id;
         activeEngine = engine;
         // Set default params from capabilities
@@ -198,9 +222,22 @@
     },
 
     engines: function () {
+      return Object.values(registry)
+        .filter(e => isExposed(e.id))
+        .map(e => ({
+          id: e.id,
+          label: e.label,
+          capabilities: e.capabilities,
+        }));
+    },
+
+    // Everything registered, exposed or not. For a host that wants to offer a
+    // hidden engine deliberately — a build where the reader owns the key.
+    allEngines: function () {
       return Object.values(registry).map(e => ({
         id: e.id,
         label: e.label,
+        exposed: isExposed(e.id),
         capabilities: e.capabilities,
       }));
     },

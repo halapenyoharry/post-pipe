@@ -1,24 +1,20 @@
 {
   "site": {
-    "title": "Harold Young — Human Posts",
+    "title": "Harold Young \u2014 Human Posts",
     "description": "Writing about systems, consciousness, and the spaces between humans and machines.",
     "base_url": "https://halapenyoharry.github.io/haroldyoung-human-posts"
   },
-
   "author": {
     "name": "harold young",
     "label": "humxn",
     "url": "https://substack.com/@haroldyoung",
     "display": "harold young [humxn]"
   },
-
   "content_dir": "~/Posts",
-
   "canonical": {
     "base": "https://halapenyoharry.github.io/haroldyoung-human-posts",
     "note": "All canonical URLs point here. Cross-posted platforms receive this as rel=canonical."
   },
-
   "frontmatter_display": [
     "publish_date",
     "updated_date",
@@ -28,87 +24,254 @@
     "license",
     "syndication"
   ],
-
   "toolbar": {
     "show_canonical_crown": true,
     "syndication_icons": {
-      "github": { "label": "GitHub Pages", "icon": "globe" },
-      "medium": { "label": "Medium", "icon": "medium" },
-      "substack": { "label": "Substack", "icon": "substack" },
-      "bluesky": { "label": "Bluesky", "icon": "bluesky" },
-      "youtube": { "label": "YouTube", "icon": "youtube" },
-      "linkedin": { "label": "LinkedIn", "icon": "linkedin" },
-      "hackernews": { "label": "Hacker News", "icon": "hackernews" },
-      "reddit": { "label": "Reddit", "icon": "reddit" }
+      "github": {
+        "label": "GitHub Pages",
+        "icon": "globe"
+      },
+      "medium": {
+        "label": "Medium",
+        "icon": "medium"
+      },
+      "substack": {
+        "label": "Substack",
+        "icon": "substack"
+      },
+      "bluesky": {
+        "label": "Bluesky",
+        "icon": "bluesky"
+      },
+      "youtube": {
+        "label": "YouTube",
+        "icon": "youtube"
+      },
+      "linkedin": {
+        "label": "LinkedIn",
+        "icon": "linkedin"
+      },
+      "hackernews": {
+        "label": "Hacker News",
+        "icon": "hackernews"
+      },
+      "reddit": {
+        "label": "Reddit",
+        "icon": "reddit"
+      }
     }
   },
-
   "tts": {
     "enabled": true,
-    "default_engine": "kokoro",
+    "default_engine": "browser",
     "engines": {
+      "browser": {
+        "label": "Browser (Web Speech API)",
+        "voices": "auto",
+        "available": true,
+        "exposed": true,
+        "cost": "free \u2014 the device already has it, no key, no network"
+      },
       "kokoro": {
-        "enabled": true,
         "label": "Kokoro (embedded)",
         "voices": [
-          { "id": "af_heart", "label": "Heart", "lang": "en-US" },
-          { "id": "bf_emma", "label": "Emma", "lang": "en-GB" },
-          { "id": "am_adam", "label": "Adam", "lang": "en-US" },
-          { "id": "bm_george", "label": "George", "lang": "en-GB" }
-        ]
-      },
-      "browser": {
-        "enabled": true,
-        "label": "Browser (Web Speech API)",
-        "voices": "auto"
+          {
+            "id": "af_heart",
+            "label": "Heart",
+            "lang": "en-US"
+          },
+          {
+            "id": "bf_emma",
+            "label": "Emma",
+            "lang": "en-GB"
+          },
+          {
+            "id": "am_adam",
+            "label": "Adam",
+            "lang": "en-US"
+          },
+          {
+            "id": "bm_george",
+            "label": "George",
+            "lang": "en-GB"
+          }
+        ],
+        "available": true,
+        "exposed": true,
+        "cost": "free \u2014 runs locally",
+        "mode": "wasm",
+        "host": null,
+        "_host_note": "mode 'wasm' runs the model in the browser via kokoro-worker.js. Set mode 'server' and host to an OpenAI-compatible /v1/audio/speech endpoint to use a self-hosted Kokoro instead of downloading a model."
       },
       "gemini": {
-        "enabled": true,
         "label": "Google Gemini",
         "model": "gemini-2.5-flash-preview-tts",
         "defaultVoice": "Kore",
         "voices": [
-          { "id": "Zephyr", "label": "Zephyr — Bright", "lang": "multi" },
-          { "id": "Puck", "label": "Puck — Upbeat", "lang": "multi" },
-          { "id": "Kore", "label": "Kore — Firm", "lang": "multi" },
-          { "id": "Aoede", "label": "Aoede — Breezy", "lang": "multi" },
-          { "id": "Charon", "label": "Charon — Informative", "lang": "multi" },
-          { "id": "Fenrir", "label": "Fenrir — Excitable", "lang": "multi" },
-          { "id": "Leda", "label": "Leda — Youthful", "lang": "multi" },
-          { "id": "Orus", "label": "Orus — Firm", "lang": "multi" },
-          { "id": "Callirrhoe", "label": "Callirrhoe — Easy-going", "lang": "multi" },
-          { "id": "Enceladus", "label": "Enceladus — Breathy", "lang": "multi" },
-          { "id": "Iapetus", "label": "Iapetus — Clear", "lang": "multi" },
-          { "id": "Umbriel", "label": "Umbriel — Easy-going", "lang": "multi" },
-          { "id": "Algieba", "label": "Algieba — Smooth", "lang": "multi" },
-          { "id": "Despina", "label": "Despina — Smooth", "lang": "multi" },
-          { "id": "Erinome", "label": "Erinome — Clear", "lang": "multi" },
-          { "id": "Algenib", "label": "Algenib — Gravelly", "lang": "multi" },
-          { "id": "Rasalgethi", "label": "Rasalgethi — Informative", "lang": "multi" },
-          { "id": "Laomedeia", "label": "Laomedeia — Upbeat", "lang": "multi" },
-          { "id": "Achernar", "label": "Achernar — Soft", "lang": "multi" },
-          { "id": "Alnilam", "label": "Alnilam — Firm", "lang": "multi" },
-          { "id": "Schedar", "label": "Schedar — Even", "lang": "multi" },
-          { "id": "Gacrux", "label": "Gacrux — Mature", "lang": "multi" },
-          { "id": "Pulcherrima", "label": "Pulcherrima — Forward", "lang": "multi" },
-          { "id": "Achird", "label": "Achird — Friendly", "lang": "multi" },
-          { "id": "Zubenelgenubi", "label": "Zubenelgenubi — Casual", "lang": "multi" },
-          { "id": "Vindemiatrix", "label": "Vindemiatrix — Gentle", "lang": "multi" },
-          { "id": "Sadachbia", "label": "Sadachbia — Lively", "lang": "multi" },
-          { "id": "Sadaltager", "label": "Sadaltager — Knowledgeable", "lang": "multi" },
-          { "id": "Sulafat", "label": "Sulafat — Warm", "lang": "multi" },
-          { "id": "Autonoe", "label": "Autonoe — Bright", "lang": "multi" }
-        ]
+          {
+            "id": "Zephyr",
+            "label": "Zephyr \u2014 Bright",
+            "lang": "multi"
+          },
+          {
+            "id": "Puck",
+            "label": "Puck \u2014 Upbeat",
+            "lang": "multi"
+          },
+          {
+            "id": "Kore",
+            "label": "Kore \u2014 Firm",
+            "lang": "multi"
+          },
+          {
+            "id": "Aoede",
+            "label": "Aoede \u2014 Breezy",
+            "lang": "multi"
+          },
+          {
+            "id": "Charon",
+            "label": "Charon \u2014 Informative",
+            "lang": "multi"
+          },
+          {
+            "id": "Fenrir",
+            "label": "Fenrir \u2014 Excitable",
+            "lang": "multi"
+          },
+          {
+            "id": "Leda",
+            "label": "Leda \u2014 Youthful",
+            "lang": "multi"
+          },
+          {
+            "id": "Orus",
+            "label": "Orus \u2014 Firm",
+            "lang": "multi"
+          },
+          {
+            "id": "Callirrhoe",
+            "label": "Callirrhoe \u2014 Easy-going",
+            "lang": "multi"
+          },
+          {
+            "id": "Enceladus",
+            "label": "Enceladus \u2014 Breathy",
+            "lang": "multi"
+          },
+          {
+            "id": "Iapetus",
+            "label": "Iapetus \u2014 Clear",
+            "lang": "multi"
+          },
+          {
+            "id": "Umbriel",
+            "label": "Umbriel \u2014 Easy-going",
+            "lang": "multi"
+          },
+          {
+            "id": "Algieba",
+            "label": "Algieba \u2014 Smooth",
+            "lang": "multi"
+          },
+          {
+            "id": "Despina",
+            "label": "Despina \u2014 Smooth",
+            "lang": "multi"
+          },
+          {
+            "id": "Erinome",
+            "label": "Erinome \u2014 Clear",
+            "lang": "multi"
+          },
+          {
+            "id": "Algenib",
+            "label": "Algenib \u2014 Gravelly",
+            "lang": "multi"
+          },
+          {
+            "id": "Rasalgethi",
+            "label": "Rasalgethi \u2014 Informative",
+            "lang": "multi"
+          },
+          {
+            "id": "Laomedeia",
+            "label": "Laomedeia \u2014 Upbeat",
+            "lang": "multi"
+          },
+          {
+            "id": "Achernar",
+            "label": "Achernar \u2014 Soft",
+            "lang": "multi"
+          },
+          {
+            "id": "Alnilam",
+            "label": "Alnilam \u2014 Firm",
+            "lang": "multi"
+          },
+          {
+            "id": "Schedar",
+            "label": "Schedar \u2014 Even",
+            "lang": "multi"
+          },
+          {
+            "id": "Gacrux",
+            "label": "Gacrux \u2014 Mature",
+            "lang": "multi"
+          },
+          {
+            "id": "Pulcherrima",
+            "label": "Pulcherrima \u2014 Forward",
+            "lang": "multi"
+          },
+          {
+            "id": "Achird",
+            "label": "Achird \u2014 Friendly",
+            "lang": "multi"
+          },
+          {
+            "id": "Zubenelgenubi",
+            "label": "Zubenelgenubi \u2014 Casual",
+            "lang": "multi"
+          },
+          {
+            "id": "Vindemiatrix",
+            "label": "Vindemiatrix \u2014 Gentle",
+            "lang": "multi"
+          },
+          {
+            "id": "Sadachbia",
+            "label": "Sadachbia \u2014 Lively",
+            "lang": "multi"
+          },
+          {
+            "id": "Sadaltager",
+            "label": "Sadaltager \u2014 Knowledgeable",
+            "lang": "multi"
+          },
+          {
+            "id": "Sulafat",
+            "label": "Sulafat \u2014 Warm",
+            "lang": "multi"
+          },
+          {
+            "id": "Autonoe",
+            "label": "Autonoe \u2014 Bright",
+            "lang": "multi"
+          }
+        ],
+        "available": true,
+        "exposed": false,
+        "cost": "billed per character to whoever owns the key",
+        "_exposed_note": "Off in the picker on purpose. Turning this on bills a real account for every paragraph anyone reads. Set exposed true only for a build where the reader owns the key."
       }
-    }
+    },
+    "_note": "available = the engine ships in the build and may be turned on. exposed = it appears in the reader's engine picker. An engine that costs the listener money, or needs a key they do not have, stays available and unexposed: present for whoever wants it, invisible to everyone who was handed this and should not be billed for reading."
   },
-
   "export": {
     "license_header": "This work is licensed under CC-BY-SA 4.0 by harold young [humxn].\nOriginal: {{canonical_url}}\nYou may share and adapt with attribution under the same license.",
     "include_frontmatter": false,
     "include_further_reading": true
   },
-
   "theme": {
     "bg": "#1a1a2e",
     "surface": "#0a0e1a",
@@ -120,43 +283,51 @@
     "node_draft": "#7f8c8d",
     "tag_color": "#f39c12"
   },
-
   "feed_cache_ttl": 3600,
-
   "feeds": [
     {
       "url": "https://aeon.co/feed",
       "label": "Aeon",
       "enabled": false,
-      "inject_tags": ["aeon"],
+      "inject_tags": [
+        "aeon"
+      ],
       "source_of_truth": "feed"
     },
     {
       "url": "https://feeds.propublica.org/propublica/main",
       "label": "ProPublica",
       "enabled": false,
-      "inject_tags": ["propublica"],
+      "inject_tags": [
+        "propublica"
+      ],
       "source_of_truth": "feed"
     },
     {
       "url": "https://www.aljazeera.com/xml/rss/all.xml",
       "label": "Al Jazeera",
       "enabled": false,
-      "inject_tags": ["aljazeera"],
+      "inject_tags": [
+        "aljazeera"
+      ],
       "source_of_truth": "feed"
     },
     {
       "url": "https://feeds.dw.com/rss/rss_en_all",
       "label": "Deutsche Welle",
       "enabled": false,
-      "inject_tags": ["dw"],
+      "inject_tags": [
+        "dw"
+      ],
       "source_of_truth": "feed"
     },
     {
       "url": "https://restofworld.org/feed/latest",
       "label": "Rest of World",
       "enabled": false,
-      "inject_tags": ["restofworld"],
+      "inject_tags": [
+        "restofworld"
+      ],
       "source_of_truth": "feed"
     }
   ]

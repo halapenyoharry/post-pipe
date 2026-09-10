@@ -72,6 +72,38 @@ function configFor(entry) {
 
 const { buildEdges } = require('./src/corpus/buildEdges');
 
+// ─── TTS exposure ────────────────────────────────────────────────────────────
+// settings.json distinguishes an engine being *available* (it ships, it works)
+// from being *exposed* (the reader is offered it). Only exposed ids reach the
+// page, so an engine that would bill somebody cannot be selected by accident.
+
+function exposedEngineIds() {
+  const engines = SETTINGS.tts?.engines || {};
+  return Object.entries(engines)
+    .filter(([, e]) => e && e.available !== false && e.exposed === true)
+    .map(([id]) => id);
+}
+
+// The Gemini API key is a live billing credential. It used to be inlined into
+// every generated page unconditionally, which meant that publishing _site/
+// anywhere published the key. Now it is emitted only when Gemini is genuinely
+// exposed to the reader — and even then, only into a page whose owner set the
+// variable on purpose.
+function geminiConfigBlock() {
+  const gemini = SETTINGS.tts?.engines?.gemini;
+  if (!gemini || gemini.exposed !== true) return '';
+  const key = process.env.GEMINI_API_KEY || '';
+  if (!key) {
+    console.warn('  tts: gemini is exposed but GEMINI_API_KEY is unset — it will not work in the page');
+  }
+  return `  geminiApiKey: ${JSON.stringify(key)},
+  geminiVoices: ${JSON.stringify(gemini.voices || [])},
+  geminiModel: ${JSON.stringify(gemini.model || 'gemini-2.5-flash-preview-tts')},
+  geminiDefaultVoice: ${JSON.stringify(gemini.defaultVoice || 'Kore')},
+`;
+}
+
+
 // ─── Build feed.json ─────────────────────────────────────────────────────────
 
 function buildFeed(articles) {
@@ -189,11 +221,11 @@ function buildIndexHTML() {
 <script>
 // ── TTS Config ──
 window.TTS_CONFIG = {
-  geminiApiKey: '${process.env.GEMINI_API_KEY || ''}',
-  geminiVoices: ${JSON.stringify(SETTINGS.tts?.engines?.gemini?.voices || [])},
-  geminiModel: '${SETTINGS.tts?.engines?.gemini?.model || 'gemini-2.5-flash-preview-tts'}',
-  geminiDefaultVoice: '${SETTINGS.tts?.engines?.gemini?.defaultVoice || 'Kore'}'
-};
+  exposedEngines: ${JSON.stringify(exposedEngineIds())},
+  defaultEngine: '${SETTINGS.tts?.default_engine || 'browser'}',
+  kokoroMode: '${SETTINGS.tts?.engines?.kokoro?.mode || 'wasm'}',
+  kokoroHost: '${SETTINGS.tts?.engines?.kokoro?.host || ''}',
+${geminiConfigBlock()}};
 </script>
 <script>
 ${ttsSource}
