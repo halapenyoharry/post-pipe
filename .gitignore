@@ -27,3 +27,7 @@ test-articles/
 
 # archive (syncthinged to other devices)
 archive/
+
+# scratch / binaries kept locally but not in the repo
+scrap.md
+*.pxd
