@@ -1,12 +1,15 @@
 {
   "name": "post-pipe",
   "version": "1.0.0",
-  "description": "markdown in → platform post out",
+  "description": "markdown in \u2192 platform post out",
   "main": "index.js",
   "bin": {
     "post-pipe": "./index.js"
   },
   "scripts": {
+    "build": "vite build",
+    "build:lib": "vite build --config vite.config.lib.js",
+    "test": "node --test test/*.test.js",
     "login:medium": "node index.js medium --login",
     "login:substack": "node index.js substack --login",
     "login:youtube": "node index.js youtube --login"

@@ -31,3 +31,7 @@ archive/
 # scratch / binaries kept locally but not in the repo
 scrap.md
 *.pxd
+
+# library build output — produced by `npm run build:lib`
+dist-lib/
+node_modules
