@@ -56,10 +56,25 @@ export function TextView({ article, width, height, viewState, fullContent }) {
   // as the card being badly rendered rather than as an image being present.
   // The cover now gets a band of its own at full opacity with the text below
   // it, so it is either legibly an image or not shown at all.
-  const bgColor = isDraft ? '#2a2a3e' : '#1e3a5f';
-  const MIN_HEIGHT_FOR_BAND = 120;
-  const showBand = Boolean(article.image) && height >= MIN_HEIGHT_FOR_BAND;
-  const bandHeight = showBand ? Math.round(Math.min(height * 0.42, 72)) : 0;
+  // How loudly this card renders is a property of its source, not its status.
+  // Before, `published` meant blue and everything else meant dark — so the
+  // eighty subscribed items and eight of your own drafts rendered identically,
+  // and your own unfinished work disappeared into somebody else's news.
+  const prominence = (article._source && article._source.prominence)
+    || (article.originalItem && article.originalItem._source && article.originalItem._source.prominence)
+    || 'secondary';
+  const isPrimary = prominence === 'primary';
+
+  const bgColor = isPrimary
+    ? (isDraft ? '#24304a' : '#1e3a5f')   // yours: finished, and still in progress
+    : '#23232f';                          // subscribed: present, quieter
+
+  // A cover is worth knowing about at a glance and not worth a third of the
+  // card. A band took 59px of 140 and squeezed the text that the node exists
+  // to show, so the image is a corner mark at rest; the reader panel is where
+  // it gets shown properly.
+  const hasImage = Boolean(article.image);
+  const bandHeight = 0;
 
   const cardClassNames = [
     styles.card,
@@ -87,10 +102,11 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {})
       }}
     >
-      {showBand && (
+      {hasImage && (
         <div
-          className={styles.imageBand}
-          style={{ height: bandHeight, backgroundImage: `url('${article.image}')` }}
+          className={styles.imageMark}
+          style={{ backgroundImage: `url('${article.image}')` }}
+          title="has an image"
         />
       )}
       <CardContent

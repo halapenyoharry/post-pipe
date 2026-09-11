@@ -60,6 +60,7 @@ async function loadCorpus(entries, options = {}) {
     color,
     home_page_url: feedMeta.home_page_url || config.htmlUrl || null,
     folder: config.folder || '',
+    prominence: config.prominence || 'secondary',
     itemCount: items.length,
     ok,
   }));
@@ -70,6 +71,7 @@ async function loadCorpus(entries, options = {}) {
       title: feedMeta.title || config.title,
       type: adapter.id,
       color,
+      prominence: config.prominence || 'secondary',
     };
     return items.map(item => ({ ...item, _source: source }));
   });

@@ -62,6 +62,11 @@ function walk(outlines, folderStack, out) {
         htmlUrl: o['@_htmlUrl'] || null,
         folder: folderStack.join('/'),
         customColor: o['@_customColor'] || null,
+        // How loudly this source renders. Your own corpus and a subscribed
+        // firehose are not peers, and nothing in the model said so before —
+        // the distinction was falling out of the status field by accident.
+        // Defaults keep the current behaviour, deliberately this time.
+        prominence: normalizeProminence(o['@_prominence'], detectType(o['@_type'], xmlUrl)),
         raw: stripAtPrefix(o),
       });
       if (Array.isArray(children)) walk(children, folderStack, out);
@@ -72,6 +77,12 @@ function walk(outlines, folderStack, out) {
       if (Array.isArray(children)) walk(children, nextStack, out);
     }
   }
+}
+
+function normalizeProminence(attr, type) {
+  const v = (attr || '').toLowerCase();
+  if (v === 'primary' || v === 'secondary') return v;
+  return type === 'local' ? 'primary' : 'secondary';
 }
 
 function detectType(typeAttr, xmlUrl) {

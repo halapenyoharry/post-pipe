@@ -10795,24 +10795,24 @@ function co() {
 	}, _;
 }
 var lo = { graphContainer: "_graphContainer_7uvsx_1" }, N = {
-	card: "_card_1lo3h_5",
-	draft: "_draft_1lo3h_22",
-	published: "_published_1lo3h_26",
-	pinned: "_pinned_1lo3h_30",
-	title: "_title_1lo3h_38",
-	titleCentered: "_titleCentered_1lo3h_49",
-	titleInline: "_titleInline_1lo3h_65",
-	preview: "_preview_1lo3h_75",
-	scroll: "_scroll_1lo3h_85",
-	full: "_full_1lo3h_97",
-	popout: "_popout_1lo3h_114",
-	imageCard: "_imageCard_1lo3h_133",
-	imageFrame: "_imageFrame_1lo3h_146",
-	imageCaption: "_imageCaption_1lo3h_163",
-	scrollFull: "_scrollFull_1lo3h_174",
-	titleScrolling: "_titleScrolling_1lo3h_178",
-	imageBand: "_imageBand_1lo3h_190",
-	glow: "_glow_1lo3h_202"
+	card: "_card_52v2z_5",
+	draft: "_draft_52v2z_22",
+	published: "_published_52v2z_26",
+	pinned: "_pinned_52v2z_30",
+	title: "_title_52v2z_38",
+	titleCentered: "_titleCentered_52v2z_49",
+	titleInline: "_titleInline_52v2z_65",
+	preview: "_preview_52v2z_75",
+	scroll: "_scroll_52v2z_85",
+	full: "_full_52v2z_97",
+	popout: "_popout_52v2z_114",
+	imageCard: "_imageCard_52v2z_133",
+	imageFrame: "_imageFrame_52v2z_146",
+	imageCaption: "_imageCaption_52v2z_163",
+	scrollFull: "_scrollFull_52v2z_174",
+	titleScrolling: "_titleScrolling_52v2z_178",
+	imageMark: "_imageMark_52v2z_190",
+	glow: "_glow_52v2z_208"
 }, uo = /* @__PURE__ */ o(((e) => {
 	var t = Symbol.for("react.transitional.element"), n = Symbol.for("react.fragment");
 	function r(e, n, r) {
@@ -10841,7 +10841,7 @@ function fo({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 		hovered: a,
 		isDraft: u
 	});
-	let f = u ? "#2a2a3e" : "#1e3a5f", p = !!e.image && n >= 120, m = p ? Math.round(Math.min(n * .42, 72)) : 0;
+	let f = (e._source && e._source.prominence || e.originalItem && e.originalItem._source && e.originalItem._source.prominence || "secondary") === "primary" ? u ? "#24304a" : "#1e3a5f" : "#23232f", p = !!e.image;
 	return /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: [
 			N.card,
@@ -10858,17 +10858,15 @@ function fo({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 		},
 		children: [
 			p && /* @__PURE__ */ (0, P.jsx)("div", {
-				className: N.imageBand,
-				style: {
-					height: m,
-					backgroundImage: `url('${e.image}')`
-				}
+				className: N.imageMark,
+				style: { backgroundImage: `url('${e.image}')` },
+				title: "has an image"
 			}),
 			/* @__PURE__ */ (0, P.jsx)(ho, {
 				article: e,
 				width: t,
-				height: n - m,
-				bandHeight: m,
+				height: n - 0,
+				bandHeight: 0,
 				viewState: r,
 				expanded: c,
 				useFullArticle: l,

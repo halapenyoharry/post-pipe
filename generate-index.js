@@ -58,6 +58,7 @@ function configFor(entry) {
     htmlUrl: entry.htmlUrl,
     customColor: entry.customColor,
     folder: entry.folder,
+    prominence: entry.prominence,
   };
   if (entry.type === 'local') {
     return {

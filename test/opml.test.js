@@ -58,3 +58,31 @@ test('type is inferred when the export omits it', () => {
 test('an empty subscription list is not an error', () => {
   assert.deepStrictEqual(parseOpml(wrap('')), []);
 });
+
+test('a local folder is primary and a subscribed feed is secondary by default', () => {
+  // Your own corpus and a subscribed firehose are not peers. This used to fall
+  // out of the status field by accident, which meant your own drafts rendered
+  // identically to somebody else's news.
+  const feeds = parseOpml(wrap(
+    `<outline type="local" text="Mine" xmlUrl="local://~/Posts"/>` +
+    `<outline type="rss" text="Theirs" xmlUrl="https://x.test/rss"/>`,
+  ));
+  assert.strictEqual(feeds[0].prominence, 'primary');
+  assert.strictEqual(feeds[1].prominence, 'secondary');
+});
+
+test('prominence can be set explicitly, including against the default', () => {
+  const feeds = parseOpml(wrap(
+    `<outline type="rss" text="Close reading" xmlUrl="https://x.test/rss" prominence="primary"/>` +
+    `<outline type="local" text="Archive" xmlUrl="local://~/Old" prominence="secondary"/>`,
+  ));
+  assert.strictEqual(feeds[0].prominence, 'primary');
+  assert.strictEqual(feeds[1].prominence, 'secondary');
+});
+
+test('an unrecognised prominence falls back to the default rather than through', () => {
+  const [feed] = parseOpml(wrap(
+    `<outline type="local" text="Mine" xmlUrl="local://~/Posts" prominence="loudest"/>`,
+  ));
+  assert.strictEqual(feed.prominence, 'primary');
+});
