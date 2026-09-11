@@ -63,6 +63,7 @@ export function TextView({ article, width, height, viewState, fullContent }) {
 
   const cardClassNames = [
     styles.card,
+    sourceColor && !pinned && styles.glow,
     isDraft ? styles.draft : styles.published,
     expanded && styles.expanded,
     pinned && styles.pinned
@@ -79,7 +80,11 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         // Ringing the whole card in a saturated feed colour competed with the
         // content for attention; an edge bar says the same thing quietly.
         // Pinned still wins outright, for selection clarity.
-        ...(sourceColor && !pinned ? { boxShadow: `inset 3px 0 0 ${sourceColor}` } : {})
+        // Provenance as a glow all the way round rather than a bar down one
+        // edge or a saturated ring. The ring competed with the card's own
+        // contents; a halo sits behind it. Rendered into the gutter the
+        // GraphViewer leaves around the card for exactly this.
+        ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {})
       }}
     >
       {showBand && (

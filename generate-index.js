@@ -255,9 +255,15 @@ ${reactJs}
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
+    // Bump when the layout algorithm changes in a way that makes previously
+    // generated positions wrong. Positions the reader placed by hand are not
+    // affected — only the ones the simulation produced.
+    const LAYOUT_VERSION = 'collide-footprint-1';
+
     const viewState = window.ViewState.createViewState({
       backend: window.ViewState.localStorageBackend('post-pipe:viewstate'),
-      corpusId: feed.feed_url || feed.home_page_url || 'corpus'
+      corpusId: feed.feed_url || feed.home_page_url || 'corpus',
+      layoutVersion: LAYOUT_VERSION
     });
 
     function App() {

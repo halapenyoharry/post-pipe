@@ -105,6 +105,11 @@ function getLOD(scale) {
 
 // Card dimensions per view state. Returned to both GraphViewer (which sizes
 // the foreignObject) and the host wrapper (which sizes the React mount).
+// Space left around the card inside its foreignObject. An SVG foreignObject
+// clips at its own bounds, so a card sized exactly to the frame has its glow
+// sliced off square — worse than no glow. This gutter gives it room.
+const GLOW_PAD = 16;
+
 function cardSizeFor({ hovered, pinned }) {
   if (pinned) return { width: 230, height: 190 };
   if (hovered) return { width: 200, height: 160 };
@@ -208,10 +213,15 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(160))
       .force('charge', d3.forceManyBody().strength(-500))
-      .force('collide', d3.forceCollide().radius(d => (d._r || d.size / 2) + 8).strength(0.9))
+      .force('collide', d3.forceCollide().radius(d => (d._r || d.size / 2) + 10).strength(1).iterations(3))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .velocityDecay(0.85)
-      .alphaDecay(0.05);
+      // Damping was heavy enough, and the run short enough, that collisions
+      // never finished resolving before the simulation froze — nodes were
+      // still overlapping when everything stopped. Looser damping over a
+      // longer run lets things find their space. It settles once, at load,
+      // and then holds still, which is the behaviour that matters.
+      .velocityDecay(0.7)
+      .alphaDecay(0.028);
 
     // Resize: rescale the SVG canvas only. Never restart the simulation —
     // node positions in graph-space stay fixed; only the viewport changes.
@@ -299,7 +309,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           .style('font-size', fontSize + 'px').style('font-weight', '400')
           .style('pointer-events', 'none')
           .text(d.label);
-        d._r = Math.max(bubbleW, bubbleH) / 2;
+        d._r = Math.hypot(bubbleW, bubbleH) / 2;
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.
         el.append('foreignObject').attr('class', 'article-fo');
@@ -320,7 +330,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           .style('stroke-opacity', '0.75')
           .style('display', 'none')
           .text(d.label);
-        d._r = 100; // upper bound for collision radius; refined after first render
+        // Collision radius from the card's real footprint. This was size/2,
+        // which is 30 for a card that is 180x140 — the reason cards sat on top
+        // of each other and tags landed inside them. A circle round a rectangle
+        // is approximate either way; half the diagonal is the version that
+        // guarantees no overlap rather than the version that looks tidy in
+        // isolation.
+        const rest = cardSizeFor({ hovered: false, pinned: false });
+        d._r = Math.hypot(rest.width, rest.height) / 2;
       }
     });
 
@@ -356,6 +373,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       const wrapper = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
       wrapper.style.width = '100%';
       wrapper.style.height = '100%';
+      wrapper.style.boxSizing = 'border-box';
       fo.appendChild(wrapper);
       reactRoots.set(d.id, { root: createRoot(wrapper), fo, wrapper });
     });
@@ -372,10 +390,11 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       const { width: w, height: h } = cardSizeFor({ hovered, pinned });
 
       d3.select(entry.fo)
-        .attr('width', w).attr('height', h)
-        .attr('x', -w / 2).attr('y', -h / 2);
+        .attr('width', w + GLOW_PAD * 2).attr('height', h + GLOW_PAD * 2)
+        .attr('x', -w / 2 - GLOW_PAD).attr('y', -h / 2 - GLOW_PAD);
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
+      entry.wrapper.style.margin = GLOW_PAD + 'px';
 
       const Lens = lensFor(d.kind);
       entry.root.render(
@@ -387,7 +406,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           fullContent: d._fullContent || null
         })
       );
-      d._r = Math.max(w, h) / 2;
+      // Keep the collision radius on the resting footprint. Growing it on
+      // hover would shove the neighbours away every time the cursor passed,
+      // which is exactly the restlessness the graph is built to avoid.
     }
 
     // Block wheel events from inside any article node from reaching the
@@ -641,6 +662,26 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
 
     // When the simulation ends, freeze every node by copying x/y to fx/fy.
     // Any later interaction (drag, etc.) keeps positions stable.
+    // Frame the whole graph once it has settled, but only when the reader has
+    // not arranged it themselves. Giving every node its true footprint spreads
+    // the corpus over far more space than before, and a layout you have to go
+    // looking for is not an improvement on one that overlaps.
+    function fitToViewport() {
+      const pts = data.nodes.filter(d => d.type === 'article');
+      if (pts.length < 2) return;
+      const pad = 140;
+      const minX = Math.min(...pts.map(d => d.x)) - pad;
+      const maxX = Math.max(...pts.map(d => d.x)) + pad;
+      const minY = Math.min(...pts.map(d => d.y)) - pad;
+      const maxY = Math.max(...pts.map(d => d.y)) + pad;
+      const w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
+      const h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
+      const k = Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1);
+      const tx = w / 2 - ((minX + maxX) / 2) * k;
+      const ty = h / 2 - ((minY + maxY) / 2) * k;
+      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+    }
+
     simulation.on('end', () => {
       data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
       // The layout the simulation settled on is itself an arrangement worth
@@ -648,13 +689,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       // started to learn the shape of. Recorded without history: the reader
       // did not do this, so there is nothing for them to undo.
       const vs = viewStateRef.current;
+      let anyRestored = false;
       if (vs) {
         for (const d of data.nodes) {
-          if (!vs.nodeState(persistKey(d))) {
-            vs.setNodePosition(persistKey(d), d.x, d.y, { silent: true });
-          }
+          if (vs.nodeState(persistKey(d))) anyRestored = true;
+          else vs.setNodePosition(persistKey(d), d.x, d.y, { silent: true });
         }
       }
+      if (!anyRestored) fitToViewport();
     });
 
     return () => {

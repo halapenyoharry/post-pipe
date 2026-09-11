@@ -193,3 +193,16 @@
   background-position: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.35);
 }
+
+
+/* Provenance glow. color-mix keeps the halo at the feed's hue without needing
+   the colour pre-converted to rgba — the value arrives as whatever the OPML or
+   the site's theme-color said, which may be hex or hsl(). The plain-colour
+   shadow before it is the fallback where color-mix is unavailable. */
+.glow {
+  box-shadow:
+    0 0 10px -2px var(--nv-src),
+    0 0 14px 1px color-mix(in srgb, var(--nv-src) 55%, transparent),
+    0 0 3px 0 color-mix(in srgb, var(--nv-src) 70%, transparent);
+  border-color: color-mix(in srgb, var(--nv-src) 45%, rgba(255, 255, 255, 0.12));
+}

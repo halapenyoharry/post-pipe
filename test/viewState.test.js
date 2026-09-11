@@ -216,3 +216,46 @@ test('a silent write persists without entering history or disturbing a gesture',
   s.undo();
   assert.strictEqual(s.state.layout, 'force');
 });
+
+test('a new layout version discards generated positions and keeps placed ones', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
+  await a.ready();
+  a.setNodePosition('generated', 1, 1, { silent: true });   // the layout chose this
+  a.setNodePosition('placed', 2, 2);                        // the reader chose this
+  await a.flush();
+
+  const b = mk({ backend, corpusId: 'c', layoutVersion: 'v2' });
+  await b.ready();
+  assert.strictEqual(b.nodeState('generated'), null, 'stale generated position dropped');
+  assert.deepStrictEqual(
+    { x: b.nodeState('placed').x, y: b.nodeState('placed').y },
+    { x: 2, y: 2 },
+    'the reader keeps what they placed',
+  );
+});
+
+test('the same layout version keeps everything', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
+  await a.ready();
+  a.setNodePosition('generated', 1, 1, { silent: true });
+  await a.flush();
+
+  const b = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
+  await b.ready();
+  assert.ok(b.nodeState('generated'), 'nothing is discarded without a reason');
+});
+
+test('dragging a generated position makes it the reader\'s', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
+  await a.ready();
+  a.setNodePosition('n', 1, 1, { silent: true });
+  a.setNodePosition('n', 9, 9);                    // reader moves it
+  await a.flush();
+
+  const b = mk({ backend, corpusId: 'c', layoutVersion: 'v2' });
+  await b.ready();
+  assert.strictEqual(b.nodeState('n').x, 9, 'a node you touched is no longer the layout\'s to reset');
+});

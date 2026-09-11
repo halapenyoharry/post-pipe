@@ -18,10 +18,11 @@
 
 const VERSION = 1;
 
-function emptyState(corpusId) {
+function emptyState(corpusId, layoutVersion) {
   return {
     version: VERSION,
     corpusId: corpusId || null,
+    layoutVersion: layoutVersion || null,
     layout: 'force',
     hiddenSources: [],
     nodes: {},      // id -> { x, y, w, h, pinned, t }
@@ -117,7 +118,7 @@ function createViewState(opts = {}) {
   const maxHistory = opts.maxHistory === undefined ? 50 : opts.maxHistory;
   const now = opts.now || (() => Date.now());
 
-  let state = emptyState(opts.corpusId);
+  let state = emptyState(opts.corpusId, opts.layoutVersion);
   let past = [];
   let future = [];
   let listeners = [];
@@ -235,9 +236,27 @@ function createViewState(opts = {}) {
       if (loaded && loaded.version === VERSION) {
         // A stored arrangement for a different corpus is not ours to apply.
         if (!opts.corpusId || !loaded.corpusId || loaded.corpusId === opts.corpusId) {
-          state = { ...emptyState(opts.corpusId), ...loaded, corpusId: opts.corpusId || loaded.corpusId };
+          state = {
+            ...emptyState(opts.corpusId, opts.layoutVersion),
+            ...loaded,
+            corpusId: opts.corpusId || loaded.corpusId,
+          };
         }
       }
+
+      // When the layout algorithm changes, positions it generated last time
+      // are stale — restoring them would hide the change behind its own old
+      // output. Positions the reader placed are theirs and survive, which is
+      // the entire reason the two are distinguished.
+      if (opts.layoutVersion && state.layoutVersion !== opts.layoutVersion) {
+        const kept = {};
+        for (const [id, node] of Object.entries(state.nodes)) {
+          if (!node.auto) kept[id] = node;
+        }
+        state = { ...state, nodes: kept, layoutVersion: opts.layoutVersion };
+        scheduleSave();
+      }
+
       notify();
       return state;
     },
@@ -259,10 +278,15 @@ function createViewState(opts = {}) {
 
     nodeState(id) { return state.nodes[id] || null; },
 
+    // `silent` marks a position the layout chose, not one the reader did.
+    // The distinction is what lets a better layout replace its own old output
+    // without touching anything a person actually placed.
     setNodePosition(id, x, y, { transient = false, silent = false } = {}) {
       const apply = silent ? updateSilent : transient ? updateTransient : update;
       apply((s) => {
-        s.nodes[id] = { ...(s.nodes[id] || {}), x, y, t: now() };
+        const prev = s.nodes[id] || {};
+        s.nodes[id] = { ...prev, x, y, t: now(), auto: silent ? true : undefined };
+        if (!silent) delete s.nodes[id].auto;
       });
     },
 
