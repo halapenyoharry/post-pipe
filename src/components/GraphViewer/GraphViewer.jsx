@@ -110,6 +110,9 @@ function getLOD(scale) {
 // sliced off square — worse than no glow. This gutter gives it room.
 const GLOW_PAD = 16;
 
+// Uniform padding on all four sides of a tag bubble.
+const TAG_PAD = 11;
+
 function cardSizeFor({ hovered, pinned }) {
   if (pinned) return { width: 230, height: 190 };
   if (hovered) return { width: 200, height: 160 };
@@ -286,6 +289,21 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       .style('font-family', "'Atkinson', sans-serif")
       .style('visibility', 'hidden');
 
+    // Wrap a tag's bubble round the text that was actually drawn. getBBox
+    // reports ink, so PAD is the same real distance on all four sides whatever
+    // the text contains — the reason this is measured rather than derived from
+    // font-size is that line-height carries leading above and below the glyphs,
+    // so an identical padding number produced visibly unequal gaps.
+    const tagBubbles = [];
+    function fitBubble(d, textEl, rectEl) {
+      const ink = textEl.node().getBBox();
+      rectEl
+        .attr('x', ink.x - TAG_PAD).attr('y', ink.y - TAG_PAD)
+        .attr('width', ink.width + TAG_PAD * 2)
+        .attr('height', ink.height + TAG_PAD * 2);
+      d._r = Math.hypot(ink.width + TAG_PAD * 2, ink.height + TAG_PAD * 2) / 2;
+    }
+
     nodes.each(function(d) {
       const el = d3.select(this);
       if (d.type === 'tag') {
@@ -313,7 +331,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         // and the width cap keeps a tag narrower than a card no matter how
         // long its text, by wrapping instead of growing.
         const fontSize = 22;
-        const padX = 11, padY = 5;
+        // One padding value for all four sides. Keeping separate padX/padY
+        // could not make the margins match, because the vertical one was
+        // measured against the line box and the horizontal one against the
+        // glyphs — line-height already carries leading above and below the
+        // text, so an identical number produced visibly different gaps. The
+        // bubble is measured from the rendered ink instead, below.
+        const PAD = TAG_PAD;
+        const padX = PAD, padY = PAD;
         const MAX_BUBBLE_W = 150;   // card is 180
         const MAX_LINES = 3;
 
@@ -367,16 +392,11 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         // Tighter leading once it wraps: a second line should cost a line, not
         // double the bubble.
         const effLineH = lines.length > 1 ? fontSize * 1.0 : fontSize * 1.1;
-        const textW = Math.max(...lines.map(widthOf));
-        const bubbleW = textW + padX * 2;
-        const bubbleH = lines.length * effLineH + padY * 2;
 
-        el.append('rect')
-          .attr('x', -bubbleW / 2).attr('y', -bubbleH / 2)
-          .attr('width', bubbleW).attr('height', bubbleH)
-          .attr('rx', 9).attr('ry', 9)
-          .attr('fill', d.color).attr('opacity', 0.7);
-
+        // Text first, then measure what was actually drawn, then wrap the
+        // bubble round it. getBBox reports the ink, so PAD is the same real
+        // distance on every side regardless of whether the text has capitals,
+        // descenders, or one line or three.
         const textEl = el.append('text')
           .attr('text-anchor', 'middle')
           .attr('fill', '#1a1a2e')
@@ -390,7 +410,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
             .text(line);
         });
 
-        d._r = Math.hypot(bubbleW, bubbleH) / 2;
+        // Behind the text, not over it. Geometry is applied by fitBubble so the
+        // same code can run again once the webfont has loaded.
+        const rectEl = el.insert('rect', 'text')
+          .attr('rx', 9).attr('ry', 9)
+          .attr('fill', d.color).attr('opacity', 0.7);
+        fitBubble(d, textEl, rectEl);
+        tagBubbles.push({ d, textEl, rectEl });
+
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.
         el.append('foreignObject').attr('class', 'article-fo');
@@ -406,6 +433,16 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     });
 
     probe.remove();
+
+    // Text metrics change when the webfont finishes loading, and the bubbles
+    // were sized against the fallback face — which is why the horizontal and
+    // vertical margins came out one or two pixels apart despite being the same
+    // number. Re-fit once the real font is in.
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        tagBubbles.forEach(({ d, textEl, rectEl }) => fitBubble(d, textEl, rectEl));
+      }).catch(() => {});
+    }
 
     // One React root per article node, mounted inside that node's
     // foreignObject. Keyed by node id. Roots are unmounted on cleanup so we
