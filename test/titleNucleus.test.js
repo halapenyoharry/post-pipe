@@ -72,9 +72,12 @@ test('an authored short_title over budget is reduced, not truncated', () => {
     title: 'The Mechanics of Effortless Action vs. Calculated Compliance',
     short_title: 'Effortless Action vs. Calculated Compliance',
   });
-  assert.strictEqual(ladder.short, 'Effortless Action');
-  assert.strictEqual(ladder.medium, 'Effortless Action Calculated Compliance');
-  assert.ok(!ladder.medium.includes('Mechanics'), 'reduced from the authored text, not the title');
+  assert.strictEqual(ladder.short, 'Effortless Action', 'five words is well past a budget of two');
+  assert.strictEqual(
+    ladder.medium, 'Effortless Action vs. Calculated Compliance',
+    'five words is within one of a budget of four, so the author keeps their wording',
+  );
+  assert.ok(!ladder.medium.includes('Mechanics'), 'never falls back to the full title');
 });
 
 test('the ladder degrades to the title when nothing is authored', () => {
@@ -82,4 +85,19 @@ test('the ladder degrades to the title when nothing is authored', () => {
   assert.strictEqual(ladder.short.split(' ').length, 2);
   assert.strictEqual(ladder.medium.split(' ').length, 4);
   assert.strictEqual(ladder.full, 'Regulators Knew This Drug Was Harming People');
+});
+
+test('an authored title one word over budget is kept, not crushed', () => {
+  // "Act or Ask" against a two-word budget reduced to "Act Ask" — the budget
+  // enforced at the cost of the thing it was protecting.
+  const ladder = labelLadder({ title: 'The Collaborator That Acts or Asks', short_title: 'Act or Ask' });
+  assert.strictEqual(ladder.short, 'Act or Ask');
+});
+
+test('an authored title well over budget is still reduced', () => {
+  const ladder = labelLadder({
+    title: 'The Mechanics of Effortless Action vs. Calculated Compliance',
+    short_title: 'Effortless Action vs. Calculated Compliance',
+  });
+  assert.strictEqual(ladder.short, 'Effortless Action');
 });

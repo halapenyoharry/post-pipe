@@ -129,9 +129,15 @@ function labelLadder(item, { shortWords = 2, mediumWords = 4 } = {}) {
   const authored = String(item.short_title || '').trim();
   const authoredWords = authored ? tokenize(authored).length : 0;
 
+  // One word of slack on an authored title. "Act or Ask" is three words against
+  // a budget of two, and reducing it gives "Act Ask" — the budget enforced at
+  // the cost of the thing it was protecting. A writer who already compressed a
+  // title to three words meant those three words.
+  const fits = (budget) => authored && authoredWords <= budget + 1;
+
   return {
-    short: authored && authoredWords <= shortWords ? authored : nucleus(authored || full, shortWords),
-    medium: authored && authoredWords <= mediumWords ? authored : nucleus(authored || full, mediumWords),
+    short: fits(shortWords) ? authored : nucleus(authored || full, shortWords),
+    medium: fits(mediumWords) ? authored : nucleus(authored || full, mediumWords),
     full: full || authored,
   };
 }

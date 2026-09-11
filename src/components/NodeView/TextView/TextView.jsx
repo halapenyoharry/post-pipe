@@ -138,7 +138,7 @@ export function TextView({ article, width, height, viewState, fullContent }) {
 // zoom change, and being a few percent conservative costs nothing here.
 function fitFontSize(text, width, height, opts = {}) {
   const {
-    min = 10, max = 44, lineHeight = 1.22, charRatio = 0.52, pad = 10, maxLines = 4,
+    min = 14, max = 36, lineHeight = 1.22, charRatio = 0.52, pad = 10, maxLines = 4,
   } = opts;
   const words = String(text || '').trim().split(/\s+/).filter(Boolean);
   if (!words.length || !width || !height) return min;
@@ -200,10 +200,21 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     );
   }
 
-  // Slug-LOD: the floating SVG slug-label overlay (in GraphViewer) does the
-  // labeling. The card itself is empty — just a marker for hit-testing.
+  // Slug-LOD: the shortest rung of the ladder, filling the card. This used to
+  // render nothing and lean on a separate counter-scaled SVG overlay, which
+  // meant that whenever the overlay was suppressed the cards went blank —
+  // a hundred empty boxes. The card owns its own label at every zoom now.
   if (viewState.lod === 'slug') {
-    return null;
+    const slugLabel =
+      article.label || article.labelMedium || article.short_title || article.title || '';
+    return (
+      <div
+        className={styles.titleCentered}
+        style={{ fontSize: fitFontSize(slugLabel, width, height) + 'px' }}
+      >
+        {slugLabel}
+      </div>
+    );
   }
 
   // Title-only LOD: centered title, larger font, no description.

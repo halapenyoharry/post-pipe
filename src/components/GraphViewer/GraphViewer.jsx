@@ -181,7 +181,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     const g = svg.append('g');
 
     // Zoom — repaints node text content only when crossing an LOD boundary;
-    // never touches the simulation. Also updates the slug-label overlay's
+    // never touches the simulation. Re-renders card contents at the new
     // font-size on every zoom event so the on-screen label size stays
     // constant as the user zooms in/out.
     const zoom = d3.zoom().on('zoom', (event) => {
@@ -193,7 +193,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         currentLodRef.current = newLod;
         renderAllArticleBodies();
       }
-      updateSlugLabels(newScale);
     });
     svg.call(zoom).on('dblclick.zoom', null);
 
@@ -290,8 +289,12 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     nodes.each(function(d) {
       const el = d3.select(this);
       if (d.type === 'tag') {
-        const fontSize = 14;
-        const padX = 14, padY = 8;
+        // Tag text was 14 units against card labels of 30-plus, so at any
+        // zoom where the cards were readable the tags were not. A tag is a
+        // navigational handle — if you cannot read it, it is decoration.
+        // The bubble is measured from the text, so it grows to match.
+        const fontSize = 26;
+        const padX = 18, padY = 9;
         probe.style('font-size', fontSize + 'px').style('font-weight', '400');
         probe.text(d.label);
         const textW = probe.node().getComputedTextLength();
@@ -313,23 +316,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.
         el.append('foreignObject').attr('class', 'article-fo');
-        // Slug label overlay — visible only at slug-LOD. Font-size set
-        // dynamically in updateSlugLabels so the longest slug fits the
-        // current viewport width.
-        el.append('text')
-          .attr('class', 'slug-label')
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .style('fill', '#fff')
-          .style('font-family', "'Atkinson', sans-serif")
-          .style('font-weight', '700')
-          .style('pointer-events', 'none')
-          .style('paint-order', 'stroke')
-          .style('stroke', '#000')
-          .style('stroke-width', '4px')
-          .style('stroke-opacity', '0.75')
-          .style('display', 'none')
-          .text(d.label);
         // Collision radius from the card's real footprint. This was size/2,
         // which is 30 for a card that is 180x140 — the reason cards sat on top
         // of each other and tags landed inside them. A circle round a rectangle
@@ -341,23 +327,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       }
     });
 
-    // Measure the longest slug's text width at a probe font-size so we can
-    // compute the font-size that makes the longest slug exactly fit the
-    // viewport. Done once at setup since slug strings are static.
-    const SLUG_PROBE_SIZE = 100;
-    probe.style('font-family', "'Atkinson', sans-serif")
-      .style('font-weight', '700')
-      .style('font-size', SLUG_PROBE_SIZE + 'px');
-    let maxSlugWidthAtProbe = 1;
-    data.nodes.forEach(d => {
-      if (d.type === 'article') {
-        probe.text(d.label);
-        const w = probe.node().getComputedTextLength();
-        if (w > maxSlugWidthAtProbe) maxSlugWidthAtProbe = w;
-      }
-    });
-    // Width contributed by one unit of font-size = (max width at probe) / probe size.
-    const slugWidthPerFontUnit = maxSlugWidthAtProbe / SLUG_PROBE_SIZE;
     probe.remove();
 
     // One React root per article node, mounted inside that node's
@@ -426,55 +395,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     // LONGEST slug exactly fits the viewport width — all slugs share that
     // size for consistency. As large as it can get without overflowing.
     // Hidden when the node is hovered or pinned.
-    function updateSlugLabels(scale) {
-      const showAny = scale < LOD_SLUG_ONLY;
-      const labels = nodes.filter(d => d.type === 'article').select('.slug-label');
-      if (!showAny) {
-        labels.style('display', 'none');
-        return;
-      }
-      // Size the label so the longest one fits the viewport — but bounded at
-      // both ends. Unbounded, this formula divides the viewport by the longest
-      // label's width, so a corpus of SHORT labels produced enormous type, and
-      // then divided it again by the zoom scale. At far zoom that gave 280px
-      // words stacked on top of each other: the wall of overlapping text.
-      const viewportPx = containerRef.current
-        ? containerRef.current.clientWidth
-        : window.innerWidth;
-      const margin = 0.9;
-      const MIN_LABEL_PX = 11;   // below this it is decoration, not a label
-      const MAX_LABEL_PX = 26;   // above this one label owns the screen
-      const fitted = (viewportPx * margin) / Math.max(slugWidthPerFontUnit, 1);
-      const screenFontSize = Math.max(MIN_LABEL_PX, Math.min(MAX_LABEL_PX, fitted));
-
-      // Density: labels are only useful while they do not collide. Estimate the
-      // on-screen room each node has from the graph's own extent, and if a label
-      // cannot fit in it, show none rather than a smear. Reading the shape is
-      // the point at this zoom; reading the words is what zooming in is for.
-      const articles = data.nodes.filter(d => d.type === 'article');
-      let spacingOk = true;
-      if (articles.length > 1) {
-        const xs = articles.map(d => d.x || 0);
-        const ys = articles.map(d => d.y || 0);
-        const w = (Math.max(...xs) - Math.min(...xs)) * scale;
-        const h = (Math.max(...ys) - Math.min(...ys)) * scale;
-        const roomPerNode = Math.sqrt(Math.max(w * h, 1) / articles.length);
-        const labelWidthPx = slugWidthPerFontUnit * screenFontSize;
-        spacingOk = roomPerNode > labelWidthPx * 0.55;
-      }
-      if (!spacingOk) {
-        labels.style('display', 'none');
-        return;
-      }
-
-      // Convert to SVG units so it survives the zoom transform and renders
-      // at the chosen on-screen size: svg_font_size * k = screen_font_size.
-      const svgFontSize = screenFontSize / Math.max(scale, 0.01);
-      labels
-        .style('font-size', svgFontSize + 'px')
-        .style('display', d => (d.id === hoveredIdRef.current || d.id === pinnedIdRef.current) ? 'none' : null);
-    }
-
     // Article-content fetch cache. Keyed by node id. Value is the body HTML
     // (with <h1> removed) or null on fetch failure.
     const articleContentCache = new Map();
@@ -506,7 +426,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
 
     // Initial paint.
     renderAllArticleBodies();
-    updateSlugLabels(zoomScaleRef.current);
     applyVisibility(svg, hiddenSourcesRef.current);
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
@@ -519,7 +438,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         if (hoveredIdRef.current === d.id) return;
         hoveredIdRef.current = d.id;
         renderArticleBody(d);
-        updateSlugLabels(zoomScaleRef.current);
       })
       .on('mouseout', (event, d) => {
         const related = event.relatedTarget;
@@ -527,7 +445,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         if (hoveredIdRef.current === d.id) {
           hoveredIdRef.current = null;
           renderArticleBody(d);
-          updateSlugLabels(zoomScaleRef.current);
         }
       })
       .on('dblclick', (event, d) => {
@@ -543,7 +460,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         pinnedIdRef.current = null;
         hoveredIdRef.current = null;
         renderArticleBody(d);
-        updateSlugLabels(zoomScaleRef.current);
       })
       .on('click', (event, d) => {
         const target = event.target;
@@ -560,7 +476,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
             // Also clear hover so the node truly returns to default.
             hoveredIdRef.current = null;
             renderArticleBody(d);
-            updateSlugLabels(zoomScaleRef.current);
           }
           return;
         }
@@ -570,7 +485,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         if (prevPinned === d.id) {
           pinnedIdRef.current = null;
           renderArticleBody(d);
-          updateSlugLabels(zoomScaleRef.current);
         } else {
           pinnedIdRef.current = d.id;
           renderArticleBody(d);
@@ -579,7 +493,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
             const prev = data.nodes.find(nd => nd.id === prevPinned);
             if (prev) renderArticleBody(prev);
           }
-          updateSlugLabels(zoomScaleRef.current);
           // Fetch full article body so the pinned node becomes a mini-reader.
           // Re-render when content arrives, but only if this node is still
           // the pinned one (user might have unpinned in the meantime).
@@ -635,7 +548,6 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         pinnedIdRef.current = null;
         if (prev) renderArticleBody(prev);
       }
-      if (hadPinned) updateSlugLabels(zoomScaleRef.current);
     });
 
     // Simulation tick → position nodes. When alpha falls below alphaMin,
@@ -682,7 +594,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
     }
 
+    let hasSettled = false;
     simulation.on('end', () => {
+      hasSettled = true;
       data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
       // The layout the simulation settled on is itself an arrangement worth
       // keeping — otherwise every reload reshuffles a graph the reader has
@@ -699,8 +613,20 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       if (!anyRestored) fitToViewport();
     });
 
+    // d3-timer runs on requestAnimationFrame, and a hidden tab gets no frames.
+    // A page opened in the background therefore never lays out: the reader
+    // switches to it later and finds the graph unsettled, or off screen
+    // entirely. Nothing is wrong with it — it simply never got to run. So run
+    // it when the page is first actually looked at.
+    const handleVisibility = () => {
+      if (document.hidden || hasSettled) return;
+      simulation.alpha(0.8).restart();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       simulation.stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
       // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
       // would try to reconcile against a detached DOM tree on the next
