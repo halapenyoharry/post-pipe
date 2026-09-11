@@ -509,6 +509,21 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           updateSlugLabels(zoomScaleRef.current);
         }
       })
+      .on('dblclick', (event, d) => {
+        // Double-click opens the reader. It used to land as two single clicks,
+        // which pinned and then unpinned the node — a visible twitch and no
+        // result. Same destination as the popout button: reader open, node
+        // back to its resting size.
+        event.stopPropagation();
+        event.preventDefault();
+        if (onNodeSelectRef.current) {
+          onNodeSelectRef.current(d.originalItem || d);
+        }
+        pinnedIdRef.current = null;
+        hoveredIdRef.current = null;
+        renderArticleBody(d);
+        updateSlugLabels(zoomScaleRef.current);
+      })
       .on('click', (event, d) => {
         const target = event.target;
         const isPopout = target && (target.dataset?.popout === '1' ||

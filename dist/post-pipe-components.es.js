@@ -10795,22 +10795,23 @@ function co() {
 	}, _;
 }
 var lo = { graphContainer: "_graphContainer_7uvsx_1" }, N = {
-	card: "_card_1rt50_5",
-	draft: "_draft_1rt50_22",
-	published: "_published_1rt50_26",
-	pinned: "_pinned_1rt50_30",
-	title: "_title_1rt50_38",
-	titleCentered: "_titleCentered_1rt50_49",
-	titleInline: "_titleInline_1rt50_65",
-	preview: "_preview_1rt50_75",
-	scroll: "_scroll_1rt50_85",
-	full: "_full_1rt50_97",
-	popout: "_popout_1rt50_114",
-	imageCard: "_imageCard_1rt50_133",
-	imageFrame: "_imageFrame_1rt50_146",
-	imageCaption: "_imageCaption_1rt50_163",
-	scrollFull: "_scrollFull_1rt50_174",
-	titleScrolling: "_titleScrolling_1rt50_178"
+	card: "_card_qmff1_5",
+	draft: "_draft_qmff1_22",
+	published: "_published_qmff1_26",
+	pinned: "_pinned_qmff1_30",
+	title: "_title_qmff1_38",
+	titleCentered: "_titleCentered_qmff1_49",
+	titleInline: "_titleInline_qmff1_65",
+	preview: "_preview_qmff1_75",
+	scroll: "_scroll_qmff1_85",
+	full: "_full_qmff1_97",
+	popout: "_popout_qmff1_114",
+	imageCard: "_imageCard_qmff1_133",
+	imageFrame: "_imageFrame_qmff1_146",
+	imageCaption: "_imageCaption_qmff1_163",
+	scrollFull: "_scrollFull_qmff1_174",
+	titleScrolling: "_titleScrolling_qmff1_178",
+	imageBand: "_imageBand_qmff1_190"
 }, uo = /* @__PURE__ */ o(((e) => {
 	var t = Symbol.for("react.transitional.element"), n = Symbol.for("react.fragment");
 	function r(e, n, r) {
@@ -10839,7 +10840,7 @@ function fo({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 		hovered: a,
 		isDraft: u
 	});
-	let f = u ? "rgba(42,42,62,0.85)" : "rgba(30,58,95,0.85)", p = e.image ? `linear-gradient(${f},${f}), url('${e.image}')` : "", m = u ? "#2a2a3e" : "#1e3a5f";
+	let f = u ? "#2a2a3e" : "#1e3a5f", p = !!e.image && n >= 120, m = p ? Math.round(Math.min(n * .42, 72)) : 0;
 	return /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: [
 			N.card,
@@ -10850,20 +10851,29 @@ function fo({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 		style: {
 			width: t,
 			height: n,
-			background: p || m,
-			backgroundSize: "cover",
-			backgroundPosition: "center",
-			...d && !o ? { borderColor: d } : {}
+			background: f,
+			...d && !o ? { boxShadow: `inset 3px 0 0 ${d}` } : {}
 		},
-		children: [/* @__PURE__ */ (0, P.jsx)(ho, {
-			article: e,
-			width: t,
-			height: n,
-			viewState: r,
-			expanded: c,
-			useFullArticle: l,
-			fullContent: i
-		}), o && /* @__PURE__ */ (0, P.jsx)(go, {})]
+		children: [
+			p && /* @__PURE__ */ (0, P.jsx)("div", {
+				className: N.imageBand,
+				style: {
+					height: m,
+					backgroundImage: `url('${e.image}')`
+				}
+			}),
+			/* @__PURE__ */ (0, P.jsx)(ho, {
+				article: e,
+				width: t,
+				height: n - m,
+				bandHeight: m,
+				viewState: r,
+				expanded: c,
+				useFullArticle: l,
+				fullContent: i
+			}),
+			o && /* @__PURE__ */ (0, P.jsx)(go, {})
+		]
 	});
 }
 function po(e, t, n, r = {}) {
@@ -10879,11 +10889,11 @@ function po(e, t, n, r = {}) {
 	return Math.round(Math.max(i, Math.min(a, p)));
 }
 var mo = 260;
-function ho({ article: e, width: t, height: n, viewState: r, expanded: i, useFullArticle: a, fullContent: o }) {
-	if (i) {
-		let t = a ? o : e.description || "", r = e.title || e.label;
+function ho({ article: e, width: t, height: n, bandHeight: r = 0, viewState: i, expanded: a, useFullArticle: o, fullContent: s }) {
+	if (a) {
+		let t = o ? s : e.description || "", r = e.title || e.label;
 		return n && n < mo ? /* @__PURE__ */ (0, P.jsxs)("div", {
-			className: `${N.scroll} ${N.scrollFull} ${a ? N.full : ""} rp-scroll`,
+			className: `${N.scroll} ${N.scrollFull} ${o ? N.full : ""} rp-scroll`,
 			children: [/* @__PURE__ */ (0, P.jsx)("div", {
 				className: N.titleScrolling,
 				children: r
@@ -10892,12 +10902,12 @@ function ho({ article: e, width: t, height: n, viewState: r, expanded: i, useFul
 			className: N.title,
 			children: r
 		}), t && /* @__PURE__ */ (0, P.jsx)("div", {
-			className: `${N.scroll} ${a ? N.full : ""} rp-scroll`,
+			className: `${N.scroll} ${o ? N.full : ""} rp-scroll`,
 			dangerouslySetInnerHTML: { __html: t }
 		})] });
 	}
-	if (r.lod === "slug") return null;
-	if (r.lod === "title") {
+	if (i.lod === "slug") return null;
+	if (i.lod === "title") {
 		let r = e.labelMedium || e.short_title || e.title || e.label;
 		return /* @__PURE__ */ (0, P.jsx)("div", {
 			className: N.titleCentered,
@@ -10905,13 +10915,13 @@ function ho({ article: e, width: t, height: n, viewState: r, expanded: i, useFul
 			children: r
 		});
 	}
-	let s = e.description || "", c = s.length > 120 ? s.slice(0, 117) + "..." : s;
+	let c = e.description || "", l = c.length > 120 ? c.slice(0, 117) + "..." : c;
 	return /* @__PURE__ */ (0, P.jsxs)(P.Fragment, { children: [/* @__PURE__ */ (0, P.jsx)("div", {
 		className: N.titleInline,
 		children: e.title || e.label
-	}), c && /* @__PURE__ */ (0, P.jsx)("div", {
+	}), l && /* @__PURE__ */ (0, P.jsx)("div", {
 		className: N.preview,
-		children: c
+		children: l
 	})] });
 }
 function F({ article: e, width: t, height: n, pinned: r, hovered: i, isDraft: a }) {
@@ -11204,6 +11214,8 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 		}).on("mouseout", (e, t) => {
 			let n = e.relatedTarget;
 			n && e.currentTarget.contains(n) || u.current === t.id && (u.current = null, ne(t), re(d.current));
+		}).on("dblclick", (e, t) => {
+			e.stopPropagation(), e.preventDefault(), o.current && o.current(t.originalItem || t), l.current = null, u.current = null, ne(t), re(d.current);
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {

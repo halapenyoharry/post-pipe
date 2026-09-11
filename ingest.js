@@ -90,8 +90,16 @@ function findCover(dir, files, legacyCoverImage) {
   }
   const art = files.find(f => (f.startsWith('art-') || f.startsWith('cover-')) && isImage(f));
   if (art) return art;
-  // Unstructured image-only folders: the image IS the cover
-  const soleImage = files.filter(isImage);
+  // Unstructured image-only folders: the image IS the cover.
+  //
+  // Except an SVG. In this corpus an SVG is a diagram — a table, a topography,
+  // a figure drawn to be read at full size. Shrunk into a node it is fog, and
+  // freedom-survival.lb spent months looking like it had a broken cover
+  // because its only image was a 36KB table view. An SVG becomes a cover only
+  // when something names it one: frontmatter cover_image, a cover.* filename,
+  // or a cover-/art- prefix. Never by being the only file that happens to be
+  // an image.
+  const soleImage = files.filter(f => isImage(f) && ext(f) !== '.svg');
   if (soleImage.length === 1) return soleImage[0];
   return null;
 }

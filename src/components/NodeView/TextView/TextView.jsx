@@ -51,14 +51,15 @@ export function TextView({ article, width, height, viewState, fullContent }) {
     );
   }
 
-  // Background style: gradient over image if present, else solid.
-  const tint = isDraft
-    ? 'rgba(42,42,62,0.85)'
-    : 'rgba(30,58,95,0.85)';
-  const bgImage = article.image
-    ? `linear-gradient(${tint},${tint}), url('${article.image}')`
-    : '';
+  // A cover used to be painted across the whole card under an 85%-opaque tint.
+  // At that opacity a photograph is a smudge and a diagram is noise — it read
+  // as the card being badly rendered rather than as an image being present.
+  // The cover now gets a band of its own at full opacity with the text below
+  // it, so it is either legibly an image or not shown at all.
   const bgColor = isDraft ? '#2a2a3e' : '#1e3a5f';
+  const MIN_HEIGHT_FOR_BAND = 120;
+  const showBand = Boolean(article.image) && height >= MIN_HEIGHT_FOR_BAND;
+  const bandHeight = showBand ? Math.round(Math.min(height * 0.42, 72)) : 0;
 
   const cardClassNames = [
     styles.card,
@@ -73,18 +74,25 @@ export function TextView({ article, width, height, viewState, fullContent }) {
       style={{
         width,
         height,
-        background: bgImage || bgColor,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        // Source-color tints the border. Pinned state still wins (accent
-        // color via the .pinned class) for selection clarity.
-        ...(sourceColor && !pinned ? { borderColor: sourceColor } : {})
+        background: bgColor,
+        // Provenance moves from a full coloured ring to a bar down one edge.
+        // Ringing the whole card in a saturated feed colour competed with the
+        // content for attention; an edge bar says the same thing quietly.
+        // Pinned still wins outright, for selection clarity.
+        ...(sourceColor && !pinned ? { boxShadow: `inset 3px 0 0 ${sourceColor}` } : {})
       }}
     >
+      {showBand && (
+        <div
+          className={styles.imageBand}
+          style={{ height: bandHeight, backgroundImage: `url('${article.image}')` }}
+        />
+      )}
       <CardContent
         article={article}
         width={width}
-        height={height}
+        height={height - bandHeight}
+        bandHeight={bandHeight}
         viewState={viewState}
         expanded={expanded}
         useFullArticle={useFullArticle}
@@ -137,7 +145,7 @@ function fitFontSize(text, width, height, opts = {}) {
 // it takes a third of the card and leaves a slot too short to read in.
 const COMPACT_HEIGHT = 260;
 
-function CardContent({ article, width, height, viewState, expanded, useFullArticle, fullContent }) {
+function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent }) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
