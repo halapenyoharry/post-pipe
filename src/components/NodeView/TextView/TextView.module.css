@@ -43,9 +43,14 @@
   margin-bottom: 6px;
 }
 
-/* Title centered (title-only LOD) — fills the card. */
+/* Title centered (title-only LOD) — fills the card. Font size is computed per
+   card by fitFontSize() in TextView.jsx and set inline; the value here is only
+   the fallback if that ever fails to run. */
 .titleCentered {
   font-size: 18px;
+  padding: 6px;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
   font-weight: 700;
   color: #fff;
   line-height: 1.25;

@@ -83,6 +83,7 @@ export function TextView({ article, width, height, viewState, fullContent }) {
     >
       <CardContent
         article={article}
+        width={width}
         height={height}
         viewState={viewState}
         expanded={expanded}
@@ -94,11 +95,49 @@ export function TextView({ article, width, height, viewState, fullContent }) {
   );
 }
 
+// Size a short label to actually fill the card it sits in.
+//
+// The label font was a fixed 18 units no matter how big the card was or how
+// few words it held, so a card carrying two words spent ninety percent of
+// itself on empty space. Reducing titles to two and four words freed that room
+// and nothing claimed it.
+//
+// Tries laying the words out over one line, two, three, four; for each, asks
+// how large the type could be before the longest line overflows the width or
+// the stack overflows the height; keeps the best. Character width is estimated
+// rather than measured — a measurement would need a layout pass per node per
+// zoom change, and being a few percent conservative costs nothing here.
+function fitFontSize(text, width, height, opts = {}) {
+  const {
+    min = 10, max = 44, lineHeight = 1.22, charRatio = 0.52, pad = 10, maxLines = 4,
+  } = opts;
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length || !width || !height) return min;
+
+  const boxW = Math.max(width - pad * 2, 8);
+  const boxH = Math.max(height - pad * 2, 8);
+
+  let best = min;
+  for (let lines = 1; lines <= Math.min(maxLines, words.length); lines++) {
+    const perLine = Math.ceil(words.length / lines);
+    let longest = 0;
+    let used = 0;
+    for (let i = 0; i < words.length; i += perLine) {
+      longest = Math.max(longest, words.slice(i, i + perLine).join(' ').length);
+      used++;
+    }
+    const byWidth = boxW / Math.max(longest * charRatio, 1);
+    const byHeight = boxH / Math.max(used * lineHeight, 1);
+    best = Math.max(best, Math.min(byWidth, byHeight));
+  }
+  return Math.round(Math.max(min, Math.min(max, best)));
+}
+
 // Below this height, a title pinned above the body costs more than it gives:
 // it takes a third of the card and leaves a slot too short to read in.
 const COMPACT_HEIGHT = 260;
 
-function CardContent({ article, height, viewState, expanded, useFullArticle, fullContent }) {
+function CardContent({ article, width, height, viewState, expanded, useFullArticle, fullContent }) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
@@ -140,12 +179,17 @@ function CardContent({ article, height, viewState, expanded, useFullArticle, ful
 
   // Title-only LOD: centered title, larger font, no description.
   if (viewState.lod === 'title') {
+    // labelMedium already prefers an authored short_title and falls back to a
+    // four-word reduction, so a long news headline stops being a wall of text
+    // in a card with room for a phrase.
+    const centredLabel =
+      article.labelMedium || article.short_title || article.title || article.label;
     return (
-      <div className={styles.titleCentered}>
-        {/* labelMedium already prefers an authored short_title and falls back
-            to a four-word reduction, so a long news headline stops being a
-            wall of text in a card with room for a phrase. */}
-        {article.labelMedium || article.short_title || article.title || article.label}
+      <div
+        className={styles.titleCentered}
+        style={{ fontSize: fitFontSize(centredLabel, width, height) + 'px' }}
+      >
+        {centredLabel}
       </div>
     );
   }
