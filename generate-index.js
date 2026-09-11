@@ -259,7 +259,7 @@ ${reactJs}
     // Bump when the layout algorithm changes in a way that makes previously
     // generated positions wrong. Positions the reader placed by hand are not
     // affected — only the ones the simulation produced.
-    const LAYOUT_VERSION = 'collide-footprint-1';
+    const LAYOUT_VERSION = 'tag-scale-2';
 
     const viewState = window.ViewState.createViewState({
       backend: window.ViewState.localStorageBackend('post-pipe:viewstate'),

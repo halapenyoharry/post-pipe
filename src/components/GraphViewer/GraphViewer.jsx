@@ -306,40 +306,67 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         //
         // What comes back from all three goes into the type: 26 to 32, in the
         // same band as the card labels so the two read as one system.
-        const fontSize = 32;
+        // A tag is a handle on the corpus, not an item in it. At 32 units it
+        // was rendering wider than the article cards it points at, which
+        // inverts the hierarchy — the label for a pile of writing should not
+        // outweigh the writing. 22 is still half again the 14 it started at,
+        // and the width cap keeps a tag narrower than a card no matter how
+        // long its text, by wrapping instead of growing.
+        const fontSize = 22;
         const padX = 11, padY = 5;
-        const lineH = fontSize * 1.1;
-        const MAX_BUBBLE_W = 230;
+        const MAX_BUBBLE_W = 150;   // card is 180
+        const MAX_LINES = 3;
 
         probe.style('font-size', fontSize + 'px').style('font-weight', '500');
         const widthOf = (t) => { probe.text(t); return probe.node().getComputedTextLength(); };
 
-        // Break on spaces and on hyphens. Half this corpus's tags are
-        // 'surveillance-capitalism' shaped, and a rule that only knew about
-        // spaces left those growing sideways forever — the widest thing on
-        // screen was a tag that could not wrap.
+        // Break on hyphens as well as spaces. Half this corpus's tags are
+        // 'surveillance-capitalism' shaped, and a space-only rule left exactly
+        // those growing sideways forever.
         const pieces = d.label.split(/(?<=-)|\s+/).filter(Boolean);
+        const join = (arr) => arr.join('').replace(/\s+$/, '').trim();
 
         let lines = [d.label];
         if (widthOf(d.label) + padX * 2 > MAX_BUBBLE_W && pieces.length > 1) {
-          // Balance the two lines rather than filling the first — a wrapped tag
-          // should look like a block, not like an overflow.
-          const join = (arr) => arr.join('').replace(/\s+$/, '');
-          let bestSplit = 1;
-          let bestCost = Infinity;
-          for (let i = 1; i < pieces.length; i++) {
-            const cost = Math.max(
-              widthOf(join(pieces.slice(0, i))),
-              widthOf(join(pieces.slice(i))),
-            );
-            if (cost < bestCost) { bestCost = cost; bestSplit = i; }
+          // Greedy fill, then rebalance the common two-line case so a wrapped
+          // tag reads as a block rather than as an overflow.
+          lines = [];
+          let current = [];
+          for (const piece of pieces) {
+            const next = [...current, piece];
+            if (current.length && widthOf(join(next)) + padX * 2 > MAX_BUBBLE_W) {
+              lines.push(join(current));
+              current = [piece];
+            } else {
+              current = next;
+            }
           }
-          lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
+          if (current.length) lines.push(join(current));
+
+          if (lines.length === 2) {
+            let bestSplit = 1;
+            let bestCost = Infinity;
+            for (let i = 1; i < pieces.length; i++) {
+              const cost = Math.max(
+                widthOf(join(pieces.slice(0, i))),
+                widthOf(join(pieces.slice(i))),
+              );
+              if (cost < bestCost) { bestCost = cost; bestSplit = i; }
+            }
+            lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
+          }
+          // A tag long enough to need a fourth line is pathological; fold the
+          // remainder onto the last allowed one and let it run a little wide
+          // rather than growing the bubble downward without limit.
+          if (lines.length > MAX_LINES) {
+            const head = lines.slice(0, MAX_LINES - 1);
+            lines = head.concat([lines.slice(MAX_LINES - 1).join(' ')]);
+          }
         }
 
         // Tighter leading once it wraps: a second line should cost a line, not
         // double the bubble.
-        const effLineH = lines.length > 1 ? fontSize * 0.98 : lineH;
+        const effLineH = lines.length > 1 ? fontSize * 1.0 : fontSize * 1.1;
         const textW = Math.max(...lines.map(widthOf));
         const bubbleW = textW + padX * 2;
         const bubbleH = lines.length * effLineH + padY * 2;
@@ -347,7 +374,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         el.append('rect')
           .attr('x', -bubbleW / 2).attr('y', -bubbleH / 2)
           .attr('width', bubbleW).attr('height', bubbleH)
-          .attr('rx', 10).attr('ry', 10)
+          .attr('rx', 9).attr('ry', 9)
           .attr('fill', d.color).attr('opacity', 0.7);
 
         const textEl = el.append('text')
@@ -629,9 +656,10 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     // not arranged it themselves. Giving every node its true footprint spreads
     // the corpus over far more space than before, and a layout you have to go
     // looking for is not an improvement on one that overlaps.
+    let hasFitted = false;
     function fitToViewport() {
       const pts = data.nodes.filter(d => d.type === 'article');
-      if (pts.length < 2) return;
+      if (pts.length < 2) return false;
       const pad = 140;
       const minX = Math.min(...pts.map(d => d.x)) - pad;
       const maxX = Math.max(...pts.map(d => d.x)) + pad;
@@ -639,10 +667,16 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       const maxY = Math.max(...pts.map(d => d.y)) + pad;
       const w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
       const h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
+      // A container with no size yet — hidden tab, collapsed pane, a layout
+      // that has not run — would give a scale of zero and collapse the whole
+      // graph to a point. Leave the view alone and fit when there is a
+      // viewport to fit to.
+      if (w < 50 || h < 50) return false;
       const k = Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1);
       const tx = w / 2 - ((minX + maxX) / 2) * k;
       const ty = h / 2 - ((minY + maxY) / 2) * k;
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+      return true;
     }
 
     let hasSettled = false;
@@ -661,7 +695,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           else vs.setNodePosition(persistKey(d), d.x, d.y, { silent: true });
         }
       }
-      if (!anyRestored) fitToViewport();
+      if (!anyRestored) hasFitted = fitToViewport();
     });
 
     // d3-timer runs on requestAnimationFrame, and a hidden tab gets no frames.
@@ -670,8 +704,11 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     // entirely. Nothing is wrong with it — it simply never got to run. So run
     // it when the page is first actually looked at.
     const handleVisibility = () => {
-      if (document.hidden || hasSettled) return;
-      simulation.alpha(0.8).restart();
+      if (document.hidden) return;
+      if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
+      // Settled while there was nothing to settle into. Frame it now that
+      // there is.
+      if (!hasFitted) hasFitted = fitToViewport();
     };
     document.addEventListener('visibilitychange', handleVisibility);
 

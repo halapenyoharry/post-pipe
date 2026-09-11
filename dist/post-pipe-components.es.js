@@ -11133,22 +11133,31 @@ function wo({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 		S.each(function(e) {
 			let t = qt(this);
 			if (e.type === "tag") {
-				C.style("font-size", "32px").style("font-weight", "500");
-				let n = (e) => (C.text(e), C.node().getComputedTextLength()), r = e.label.split(/(?<=-)|\s+/).filter(Boolean), i = [e.label];
-				if (n(e.label) + 22 > 230 && r.length > 1) {
-					let e = (e) => e.join("").replace(/\s+$/, ""), t = 1, a = Infinity;
-					for (let i = 1; i < r.length; i++) {
-						let o = Math.max(n(e(r.slice(0, i))), n(e(r.slice(i))));
-						o < a && (a = o, t = i);
+				C.style("font-size", "22px").style("font-weight", "500");
+				let n = (e) => (C.text(e), C.node().getComputedTextLength()), r = e.label.split(/(?<=-)|\s+/).filter(Boolean), i = (e) => e.join("").replace(/\s+$/, "").trim(), a = [e.label];
+				if (n(e.label) + 22 > 150 && r.length > 1) {
+					a = [];
+					let e = [];
+					for (let t of r) {
+						let r = [...e, t];
+						e.length && n(i(r)) + 22 > 150 ? (a.push(i(e)), e = [t]) : e = r;
 					}
-					i = [e(r.slice(0, t)), e(r.slice(t))];
+					if (e.length && a.push(i(e)), a.length === 2) {
+						let e = 1, t = Infinity;
+						for (let a = 1; a < r.length; a++) {
+							let o = Math.max(n(i(r.slice(0, a))), n(i(r.slice(a))));
+							o < t && (t = o, e = a);
+						}
+						a = [i(r.slice(0, e)), i(r.slice(e))];
+					}
+					a.length > 3 && (a = a.slice(0, 2).concat([a.slice(2).join(" ")]));
 				}
-				let a = i.length > 1 ? 32 * .98 : 35.2, o = Math.max(...i.map(n)) + 22, s = i.length * a + 10;
-				t.append("rect").attr("x", -o / 2).attr("y", -s / 2).attr("width", o).attr("height", s).attr("rx", 10).attr("ry", 10).attr("fill", e.color).attr("opacity", .7);
-				let c = t.append("text").attr("text-anchor", "middle").attr("fill", "#1a1a2e").style("font-size", "32px").style("font-weight", "500").style("pointer-events", "none");
-				i.forEach((e, t) => {
-					c.append("tspan").attr("x", 0).attr("y", (t - (i.length - 1) / 2) * a).attr("dominant-baseline", "central").text(e);
-				}), e._r = Math.hypot(o, s) / 2;
+				let o = a.length > 1 ? 22 : 22 * 1.1, s = Math.max(...a.map(n)) + 22, c = a.length * o + 10;
+				t.append("rect").attr("x", -s / 2).attr("y", -c / 2).attr("width", s).attr("height", c).attr("rx", 9).attr("ry", 9).attr("fill", e.color).attr("opacity", .7);
+				let l = t.append("text").attr("text-anchor", "middle").attr("fill", "#1a1a2e").style("font-size", "22px").style("font-weight", "500").style("pointer-events", "none");
+				a.forEach((e, t) => {
+					l.append("tspan").attr("x", 0).attr("y", (t - (a.length - 1) / 2) * o).attr("dominant-baseline", "central").text(e);
+				}), e._r = Math.hypot(s, c) / 2;
 			} else {
 				t.append("foreignObject").attr("class", "article-fo");
 				let n = Co({
@@ -11262,26 +11271,35 @@ function wo({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 			x.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), S.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")");
 		}
 		y.nodes(h.nodes).on("tick", ae), y.force("link").links(h.links), ae();
-		function oe() {
+		let oe = !1;
+		function se() {
 			let e = h.nodes.filter((e) => e.type === "article");
-			if (e.length < 2) return;
-			let t = Math.min(...e.map((e) => e.x)) - 140, n = Math.max(...e.map((e) => e.x)) + 140, r = Math.min(...e.map((e) => e.y)) - 140, a = Math.max(...e.map((e) => e.y)) + 140, o = i.current ? i.current.clientWidth : window.innerWidth, s = i.current ? i.current.clientHeight : window.innerHeight, c = Math.min(o / Math.max(n - t, 1), s / Math.max(a - r, 1), 1), l = o / 2 - (t + n) / 2 * c, u = s / 2 - (r + a) / 2 * c;
-			g.call(v.transform, $a.translate(l, u).scale(c));
+			if (e.length < 2) return !1;
+			let t = Math.min(...e.map((e) => e.x)) - 140, n = Math.max(...e.map((e) => e.x)) + 140, r = Math.min(...e.map((e) => e.y)) - 140, a = Math.max(...e.map((e) => e.y)) + 140, o = i.current ? i.current.clientWidth : window.innerWidth, s = i.current ? i.current.clientHeight : window.innerHeight;
+			if (o < 50 || s < 50) return !1;
+			let c = Math.min(o / Math.max(n - t, 1), s / Math.max(a - r, 1), 1), l = o / 2 - (t + n) / 2 * c, u = s / 2 - (r + a) / 2 * c;
+			return g.call(v.transform, $a.translate(l, u).scale(c)), !0;
 		}
-		let se = !1;
+		let ce = !1;
 		y.on("end", () => {
-			se = !0, h.nodes.forEach((e) => {
+			ce = !0, h.nodes.forEach((e) => {
 				e.fx = e.x, e.fy = e.y;
 			});
 			let e = s.current, t = !1;
 			if (e) for (let n of h.nodes) e.nodeState(c(n)) ? t = !0 : e.setNodePosition(c(n), n.x, n.y, { silent: !0 });
-			t || oe();
+			t || (oe = se());
 		});
-		let ce = () => {
-			document.hidden || se || y.alpha(.8).restart();
+		let le = () => {
+			if (!document.hidden) {
+				if (!ce) {
+					y.alpha(.8).restart();
+					return;
+				}
+				oe ||= se();
+			}
 		};
-		return document.addEventListener("visibilitychange", ce), () => {
-			y.stop(), document.removeEventListener("visibilitychange", ce), window.removeEventListener("resize", b), w.forEach(({ root: e }) => {
+		return document.addEventListener("visibilitychange", le), () => {
+			y.stop(), document.removeEventListener("visibilitychange", le), window.removeEventListener("resize", b), w.forEach(({ root: e }) => {
 				queueMicrotask(() => e.unmount());
 			}), w.clear();
 		};
