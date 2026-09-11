@@ -289,29 +289,80 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     nodes.each(function(d) {
       const el = d3.select(this);
       if (d.type === 'tag') {
-        // Tag text was 14 units against card labels of 30-plus, so at any
-        // zoom where the cards were readable the tags were not. A tag is a
-        // navigational handle — if you cannot read it, it is decoration.
-        // The bubble is measured from the text, so it grows to match.
-        const fontSize = 26;
-        const padX = 18, padY = 9;
-        probe.style('font-size', fontSize + 'px').style('font-weight', '400');
-        probe.text(d.label);
-        const textW = probe.node().getComputedTextLength();
+        // Tag bubbles are measured from their text, so every constant here is
+        // real estate. Three things were wasting it:
+        //
+        //   The pill shape. rx = height/2 means each rounded cap is as wide as
+        //   the bubble is tall, and the text has to clear the curve — so the
+        //   apparent padding grew with the font rather than staying put. It
+        //   reads as percentage padding even though the padding was constant.
+        //   A modest corner radius instead.
+        //
+        //   Vertical padding sized for a pill, which a two-line bubble does
+        //   not need.
+        //
+        //   A long tag growing sideways forever. It wraps now, and a second
+        //   line costs one line-height rather than doubling the width.
+        //
+        // What comes back from all three goes into the type: 26 to 32, in the
+        // same band as the card labels so the two read as one system.
+        const fontSize = 32;
+        const padX = 11, padY = 5;
+        const lineH = fontSize * 1.1;
+        const MAX_BUBBLE_W = 230;
+
+        probe.style('font-size', fontSize + 'px').style('font-weight', '500');
+        const widthOf = (t) => { probe.text(t); return probe.node().getComputedTextLength(); };
+
+        // Break on spaces and on hyphens. Half this corpus's tags are
+        // 'surveillance-capitalism' shaped, and a rule that only knew about
+        // spaces left those growing sideways forever — the widest thing on
+        // screen was a tag that could not wrap.
+        const pieces = d.label.split(/(?<=-)|\s+/).filter(Boolean);
+
+        let lines = [d.label];
+        if (widthOf(d.label) + padX * 2 > MAX_BUBBLE_W && pieces.length > 1) {
+          // Balance the two lines rather than filling the first — a wrapped tag
+          // should look like a block, not like an overflow.
+          const join = (arr) => arr.join('').replace(/\s+$/, '');
+          let bestSplit = 1;
+          let bestCost = Infinity;
+          for (let i = 1; i < pieces.length; i++) {
+            const cost = Math.max(
+              widthOf(join(pieces.slice(0, i))),
+              widthOf(join(pieces.slice(i))),
+            );
+            if (cost < bestCost) { bestCost = cost; bestSplit = i; }
+          }
+          lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
+        }
+
+        // Tighter leading once it wraps: a second line should cost a line, not
+        // double the bubble.
+        const effLineH = lines.length > 1 ? fontSize * 0.98 : lineH;
+        const textW = Math.max(...lines.map(widthOf));
         const bubbleW = textW + padX * 2;
-        const bubbleH = fontSize * 1.4 + padY * 2;
+        const bubbleH = lines.length * effLineH + padY * 2;
 
         el.append('rect')
           .attr('x', -bubbleW / 2).attr('y', -bubbleH / 2)
           .attr('width', bubbleW).attr('height', bubbleH)
-          .attr('rx', bubbleH / 2).attr('ry', bubbleH / 2)
+          .attr('rx', 10).attr('ry', 10)
           .attr('fill', d.color).attr('opacity', 0.7);
-        el.append('text')
-          .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+
+        const textEl = el.append('text')
+          .attr('text-anchor', 'middle')
           .attr('fill', '#1a1a2e')
-          .style('font-size', fontSize + 'px').style('font-weight', '400')
-          .style('pointer-events', 'none')
-          .text(d.label);
+          .style('font-size', fontSize + 'px').style('font-weight', '500')
+          .style('pointer-events', 'none');
+        lines.forEach((line, i) => {
+          textEl.append('tspan')
+            .attr('x', 0)
+            .attr('y', (i - (lines.length - 1) / 2) * effLineH)
+            .attr('dominant-baseline', 'central')
+            .text(line);
+        });
+
         d._r = Math.hypot(bubbleW, bubbleH) / 2;
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.

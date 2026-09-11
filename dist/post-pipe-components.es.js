@@ -11133,9 +11133,22 @@ function wo({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 		S.each(function(e) {
 			let t = qt(this);
 			if (e.type === "tag") {
-				C.style("font-size", "26px").style("font-weight", "400"), C.text(e.label);
-				let n = C.node().getComputedTextLength() + 36, r = 54.4;
-				t.append("rect").attr("x", -n / 2).attr("y", -r / 2).attr("width", n).attr("height", r).attr("rx", r / 2).attr("ry", r / 2).attr("fill", e.color).attr("opacity", .7), t.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("fill", "#1a1a2e").style("font-size", "26px").style("font-weight", "400").style("pointer-events", "none").text(e.label), e._r = Math.hypot(n, r) / 2;
+				C.style("font-size", "32px").style("font-weight", "500");
+				let n = (e) => (C.text(e), C.node().getComputedTextLength()), r = e.label.split(/(?<=-)|\s+/).filter(Boolean), i = [e.label];
+				if (n(e.label) + 22 > 230 && r.length > 1) {
+					let e = (e) => e.join("").replace(/\s+$/, ""), t = 1, a = Infinity;
+					for (let i = 1; i < r.length; i++) {
+						let o = Math.max(n(e(r.slice(0, i))), n(e(r.slice(i))));
+						o < a && (a = o, t = i);
+					}
+					i = [e(r.slice(0, t)), e(r.slice(t))];
+				}
+				let a = i.length > 1 ? 32 * .98 : 35.2, o = Math.max(...i.map(n)) + 22, s = i.length * a + 10;
+				t.append("rect").attr("x", -o / 2).attr("y", -s / 2).attr("width", o).attr("height", s).attr("rx", 10).attr("ry", 10).attr("fill", e.color).attr("opacity", .7);
+				let c = t.append("text").attr("text-anchor", "middle").attr("fill", "#1a1a2e").style("font-size", "32px").style("font-weight", "500").style("pointer-events", "none");
+				i.forEach((e, t) => {
+					c.append("tspan").attr("x", 0).attr("y", (t - (i.length - 1) / 2) * a).attr("dominant-baseline", "central").text(e);
+				}), e._r = Math.hypot(o, s) / 2;
 			} else {
 				t.append("foreignObject").attr("class", "article-fo");
 				let n = Co({
