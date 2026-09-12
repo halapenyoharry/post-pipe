@@ -109,23 +109,36 @@ function getLOD(scale) {
 // Space left around the card inside its foreignObject. An SVG foreignObject
 // clips at its own bounds, so a card sized exactly to the frame has its glow
 // sliced off square — worse than no glow. This gutter gives it room.
-const GLOW_PAD = 16;
 
-// Uniform padding on all four sides of a tag bubble.
-const TAG_PAD = 11;
 
 // Bounds for a hand-resized card. Below the minimum the label stops fitting;
 // above the maximum one node eats the graph.
-const MIN_CARD = { width: 110, height: 80 };
-const MAX_CARD = { width: 620, height: 520 };
-
-function cardSizeFor({ hovered, pinned }) {
-  if (pinned) return { width: 230, height: 190 };
-  if (hovered) return { width: 200, height: 160 };
-  return { width: 180, height: 140 };
+function makeCardSizeFor(CARD) {
+  return function cardSizeFor({ hovered, pinned }) {
+    if (pinned) return { width: CARD.pinnedWidth, height: CARD.pinnedHeight };
+    if (hovered) return { width: CARD.hoverWidth, height: CARD.hoverHeight };
+    return { width: CARD.width, height: CARD.height };
+  };
 }
 
-export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, layout = 'force', timeAxis }) {
+export function GraphViewer({
+  feedData, onNodeSelect, hiddenSources, viewState, layout = 'force', timeAxis, graphSettings,
+}) {
+  // Visual parameters come from settings.json so they can be tuned without a
+  // rebuild. The defaults here are the values they replaced, so a missing or
+  // partial settings file still renders exactly as before rather than oddly.
+  const GS = graphSettings || {};
+  const CARD = { width: 180, height: 140, hoverWidth: 200, hoverHeight: 160,
+    pinnedWidth: 230, pinnedHeight: 190, minWidth: 110, minHeight: 80,
+    maxWidth: 620, maxHeight: 520, glowPadding: 16, ...(GS.card || {}) };
+  const TAG = { fontSize: 22, padding: 11, maxWidth: 150, maxLines: 3,
+    cornerRadius: 9, opacity: 0.7, ...(GS.tag || {}) };
+  const AX = { orientation: 'ltr', connectorOpacity: 0.45, connectorWidth: 1.6,
+    spineOpacity: 0.55, spineWidth: 3, tickFontSize: 26, clearance: 460,
+    marginFraction: 0.07, ...(GS.timeAxis || {}) };
+  const SIM = { linkDistance: 160, chargeStrength: -500, collidePadding: 10,
+    velocityDecay: 0.7, alphaDecay: 0.028, ...(GS.simulation || {}) };
+
   const containerRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -139,6 +152,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
   useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
 
   // The live graph, reachable from effects that must not rebuild it.
+  const cardSizeFor = makeCardSizeFor(CARD);
+  const GLOW_PAD = CARD.glowPadding;
+
   const graphRef = useRef(null);
   const layoutRef = useRef(layout);
   const axisFittedRef = useRef(false);
@@ -264,17 +280,17 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     }
 
     const simulation = d3.forceSimulation()
-      .force('link', d3.forceLink().id(d => d.id).distance(160))
-      .force('charge', d3.forceManyBody().strength(-500))
-      .force('collide', d3.forceCollide().radius(d => (d._r || d.size / 2) + 10).strength(1).iterations(3))
+      .force('link', d3.forceLink().id(d => d.id).distance(SIM.linkDistance))
+      .force('charge', d3.forceManyBody().strength(SIM.chargeStrength))
+      .force('collide', d3.forceCollide().radius(d => (d._r || d.size / 2) + SIM.collidePadding).strength(1).iterations(3))
       .force('center', d3.forceCenter(width / 2, height / 2))
       // Damping was heavy enough, and the run short enough, that collisions
       // never finished resolving before the simulation froze — nodes were
       // still overlapping when everything stopped. Looser damping over a
       // longer run lets things find their space. It settles once, at load,
       // and then holds still, which is the behaviour that matters.
-      .velocityDecay(0.7)
-      .alphaDecay(0.028);
+      .velocityDecay(SIM.velocityDecay)
+      .alphaDecay(SIM.alphaDecay);
 
     // Resize: rescale the SVG canvas only. Never restart the simulation —
     // node positions in graph-space stay fixed; only the viewport changes.
@@ -342,8 +358,8 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
             const f = d._resizeFrom;
             const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
             d._size = {
-              width: clamp(f.w + (event.x - f.x) * 2, MIN_CARD.width, MAX_CARD.width),
-              height: clamp(f.h + (event.y - f.y) * 2, MIN_CARD.height, MAX_CARD.height),
+              width: clamp(f.w + (event.x - f.x) * 2, CARD.minWidth, CARD.maxWidth),
+              height: clamp(f.h + (event.y - f.y) * 2, CARD.minHeight, CARD.maxHeight),
             };
             renderArticleBody(d);
             if (viewStateRef.current) {
@@ -446,12 +462,12 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       });
 
       rectEl
-        .attr('x', -inkW / 2 - TAG_PAD)
-        .attr('y', inkTop - TAG_PAD)
-        .attr('width', inkW + TAG_PAD * 2)
-        .attr('height', (inkBottom - inkTop) + TAG_PAD * 2);
+        .attr('x', -inkW / 2 - TAG.padding)
+        .attr('y', inkTop - TAG.padding)
+        .attr('width', inkW + TAG.padding * 2)
+        .attr('height', (inkBottom - inkTop) + TAG.padding * 2);
 
-      d._r = Math.hypot(inkW + TAG_PAD * 2, (inkBottom - inkTop) + TAG_PAD * 2) / 2;
+      d._r = Math.hypot(inkW + TAG.padding * 2, (inkBottom - inkTop) + TAG.padding * 2) / 2;
     }
 
     nodes.each(function(d) {
@@ -480,17 +496,16 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
         // outweigh the writing. 22 is still half again the 14 it started at,
         // and the width cap keeps a tag narrower than a card no matter how
         // long its text, by wrapping instead of growing.
-        const fontSize = 22;
+        const fontSize = TAG.fontSize;
         // One padding value for all four sides. Keeping separate padX/padY
         // could not make the margins match, because the vertical one was
         // measured against the line box and the horizontal one against the
         // glyphs — line-height already carries leading above and below the
         // text, so an identical number produced visibly different gaps. The
         // bubble is measured from the rendered ink instead, below.
-        const PAD = TAG_PAD;
-        const padX = PAD, padY = PAD;
-        const MAX_BUBBLE_W = 150;   // card is 180
-        const MAX_LINES = 3;
+        const PAD = TAG.padding;
+        const MAX_BUBBLE_W = TAG.maxWidth;
+        const MAX_LINES = TAG.maxLines;
 
         probe.style('font-size', fontSize + 'px').style('font-weight', '500');
         const widthOf = (t) => { probe.text(t); return probe.node().getComputedTextLength(); };
@@ -502,14 +517,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
         const join = (arr) => arr.join('').replace(/\s+$/, '').trim();
 
         let lines = [d.label];
-        if (widthOf(d.label) + padX * 2 > MAX_BUBBLE_W && pieces.length > 1) {
+        if (widthOf(d.label) + PAD * 2 > MAX_BUBBLE_W && pieces.length > 1) {
           // Greedy fill, then rebalance the common two-line case so a wrapped
           // tag reads as a block rather than as an overflow.
           lines = [];
           let current = [];
           for (const piece of pieces) {
             const next = [...current, piece];
-            if (current.length && widthOf(join(next)) + padX * 2 > MAX_BUBBLE_W) {
+            if (current.length && widthOf(join(next)) + PAD * 2 > MAX_BUBBLE_W) {
               lines.push(join(current));
               current = [piece];
             } else {
@@ -563,8 +578,8 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
         // Behind the text, not over it. Geometry is applied by fitBubble so the
         // same code can run again once the webfont has loaded.
         const rectEl = el.insert('rect', 'text')
-          .attr('rx', 9).attr('ry', 9)
-          .attr('fill', d.color).attr('opacity', 0.7);
+          .attr('rx', TAG.cornerRadius).attr('ry', TAG.cornerRadius)
+          .attr('fill', d.color).attr('opacity', TAG.opacity);
         const entry = { d, textEl, rectEl, lines, fontSize, lineH: effLineH };
         tagBubbles.push(entry);
         fitBubble(entry);
@@ -1003,10 +1018,11 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const vertical = axis.orientation === 'ttb' || axis.orientation === 'btt';
+    const orient = axis.orientation || AX.orientation;
+    const vertical = orient === 'ttb' || orient === 'btt';
 
-    const MARGIN = 0.07;         // share of the span left clear at each end
-    const CLEARANCE = 460;       // distance from the corpus to the spine
+    const MARGIN = AX.marginFraction;
+    const CLEARANCE = AX.clearance;
     const spanAlong = vertical ? (maxY - minY) : (maxX - minX);
     const length = Math.max(spanAlong * (1 - MARGIN * 2), 900);
 
@@ -1017,17 +1033,17 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     const auto = vertical
       ? {
           x: minX - CLEARANCE,
-          y: axis.orientation === 'btt' ? midY + length / 2 : midY - length / 2,
+          y: orient === 'btt' ? midY + length / 2 : midY - length / 2,
         }
       : {
-          x: axis.orientation === 'rtl' ? midX + length / 2 : midX - length / 2,
+          x: orient === 'rtl' ? midX + length / 2 : midX - length / 2,
           y: minY - CLEARANCE,
         };
 
     const origin = axis.moved ? { x: axis.x || 0, y: axis.y || 0 } : auto;
 
     const geo = timeAxisGeometry(g.data.nodes, {
-      orientation: axis.orientation || 'ltr',
+      orientation: axis.orientation || AX.orientation,
       origin,
       length,
     });
@@ -1042,21 +1058,22 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       const a = geo.anchors[d.id];
       if (!a) return;
       conn.append('line')
+        .datum({ ax: a.x, ay: a.y })
         .attr('class', 'time-connector')
         .attr('data-node', d.id)
         .attr('x1', a.x).attr('y1', a.y)
         .attr('x2', d.x).attr('y2', d.y)
         .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
-        .attr('stroke-width', 1.4)
-        .attr('stroke-opacity', 0.22);
+        .attr('stroke-width', AX.connectorWidth)
+        .attr('stroke-opacity', AX.connectorOpacity);
     });
 
     const spine = root.append('g').attr('class', 'time-spine').style('cursor', 'grab');
     spine.append('line')
       .attr('x1', geo.from.x).attr('y1', geo.from.y)
       .attr('x2', geo.to.x).attr('y2', geo.to.y)
-      .attr('stroke', 'rgba(255,255,255,0.45)')
-      .attr('stroke-width', 3);
+      .attr('stroke', 'rgba(255,255,255,' + AX.spineOpacity + ')')
+      .attr('stroke-width', AX.spineWidth);
 
     // A fat invisible line so the spine can be grabbed without precision.
     spine.append('line')
@@ -1068,7 +1085,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     // Label every tick only while there is room for every label. Past that,
     // label every nth — a row of overlapping dates is less legible than a
     // sparser one, and the unlabelled ticks still carry the rhythm.
-    const TICK_FONT = 26;
+    const TICK_FONT = AX.tickFontSize;
     const labelRoom = geo.ticks.length > 1
       ? Math.hypot(geo.ticks[1].x - geo.ticks[0].x, geo.ticks[1].y - geo.ticks[0].y)
       : Infinity;
@@ -1094,23 +1111,39 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     });
 
     // Drag the whole axis. Grabbing it moves the reference, not the corpus.
+    //
+    // The offset is applied to the DOM directly and only written to state when
+    // the gesture ends. Writing on every frame re-ran this effect, which tears
+    // the spine down and builds a new one — so the element under the pointer
+    // was destroyed mid-drag and the axis jumped to wherever the rebuild put
+    // it instead of following the hand.
     let from = null;
+    let offset = { x: 0, y: 0 };
     spine.call(d3.drag()
       .on('start', (event) => {
-        from = { x: origin.x, y: origin.y, ex: event.x, ey: event.y };
+        from = { ex: event.x, ey: event.y };
+        offset = { x: 0, y: 0 };
         spine.style('cursor', 'grabbing');
       })
       .on('drag', (event) => {
-        if (!from || !viewStateRef.current) return;
-        viewStateRef.current.setTimeAxis({
-          x: from.x + (event.x - from.ex),
-          y: from.y + (event.y - from.ey),
-          moved: true,
-        }, { transient: true });
+        if (!from) return;
+        offset = { x: event.x - from.ex, y: event.y - from.ey };
+        spine.attr('transform', 'translate(' + offset.x + ',' + offset.y + ')');
+        // Only the axis end of each connector moves; the other end is a node,
+        // which is staying exactly where it is.
+        conn.selectAll('line')
+          .attr('x1', (c) => c.ax + offset.x)
+          .attr('y1', (c) => c.ay + offset.y);
       })
       .on('end', () => {
         spine.style('cursor', 'grab');
-        if (viewStateRef.current) viewStateRef.current.commit();
+        if (from && viewStateRef.current && (offset.x || offset.y)) {
+          viewStateRef.current.setTimeAxis({
+            x: origin.x + offset.x,
+            y: origin.y + offset.y,
+            moved: true,
+          });
+        }
         from = null;
       }));
 

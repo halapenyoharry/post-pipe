@@ -312,6 +312,7 @@ ${reactJs}
           feedData: feed,
           layout: viewState.state.layout,
           timeAxis: viewState.state.timeAxis,
+          graphSettings: (window.SETTINGS && window.SETTINGS.graph) || {},
           onNodeSelect: function (article) {
             if (article && article.originalItem) viewState.markSeen(article.originalItem.id);
             setSelectedArticle(article);
@@ -381,34 +382,27 @@ ${reactJs}
     }
 
     // The time axis: a spine the corpus hangs from, drawn over whatever layout
-    // is showing. Direction is a setting because left-to-right is one culture's
-    // reading order, not a property of time.
-    const ORIENTATIONS = [
-      { id: 'ltr', glyph: '\u2192', title: 'Time runs left to right' },
-      { id: 'rtl', glyph: '\u2190', title: 'Time runs right to left' },
-      { id: 'ttb', glyph: '\u2193', title: 'Time runs top to bottom' },
-      { id: 'btt', glyph: '\u2191', title: 'Time runs bottom to top' }
-    ];
-
+    // is showing.
+    //
+    // There is no direction control. Four arrows asked the reader a question
+    // they were not asking — time runs the way their language reads, and for
+    // most people opening this that is left to right. The other three
+    // orientations still work and still persist; they live in settings.json
+    // under graph.timeAxis.orientation, which is the right place for a thing
+    // that matters enormously to a few people and not at all to everyone else.
     function TimeAxisControls() {
       const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
       React.useEffect(function () { return viewState.subscribe(bump); }, []);
       const axis = viewState.timeAxis();
 
-      function chip(content, title, on, onClick) {
-        return React.createElement('button', {
-          title: title,
-          onClick: onClick,
-          style: {
-            border: 0, borderRadius: '6px', padding: '5px 9px', cursor: 'pointer',
-            background: on ? 'rgba(255,255,255,0.14)' : 'transparent',
-            color: on ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
-            font: '12px/1 system-ui, sans-serif'
-          }
-        }, content);
-      }
-
-      const children = [
+      return React.createElement('div', {
+        style: {
+          position: 'fixed', bottom: '14px', right: '14px',
+          display: 'flex', gap: '2px', zIndex: 40, alignItems: 'center',
+          background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
+        }
+      }, [
         React.createElement('span', {
           key: 'label',
           style: {
@@ -417,31 +411,18 @@ ${reactJs}
             padding: '0 7px 0 4px'
           }
         }, 'overlay'),
-        chip('time', 'Draw a time axis across the graph', axis.on,
-          function () { viewState.setTimeAxis({ on: !axis.on }); })
-      ];
-      if (axis.on) {
-        children.push(React.createElement('span', {
-          key: 'sep',
-          style: { width: '1px', alignSelf: 'stretch', margin: '3px 4px', background: 'rgba(255,255,255,0.14)' }
-        }));
-        ORIENTATIONS.forEach(function (o) {
-          children.push(chip(o.glyph, o.title, axis.orientation === o.id,
-            function () { viewState.setTimeAxis({ orientation: o.id }); }));
-        });
-      }
-
-      return React.createElement('div', {
-        style: {
-          // Opposite corner from the layout switch on purpose. A layout is
-          // where the pieces are; an overlay is something drawn over them.
-          // Sitting them in one row made them read as one set of choices.
-          position: 'fixed', bottom: '14px', right: '14px',
-          display: 'flex', gap: '2px', zIndex: 40, alignItems: 'center',
-          background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
-          border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
-        }
-      }, children);
+        React.createElement('button', {
+          key: 'time',
+          title: 'Draw a time axis across the graph',
+          onClick: function () { viewState.setTimeAxis({ on: !axis.on }); },
+          style: {
+            border: 0, borderRadius: '6px', padding: '5px 9px', cursor: 'pointer',
+            background: axis.on ? 'rgba(255,255,255,0.14)' : 'transparent',
+            color: axis.on ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
+            font: '12px/1 system-ui, sans-serif'
+          }
+        }, 'time')
+      ]);
     }
 
     // Previous / next through the reader's own arrangement.

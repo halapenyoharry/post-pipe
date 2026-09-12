@@ -330,5 +330,52 @@
       ],
       "source_of_truth": "feed"
     }
-  ]
+  ],
+  "graph": {
+    "_note": "Visual parameters for the graph. Here rather than in the code so they can be tuned without a rebuild, and so a fork can look different without editing components. Not all of these are exposed in the interface, and they do not need to be \u2014 being reachable is the point.",
+    "card": {
+      "width": 180,
+      "height": 140,
+      "hoverWidth": 200,
+      "hoverHeight": 160,
+      "pinnedWidth": 230,
+      "pinnedHeight": 190,
+      "minWidth": 110,
+      "minHeight": 80,
+      "maxWidth": 620,
+      "maxHeight": 520,
+      "cornerRadius": 10,
+      "glowPadding": 16,
+      "labelMinFontSize": 14,
+      "labelMaxFontSize": 36,
+      "compactHeight": 260,
+      "imageMarkSize": 22
+    },
+    "tag": {
+      "fontSize": 22,
+      "padding": 11,
+      "maxWidth": 150,
+      "maxLines": 3,
+      "cornerRadius": 9,
+      "opacity": 0.7
+    },
+    "timeAxis": {
+      "orientation": "ltr",
+      "_orientation_note": "ltr | rtl | ttb | btt. Left-to-right is the western reading order and the default. The other three work and are kept for anyone whose reading order differs; they are deliberately not in the interface, because a direction control is a question most readers were not asking.",
+      "connectorOpacity": 0.45,
+      "connectorWidth": 1.6,
+      "spineOpacity": 0.55,
+      "spineWidth": 3,
+      "tickFontSize": 26,
+      "clearance": 460,
+      "marginFraction": 0.07
+    },
+    "simulation": {
+      "linkDistance": 160,
+      "chargeStrength": -500,
+      "collidePadding": 10,
+      "velocityDecay": 0.7,
+      "alphaDecay": 0.028
+    }
+  }
 }

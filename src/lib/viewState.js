@@ -29,7 +29,10 @@ function emptyState(corpusId, layoutVersion) {
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
     // culture's reading order, not a property of time.
-    timeAxis: { on: false, orientation: 'ltr', x: 0, y: -1000 },
+    // Orientation defaults from settings.json (graph.timeAxis.orientation)
+    // rather than being fixed here, so a fork that reads right-to-left is a
+    // configuration rather than a patch.
+    timeAxis: { on: false, x: 0, y: -1000 },
     reading: {},    // id -> { scroll, seenAt, t }
   };
 }
@@ -309,7 +312,7 @@ function createViewState(opts = {}) {
     setLayout(layout) { update((s) => { s.layout = layout; }); },
 
     timeAxis() {
-      return state.timeAxis || { on: false, orientation: 'ltr', x: 0, y: -1000 };
+      return state.timeAxis || { on: false, x: 0, y: -1000 };
     },
 
     setTimeAxis(patch, { transient = false } = {}) {
