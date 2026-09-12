@@ -353,11 +353,18 @@ ${reactJs}
       return React.createElement('div', {
         style: {
           position: 'fixed', bottom: '14px', left: '92px',
-          display: 'flex', gap: '4px', zIndex: 40,
+          display: 'flex', gap: '4px', zIndex: 40, alignItems: 'center',
           background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
           border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
         }
-      }, LAYOUTS.map(function (l) {
+      }, [React.createElement('span', {
+        key: 'label',
+        style: {
+          font: '10px/1 system-ui, sans-serif', letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: 'rgba(255,255,255,0.32)',
+          padding: '0 5px 0 6px'
+        }
+      }, 'layout')].concat(LAYOUTS.map(function (l) {
         const on = active === l.id;
         return React.createElement('button', {
           key: l.id,
@@ -370,7 +377,7 @@ ${reactJs}
             font: '12px/1 system-ui, sans-serif', letterSpacing: '0.02em'
           }
         }, l.label);
-      }));
+      })));
     }
 
     // The time axis: a spine the corpus hangs from, drawn over whatever layout
@@ -402,10 +409,22 @@ ${reactJs}
       }
 
       const children = [
+        React.createElement('span', {
+          key: 'label',
+          style: {
+            font: '10px/1 system-ui, sans-serif', letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.32)',
+            padding: '0 7px 0 4px'
+          }
+        }, 'overlay'),
         chip('time', 'Draw a time axis across the graph', axis.on,
           function () { viewState.setTimeAxis({ on: !axis.on }); })
       ];
       if (axis.on) {
+        children.push(React.createElement('span', {
+          key: 'sep',
+          style: { width: '1px', alignSelf: 'stretch', margin: '3px 4px', background: 'rgba(255,255,255,0.14)' }
+        }));
         ORIENTATIONS.forEach(function (o) {
           children.push(chip(o.glyph, o.title, axis.orientation === o.id,
             function () { viewState.setTimeAxis({ orientation: o.id }); }));
@@ -414,8 +433,11 @@ ${reactJs}
 
       return React.createElement('div', {
         style: {
-          position: 'fixed', bottom: '14px', left: '268px',
-          display: 'flex', gap: '2px', zIndex: 40,
+          // Opposite corner from the layout switch on purpose. A layout is
+          // where the pieces are; an overlay is something drawn over them.
+          // Sitting them in one row made them read as one set of choices.
+          position: 'fixed', bottom: '14px', right: '14px',
+          display: 'flex', gap: '2px', zIndex: 40, alignItems: 'center',
           background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
           border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
         }

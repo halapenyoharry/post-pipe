@@ -142,6 +142,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
   const graphRef = useRef(null);
   const layoutRef = useRef(layout);
   const axisFittedRef = useRef(false);
+  // Set by the axis effect so the simulation can ask for a redraw when the
+  // nodes it is measured against have finished moving.
+  const redrawAxisRef = useRef(null);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -850,7 +853,15 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
 
     graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g };
 
-    simulation.nodes(data.nodes).on('tick', applyPositions);
+    // The axis is measured against the corpus extent, which keeps changing
+    // while the simulation runs — so drawing it once at the start pins it to
+    // whatever the first frame happened to look like. Redrawn on a throttle
+    // during the settle and once more at the end.
+    let tickCount = 0;
+    simulation.nodes(data.nodes).on('tick', () => {
+      applyPositions();
+      if (redrawAxisRef.current && ++tickCount % 25 === 0) redrawAxisRef.current();
+    });
     simulation.force('link').links(data.links);
 
     // Paint once now, from whatever positions were restored or seeded, so the
@@ -921,6 +932,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
         }
       }
       if (!anyRestored) hasFitted = fitToViewport();
+      // The axis is measured against where the pieces ended up, so it is drawn
+      // again now that they have stopped moving.
+      if (redrawAxisRef.current) redrawAxisRef.current();
     });
 
     // d3-timer runs on requestAnimationFrame, and a hidden tab gets no frames.
@@ -961,30 +975,61 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     const g = graphRef.current;
     if (!g || !g.axisLayer) return;
     const axis = timeAxis || {};
+
+    // Re-entrant: the corpus extent the default placement is measured from
+    // only exists once the simulation has settled, and the effect's own
+    // dependencies cannot see that happen.
+    const draw = () => drawAxis(g, axis);
+    redrawAxisRef.current = axis.on ? draw : null;
+    draw();
+  }, [timeAxis, layout, feedData]);
+
+  function drawAxis(g, axis) {
     g.axisLayer.selectAll('*').remove();
     if (!axis.on) { axisFittedRef.current = false; return; }
 
-    // First time it is switched on, put it where the corpus actually is. A
-    // fixed default coordinate is fine until the graph has settled somewhere
-    // else entirely, at which point the reader turns the axis on and sees
-    // connectors leaving for somewhere off screen.
+    // Where the axis sits by default is derived from the corpus, not fixed.
+    // It spans the width the pieces actually occupy, centred on them, inset by
+    // a margin, and sits clear of the top — so it reads as a heading over the
+    // corpus rather than a line that happens to be nearby. Recomputed as the
+    // graph changes, right up until the reader drags it somewhere; after that
+    // the position is theirs and nothing moves it.
     const arts = g.data.nodes.filter(n => n.type === 'article' && Number.isFinite(n.x));
-    if (!axis.placed && arts.length && viewStateRef.current) {
-      const xs = arts.map(n => n.x);
-      const ys = arts.map(n => n.y);
-      const vertical = axis.orientation === 'ttb' || axis.orientation === 'btt';
-      const origin = vertical
-        ? { x: Math.min(...xs) - 520, y: Math.min(...ys) - 120 }
-        : { x: Math.min(...xs) - 120, y: Math.min(...ys) - 520 };
-      viewStateRef.current.setTimeAxis({ ...origin, placed: true }, { transient: true });
-      viewStateRef.current.commit();
-      return; // the state change re-runs this effect with the new position
-    }
+    if (!arts.length) return;
+
+    const xs = arts.map(n => n.x);
+    const ys = arts.map(n => n.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const vertical = axis.orientation === 'ttb' || axis.orientation === 'btt';
+
+    const MARGIN = 0.07;         // share of the span left clear at each end
+    const CLEARANCE = 460;       // distance from the corpus to the spine
+    const spanAlong = vertical ? (maxY - minY) : (maxX - minX);
+    const length = Math.max(spanAlong * (1 - MARGIN * 2), 900);
+
+    // Start of the run, for whichever direction time is travelling. The axis
+    // is centred on the corpus either way; only the end it starts from moves.
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+    const auto = vertical
+      ? {
+          x: minX - CLEARANCE,
+          y: axis.orientation === 'btt' ? midY + length / 2 : midY - length / 2,
+        }
+      : {
+          x: axis.orientation === 'rtl' ? midX + length / 2 : midX - length / 2,
+          y: minY - CLEARANCE,
+        };
+
+    const origin = axis.moved ? { x: axis.x || 0, y: axis.y || 0 } : auto;
 
     const geo = timeAxisGeometry(g.data.nodes, {
       orientation: axis.orientation || 'ltr',
-      origin: { x: axis.x || 0, y: axis.y || 0 },
-      length: 4200,
+      origin,
+      length,
     });
     if (!geo) return;
 
@@ -1020,18 +1065,29 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       .attr('stroke', 'transparent')
       .attr('stroke-width', 46);
 
-    geo.ticks.forEach((t) => {
+    // Label every tick only while there is room for every label. Past that,
+    // label every nth — a row of overlapping dates is less legible than a
+    // sparser one, and the unlabelled ticks still carry the rhythm.
+    const TICK_FONT = 26;
+    const labelRoom = geo.ticks.length > 1
+      ? Math.hypot(geo.ticks[1].x - geo.ticks[0].x, geo.ticks[1].y - geo.ticks[0].y)
+      : Infinity;
+    const needed = geo.vertical ? TICK_FONT * 1.6 : TICK_FONT * 4.2;
+    const labelEvery = Math.max(1, Math.ceil(needed / Math.max(labelRoom, 1)));
+
+    geo.ticks.forEach((t, ti) => {
       const across = geo.vertical ? { x: 16, y: 0 } : { x: 0, y: -16 };
       spine.append('line')
         .attr('x1', t.x).attr('y1', t.y)
         .attr('x2', t.x + (geo.vertical ? -10 : 0)).attr('y2', t.y + (geo.vertical ? 0 : 10))
         .attr('stroke', 'rgba(255,255,255,0.5)').attr('stroke-width', 2);
+      if (ti % labelEvery !== 0) return;
       spine.append('text')
         .attr('x', t.x + across.x).attr('y', t.y + across.y)
         .attr('text-anchor', geo.vertical ? 'start' : 'middle')
         .attr('dominant-baseline', geo.vertical ? 'central' : 'auto')
         .style('font-family', "'Atkinson', sans-serif")
-        .style('font-size', '26px')
+        .style('font-size', TICK_FONT + 'px')
         .style('fill', 'rgba(255,255,255,0.6)')
         .style('pointer-events', 'none')
         .text(t.label);
@@ -1041,7 +1097,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     let from = null;
     spine.call(d3.drag()
       .on('start', (event) => {
-        from = { x: axis.x || 0, y: axis.y || 0, ex: event.x, ey: event.y };
+        from = { x: origin.x, y: origin.y, ex: event.x, ey: event.y };
         spine.style('cursor', 'grabbing');
       })
       .on('drag', (event) => {
@@ -1049,6 +1105,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
         viewStateRef.current.setTimeAxis({
           x: from.x + (event.x - from.ex),
           y: from.y + (event.y - from.ey),
+          moved: true,
         }, { transient: true });
       })
       .on('end', () => {
@@ -1064,7 +1121,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       axisFittedRef.current = true;
       setTimeout(() => g.fitToViewport(), 60);
     }
-  }, [timeAxis, layout, feedData]);
+  }
 
   // Switching layout moves nodes; it does not rebuild the graph. Everything
   // already on screen stays mounted, so a reader who has a card open keeps it.
@@ -1130,7 +1187,10 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
 
-    const t = setTimeout(() => { if (g.fitToViewport) g.fitToViewport(); }, 800);
+    const t = setTimeout(() => {
+      if (redrawAxisRef.current) redrawAxisRef.current();
+      if (g.fitToViewport) g.fitToViewport();
+    }, 800);
     return () => clearTimeout(t);
   }, [layout]);
 
