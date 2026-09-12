@@ -26,7 +26,13 @@ function articlesAndTags(nodes) {
  * and gap where it is flattest, which looks like a mistake rather than a shape.
  */
 function radialLayout(nodes, opts = {}) {
-  const { cardW = DEFAULT_CARD.width, cardH = DEFAULT_CARD.height, gap = 28, flatten = 0.62 } = opts;
+  const {
+    cardW = DEFAULT_CARD.width,
+    cardH = DEFAULT_CARD.height,
+    gap = 28,
+    flatten = 0.62,
+    maxRings = 4,
+  } = opts;
   const { articles, tags } = articlesAndTags(nodes);
   const out = {};
   if (!articles.length) return out;
@@ -40,73 +46,100 @@ function radialLayout(nodes, opts = {}) {
     return String(a.date || '').localeCompare(String(b.date || ''));
   });
 
-  // Sizing the ring from arc length under-spaces it: neighbours sit a chord
-  // apart, and a chord is shorter than the arc it subtends — more so the
-  // tighter the curve, which is exactly where an ellipse is tightest. So size
-  // from arc as a first guess, then measure the real chord and grow until it
-  // clears a card. Converges in a couple of passes and stays deterministic.
-  const needed = ordered.length * (cardW + gap);
-  let rx = Math.max(needed / (2 * Math.PI), cardW * 2);
-  let ry = Math.max(rx * flatten, cardH * 2);
+  // Neighbours sit a chord apart and a chord is shorter than the arc it
+  // subtends, so the arc budget carries a margin over the card width.
+  const arcNeed = (cardW + gap) * 1.14;
+  // Flattening squashes the rings together vertically: two rings whose radii
+  // differ by R are only R * flatten apart at the top of the figure, which is
+  // exactly where they are closest. Budget in that direction or the rings
+  // overlap where they touch, however generous the number looks.
+  const ringGap = (cardH + gap) / flatten;
 
-  // Arc-length table around the ellipse.
-  const STEPS = 2048;
-  const cum = [0];
-  for (let i = 1; i <= STEPS; i++) {
-    const t0 = ((i - 1) / STEPS) * 2 * Math.PI;
-    const t1 = (i / STEPS) * 2 * Math.PI;
-    const dx = rx * (Math.cos(t1) - Math.cos(t0));
-    const dy = ry * (Math.sin(t1) - Math.sin(t0));
-    cum.push(cum[i - 1] + Math.hypot(dx, dy));
-  }
-  const total = cum[STEPS];
-
-  const angleAtArc = (target) => {
-    let lo = 0;
-    let hi = STEPS;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (cum[mid] < target) lo = mid + 1;
-      else hi = mid;
-    }
-    return (lo / STEPS) * 2 * Math.PI;
+  const perimeter = (rx) => {
+    const ry = rx * flatten;
+    // Ramanujan's approximation; exact enough to budget with.
+    const h = Math.pow(rx - ry, 2) / Math.pow(rx + ry, 2);
+    return Math.PI * (rx + ry) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
   };
 
-  const thetas = ordered.map((_, i) => angleAtArc((i / ordered.length) * total));
-  const place = () => {
-    ordered.forEach((n, i) => {
-      out[n.id] = { x: rx * Math.cos(thetas[i]), y: ry * Math.sin(thetas[i]) };
+  const ringCount = Math.max(1, Math.min(maxRings, Math.ceil(ordered.length / 26)));
+  const radiiFor = (inner) =>
+    [...Array(ringCount)].map((_, i) => inner + i * ringGap);
+  const capacity = (inner) =>
+    radiiFor(inner).reduce((sum, rx) => sum + Math.floor(perimeter(rx) / arcNeed), 0);
+
+  // Smallest innermost radius whose rings hold the corpus. Concentric rings
+  // pack the same number of pieces into a far smaller figure than one giant
+  // circle, which is what makes the whole thing read larger on screen — the
+  // fit has less empty middle to spend the viewport on — and leaves room
+  // between rings for the edges to be followed.
+  let lo = cardW;
+  let hi = cardW;
+  while (capacity(hi) < ordered.length && hi < 1e6) hi *= 1.6;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (capacity(mid) >= ordered.length) hi = mid;
+    else lo = mid;
+  }
+  const innerRx = hi;
+  const radii = radiiFor(innerRx);
+
+  // Share out by circumference, so density is even rather than the inner
+  // rings being crowded and the outer ones sparse.
+  const perims = radii.map(perimeter);
+  const totalPerim = perims.reduce((x, y) => x + y, 0);
+  const counts = perims.map((p) => Math.floor((p / totalPerim) * ordered.length));
+  let assigned = counts.reduce((x, y) => x + y, 0);
+  for (let i = counts.length - 1; assigned < ordered.length; i = (i - 1 + counts.length) % counts.length) {
+    counts[i]++;
+    assigned++;
+  }
+
+  let cursor = 0;
+  radii.forEach((rx, ringIndex) => {
+    const ry = rx * flatten;
+    const members = ordered.slice(cursor, cursor + counts[ringIndex]);
+    cursor += counts[ringIndex];
+    if (!members.length) return;
+
+    // Equal spacing by arc length. Equal angles on an ellipse bunch cards
+    // where the curve is tightest and gap where it is flattest, which reads as
+    // a mistake rather than as a shape.
+    const STEPS = 1024;
+    const cum = [0];
+    for (let i = 1; i <= STEPS; i++) {
+      const t0 = ((i - 1) / STEPS) * 2 * Math.PI;
+      const t1 = (i / STEPS) * 2 * Math.PI;
+      cum.push(cum[i - 1] + Math.hypot(rx * (Math.cos(t1) - Math.cos(t0)), ry * (Math.sin(t1) - Math.sin(t0))));
+    }
+    const total = cum[STEPS];
+    const angleAtArc = (target) => {
+      let lo2 = 0;
+      let hi2 = STEPS;
+      while (lo2 < hi2) {
+        const mid = (lo2 + hi2) >> 1;
+        if (cum[mid] < target) lo2 = mid + 1;
+        else hi2 = mid;
+      }
+      return (lo2 / STEPS) * 2 * Math.PI;
+    };
+
+    // Offset alternate rings by half a step so cards do not line up radially,
+    // which is what leaves a clear diagonal for an edge to travel along.
+    const offset = (ringIndex % 2) * (total / members.length) * 0.5;
+    members.forEach((n, i) => {
+      const theta = angleAtArc(((i / members.length) * total + offset) % total);
+      out[n.id] = { x: rx * Math.cos(theta), y: ry * Math.sin(theta) };
     });
-  };
-  place();
-
-  const minChord = () => {
-    let m = Infinity;
-    for (let i = 0; i < ordered.length; i++) {
-      const a = out[ordered[i].id];
-      const b = out[ordered[(i + 1) % ordered.length].id];
-      m = Math.min(m, Math.hypot(a.x - b.x, a.y - b.y));
-    }
-    return m;
-  };
-
-  const required = cardW + gap * 0.5;
-  for (let pass = 0; pass < 6 && ordered.length > 1; pass++) {
-    const m = minChord();
-    if (m >= required) break;
-    const grow = (required / Math.max(m, 1)) * 1.01;
-    rx *= grow;
-    ry *= grow;
-    place();
-  }
+  });
 
   // Tags fill the interior on a phyllotaxis spiral — even density, no rings,
-  // no preferred direction.
-  const inner = Math.min(rx, ry) * 0.66;
+  // no preferred direction — kept clear of the innermost ring of cards.
+  const innerRoom = Math.max(innerRx - cardW * 0.75, cardW * 0.5);
   const golden = Math.PI * (3 - Math.sqrt(5));
   tags.forEach((n, i) => {
     const f = tags.length === 1 ? 0 : Math.sqrt(i / (tags.length - 1));
-    const r = f * inner;
+    const r = f * innerRoom;
     const theta = i * golden;
     out[n.id] = { x: r * Math.cos(theta), y: r * Math.sin(theta) * flatten };
   });

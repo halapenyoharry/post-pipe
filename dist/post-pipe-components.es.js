@@ -11036,54 +11036,55 @@ var R = (/* @__PURE__ */ o(((e, t) => {
 		};
 	}
 	function i(e, t = {}) {
-		let { cardW: i = n.width, cardH: a = n.height, gap: o = 28, flatten: s = .62 } = t, { articles: c, tags: l } = r(e), u = {};
-		if (!c.length) return u;
-		let d = [...c].sort((e, t) => {
+		let { cardW: i = n.width, cardH: a = n.height, gap: o = 28, flatten: s = .62, maxRings: c = 4 } = t, { articles: l, tags: u } = r(e), d = {};
+		if (!l.length) return d;
+		let f = [...l].sort((e, t) => {
 			let n = e._source && e._source.title || "", r = t._source && t._source.title || "";
 			return n === r ? String(e.date || "").localeCompare(String(t.date || "")) : n < r ? -1 : 1;
-		}), f = d.length * (i + o), p = Math.max(f / (2 * Math.PI), i * 2), m = Math.max(p * s, a * 2), h = 2048, g = [0];
-		for (let e = 1; e <= h; e++) {
-			let t = (e - 1) / h * 2 * Math.PI, n = e / h * 2 * Math.PI, r = p * (Math.cos(n) - Math.cos(t)), i = m * (Math.sin(n) - Math.sin(t));
-			g.push(g[e - 1] + Math.hypot(r, i));
+		}), p = (i + o) * 1.14, m = (a + o) / s, h = (e) => {
+			let t = e * s, n = (e - t) ** 2 / (e + t) ** 2;
+			return Math.PI * (e + t) * (1 + 3 * n / (10 + Math.sqrt(4 - 3 * n)));
+		}, g = Math.max(1, Math.min(c, Math.ceil(f.length / 26))), _ = (e) => [...Array(g)].map((t, n) => e + n * m), v = (e) => _(e).reduce((e, t) => e + Math.floor(h(t) / p), 0), y = i, b = i;
+		for (; v(b) < f.length && b < 1e6;) b *= 1.6;
+		for (let e = 0; e < 40; e++) {
+			let e = (y + b) / 2;
+			v(e) >= f.length ? b = e : y = e;
 		}
-		let _ = g[h], v = (e) => {
-			let t = 0, n = h;
-			for (; t < n;) {
-				let r = t + n >> 1;
-				g[r] < e ? t = r + 1 : n = r;
+		let x = b, S = _(x), C = S.map(h), w = C.reduce((e, t) => e + t, 0), T = C.map((e) => Math.floor(e / w * f.length)), ee = T.reduce((e, t) => e + t, 0);
+		for (let e = T.length - 1; ee < f.length; e = (e - 1 + T.length) % T.length) T[e]++, ee++;
+		let te = 0;
+		S.forEach((e, t) => {
+			let n = e * s, r = f.slice(te, te + T[t]);
+			if (te += T[t], !r.length) return;
+			let i = 1024, a = [0];
+			for (let t = 1; t <= i; t++) {
+				let r = (t - 1) / i * 2 * Math.PI, o = t / i * 2 * Math.PI;
+				a.push(a[t - 1] + Math.hypot(e * (Math.cos(o) - Math.cos(r)), n * (Math.sin(o) - Math.sin(r))));
 			}
-			return t / h * 2 * Math.PI;
-		}, y = d.map((e, t) => v(t / d.length * _)), b = () => {
-			d.forEach((e, t) => {
-				u[e.id] = {
-					x: p * Math.cos(y[t]),
-					y: m * Math.sin(y[t])
+			let o = a[i], c = (e) => {
+				let t = 0, n = i;
+				for (; t < n;) {
+					let r = t + n >> 1;
+					a[r] < e ? t = r + 1 : n = r;
+				}
+				return t / i * 2 * Math.PI;
+			}, l = t % 2 * (o / r.length) * .5;
+			r.forEach((t, i) => {
+				let a = c((i / r.length * o + l) % o);
+				d[t.id] = {
+					x: e * Math.cos(a),
+					y: n * Math.sin(a)
 				};
 			});
-		};
-		b();
-		let x = () => {
-			let e = Infinity;
-			for (let t = 0; t < d.length; t++) {
-				let n = u[d[t].id], r = u[d[(t + 1) % d.length].id];
-				e = Math.min(e, Math.hypot(n.x - r.x, n.y - r.y));
-			}
-			return e;
-		}, S = i + o * .5;
-		for (let e = 0; e < 6 && d.length > 1; e++) {
-			let e = x();
-			if (e >= S) break;
-			let t = S / Math.max(e, 1) * 1.01;
-			p *= t, m *= t, b();
-		}
-		let C = Math.min(p, m) * .66, w = Math.PI * (3 - Math.sqrt(5));
-		return l.forEach((e, t) => {
-			let n = (l.length === 1 ? 0 : Math.sqrt(t / (l.length - 1))) * C, r = t * w;
-			u[e.id] = {
+		});
+		let ne = Math.max(x - i * .75, i * .5), re = Math.PI * (3 - Math.sqrt(5));
+		return u.forEach((e, t) => {
+			let n = (u.length === 1 ? 0 : Math.sqrt(t / (u.length - 1))) * ne, r = t * re;
+			d[e.id] = {
 				x: n * Math.cos(r),
 				y: n * Math.sin(r) * s
 			};
-		}), u;
+		}), d;
 	}
 	function a(e, t = {}) {
 		let { cardW: i = n.width, cardH: a = n.height, gap: o = 24, span: s = 4200 } = t, { articles: c, tags: l } = r(e), u = {};
@@ -11517,7 +11518,8 @@ function Do({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			applyPositions: D,
 			svg: v,
 			zoom: b,
-			fitToViewport: de
+			fitToViewport: de,
+			simulation: S
 		}, S.nodes(u.nodes).on("tick", D), S.force("link").links(u.links), D();
 		let ue = !1;
 		function de() {
@@ -11566,7 +11568,18 @@ function Do({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 		let t = c.current, n = Eo({
 			hovered: !1,
 			pinned: !1
-		}), r = i === "force" ? Object.fromEntries(e.data.nodes.map((e) => [e.id, e._forcePos || {
+		});
+		if (i === "force" && e.data.nodes.filter((e) => {
+			let n = t && t.nodeState("force::" + d(e));
+			return n && !n.auto || e._forcePos;
+		}).length < e.data.nodes.length * .5) {
+			e.data.nodes.forEach((e) => {
+				let n = t && t.nodeState("force::" + d(e));
+				n && !n.auto ? (e.fx = n.x, e.fy = n.y) : (e.fx = null, e.fy = null);
+			}), e.simulation.alpha(1).restart();
+			return;
+		}
+		let r = i === "force" ? Object.fromEntries(e.data.nodes.map((e) => [e.id, e._forcePos || t && t.nodeState("force::" + d(e)) || {
 			x: e.x,
 			y: e.y
 		}])) : (0, R.computeLayout)(i, e.data.nodes, {

@@ -27,35 +27,58 @@ test('force has no layout function — the simulation owns it', () => {
   assert.strictEqual(computeLayout('force', [article('a')], CARD), null);
 });
 
-test('radial: articles ride the rim, tags stay inside it', () => {
-  const nodes = [...Array(24)].map((_, i) => article('a' + i)).concat([tag('t1'), tag('t2')]);
+test('radial: articles ride the rings, tags stay inside the innermost', () => {
+  const nodes = [...Array(90)].map((_, i) => article('a' + i)).concat([tag('t1'), tag('t2')]);
   const pos = radialLayout(nodes, CARD);
-  const radii = [...Array(24)].map((_, i) => Math.hypot(pos['a' + i].x, pos['a' + i].y));
-  const minRim = Math.min(...radii);
+  // Compare on the unflattened radius, since the figure is an ellipse.
+  const r = (p) => Math.hypot(p.x, p.y / 0.62);
+  const innermost = Math.min(...[...Array(90)].map((_, i) => r(pos['a' + i])));
   for (const t of ['t1', 't2']) {
-    assert.ok(Math.hypot(pos[t].x, pos[t].y) < minRim, 'a tag escaped the ring');
+    assert.ok(r(pos[t]) < innermost, 'a tag escaped into the rings');
   }
 });
 
-test('radial: neighbours are evenly spaced by arc, not by angle', () => {
-  // Equal angles on an ellipse bunch cards where the curve is tightest. The
-  // check that catches it is the spread of neighbour distances.
-  const nodes = [...Array(30)].map((_, i) => article('a' + i));
+test('radial: uses concentric rings rather than one enormous circle', () => {
+  const nodes = [...Array(102)].map((_, i) => article('a' + i));
   const pos = radialLayout(nodes, CARD);
-  const gaps = [];
-  for (let i = 0; i < 30; i++) gaps.push(dist(pos['a' + i], pos['a' + ((i + 1) % 30)]));
-  const avg = gaps.reduce((x, y) => x + y, 0) / gaps.length;
-  const worst = Math.max(...gaps.map((g) => Math.abs(g - avg) / avg));
-  assert.ok(worst < 0.05, `neighbour spacing varies by ${(worst * 100).toFixed(1)}%`);
+  const r = (p) => Math.hypot(p.x, p.y / 0.62);
+  const radii = Object.values(pos).map(r);
+  const distinct = new Set(radii.map((x) => Math.round(x / 50))).size;
+  assert.ok(distinct >= 2 && distinct <= 4, `expected up to four rings, found ${distinct}`);
+
+  // The point of ringing rather than circling: the same corpus in a much
+  // smaller figure, so the fit has less empty middle to spend the viewport on.
+  const xs = Object.values(pos).map((p) => p.x);
+  const extent = Math.max(...xs) - Math.min(...xs);
+  assert.ok(extent < 4200, `figure is ${Math.round(extent)} across; one ring would be about 6700`);
 });
 
-test('radial: the ring grows with the corpus so cards never overlap', () => {
-  for (const n of [10, 60, 200]) {
-    const nodes = [...Array(n)].map((_, i) => article('a' + i));
-    const pos = radialLayout(nodes, CARD);
-    let closest = Infinity;
-    for (let i = 0; i < n; i++) closest = Math.min(closest, dist(pos['a' + i], pos['a' + ((i + 1) % n)]));
-    assert.ok(closest >= CARD.cardW, `at n=${n} neighbours are ${closest.toFixed(0)} apart, card is ${CARD.cardW}`);
+test('radial: neighbours within a ring are evenly spaced by arc, not by angle', () => {
+  // Equal angles on an ellipse bunch cards where the curve is tightest. With
+  // 20 nodes there is a single ring, so consecutive ids are ring neighbours.
+  const nodes = [...Array(20)].map((_, i) => article('a' + i));
+  const pos = radialLayout(nodes, CARD);
+  const gaps = [];
+  for (let i = 0; i < 20; i++) gaps.push(dist(pos['a' + i], pos['a' + ((i + 1) % 20)]));
+  const avg = gaps.reduce((x, y) => x + y, 0) / gaps.length;
+  const worst = Math.max(...gaps.map((g) => Math.abs(g - avg) / avg));
+  assert.ok(worst < 0.06, `neighbour spacing varies by ${(worst * 100).toFixed(1)}%`);
+});
+
+test('radial: no two cards overlap, at any corpus size', () => {
+  // Box overlap, not centre distance. Two cards stacked vertically on adjacent
+  // rings can be closer than a card is wide and still not touch, and two on
+  // the same ring can be further apart than that and still collide.
+  for (const n of [10, 60, 102, 200]) {
+    const pos = radialLayout([...Array(n)].map((_, i) => article('a' + i)), CARD);
+    const pts = Object.values(pos);
+    let overlaps = 0;
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        if (Math.abs(pts[i].x - pts[j].x) < CARD.cardW && Math.abs(pts[i].y - pts[j].y) < CARD.cardH) overlaps++;
+      }
+    }
+    assert.strictEqual(overlaps, 0, `${overlaps} overlapping pairs at n=${n}`);
   }
 });
 

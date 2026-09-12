@@ -843,7 +843,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
     }
 
-    graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport };
+    graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport, simulation };
 
     simulation.nodes(data.nodes).on('tick', applyPositions);
     simulation.force('link').links(data.links);
@@ -953,8 +953,32 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     const rest = cardSizeFor({ hovered: false, pinned: false });
 
     // Prefer what the reader arranged in this layout; fall back to computing it.
+    // Cluster is not a set of coordinates, it is the simulation. Asking for it
+    // used to fall back to "wherever the nodes are right now" whenever the
+    // simulation had not settled — so choosing cluster after ring left
+    // everything in the ring, which looked like the button doing nothing.
+    // If there is no cluster arrangement to return to, run one.
+    if (layout === 'force') {
+      const placed = g.data.nodes.filter((d) => {
+        const saved = vs && vs.nodeState('force::' + persistKey(d));
+        return (saved && !saved.auto) || d._forcePos;
+      });
+      if (placed.length < g.data.nodes.length * 0.5) {
+        g.data.nodes.forEach((d) => {
+          const saved = vs && vs.nodeState('force::' + persistKey(d));
+          if (saved && !saved.auto) { d.fx = saved.x; d.fy = saved.y; }
+          else { d.fx = null; d.fy = null; }
+        });
+        g.simulation.alpha(1).restart();
+        return;
+      }
+    }
+
     const computed = layout === 'force'
-      ? Object.fromEntries(g.data.nodes.map(d => [d.id, d._forcePos || { x: d.x, y: d.y }]))
+      ? Object.fromEntries(g.data.nodes.map(d => [
+          d.id,
+          d._forcePos || (vs && vs.nodeState('force::' + persistKey(d))) || { x: d.x, y: d.y },
+        ]))
       : computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
     if (!computed) return;
 
