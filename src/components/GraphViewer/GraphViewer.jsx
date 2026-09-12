@@ -289,19 +289,64 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       .style('font-family', "'Atkinson', sans-serif")
       .style('visibility', 'hidden');
 
-    // Wrap a tag's bubble round the text that was actually drawn. getBBox
-    // reports ink, so PAD is the same real distance on all four sides whatever
-    // the text contains — the reason this is measured rather than derived from
-    // font-size is that line-height carries leading above and below the glyphs,
-    // so an identical padding number produced visibly unequal gaps.
+    // Wrap a tag's bubble round its text with the same real gap on all four
+    // sides.
+    //
+    // getBBox looks like the tool for this and is not: on an SVG <text> it
+    // returns the em box, built from the font's ascender and descender
+    // metrics, not from the glyphs that were actually drawn. For 22px Atkinson
+    // that box is around 31px tall while "psychology" inks about 22, so an
+    // identical padding number sat 11px from the glyphs horizontally and about
+    // 15px from them vertically. Measured equal, looked unequal, and the eye
+    // was right.
+    //
+    // Canvas measureText reports actualBoundingBox* — the true ink extents —
+    // so the bubble is built from those and the tspans are placed on baselines
+    // this code controls rather than on a browser-computed central alignment.
+    const TAG_FONT_FAMILY = "'Atkinson', sans-serif";
+    const TAG_WEIGHT = 500;
+    const measureCtx = typeof document !== 'undefined'
+      ? document.createElement('canvas').getContext('2d')
+      : null;
+
+    function inkOf(text, fontSize) {
+      if (!measureCtx) return { width: text.length * fontSize * 0.5, ascent: fontSize * 0.7, descent: fontSize * 0.2 };
+      measureCtx.font = TAG_WEIGHT + ' ' + fontSize + 'px ' + TAG_FONT_FAMILY;
+      const m = measureCtx.measureText(text);
+      return {
+        width: m.actualBoundingBoxLeft + m.actualBoundingBoxRight,
+        ascent: m.actualBoundingBoxAscent,
+        descent: m.actualBoundingBoxDescent,
+      };
+    }
+
     const tagBubbles = [];
-    function fitBubble(d, textEl, rectEl) {
-      const ink = textEl.node().getBBox();
+    function fitBubble(entry) {
+      const { d, textEl, rectEl, lines, fontSize, lineH } = entry;
+      const inks = lines.map(l => inkOf(l, fontSize));
+
+      // Baselines one line-height apart, then shifted so the ink block is
+      // centred on the node rather than the em block.
+      const rawBaselines = lines.map((_, i) => i * lineH);
+      const top = Math.min(...rawBaselines.map((b, i) => b - inks[i].ascent));
+      const bottom = Math.max(...rawBaselines.map((b, i) => b + inks[i].descent));
+      const shift = -(top + bottom) / 2;
+
+      const inkTop = top + shift;
+      const inkBottom = bottom + shift;
+      const inkW = Math.max(...inks.map(i => i.width));
+
+      textEl.selectAll('tspan').each(function (_, i) {
+        d3.select(this).attr('y', rawBaselines[i] + shift);
+      });
+
       rectEl
-        .attr('x', ink.x - TAG_PAD).attr('y', ink.y - TAG_PAD)
-        .attr('width', ink.width + TAG_PAD * 2)
-        .attr('height', ink.height + TAG_PAD * 2);
-      d._r = Math.hypot(ink.width + TAG_PAD * 2, ink.height + TAG_PAD * 2) / 2;
+        .attr('x', -inkW / 2 - TAG_PAD)
+        .attr('y', inkTop - TAG_PAD)
+        .attr('width', inkW + TAG_PAD * 2)
+        .attr('height', (inkBottom - inkTop) + TAG_PAD * 2);
+
+      d._r = Math.hypot(inkW + TAG_PAD * 2, (inkBottom - inkTop) + TAG_PAD * 2) / 2;
     }
 
     nodes.each(function(d) {
@@ -400,14 +445,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         const textEl = el.append('text')
           .attr('text-anchor', 'middle')
           .attr('fill', '#1a1a2e')
-          .style('font-size', fontSize + 'px').style('font-weight', '500')
+          .style('font-family', TAG_FONT_FAMILY)
+          .style('font-size', fontSize + 'px')
+          .style('font-weight', String(TAG_WEIGHT))
           .style('pointer-events', 'none');
-        lines.forEach((line, i) => {
-          textEl.append('tspan')
-            .attr('x', 0)
-            .attr('y', (i - (lines.length - 1) / 2) * effLineH)
-            .attr('dominant-baseline', 'central')
-            .text(line);
+        // Baselines are set by fitBubble; no dominant-baseline, because the
+        // whole point is that this code knows where the baseline is.
+        lines.forEach((line) => {
+          textEl.append('tspan').attr('x', 0).text(line);
         });
 
         // Behind the text, not over it. Geometry is applied by fitBubble so the
@@ -415,8 +460,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         const rectEl = el.insert('rect', 'text')
           .attr('rx', 9).attr('ry', 9)
           .attr('fill', d.color).attr('opacity', 0.7);
-        fitBubble(d, textEl, rectEl);
-        tagBubbles.push({ d, textEl, rectEl });
+        const entry = { d, textEl, rectEl, lines, fontSize, lineH: effLineH };
+        tagBubbles.push(entry);
+        fitBubble(entry);
 
       } else {
         // Article nodes get a foreignObject that we'll re-fill on state change.
@@ -440,7 +486,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     // number. Re-fit once the real font is in.
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        tagBubbles.forEach(({ d, textEl, rectEl }) => fitBubble(d, textEl, rectEl));
+        tagBubbles.forEach(fitBubble);
       }).catch(() => {});
     }
 

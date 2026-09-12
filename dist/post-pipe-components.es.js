@@ -11105,7 +11105,7 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 			let t = e.transform.k;
 			d.current = t;
 			let n = yo(t);
-			n !== f.current && (f.current = n, T());
+			n !== f.current && (f.current = n, ie());
 		});
 		if (g.call(v).on("dblclick.zoom", null), s.current) for (let e of h.nodes) {
 			let t = s.current.nodeState(c(e));
@@ -11129,10 +11129,27 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 			t.fx = t.x, t.fy = t.y;
 			let n = s.current;
 			n && (n.setNodePosition(c(t), t.x, t.y, { transient: !0 }), n.commit());
-		})), C = g.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden"), w = [];
-		function ee(e, t, n) {
-			let r = t.node().getBBox();
-			n.attr("x", r.x - xo).attr("y", r.y - xo).attr("width", r.width + xo * 2).attr("height", r.height + xo * 2), e._r = Math.hypot(r.width + xo * 2, r.height + xo * 2) / 2;
+		})), C = g.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden"), w = typeof document < "u" ? document.createElement("canvas").getContext("2d") : null;
+		function ee(e, t) {
+			if (!w) return {
+				width: e.length * t * .5,
+				ascent: t * .7,
+				descent: t * .2
+			};
+			w.font = "500 " + t + "px 'Atkinson', sans-serif";
+			let n = w.measureText(e);
+			return {
+				width: n.actualBoundingBoxLeft + n.actualBoundingBoxRight,
+				ascent: n.actualBoundingBoxAscent,
+				descent: n.actualBoundingBoxDescent
+			};
+		}
+		let te = [];
+		function ne(e) {
+			let { d: t, textEl: n, rectEl: r, lines: i, fontSize: a, lineH: o } = e, s = i.map((e) => ee(e, a)), c = i.map((e, t) => t * o), l = Math.min(...c.map((e, t) => e - s[t].ascent)), u = Math.max(...c.map((e, t) => e + s[t].descent)), d = -(l + u) / 2, f = l + d, p = u + d, m = Math.max(...s.map((e) => e.width));
+			n.selectAll("tspan").each(function(e, t) {
+				Kt(this).attr("y", c[t] + d);
+			}), r.attr("x", -m / 2 - xo).attr("y", f - xo).attr("width", m + xo * 2).attr("height", p - f + xo * 2), t._r = Math.hypot(m + xo * 2, p - f + xo * 2) / 2;
 		}
 		S.each(function(e) {
 			let t = Kt(this);
@@ -11157,16 +11174,19 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 					}
 					o.length > 3 && (o = o.slice(0, 2).concat([o.slice(2).join(" ")]));
 				}
-				let s = o.length > 1 ? 22 : 22 * 1.1, c = t.append("text").attr("text-anchor", "middle").attr("fill", "#1a1a2e").style("font-size", "22px").style("font-weight", "500").style("pointer-events", "none");
-				o.forEach((e, t) => {
-					c.append("tspan").attr("x", 0).attr("y", (t - (o.length - 1) / 2) * s).attr("dominant-baseline", "central").text(e);
+				let s = o.length > 1 ? 22 : 22 * 1.1, c = t.append("text").attr("text-anchor", "middle").attr("fill", "#1a1a2e").style("font-family", "'Atkinson', sans-serif").style("font-size", "22px").style("font-weight", "500").style("pointer-events", "none");
+				o.forEach((e) => {
+					c.append("tspan").attr("x", 0).text(e);
 				});
-				let l = t.insert("rect", "text").attr("rx", 9).attr("ry", 9).attr("fill", e.color).attr("opacity", .7);
-				ee(e, c, l), w.push({
+				let l = {
 					d: e,
 					textEl: c,
-					rectEl: l
-				});
+					rectEl: t.insert("rect", "text").attr("rx", 9).attr("ry", 9).attr("fill", e.color).attr("opacity", .7),
+					lines: o,
+					fontSize: 22,
+					lineH: s
+				};
+				te.push(l), ne(l);
 			} else {
 				t.append("foreignObject").attr("class", "article-fo");
 				let n = So({
@@ -11176,20 +11196,20 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 				e._r = Math.hypot(n.width, n.height) / 2;
 			}
 		}), C.remove(), typeof document < "u" && document.fonts && document.fonts.ready && document.fonts.ready.then(() => {
-			w.forEach(({ d: e, textEl: t, rectEl: n }) => ee(e, t, n));
+			te.forEach(ne);
 		}).catch(() => {});
-		let te = /* @__PURE__ */ new Map();
+		let T = /* @__PURE__ */ new Map();
 		S.filter((e) => e.type === "article").each(function(e) {
 			let t = Kt(this).select("foreignObject.article-fo").node(), n = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-			n.style.width = "100%", n.style.height = "100%", n.style.boxSizing = "border-box", t.appendChild(n), te.set(e.id, {
+			n.style.width = "100%", n.style.height = "100%", n.style.boxSizing = "border-box", t.appendChild(n), T.set(e.id, {
 				root: (0, Br.createRoot)(n),
 				fo: t,
 				wrapper: n
 			});
 		});
-		function ne(e) {
+		function re(e) {
 			if (e.type !== "article") return;
-			let t = te.get(e.id);
+			let t = T.get(e.id);
 			if (!t) return;
 			let n = u.current === e.id, r = l.current === e.id, i = yo(d.current), { width: a, height: o } = So({
 				hovered: n,
@@ -11210,56 +11230,56 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 			}));
 		}
 		S.filter((e) => e.type === "article").select("foreignObject.article-fo").on("wheel", (e) => e.stopPropagation());
-		function T() {
+		function ie() {
 			h.nodes.forEach((e) => {
-				e.type === "article" && ne(e);
+				e.type === "article" && re(e);
 			});
 		}
-		let re = /* @__PURE__ */ new Map();
-		function ie(e) {
-			return re.has(e.id) ? (e._fullContent = re.get(e.id), Promise.resolve()) : fetch(e.url).then((e) => {
+		let ae = /* @__PURE__ */ new Map();
+		function oe(e) {
+			return ae.has(e.id) ? (e._fullContent = ae.get(e.id), Promise.resolve()) : fetch(e.url).then((e) => {
 				if (!e.ok) throw Error("HTTP " + e.status);
 				return e.text();
 			}).then((t) => {
 				let n = new DOMParser().parseFromString(t, "text/html"), r = n.querySelector("h1");
 				r && r.remove();
 				let i = n.querySelector("body") ? n.querySelector("body").innerHTML : t;
-				re.set(e.id, i), e._fullContent = i;
+				ae.set(e.id, i), e._fullContent = i;
 			}).catch(() => {
-				re.set(e.id, null), e._fullContent = null;
+				ae.set(e.id, null), e._fullContent = null;
 			});
 		}
-		T(), z(g, p.current), S.filter((e) => e.type === "article").on("mouseover", (e, t) => {
-			u.current !== t.id && (u.current = t.id, ne(t));
+		ie(), z(g, p.current), S.filter((e) => e.type === "article").on("mouseover", (e, t) => {
+			u.current !== t.id && (u.current = t.id, re(t));
 		}).on("mouseout", (e, t) => {
 			let n = e.relatedTarget;
-			n && e.currentTarget.contains(n) || u.current === t.id && (u.current = null, ne(t));
+			n && e.currentTarget.contains(n) || u.current === t.id && (u.current = null, re(t));
 		}).on("dblclick", (e, t) => {
-			e.stopPropagation(), e.preventDefault(), o.current && o.current(t.originalItem || t), l.current = null, u.current = null, ne(t);
+			e.stopPropagation(), e.preventDefault(), o.current && o.current(t.originalItem || t), l.current = null, u.current = null, re(t);
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {
-				e.stopPropagation(), o.current && o.current(t.originalItem || t), l.current === t.id && (l.current = null, u.current = null, ne(t));
+				e.stopPropagation(), o.current && o.current(t.originalItem || t), l.current === t.id && (l.current = null, u.current = null, re(t));
 				return;
 			}
 			e.stopPropagation();
 			let r = l.current;
-			if (r === t.id) l.current = null, ne(t);
+			if (r === t.id) l.current = null, re(t);
 			else {
-				if (l.current = t.id, ne(t), S.filter((e) => e.id === t.id).raise(), r) {
+				if (l.current = t.id, re(t), S.filter((e) => e.id === t.id).raise(), r) {
 					let e = h.nodes.find((e) => e.id === r);
-					e && ne(e);
+					e && re(e);
 				}
-				ie(t).then(() => {
-					l.current === t.id && ne(t);
+				oe(t).then(() => {
+					l.current === t.id && re(t);
 				});
 			}
 		});
-		let ae = null;
+		let se = null;
 		S.filter((e) => e.type === "tag").on("click", (e, t) => {
-			if (e.stopPropagation(), ae === t.id) ae = null, S.classed("dimmed", !1).classed("tag-active", !1), x.classed("highlighted", !1);
+			if (e.stopPropagation(), se === t.id) se = null, S.classed("dimmed", !1).classed("tag-active", !1), x.classed("highlighted", !1);
 			else {
-				ae = t.id;
+				se = t.id;
 				let e = new Set(h.links.filter((e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id || r === t.id;
@@ -11273,17 +11293,17 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 				});
 			}
 		}), g.on("click", () => {
-			if (ae && (ae = null, S.classed("dimmed", !1).classed("tag-active", !1), x.classed("highlighted", !1)), l.current, l.current) {
+			if (se && (se = null, S.classed("dimmed", !1).classed("tag-active", !1), x.classed("highlighted", !1)), l.current, l.current) {
 				let e = h.nodes.find((e) => e.id === l.current);
-				l.current = null, e && ne(e);
+				l.current = null, e && re(e);
 			}
 		});
-		function oe() {
+		function ce() {
 			x.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), S.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")");
 		}
-		y.nodes(h.nodes).on("tick", oe), y.force("link").links(h.links), oe();
-		let se = !1;
-		function ce() {
+		y.nodes(h.nodes).on("tick", ce), y.force("link").links(h.links), ce();
+		let le = !1;
+		function E() {
 			let e = h.nodes.filter((e) => e.type === "article");
 			if (e.length < 2) return !1;
 			let t = Math.min(...e.map((e) => e.x)) - 140, n = Math.max(...e.map((e) => e.x)) + 140, r = Math.min(...e.map((e) => e.y)) - 140, a = Math.max(...e.map((e) => e.y)) + 140, o = i.current ? i.current.clientWidth : window.innerWidth, s = i.current ? i.current.clientHeight : window.innerHeight;
@@ -11291,28 +11311,28 @@ function Co({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r }) {
 			let c = Math.min(o / Math.max(n - t, 1), s / Math.max(a - r, 1), 1), l = o / 2 - (t + n) / 2 * c, u = s / 2 - (r + a) / 2 * c;
 			return g.call(v.transform, Za.translate(l, u).scale(c)), !0;
 		}
-		let le = !1;
+		let D = !1;
 		y.on("end", () => {
-			le = !0, h.nodes.forEach((e) => {
+			D = !0, h.nodes.forEach((e) => {
 				e.fx = e.x, e.fy = e.y;
 			});
 			let e = s.current, t = !1;
 			if (e) for (let n of h.nodes) e.nodeState(c(n)) ? t = !0 : e.setNodePosition(c(n), n.x, n.y, { silent: !0 });
-			t || (se = ce());
+			t || (le = E());
 		});
-		let E = () => {
+		let ue = () => {
 			if (!document.hidden) {
-				if (!le) {
+				if (!D) {
 					y.alpha(.8).restart();
 					return;
 				}
-				se ||= ce();
+				le ||= E();
 			}
 		};
-		return document.addEventListener("visibilitychange", E), () => {
-			y.stop(), document.removeEventListener("visibilitychange", E), window.removeEventListener("resize", b), te.forEach(({ root: e }) => {
+		return document.addEventListener("visibilitychange", ue), () => {
+			y.stop(), document.removeEventListener("visibilitychange", ue), window.removeEventListener("resize", b), T.forEach(({ root: e }) => {
 				queueMicrotask(() => e.unmount());
-			}), te.clear();
+			}), T.clear();
 		};
 	}, [e]), /* @__PURE__ */ (0, F.jsx)("div", {
 		ref: i,
