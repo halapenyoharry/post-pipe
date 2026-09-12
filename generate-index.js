@@ -164,6 +164,15 @@ function buildIndexHTML() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- The page is a build artefact that is rebuilt constantly during development,
+     and a plain static file server sends no cache headers — so a refresh
+     happily reuses the previous build and the change you just made appears not
+     to have happened. Several rounds of "it still looks wrong" in this project
+     were a cached index.html rather than a bug. -->
+<meta http-equiv="Cache-Control" content="no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="generator" content="post-pipe ${new Date().toISOString()}">
 <title>${SETTINGS.site.title}</title>
 <meta name="description" content="${SETTINGS.site.description}">
 <meta property="og:title" content="${SETTINGS.site.title}">
