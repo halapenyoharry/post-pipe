@@ -133,9 +133,9 @@ export function GraphViewer({
     maxWidth: 620, maxHeight: 520, glowPadding: 16, ...(GS.card || {}) };
   const TAG = { fontSize: 22, padding: 11, maxWidth: 150, maxLines: 3,
     cornerRadius: 9, opacity: 0.7, ...(GS.tag || {}) };
-  const AX = { orientation: 'ltr', connectorOpacity: 0.45, connectorWidth: 1.6,
-    spineOpacity: 0.55, spineWidth: 3, tickFontSize: 26, clearance: 460,
-    marginFraction: 0.07, ...(GS.timeAxis || {}) };
+  const AX = { dock: 'left', inset: 54, endPadding: 70, connectorOpacity: 0.45,
+    connectorWidth: 1.6, spineOpacity: 0.55, spineWidth: 3, tickFontSize: 13,
+    ...(GS.timeAxis || {}) };
   const SIM = { linkDistance: 160, chargeStrength: -500, collidePadding: 10,
     velocityDecay: 0.7, alphaDecay: 0.028, ...(GS.simulation || {}) };
 
@@ -161,6 +161,8 @@ export function GraphViewer({
   // Set by the axis effect so the simulation can ask for a redraw when the
   // nodes it is measured against have finished moving.
   const redrawAxisRef = useRef(null);
+  // Set by the axis draw so pan and zoom can re-project the connectors.
+  const connectorUpdateRef = useRef(null);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -226,6 +228,9 @@ export function GraphViewer({
       g.attr('transform', event.transform);
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
+      // The rail is pinned to the window and the nodes are not, so every pan
+      // and zoom moves one end of every connector.
+      if (connectorUpdateRef.current) connectorUpdateRef.current();
       const newLod = getLOD(newScale);
       if (newLod !== currentLodRef.current) {
         currentLodRef.current = newLod;
@@ -295,6 +300,7 @@ export function GraphViewer({
     // Resize: rescale the SVG canvas only. Never restart the simulation —
     // node positions in graph-space stay fixed; only the viewport changes.
     const handleResize = () => {
+      if (redrawAxisRef.current) redrawAxisRef.current();
       if (!containerRef.current) return;
       width = containerRef.current.clientWidth;
       height = containerRef.current.clientHeight;
@@ -302,9 +308,12 @@ export function GraphViewer({
     };
     window.addEventListener('resize', handleResize);
 
-    // The time axis lives under everything else: it is a reference the corpus
-    // hangs from, not another thing competing for the foreground.
-    const axisLayer = g.append('g').attr('class', 'time-axis-layer');
+    // The axis layer is a sibling of the zoom container, not a child of it.
+    // That is the whole difference between a ruler and a thing drawn on the
+    // paper: the corpus pans and zooms underneath, the ruler stays where it is
+    // pinned. Inside the zoom container it travelled with the graph and ended
+    // up bisecting it.
+    const axisLayer = svg.append('g').attr('class', 'time-axis-layer');
 
     // Render links + nodes.
     const links = g.selectAll('.link')
@@ -376,6 +385,7 @@ export function GraphViewer({
           }
           nodes.filter(nd => nd.id === d.id)
             .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
+          if (connectorUpdateRef.current) connectorUpdateRef.current();
           links.each(function(l) {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
@@ -875,6 +885,7 @@ export function GraphViewer({
     let tickCount = 0;
     simulation.nodes(data.nodes).on('tick', () => {
       applyPositions();
+      if (connectorUpdateRef.current) connectorUpdateRef.current();
       if (redrawAxisRef.current && ++tickCount % 25 === 0) redrawAxisRef.current();
     });
     simulation.force('link').links(data.links);
@@ -896,15 +907,6 @@ export function GraphViewer({
       const pad = 140;
       const xsAll = pts.map(d => d.x);
       const ysAll = pts.map(d => d.y);
-      // Include the axis when it is showing, or turning it on would push the
-      // reference off the edge of the view it is a reference for.
-      const box = axisLayer.node() && axisLayer.node().childNodes.length
-        ? axisLayer.node().getBBox()
-        : null;
-      if (box && box.width && box.height) {
-        xsAll.push(box.x, box.x + box.width);
-        ysAll.push(box.y, box.y + box.height);
-      }
       const minX = Math.min(...xsAll) - pad;
       const maxX = Math.max(...xsAll) + pad;
       const minY = Math.min(...ysAll) - pad;
@@ -1001,49 +1003,32 @@ export function GraphViewer({
 
   function drawAxis(g, axis) {
     g.axisLayer.selectAll('*').remove();
+    connectorUpdateRef.current = null;
     if (!axis.on) { axisFittedRef.current = false; return; }
 
-    // Where the axis sits by default is derived from the corpus, not fixed.
-    // It spans the width the pieces actually occupy, centred on them, inset by
-    // a margin, and sits clear of the top — so it reads as a heading over the
-    // corpus rather than a line that happens to be nearby. Recomputed as the
-    // graph changes, right up until the reader drags it somewhere; after that
-    // the position is theirs and nothing moves it.
-    const arts = g.data.nodes.filter(n => n.type === 'article' && Number.isFinite(n.x));
-    if (!arts.length) return;
+    const el = containerRef.current;
+    const W = el ? el.clientWidth : window.innerWidth;
+    const H = el ? el.clientHeight : window.innerHeight;
+    if (W < 60 || H < 60) return;
 
-    const xs = arts.map(n => n.x);
-    const ys = arts.map(n => n.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const orient = axis.orientation || AX.orientation;
-    const vertical = orient === 'ttb' || orient === 'btt';
+    const dock = axis.dock || AX.dock;
+    const vertical = dock === 'left' || dock === 'right';
+    const pad = AX.endPadding;
 
-    const MARGIN = AX.marginFraction;
-    const CLEARANCE = AX.clearance;
-    const spanAlong = vertical ? (maxY - minY) : (maxX - minX);
-    const length = Math.max(spanAlong * (1 - MARGIN * 2), 900);
+    // Where the rail sits, in screen pixels. Dragging it moves it along the
+    // edge it is docked to; nothing else about it changes.
+    const offset = Number.isFinite(axis.offset) ? axis.offset : AX.inset;
+    const railPos = (dock === 'right') ? W - offset
+      : (dock === 'bottom') ? H - offset
+      : offset;
 
-    // Start of the run, for whichever direction time is travelling. The axis
-    // is centred on the corpus either way; only the end it starts from moves.
-    const midX = (minX + maxX) / 2;
-    const midY = (minY + maxY) / 2;
-    const auto = vertical
-      ? {
-          x: minX - CLEARANCE,
-          y: orient === 'btt' ? midY + length / 2 : midY - length / 2,
-        }
-      : {
-          x: orient === 'rtl' ? midX + length / 2 : midX - length / 2,
-          y: minY - CLEARANCE,
-        };
+    const length = Math.max((vertical ? H : W) - pad * 2, 120);
+    const origin = vertical ? { x: railPos, y: pad } : { x: pad, y: railPos };
 
-    const origin = axis.moved ? { x: axis.x || 0, y: axis.y || 0 } : auto;
-
+    // A side rail runs earliest at the top; a top or bottom rail earliest at
+    // the left. Both are the western reading order for the direction they run.
     const geo = timeAxisGeometry(g.data.nodes, {
-      orientation: axis.orientation || AX.orientation,
+      orientation: vertical ? 'ttb' : 'ltr',
       origin,
       length,
     });
@@ -1051,109 +1036,106 @@ export function GraphViewer({
 
     const root = g.axisLayer.append('g').attr('class', 'time-axis');
 
-    // Connectors first, so the spine sits on top of them. Faint on purpose:
-    // ninety of these at full strength would be a net thrown over the graph.
+    // Connectors first, so the rail sits on top of them.
     const conn = root.append('g').attr('class', 'time-connectors');
+    const connected = [];
     g.data.nodes.forEach((d) => {
-      const a = geo.anchors[d.id];
-      if (!a) return;
-      conn.append('line')
-        .datum({ ax: a.x, ay: a.y })
+      const a2 = geo.anchors[d.id];
+      if (!a2) return;
+      const line = conn.append('line')
         .attr('class', 'time-connector')
         .attr('data-node', d.id)
-        .attr('x1', a.x).attr('y1', a.y)
-        .attr('x2', d.x).attr('y2', d.y)
+        .attr('x1', a2.x).attr('y1', a2.y)
         .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
         .attr('stroke-width', AX.connectorWidth)
         .attr('stroke-opacity', AX.connectorOpacity);
+      connected.push({ node: d, anchor: a2, line });
     });
 
-    const spine = root.append('g').attr('class', 'time-spine').style('cursor', 'grab');
-    spine.append('line')
+    // The rail is in screen space and the nodes are in graph space, so the
+    // far end of every connector has to be projected through the current zoom
+    // — and re-projected whenever it changes. This is the cost of the rail
+    // staying still, and it is only an attribute write per connector.
+    function updateConnectors() {
+      const t = d3.zoomTransform(g.svg.node());
+      connected.forEach(({ node, anchor, line }) => {
+        const p = t.apply([node.x, node.y]);
+        line.attr('x1', anchor.x).attr('y1', anchor.y).attr('x2', p[0]).attr('y2', p[1]);
+      });
+    }
+    connectorUpdateRef.current = updateConnectors;
+    updateConnectors();
+
+    const rail = root.append('g').attr('class', 'time-spine').style('cursor', vertical ? 'ew-resize' : 'ns-resize');
+
+    // A backing strip, so the rail reads as a fixed edge of the window rather
+    // than a line that happens to be lying on top of the graph.
+    const strip = 34;
+    rail.append('rect')
+      .attr('x', vertical ? railPos - strip / 2 : 0)
+      .attr('y', vertical ? 0 : railPos - strip / 2)
+      .attr('width', vertical ? strip : W)
+      .attr('height', vertical ? H : strip)
+      .attr('fill', 'rgba(18,20,28,0.82)');
+
+    rail.append('line')
       .attr('x1', geo.from.x).attr('y1', geo.from.y)
       .attr('x2', geo.to.x).attr('y2', geo.to.y)
       .attr('stroke', 'rgba(255,255,255,' + AX.spineOpacity + ')')
       .attr('stroke-width', AX.spineWidth);
 
-    // A fat invisible line so the spine can be grabbed without precision.
-    spine.append('line')
-      .attr('x1', geo.from.x).attr('y1', geo.from.y)
-      .attr('x2', geo.to.x).attr('y2', geo.to.y)
-      .attr('stroke', 'transparent')
-      .attr('stroke-width', 46);
-
-    // Label every tick only while there is room for every label. Past that,
-    // label every nth — a row of overlapping dates is less legible than a
-    // sparser one, and the unlabelled ticks still carry the rhythm.
     const TICK_FONT = AX.tickFontSize;
     const labelRoom = geo.ticks.length > 1
       ? Math.hypot(geo.ticks[1].x - geo.ticks[0].x, geo.ticks[1].y - geo.ticks[0].y)
       : Infinity;
-    const needed = geo.vertical ? TICK_FONT * 1.6 : TICK_FONT * 4.2;
+    const needed = vertical ? TICK_FONT * 1.7 : TICK_FONT * 4.2;
     const labelEvery = Math.max(1, Math.ceil(needed / Math.max(labelRoom, 1)));
 
     geo.ticks.forEach((t, ti) => {
-      const across = geo.vertical ? { x: 16, y: 0 } : { x: 0, y: -16 };
-      spine.append('line')
+      rail.append('line')
         .attr('x1', t.x).attr('y1', t.y)
-        .attr('x2', t.x + (geo.vertical ? -10 : 0)).attr('y2', t.y + (geo.vertical ? 0 : 10))
-        .attr('stroke', 'rgba(255,255,255,0.5)').attr('stroke-width', 2);
+        .attr('x2', t.x + (vertical ? 9 : 0)).attr('y2', t.y + (vertical ? 0 : -9))
+        .attr('stroke', 'rgba(255,255,255,0.45)').attr('stroke-width', 1.5);
       if (ti % labelEvery !== 0) return;
-      spine.append('text')
-        .attr('x', t.x + across.x).attr('y', t.y + across.y)
-        .attr('text-anchor', geo.vertical ? 'start' : 'middle')
-        .attr('dominant-baseline', geo.vertical ? 'central' : 'auto')
+      rail.append('text')
+        .attr('x', t.x + (vertical ? 13 : 0))
+        .attr('y', t.y + (vertical ? 0 : -14))
+        .attr('text-anchor', vertical ? 'start' : 'middle')
+        .attr('dominant-baseline', vertical ? 'central' : 'auto')
         .style('font-family', "'Atkinson', sans-serif")
         .style('font-size', TICK_FONT + 'px')
-        .style('fill', 'rgba(255,255,255,0.6)')
+        .style('fill', 'rgba(255,255,255,0.62)')
         .style('pointer-events', 'none')
         .text(t.label);
     });
 
-    // Drag the whole axis. Grabbing it moves the reference, not the corpus.
-    //
-    // The offset is applied to the DOM directly and only written to state when
-    // the gesture ends. Writing on every frame re-ran this effect, which tears
-    // the spine down and builds a new one — so the element under the pointer
-    // was destroyed mid-drag and the axis jumped to wherever the rebuild put
-    // it instead of following the hand.
+    // Drag slides the rail along its edge. The offset is applied to the DOM
+    // during the gesture and written to state once on release — writing every
+    // frame re-ran this effect, which destroyed the element under the pointer
+    // mid-drag.
     let from = null;
-    let offset = { x: 0, y: 0 };
-    spine.call(d3.drag()
-      .on('start', (event) => {
-        from = { ex: event.x, ey: event.y };
-        offset = { x: 0, y: 0 };
-        spine.style('cursor', 'grabbing');
-      })
+    let delta = 0;
+    rail.call(d3.drag()
+      .on('start', (event) => { from = vertical ? event.x : event.y; delta = 0; })
       .on('drag', (event) => {
-        if (!from) return;
-        offset = { x: event.x - from.ex, y: event.y - from.ey };
-        spine.attr('transform', 'translate(' + offset.x + ',' + offset.y + ')');
-        // Only the axis end of each connector moves; the other end is a node,
-        // which is staying exactly where it is.
-        conn.selectAll('line')
-          .attr('x1', (c) => c.ax + offset.x)
-          .attr('y1', (c) => c.ay + offset.y);
+        if (from === null) return;
+        delta = (vertical ? event.x : event.y) - from;
+        rail.attr('transform', vertical ? 'translate(' + delta + ',0)' : 'translate(0,' + delta + ')');
+        conn.selectAll('line').attr(vertical ? 'x1' : 'y1', function () {
+          return Number(d3.select(this).attr(vertical ? 'x1' : 'y1'));
+        });
+        connected.forEach(({ anchor, line }) => {
+          if (vertical) line.attr('x1', anchor.x + delta);
+          else line.attr('y1', anchor.y + delta);
+        });
       })
       .on('end', () => {
-        spine.style('cursor', 'grab');
-        if (from && viewStateRef.current && (offset.x || offset.y)) {
-          viewStateRef.current.setTimeAxis({
-            x: origin.x + offset.x,
-            y: origin.y + offset.y,
-            moved: true,
-          });
+        if (from !== null && delta && viewStateRef.current) {
+          const moved = (dock === 'right' || dock === 'bottom') ? offset - delta : offset + delta;
+          viewStateRef.current.setTimeAxis({ offset: Math.max(20, moved), moved: true });
         }
         from = null;
       }));
-
-    // Reframe once, when it first appears, so the axis and the corpus are on
-    // screen together. Not on every redraw — that would yank the view back
-    // every time the reader dragged the spine somewhere deliberate.
-    if (!axisFittedRef.current && g.fitToViewport) {
-      axisFittedRef.current = true;
-      setTimeout(() => g.fitToViewport(), 60);
-    }
   }
 
   // Switching layout moves nodes; it does not rebuild the graph. Everything

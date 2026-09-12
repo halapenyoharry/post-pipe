@@ -360,15 +360,15 @@
       "opacity": 0.7
     },
     "timeAxis": {
-      "orientation": "ltr",
-      "_orientation_note": "ltr | rtl | ttb | btt. Left-to-right is the western reading order and the default. The other three work and are kept for anyone whose reading order differs; they are deliberately not in the interface, because a direction control is a question most readers were not asking.",
+      "dock": "left",
+      "_dock_note": "left | right | top | bottom. The axis is a ruler pinned to the edge of the viewport, not an object in the canvas: panning and zooming the corpus moves the corpus past it, the way a ruler stays put while the paper slides under it. A docked edge also decides the direction \u2014 a side rail runs earliest at the top, a top or bottom rail earliest at the left.",
+      "inset": 54,
+      "endPadding": 70,
       "connectorOpacity": 0.45,
       "connectorWidth": 1.6,
       "spineOpacity": 0.55,
       "spineWidth": 3,
-      "tickFontSize": 26,
-      "clearance": 460,
-      "marginFraction": 0.07
+      "tickFontSize": 13
     },
     "simulation": {
       "linkDistance": 160,
