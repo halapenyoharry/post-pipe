@@ -4,6 +4,8 @@
   --gv-node-draft: #555;
   --gv-node-published: #2ecc71;
   --gv-tag-color: #f39c12;
+  --gv-topology-color: #9b59b6;
+  --gv-placeholder-color: #7f8c8d;
   --gv-accent: #64ffda;
 
   width: var(--gv-width);

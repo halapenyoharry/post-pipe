@@ -5,19 +5,28 @@ import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, layoutIsDegenerate, timeAxisGeometry } from './layouts';
 
-// Transform the raw feed JSON into graph nodes and links.
+// Transform the raw feed JSON into graph nodes and links. Links come from
+// feed.edges — the authored connected_to edges, the tag/topology reifications,
+// and any sequence edges are all already computed on disk (buildEdges.js);
+// this just resolves each edge's endpoints to the ids this renderer uses.
 function feedToGraph(feed, config = {}) {
   const nodes = [];
   const links = [];
-  const tagNodes = new Map();
+  const auxNodes = new Map(); // tag:/topology:/placeholder id -> node
+  const articleSlugs = new Set();
+  const idToSlug = new Map(); // item.id (feed-item identity) -> renderer slug
 
   const draftColor = config.nodeDraftColor || '#555';
   const publishedColor = config.nodePublishedColor || '#2ecc71';
   const tagColor = config.tagColor || '#f39c12';
+  const topologyColor = config.topologyColor || '#9b59b6';
+  const placeholderColor = config.placeholderColor || '#7f8c8d';
 
   for (const item of feed.items) {
     const slug = item.url.split('/').pop().replace('.html', '');
     const status = item._status || 'draft';
+    idToSlug.set(item.id, slug);
+    articleSlugs.add(slug);
 
     nodes.push({
       id: slug,
@@ -55,22 +64,35 @@ function feedToGraph(feed, config = {}) {
       _source: item._source || null,
       originalItem: item
     });
-
-    for (const tag of (item.tags || [])) {
-      if (!tagNodes.has(tag)) {
-        tagNodes.set(tag, {
-          id: 'tag:' + tag,
-          label: tag,
-          type: 'tag',
-          size: 30,
-          color: tagColor,
-        });
-      }
-      links.push({ source: slug, target: 'tag:' + tag });
-    }
   }
 
-  nodes.push(...tagNodes.values());
+  // Edge endpoints are item.id (a feed item's own identity — a full URL for
+  // local content), or a synthetic 'tag:'/'topology:' id, or — for an
+  // authored edge nobody has written yet — a bare slug with no item behind
+  // it. Resolve each to the id this renderer actually uses for that node.
+  function resolveEndpoint(rawId) {
+    if (rawId.startsWith('tag:') || rawId.startsWith('topology:')) return rawId;
+    return idToSlug.get(rawId) || rawId;
+  }
+
+  for (const edge of (feed.edges || [])) {
+    const source = resolveEndpoint(edge.source);
+    const target = resolveEndpoint(edge.target);
+
+    if (edge.layer === 'tag' && !auxNodes.has(target)) {
+      auxNodes.set(target, { id: target, label: target.slice(4), type: 'tag', size: 30, color: tagColor });
+    } else if (edge.layer === 'topology' && !auxNodes.has(target)) {
+      auxNodes.set(target, { id: target, label: target.slice(9), type: 'topology', size: 30, color: topologyColor });
+    } else if (edge.layer === 'authored' && !articleSlugs.has(target) && !auxNodes.has(target)) {
+      // A connected_to edge pointing at a piece that hasn't been written yet.
+      // Not an error — a placeholder with gravity, per buildEdges.js.
+      auxNodes.set(target, { id: target, label: target, type: 'placeholder', size: 40, color: placeholderColor });
+    }
+
+    links.push({ source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer });
+  }
+
+  nodes.push(...auxNodes.values());
   return { nodes, links };
 }
 
@@ -205,7 +227,9 @@ export function GraphViewer({
     const config = {
       nodeDraftColor: computedStyles.getPropertyValue('--gv-node-draft').trim() || '#555',
       nodePublishedColor: computedStyles.getPropertyValue('--gv-node-published').trim() || '#2ecc71',
-      tagColor: computedStyles.getPropertyValue('--gv-tag-color').trim() || '#f39c12'
+      tagColor: computedStyles.getPropertyValue('--gv-tag-color').trim() || '#f39c12',
+      topologyColor: computedStyles.getPropertyValue('--gv-topology-color').trim() || '#9b59b6',
+      placeholderColor: computedStyles.getPropertyValue('--gv-placeholder-color').trim() || '#7f8c8d'
     };
 
     const data = feedToGraph(feedData, config);
@@ -482,7 +506,11 @@ export function GraphViewer({
 
     nodes.each(function(d) {
       const el = d3.select(this);
-      if (d.type === 'tag') {
+      if (d.type !== 'article') {
+        // Every non-article node (tag, topology, placeholder) gets the same
+        // bubble treatment, distinguished only by color — a tag, a topology
+        // handle, and an unwritten piece are all "a labeled handle on the
+        // corpus, not an item in it."
         // Tag bubbles are measured from their text, so every constant here is
         // real estate. Three things were wasting it:
         //
@@ -813,9 +841,10 @@ export function GraphViewer({
         }
       });
 
-    // Tag click: highlight only — no rearrangement, no simulation restart.
+    // Bubble click (tag, topology, or placeholder): highlight only — no
+    // rearrangement, no simulation restart.
     let activeTag = null;
-    nodes.filter(d => d.type === 'tag')
+    nodes.filter(d => d.type !== 'article')
       .on('click', (event, d) => {
         event.stopPropagation();
         if (activeTag === d.id) {
