@@ -273,3 +273,20 @@ test('resizing a generated node makes it the reader\'s, like moving it does', as
   assert.ok(b.nodeState('n'), 'a card you resized is not the layout\'s to discard');
   assert.strictEqual(b.nodeState('n').w, 400);
 });
+
+test('prune matches the item, not the layout-prefixed position key', async () => {
+  // Positions are filed per layout as "<layout>::<id>". A prune that compared
+  // whole keys would treat every one of them as orphaned.
+  const s = mk(); await s.ready();
+  s.setNodePosition('force::https://x/a.html', 1, 1);
+  s.setNodePosition('radial::https://x/a.html', 2, 2);
+  s.setNodeSize('https://x/a.html', 300, 200);
+  s.setNodePosition('force::https://x/gone.html', 9, 9);
+
+  s.prune(['https://x/a.html'], { keep: 0 });
+
+  assert.ok(s.nodeState('force::https://x/a.html'), 'kept: the item is present');
+  assert.ok(s.nodeState('radial::https://x/a.html'), 'kept in every layout');
+  assert.ok(s.nodeState('https://x/a.html'), 'the unprefixed size entry survives too');
+  assert.strictEqual(s.nodeState('force::https://x/gone.html'), null, 'a departed item still goes');
+});

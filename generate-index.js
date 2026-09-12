@@ -259,7 +259,7 @@ ${reactJs}
     // Bump when the layout algorithm changes in a way that makes previously
     // generated positions wrong. Positions the reader placed by hand are not
     // affected — only the ones the simulation produced.
-    const LAYOUT_VERSION = 'tag-scale-2';
+    const LAYOUT_VERSION = 'per-layout-positions-3';
 
     const viewState = window.ViewState.createViewState({
       backend: window.ViewState.localStorageBackend('post-pipe:viewstate'),
@@ -310,6 +310,7 @@ ${reactJs}
       return React.createElement(React.Fragment, null,
         React.createElement(GraphViewer, {
           feedData: feed,
+          layout: viewState.state.layout,
           onNodeSelect: function (article) {
             if (article && article.originalItem) viewState.markSeen(article.originalItem.id);
             setSelectedArticle(article);
@@ -322,6 +323,7 @@ ${reactJs}
           hiddenSources: hiddenSources,
           onToggleSource: toggleSource
         }),
+        React.createElement(LayoutControls, null),
         React.createElement(HistoryControls, null),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
@@ -329,6 +331,44 @@ ${reactJs}
           settings: window.SETTINGS
         })
       );
+    }
+
+    // How the corpus is arranged. Force finds clusters, radial puts the writing
+    // on a rim with its vocabulary in the middle, timeline spends an axis on
+    // time — which is the one that shows your own work against a subscribed
+    // firehose without anything having to explain it.
+    const LAYOUTS = [
+      { id: 'force',    label: 'cluster',  title: 'Force-directed: related pieces attract' },
+      { id: 'radial',   label: 'ring',     title: 'Radial: pieces on the rim, tags in the middle' },
+      { id: 'timeline', label: 'timeline', title: 'Timeline: arranged by date' }
+    ];
+
+    function LayoutControls() {
+      const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
+      React.useEffect(function () { return viewState.subscribe(bump); }, []);
+      const active = viewState.state.layout;
+
+      return React.createElement('div', {
+        style: {
+          position: 'fixed', bottom: '14px', left: '92px',
+          display: 'flex', gap: '4px', zIndex: 40,
+          background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
+        }
+      }, LAYOUTS.map(function (l) {
+        const on = active === l.id;
+        return React.createElement('button', {
+          key: l.id,
+          title: l.title,
+          onClick: function () { if (!on) viewState.setLayout(l.id); },
+          style: {
+            border: 0, borderRadius: '6px', padding: '5px 10px', cursor: on ? 'default' : 'pointer',
+            background: on ? 'rgba(255,255,255,0.14)' : 'transparent',
+            color: on ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
+            font: '12px/1 system-ui, sans-serif', letterSpacing: '0.02em'
+          }
+        }, l.label);
+      }));
     }
 
     // Previous / next through the reader's own arrangement.

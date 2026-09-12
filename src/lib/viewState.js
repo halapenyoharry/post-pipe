@@ -345,11 +345,20 @@ function createViewState(opts = {}) {
      */
     prune(validIds, { keep = 500 } = {}) {
       const valid = new Set(validIds);
+      // Positions are filed per layout, as "<layout>::<item id>", because the
+      // same node belongs in different places in a ring and on a timeline.
+      // Pruning matches on the item, not the composite key, or every position
+      // in every layout would look like it belonged to a node that no longer
+      // exists.
+      const itemOf = (key) => {
+        const i = key.indexOf('::');
+        return i === -1 ? key : key.slice(i + 2);
+      };
       update((s) => {
         for (const bucket of ['nodes', 'reading']) {
           const entries = Object.entries(s[bucket]);
           const absent = entries
-            .filter(([id]) => !valid.has(id))
+            .filter(([id]) => !valid.has(itemOf(id)))
             .sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
           for (const [id] of absent.slice(keep)) delete s[bucket][id];
         }

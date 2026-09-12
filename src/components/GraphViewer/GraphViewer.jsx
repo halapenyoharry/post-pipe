@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
+import { computeLayout } from './layouts';
 
 // Transform the raw feed JSON into graph nodes and links.
 function feedToGraph(feed, config = {}) {
@@ -124,7 +125,7 @@ function cardSizeFor({ hovered, pinned }) {
   return { width: 180, height: 140 };
 }
 
-export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }) {
+export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, layout = 'force' }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -137,11 +138,20 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
   const viewStateRef = useRef(viewState);
   useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
 
+  // The live graph, reachable from effects that must not rebuild it.
+  const graphRef = useRef(null);
+  const layoutRef = useRef(layout);
+
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
   // reorders everything. Tag and topology nodes key by their own synthetic id,
   // which is already stable.
   const persistKey = (d) => (d.originalItem && d.originalItem.id) || d.id;
+
+  // Where a node sits depends on the layout — a node has one place in a ring
+  // and another on a timeline — so positions are filed per layout. How big the
+  // reader made it does not, so size is filed against the item alone.
+  const positionKey = (d) => layoutRef.current + '::' + persistKey(d);
 
   // View state lives in refs because it must not trigger React re-renders or
   // re-run the useEffect that owns the simulation.
@@ -209,13 +219,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     // arranges the rest around the reader's choices rather than over them.
     if (viewStateRef.current) {
       for (const d of data.nodes) {
-        const saved = viewStateRef.current.nodeState(persistKey(d));
+        const saved = viewStateRef.current.nodeState(positionKey(d));
+        const savedSize = viewStateRef.current.nodeState(persistKey(d));
         if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
           d.x = saved.x; d.y = saved.y;
           d.fx = saved.x; d.fy = saved.y;
         }
-        if (saved && typeof saved.w === 'number' && typeof saved.h === 'number') {
-          d._size = { width: saved.w, height: saved.h };
+        if (savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
+          d._size = { width: savedSize.w, height: savedSize.h };
         }
       }
     }
@@ -321,7 +332,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           d.fx = d.x; d.fy = d.y;
           // One history entry for the whole drag, not one per frame.
           if (vs) {
-            vs.setNodePosition(persistKey(d), d.x, d.y, { transient: true });
+            vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
             vs.commit();
           }
         })
@@ -610,6 +621,23 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
         d._fullContent = articleContentCache.get(d.id);
         return Promise.resolve();
       }
+
+      // Only same-origin bodies can be fetched. A subscribed feed's article
+      // lives on somebody else's server, which sends no CORS header and has no
+      // reason to — so pinning one used to fire a request that could only ever
+      // fail, and fail loudly in the console, a hundred times over. The summary
+      // the feed already gave us is what there is; reading the rest is what the
+      // link is for.
+      let sameOrigin = false;
+      try {
+        sameOrigin = new URL(d.url, window.location.href).origin === window.location.origin;
+      } catch (_) { sameOrigin = false; }
+      if (!sameOrigin) {
+        articleContentCache.set(d.id, null);
+        d._fullContent = null;
+        return Promise.resolve();
+      }
+
       return fetch(d.url)
         .then(r => {
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -772,6 +800,8 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
     }
 
+    graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport };
+
     simulation.nodes(data.nodes).on('tick', applyPositions);
     simulation.force('link').links(data.links);
 
@@ -811,7 +841,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     let hasSettled = false;
     simulation.on('end', () => {
       hasSettled = true;
-      data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
+      data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; d._forcePos = { x: d.x, y: d.y }; });
       // The layout the simulation settled on is itself an arrangement worth
       // keeping — otherwise every reload reshuffles a graph the reader has
       // started to learn the shape of. Recorded without history: the reader
@@ -820,8 +850,8 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       let anyRestored = false;
       if (vs) {
         for (const d of data.nodes) {
-          if (vs.nodeState(persistKey(d))) anyRestored = true;
-          else vs.setNodePosition(persistKey(d), d.x, d.y, { silent: true });
+          if (vs.nodeState(positionKey(d))) anyRestored = true;
+          else vs.setNodePosition(positionKey(d), d.x, d.y, { silent: true });
         }
       }
       if (!anyRestored) hasFitted = fitToViewport();
@@ -856,6 +886,50 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
     // Deliberately depend only on feedData — onNodeSelect changes are
     // handled through onNodeSelectRef without rebuilding the simulation.
   }, [feedData]);
+
+  // Switching layout moves nodes; it does not rebuild the graph. Everything
+  // already on screen stays mounted, so a reader who has a card open keeps it.
+  //
+  // Movement here is deliberate and meaningful — the whole corpus reorganising
+  // is the one moment where motion is the message — so it is animated rather
+  // than cut, which is also the only way to keep track of where a given piece
+  // went.
+  useEffect(() => {
+    layoutRef.current = layout;
+    const g = graphRef.current;
+    if (!g) return;
+
+    const vs = viewStateRef.current;
+    const rest = cardSizeFor({ hovered: false, pinned: false });
+
+    // Prefer what the reader arranged in this layout; fall back to computing it.
+    const computed = layout === 'force'
+      ? Object.fromEntries(g.data.nodes.map(d => [d.id, d._forcePos || { x: d.x, y: d.y }]))
+      : computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
+    if (!computed) return;
+
+    g.data.nodes.forEach((d) => {
+      const saved = vs && vs.nodeState(layout + '::' + persistKey(d));
+      const target = (saved && typeof saved.x === 'number' && !saved.auto)
+        ? { x: saved.x, y: saved.y }
+        : computed[d.id];
+      if (!target) return;
+      d.x = target.x; d.y = target.y;
+      d.fx = target.x; d.fy = target.y;
+      if (vs && !(saved && !saved.auto)) {
+        vs.setNodePosition(layout + '::' + persistKey(d), target.x, target.y, { silent: true });
+      }
+    });
+
+    g.nodes.transition().duration(760).ease(d3.easeCubicInOut)
+      .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+    g.links.transition().duration(760).ease(d3.easeCubicInOut)
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+
+    const t = setTimeout(() => { if (g.fitToViewport) g.fitToViewport(); }, 800);
+    return () => clearTimeout(t);
+  }, [layout]);
 
   return (
     <div
