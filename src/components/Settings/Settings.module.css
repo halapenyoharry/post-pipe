@@ -1,0 +1,184 @@
+/* Settings — a compact popover, never full-screen. It must always leave the
+   canvas visible, which is why the popover has a fixed, modest width instead
+   of covering the viewport, and the backdrop is transparent (a click-catcher
+   for "close", not a dimming overlay). */
+
+.gearBtn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 55;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 22, 30, 0.72);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.gearBtn:hover {
+  background: rgba(20, 22, 30, 0.9);
+  color: #64ffda;
+  border-color: rgba(100, 255, 218, 0.35);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  background: transparent;
+}
+
+.popover {
+  position: fixed;
+  top: 50px;
+  right: 12px;
+  z-index: 56;
+  width: 280px;
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
+  padding: 12px;
+  background: rgba(17, 24, 39, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: #e0e0e0;
+  font-family: 'Atkinson', sans-serif;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(224, 224, 224, 0.5);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+  font-family: inherit;
+}
+.closeBtn:hover { color: #e0e0e0; }
+
+.presetRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.presetBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.presetBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.presetActive {
+  border-color: #64ffda;
+  background: rgba(100, 255, 218, 0.08);
+}
+
+.presetSwatches {
+  display: flex;
+  gap: 2px;
+}
+
+.miniSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.presetLabel {
+  font-size: 10px;
+  color: rgba(224, 224, 224, 0.75);
+}
+
+.hint {
+  font-size: 11px;
+  color: rgba(224, 224, 224, 0.45);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.fieldList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.fieldLabel {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(224, 224, 224, 0.85);
+}
+
+.colorInput {
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.hexLabel {
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 10px;
+  color: rgba(224, 224, 224, 0.5);
+  width: 54px;
+  text-align: right;
+}
+
+.resetBtn {
+  width: 100%;
+  padding: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: rgba(224, 224, 224, 0.6);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.resetBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e0e0e0;
+}

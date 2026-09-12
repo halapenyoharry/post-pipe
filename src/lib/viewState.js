@@ -25,6 +25,9 @@ function emptyState(corpusId, layoutVersion) {
     layoutVersion: layoutVersion || null,
     layout: 'force',
     hiddenSources: [],
+    sourceColors: {},  // sourceId -> hex override, chosen from the pill's ring picker
+    graphColors: {},   // e.g. draft/published/tag/topology/placeholder -> hex override
+    colorProfileId: null, // which preset (if any) graphColors currently matches
     nodes: {},      // id -> { x, y, w, h, pinned, t }
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
@@ -330,6 +333,31 @@ function createViewState(opts = {}) {
     },
 
     isHidden(sourceId) { return state.hiddenSources.indexOf(sourceId) !== -1; },
+
+    // A color the reader chose for one feed's dot, from the pill's ring
+    // picker — overrides whatever the build computed (theme-color/hash).
+    sourceColor(sourceId) { return (state.sourceColors || {})[sourceId] || null; },
+    setSourceColor(sourceId, color) {
+      update((s) => { s.sourceColors = { ...(s.sourceColors || {}), [sourceId]: color }; });
+    },
+
+    // The graph's own palette (draft/published/tag/topology/placeholder).
+    // A profile replaces the whole set at once; a single key can then be
+    // nudged without losing the rest of the chosen profile. colorProfileId
+    // is purely cosmetic — which preset button Settings highlights as
+    // active — and is cleared the moment a single key is nudged, since at
+    // that point the palette is no longer exactly that preset.
+    graphColors() { return state.graphColors || {}; },
+    colorProfileId() { return state.colorProfileId || null; },
+    setGraphColor(key, value) {
+      update((s) => {
+        s.graphColors = { ...(s.graphColors || {}), [key]: value };
+        s.colorProfileId = null;
+      });
+    },
+    applyColorProfile(id, colors) {
+      update((s) => { s.graphColors = { ...colors }; s.colorProfileId = id; });
+    },
 
     // Reading position. Scrolling is continuous and not an undoable act, so it
     // never enters history — taking back a scroll is not a thing readers want.

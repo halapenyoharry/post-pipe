@@ -3,9 +3,11 @@
    companion strip). Caller sets dimensions via inline style. */
 
 .card {
-  --nv-accent: #64ffda;
-  --nv-published: #2ecc71;
-  --nv-draft: #555;
+  /* --nv-accent/--nv-published/--nv-draft are NOT declared here on purpose —
+     they inherit from .graphContainer (GraphViewer.module.css), which is
+     where the reader's chosen color profile actually lives. Declaring them
+     here would always win over that ancestor, no matter what the reader
+     picked in Settings. */
 
   position: relative;
   box-sizing: border-box;
@@ -20,11 +22,11 @@
 }
 
 .draft {
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid color-mix(in srgb, var(--nv-draft) 55%, transparent);
 }
 
 .published {
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid color-mix(in srgb, var(--nv-published) 55%, transparent);
 }
 
 .pinned {
@@ -135,9 +137,7 @@
 /* ─── Image-kind variant ─── */
 
 .imageCard {
-  --nv-accent: #64ffda;
-  --nv-published: #2ecc71;
-  --nv-draft: #555;
+  /* Same reasoning as .card above — inherit from .graphContainer. */
 
   position: relative;
   box-sizing: border-box;

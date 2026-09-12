@@ -192,6 +192,7 @@ export function ReaderPanel({ article, onClose, settings }) {
 
         <div
           className={styles.body}
+          data-tts-target
           ref={bodyRef}
           onScroll={handleScroll}
         >

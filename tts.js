@@ -437,13 +437,35 @@
   })();
 
   // ─── Built-in engine: Kokoro ───────────────────────────────────────────────
-  // 82MB model, 53 voices, 9 languages. Loads on first play via Web Worker.
+  // Two transports behind one engine id, chosen by settings.json's
+  // tts.engines.kokoro.mode:
+  //
+  //  'server' — calls a self-hosted Kokoro instance's OpenAI-compatible
+  //             /v1/audio/speech endpoint (see the kokoro-tts skill and
+  //             services-registry.json's "kokoro-tts" entry — lumen runs one
+  //             on its RTX 3090 at 192.168.1.3:8880). No download, no
+  //             per-request billing, but only reachable from a device on
+  //             lothal's 10GbE/Tailscale network.
+  //
+  //  'wasm'   — would run an 82MB ONNX model in-browser via a Worker. This
+  //             path has never actually worked: kokoro-worker.js does not
+  //             exist in this repo and there is no ONNX runtime dependency
+  //             to build it from, so init() would hang forever waiting for a
+  //             'ready' message the Worker can never send (a 404 module
+  //             import throws before the worker's own message loop starts).
+  //             Left in place for whoever eventually builds that worker;
+  //             'server' is the mode actually in use.
 
   (function registerKokoro() {
+    const cfg = window.TTS_CONFIG || {};
+    const mode = cfg.kokoroMode || 'wasm';
+    const host = (cfg.kokoroHost || '').replace(/\/+$/, '');
+    const staticVoices = cfg.kokoroVoices || [];
+
     let worker = null;
     let ready = false;
-    let voiceList = [];       // raw voice IDs from model
-    let voiceMeta = {};       // { id: { name, language, gender, overallGrade } }
+    let voiceList = [];       // raw voice IDs from model (wasm mode)
+    let voiceMeta = {};       // { id: { name, language, gender, overallGrade } } (wasm mode)
     let currentAudio = null;
     let resolveSpeak = null;
 
@@ -451,9 +473,35 @@
       a: 'en-US', b: 'en-GB', e: 'es', f: 'fr', h: 'hi', i: 'it', j: 'ja', p: 'pt', z: 'zh'
     };
 
+    function idToVoice(id, meta) {
+      const prefix = id.charAt(0);
+      const gender = id.charAt(1) === 'f' ? 'female' : 'male';
+      const lang = LANG_MAP[prefix] || 'en';
+      const m = meta || {};
+      return {
+        id: id,
+        label: m.label || m.name || id,
+        lang: m.lang || lang,
+        gender: gender,
+        grade: m.overallGrade || '',
+      };
+    }
+
+    function playBlob(blob) {
+      return new Promise((resolve, reject) => {
+        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        const url = URL.createObjectURL(blob);
+        currentAudio = new Audio(url);
+        resolveSpeak = resolve;
+        currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+        currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
+        currentAudio.play();
+      });
+    }
+
     window.TTS.register({
       id: 'kokoro',
-      label: 'Kokoro (82M)',
+      label: 'Kokoro (self-hosted)',
       capabilities: {
         speed:   { type: 'range', min: 0.5, max: 2, step: 0.1, default: 1, label: 'Speed' },
         quality: { type: 'select', options: [
@@ -466,7 +514,20 @@
 
       init: async function (p) {
         if (ready) return;
-        const workerUrl = (window.TTS_CONFIG && window.TTS_CONFIG.kokoroWorkerUrl) || './kokoro-worker.js';
+
+        if (mode === 'server') {
+          if (!host) throw new Error('Kokoro: mode is "server" but tts.engines.kokoro.host is not set in settings.json');
+          // The curated voice list already in settings.json is known-good, so
+          // there is nothing to fetch before this engine is usable — a live
+          // GET /v1/voices call would be nice-to-have (the full 54-voice set)
+          // but its response shape is unverified on this specific Kokoro
+          // build, and a working default beats a richer list that might fail
+          // to parse. Ship the reliable path.
+          ready = true;
+          return;
+        }
+
+        const workerUrl = cfg.kokoroWorkerUrl || './kokoro-worker.js';
         worker = new Worker(workerUrl, { type: 'module' });
         return new Promise((resolve, reject) => {
           worker.addEventListener('message', function handler(e) {
@@ -489,22 +550,38 @@
       },
 
       voices: function () {
-        return voiceList.map(id => {
-          const prefix = id.charAt(0);
-          const gender = id.charAt(1) === 'f' ? 'female' : 'male';
-          const lang = LANG_MAP[prefix] || 'en';
-          const meta = voiceMeta[id] || {};
-          return {
-            id: id,
-            label: meta.name || id,
-            lang: lang,
-            gender: gender,
-            grade: meta.overallGrade || '',
-          };
-        }).sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
+        if (mode === 'server') {
+          return staticVoices.map(v => idToVoice(v.id, v))
+            .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
+        }
+        return voiceList.map(id => idToVoice(id, voiceMeta[id]))
+          .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
       },
 
       speak: function (text, p) {
+        const voice = p.voice || (staticVoices[0] && staticVoices[0].id) || 'af_heart';
+
+        if (mode === 'server') {
+          return fetch(host + '/v1/audio/speech', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'kokoro',
+              input: text,
+              voice: voice,
+              speed: p.speed || 1,
+              response_format: 'mp3',
+            }),
+          }).then(res => {
+            if (!res.ok) {
+              return res.text().then(t => {
+                throw new Error('Kokoro server HTTP ' + res.status + ': ' + t.slice(0, 200));
+              });
+            }
+            return res.blob();
+          }).then(playBlob);
+        }
+
         return new Promise((resolve, reject) => {
           resolveSpeak = resolve;
 
@@ -529,7 +606,7 @@
           worker.postMessage({
             action: 'generate',
             text: text,
-            voice: p.voice || 'af_heart',
+            voice: voice,
             speed: p.speed || 1,
           });
         });

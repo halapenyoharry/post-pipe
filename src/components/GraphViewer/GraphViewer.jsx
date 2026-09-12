@@ -145,6 +145,7 @@ function makeCardSizeFor(CARD) {
 
 export function GraphViewer({
   feedData, onNodeSelect, hiddenSources, viewState, layout = 'force', timeAxis, graphSettings,
+  colorOverrides,
 }) {
   // Visual parameters come from settings.json so they can be tuned without a
   // rebuild. The defaults here are the values they replaced, so a missing or
@@ -215,6 +216,16 @@ export function GraphViewer({
     if (!svgRef.current) return;
     applyVisibility(svgRef.current, hiddenSourcesRef.current);
   }, [hiddenSources]);
+
+  // Settings writes a color profile to viewState; this repaints instantly by
+  // setting the CSS custom properties every bubble and card already reads
+  // via var(...) — no simulation rebuild, no React re-render of any node.
+  useEffect(() => {
+    if (!containerRef.current || !colorOverrides) return;
+    for (const [prop, value] of Object.entries(colorOverrides)) {
+      if (value) containerRef.current.style.setProperty(prop, value);
+    }
+  }, [colorOverrides]);
 
   useEffect(() => {
     if (!feedData || !containerRef.current) return;
@@ -617,7 +628,10 @@ export function GraphViewer({
         // same code can run again once the webfont has loaded.
         const rectEl = el.insert('rect', 'text')
           .attr('rx', TAG.cornerRadius).attr('ry', TAG.cornerRadius)
-          .attr('fill', d.color).attr('opacity', TAG.opacity);
+          // A CSS var reference, not the baked d.color value, so changing a
+          // color in Settings repaints every bubble instantly — no rebuild.
+          .attr('fill', 'var(--gv-' + (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') + ')')
+          .attr('opacity', TAG.opacity);
         const entry = { d, textEl, rectEl, lines, fontSize, lineH: effLineH };
         tagBubbles.push(entry);
         fitBubble(entry);

@@ -124,6 +124,27 @@ test('hidden feeds round-trip and toggle', async () => {
   assert.strictEqual(s.isHidden('sciencedaily'), false);
 });
 
+test('a feed color override round-trips and is undoable', async () => {
+  const s = mk(); await s.ready();
+  assert.strictEqual(s.sourceColor('sciencedaily'), null);
+  s.setSourceColor('sciencedaily', '#ff8800');
+  assert.strictEqual(s.sourceColor('sciencedaily'), '#ff8800');
+  s.undo();
+  assert.strictEqual(s.sourceColor('sciencedaily'), null);
+});
+
+test('a color profile replaces the whole graph palette at once', async () => {
+  const s = mk(); await s.ready();
+  s.applyColorProfile('cool', { tag: '#111', topology: '#222' });
+  assert.deepStrictEqual(s.graphColors(), { tag: '#111', topology: '#222' });
+  assert.strictEqual(s.colorProfileId(), 'cool');
+  // A single key can then be nudged without losing the rest of the profile —
+  // but it no longer counts as exactly that preset.
+  s.setGraphColor('tag', '#333');
+  assert.deepStrictEqual(s.graphColors(), { tag: '#333', topology: '#222' });
+  assert.strictEqual(s.colorProfileId(), null);
+});
+
 test('prune keeps everything present and caps what is gone', async () => {
   let t = 0;
   const s = mk({ now: () => ++t }); await s.ready();

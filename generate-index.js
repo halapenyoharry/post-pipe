@@ -237,6 +237,7 @@ window.TTS_CONFIG = {
   defaultEngine: '${SETTINGS.tts?.default_engine || 'browser'}',
   kokoroMode: '${SETTINGS.tts?.engines?.kokoro?.mode || 'wasm'}',
   kokoroHost: '${SETTINGS.tts?.engines?.kokoro?.host || ''}',
+  kokoroVoices: ${JSON.stringify(SETTINGS.tts?.engines?.kokoro?.voices || [])},
 ${geminiConfigBlock()}};
 </script>
 <script>
@@ -261,7 +262,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -314,6 +315,22 @@ ${reactJs}
         viewState.toggleSource(sourceId);
       }, []);
 
+      // Settings writes logical color keys (draft/published/tag/topology/
+      // placeholder); this translates them to the actual CSS custom
+      // property names the graph and article cards read via var(...).
+      const colorOverrides = React.useMemo(function () {
+        const graphColors = viewState.graphColors();
+        const keyToVar = {
+          draft: '--nv-draft', published: '--nv-published', tag: '--gv-tag-color',
+          topology: '--gv-topology-color', placeholder: '--gv-placeholder-color'
+        };
+        const out = {};
+        for (const key of Object.keys(keyToVar)) {
+          if (graphColors[key]) out[keyToVar[key]] = graphColors[key];
+        }
+        return out;
+      }, [viewState.state.graphColors]);
+
       if (!hydrated) return null;
 
       return React.createElement(React.Fragment, null,
@@ -327,16 +344,19 @@ ${reactJs}
             setSelectedArticle(article);
           },
           hiddenSources: hiddenSources,
-          viewState: viewState
+          viewState: viewState,
+          colorOverrides: colorOverrides
         }),
         React.createElement(FeedZ, {
           sources: feed._sources || [],
           hiddenSources: hiddenSources,
-          onToggleSource: toggleSource
+          onToggleSource: toggleSource,
+          viewState: viewState
         }),
         React.createElement(LayoutControls, null),
         React.createElement(TimeAxisControls, null),
         React.createElement(HistoryControls, null),
+        React.createElement(Settings, { viewState: viewState }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
           onClose: function () { setSelectedArticle(null); },
@@ -477,8 +497,12 @@ ${reactJs}
       if (ttsMount && !ttsMount.dataset.mounted) {
         ttsMount.dataset.mounted = 'true';
         const ttsRoot = ReactDOM.createRoot(ttsMount);
-        // The reader body is the element we want to scroll/read
-        const readerBody = document.querySelector('[class*="ReaderPanel_body"]');
+        // The reader body is the element we want to scroll/read. Matched by
+        // a plain data attribute, not a CSS-module class name — Vite's
+        // module hashing produces names like "_body_t9314_261" with no
+        // "ReaderPanel" substring, so a class-name query here never matched
+        // anything and every Play press silently no-opped on every engine.
+        const readerBody = document.querySelector('[data-tts-target]');
         const ref = { current: readerBody };
         ttsRoot.render(React.createElement(TTS, { targetRef: ref }));
       }

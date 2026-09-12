@@ -8,6 +8,14 @@
   --gv-placeholder-color: #7f8c8d;
   --gv-accent: #64ffda;
 
+  /* TextView (article cards) reads these — declared here, on the shared
+     ancestor of every card, so Settings' color profile can override them
+     for the whole graph in one place. See TextView.module.css for why they
+     are deliberately NOT redeclared closer to the card itself. */
+  --nv-accent: #64ffda;
+  --nv-published: #2ecc71;
+  --nv-draft: #555;
+
   width: var(--gv-width);
   height: var(--gv-height);
   position: relative;

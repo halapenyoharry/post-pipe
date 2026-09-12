@@ -17,8 +17,10 @@ import styles from './FeedZ.module.css';
  *   sources        — array from feed._sources
  *   hiddenSources  — Set<string> of source ids currently hidden
  *   onToggleSource — (sourceId) => void
+ *   viewState      — optional; enables the dot's color-ring picker and
+ *                    persists the reader's choice per source
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState }) {
   if (!sources || sources.length === 0) return null;
 
   const hidden = hiddenSources || new Set();
@@ -31,6 +33,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource }) {
           source={src}
           hidden={hidden.has(src.id)}
           onToggle={() => onToggleSource && onToggleSource(src.id)}
+          viewState={viewState}
         />
       ))}
       <AddPill />
@@ -38,20 +41,116 @@ export function FeedZ({ sources, hiddenSources, onToggleSource }) {
   );
 }
 
-function FeedPill({ source, hidden, onToggle }) {
+// The pill is a div (not a <button>) because it hosts a real interactive
+// control of its own — the dot's ring picker is a set of <button>s, and
+// nesting <button> inside <button> is invalid HTML that browsers handle
+// inconsistently (the outer control can silently stop receiving events).
+// role="button" + a key handler keep it keyboard-operable regardless.
+function FeedPill({ source, hidden, onToggle, viewState }) {
   const title = source.title || source.id;
   const ok = source.ok !== false;
+  const color = (viewState && viewState.sourceColor(source.id)) || source.color;
   return (
-    <button
+    <div
       className={`${styles.pill} ${hidden ? styles.hidden : ''} ${!ok ? styles.failed : ''}`}
       onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+      role="button"
+      tabIndex={0}
       title={hidden ? `Show ${title}` : `Hide ${title}`}
-      style={{ '--pill-color': source.color }}
+      style={{ '--pill-color': color }}
     >
-      <span className={styles.dot} aria-hidden="true" />
+      <FeedDot color={color} sourceId={source.id} viewState={viewState} />
       <span className={styles.title}>{title}</span>
       <span className={styles.count}>{source.itemCount}</span>
-    </button>
+    </div>
+  );
+}
+
+// A curated spread of hues, not a full wheel — easy to hit on a touch
+// screen, wide enough to actually distinguish feeds from each other.
+const RING_COLORS = [
+  '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
+  '#1abc9c', '#3498db', '#9b59b6', '#e84393',
+];
+
+// Dwell duration before hovering the dot opens the ring on its own, for
+// anyone who doesn't want to click/tap at all.
+const DWELL_MS = 650;
+
+function FeedDot({ color, sourceId, viewState }) {
+  const [ringOpen, setRingOpen] = useState(false);
+  const dwellTimer = useRef(null);
+
+  useEffect(() => () => { if (dwellTimer.current) clearTimeout(dwellTimer.current); }, []);
+
+  const openRing = (e) => {
+    e.stopPropagation();
+    setRingOpen(true);
+  };
+  const closeRing = (e) => {
+    if (e) e.stopPropagation();
+    setRingOpen(false);
+  };
+
+  const handleMouseEnter = () => {
+    dwellTimer.current = setTimeout(() => setRingOpen(true), DWELL_MS);
+  };
+  const handleMouseLeave = () => {
+    if (dwellTimer.current) { clearTimeout(dwellTimer.current); dwellTimer.current = null; }
+  };
+
+  const pick = (c, e) => {
+    e.stopPropagation();
+    if (viewState) viewState.setSourceColor(sourceId, c);
+    setRingOpen(false);
+  };
+
+  // A downward arc, not a full circle — the pill bar sits right at the top
+  // edge of the viewport, so a ring centered on the dot would be clipped
+  // above the browser window. Spanning just below the dot keeps every
+  // swatch reachable no matter how close to the top the pill sits.
+  const RADIUS = 30;
+  const START_DEG = 15;
+  const END_DEG = 165;
+  const n = RING_COLORS.length;
+
+  return (
+    <span
+      className={styles.dotWrap}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={openRing}
+      onTouchEnd={openRing}
+    >
+      <span
+        className={`${styles.dot} ${ringOpen ? styles.dotActive : ''}`}
+        aria-hidden="true"
+      />
+      {ringOpen && (
+        <>
+          <span className={styles.ringBackdrop} onClick={closeRing} onTouchEnd={closeRing} />
+          <span className={styles.ring}>
+            {RING_COLORS.map((c, i) => {
+              const deg = n === 1 ? START_DEG : START_DEG + (i / (n - 1)) * (END_DEG - START_DEG);
+              const rad = (deg * Math.PI) / 180;
+              const dx = RADIUS * Math.cos(rad);
+              const dy = RADIUS * Math.sin(rad);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  className={`${styles.swatch} ${c.toLowerCase() === String(color).toLowerCase() ? styles.swatchCurrent : ''}`}
+                  style={{ left: (dx - 8) + 'px', top: (dy - 8) + 'px', background: c }}
+                  onClick={(e) => pick(c, e)}
+                  title={c}
+                />
+              );
+            })}
+          </span>
+        </>
+      )}
+    </span>
   );
 }
 
