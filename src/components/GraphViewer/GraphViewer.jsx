@@ -957,6 +957,15 @@ export function GraphViewer({
     let hasSettled = false;
     simulation.on('end', () => {
       hasSettled = true;
+      // This simulation runs for the whole mount's lifetime regardless of
+      // which layout is on screen — switching to ring or timeline just pins
+      // every node's fx/fy to that layout's coordinates while this keeps
+      // ticking underneath. If alpha happens to cross the end threshold
+      // while a different layout is showing, d.x/d.y are that layout's
+      // coordinates, not a converged cluster — treating them as one here
+      // would bake, e.g., timeline's shape into cluster permanently. Only
+      // capture the arrangement when cluster is actually what's displayed.
+      if (layoutRef.current !== 'force') return;
       data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; d._forcePos = { x: d.x, y: d.y }; });
       // The layout the simulation settled on is itself an arrangement worth
       // keeping — otherwise every reload reshuffles a graph the reader has
