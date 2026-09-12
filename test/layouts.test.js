@@ -4,7 +4,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { radialLayout, timelineLayout, computeLayout, layoutNames } = require('../src/components/GraphViewer/layouts');
+const { radialLayout, timelineLayout, computeLayout, layoutNames, layoutIsDegenerate } = require('../src/components/GraphViewer/layouts');
 
 const article = (id, extra = {}) => ({ id, type: 'article', ...extra });
 const tag = (id) => ({ id, type: 'tag', _r: 60 });
@@ -138,4 +138,34 @@ test('timeline keeps exact order despite compressing the gaps', () => {
   const pos = timelineLayout(nodes, CARD);
   assert.ok(pos.a.x < pos.b.x, 'years before hours');
   assert.ok(pos.b.x < pos.c.x, 'and an hour still advances');
+});
+
+test('an unsettled heap is recognised as not an arrangement', () => {
+  // d3 seeds nodes on a spiral about 10*sqrt(i) across. For 178 nodes that is
+  // roughly 260px wide — which is what a page that never got an animation
+  // frame leaves behind, and what must never be persisted or restored.
+  const heap = [...Array(178)].map((_, i) => {
+    const r = 10 * Math.sqrt(i);
+    const a = i * 2.4;
+    return { x: r * Math.cos(a), y: r * Math.sin(a) };
+  });
+  assert.strictEqual(layoutIsDegenerate(heap, { width: 180, height: 140 }), true);
+});
+
+test('a real arrangement is not mistaken for a heap', () => {
+  const real = radialLayout([...Array(178)].map((_, i) => article('a' + i)), CARD);
+  assert.strictEqual(
+    layoutIsDegenerate(Object.values(real), { width: 180, height: 140 }), false,
+  );
+  const line = timelineLayout(
+    [...Array(60)].map((_, i) => article('a' + i, { date: '2026-0' + ((i % 9) + 1) + '-01' })), CARD,
+  );
+  assert.strictEqual(
+    layoutIsDegenerate(Object.values(line), { width: 180, height: 140 }), false,
+  );
+});
+
+test('too few nodes to judge is left alone', () => {
+  const few = [...Array(5)].map((_, i) => ({ x: i, y: i }));
+  assert.strictEqual(layoutIsDegenerate(few, { width: 180, height: 140 }), false);
 });

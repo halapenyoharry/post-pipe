@@ -83,6 +83,10 @@
 /* Scrollable body (expanded state). Tag class .rp-scroll is also applied
    so GraphViewer's wheel-stop handler can find it. */
 .scroll {
+  /* Takes the vertical gesture back from the canvas so a card's text can be
+     scrolled with a thumb. Horizontal is left to d3.zoom, so a sideways drag
+     still pans the graph rather than doing nothing. */
+  touch-action: pan-y;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.78);
   line-height: 1.45;
@@ -232,4 +236,28 @@
 .resizeGrip:hover {
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.08);
+}
+
+
+/* Touch targets. Under a mouse a 16px grip is comfortable; under a thumb it is
+   a near miss. The visual stays the same size — only the area that responds
+   grows, so nothing looks heavier on a phone than it does on a desktop. */
+@media (pointer: coarse) {
+  .resizeGrip {
+    width: 34px;
+    height: 34px;
+    right: 0;
+    bottom: 0;
+  }
+
+  .popout {
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  /* No hover on touch, so the hover affordance would leave the grip invisible
+     until it was already being used. */
+  .resizeGrip {
+    color: rgba(255, 255, 255, 0.6);
+  }
 }

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
-import { computeLayout } from './layouts';
+import { computeLayout, layoutIsDegenerate } from './layouts';
 
 // Transform the raw feed JSON into graph nodes and links.
 function feedToGraph(feed, config = {}) {
@@ -217,7 +217,27 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     // Restore anything the reader has already placed. Setting fx/fy pins the
     // node, so the simulation lays out only what has never been positioned and
     // arranges the rest around the reader's choices rather than over them.
+    // A stored arrangement is only worth restoring if it is a real one.
+    //
+    // The simulation runs on requestAnimationFrame, so a page that is never
+    // looked at never lays out — and if anything wrote those unsettled
+    // positions to storage, every later load would restore the pile and skip
+    // both the settle and the fit, because it looked like the reader had an
+    // arrangement. The graph would be permanently broken by one bad load.
+    //
+    // The check is area: a layout needs room for its nodes. Anything occupying
+    // a small fraction of that is not an arrangement, whatever produced it.
+    let positionsWereDegenerate = false;
     if (viewStateRef.current) {
+      const restored = data.nodes
+        .map(d => viewStateRef.current.nodeState(positionKey(d)))
+        .filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+      positionsWereDegenerate = layoutIsDegenerate(
+        restored, cardSizeFor({ hovered: false, pinned: false }),
+      );
+    }
+
+    if (viewStateRef.current && !positionsWereDegenerate) {
       for (const d of data.nodes) {
         const saved = viewStateRef.current.nodeState(positionKey(d));
         const savedSize = viewStateRef.current.nodeState(persistKey(d));
@@ -225,6 +245,14 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
           d.x = saved.x; d.y = saved.y;
           d.fx = saved.x; d.fy = saved.y;
         }
+        if (savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
+          d._size = { width: savedSize.w, height: savedSize.h };
+        }
+      }
+    } else if (viewStateRef.current) {
+      // Positions rejected, but a card the reader resized is still their work.
+      for (const d of data.nodes) {
+        const savedSize = viewStateRef.current.nodeState(persistKey(d));
         if (savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
           d._size = { width: savedSize.w, height: savedSize.h };
         }
@@ -265,6 +293,21 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       .enter().append('g')
       .attr('class', 'node')
       .call(d3.drag()
+        // Under a mouse, moving a card and scrolling its text are different
+        // gestures — drag versus wheel. Under a thumb they are the same
+        // gesture, and drag would win every time, so a card's text could never
+        // be scrolled on a phone. A touch that starts inside the scrollable
+        // body is left to the browser, which the CSS has already told to pan
+        // vertically there; anywhere else on the card still moves it.
+        .filter((event) => {
+          if (event.ctrlKey) return false;
+          if (event.button !== undefined && event.button !== 0) return false;
+          if (event.pointerType === 'touch' || event.type === 'touchstart') {
+            const t = event.target;
+            if (t && t.closest && t.closest('.rp-scroll')) return false;
+          }
+          return true;
+        })
         .on('start', (event, d) => {
           // Bypass the simulation entirely. We don't restart d3-force —
           // dragging directly updates this node's transform and its
@@ -847,10 +890,17 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       // started to learn the shape of. Recorded without history: the reader
       // did not do this, so there is nothing for them to undo.
       const vs = viewStateRef.current;
+      // Symmetric to the restore guard: a heap is not worth writing either.
+      // Whatever produced this one, storing it would hand the next load a
+      // layout it would then have to reject.
+      if (layoutIsDegenerate(data.nodes, cardSizeFor({ hovered: false, pinned: false }))) return;
+
       let anyRestored = false;
       if (vs) {
         for (const d of data.nodes) {
-          if (vs.nodeState(positionKey(d))) anyRestored = true;
+          // A rejected arrangement is overwritten rather than preserved,
+          // otherwise the bad layout survives the very pass that replaced it.
+          if (!positionsWereDegenerate && vs.nodeState(positionKey(d))) anyRestored = true;
           else vs.setNodePosition(positionKey(d), d.x, d.y, { silent: true });
         }
       }

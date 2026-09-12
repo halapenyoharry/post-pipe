@@ -202,6 +202,37 @@ function timelineLayout(nodes, opts = {}) {
   return out;
 }
 
+/**
+ * Is this set of positions a real arrangement, or a heap?
+ *
+ * The simulation runs on requestAnimationFrame, so a page that is never looked
+ * at never lays out, and its nodes sit in d3's initial spiral — a couple of
+ * hundred pixels across whatever the corpus size. Persisting that heap and
+ * restoring it later breaks the graph permanently: it looks like an
+ * arrangement, so the next load skips both the settle and the fit.
+ *
+ * Area is the test. A layout needs room for its nodes; anything occupying a
+ * small fraction of that is not one, whatever produced it. Deliberately
+ * generous, because the cost of rejecting a real arrangement is one relayout
+ * and the cost of accepting a heap is a permanently broken graph.
+ *
+ * @param {Array<{x:number,y:number}>} positions
+ * @param {{width:number,height:number}} card
+ * @param {number} [fraction] share of the needed area below which it is a heap
+ */
+function layoutIsDegenerate(positions, card, fraction = 0.3) {
+  const pts = (positions || []).filter(
+    (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y),
+  );
+  if (pts.length <= 8) return false;   // too few to judge; leave it alone
+
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const area = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+  const needed = pts.length * card.width * card.height;
+  return area < needed * fraction;
+}
+
 const LAYOUTS = {
   force: null,        // the simulation owns this one; see GraphViewer
   radial: radialLayout,
@@ -217,4 +248,4 @@ function computeLayout(name, nodes, opts) {
   return fn ? fn(nodes, opts) : null;
 }
 
-module.exports = { radialLayout, timelineLayout, computeLayout, layoutNames, LAYOUTS };
+module.exports = { radialLayout, timelineLayout, computeLayout, layoutNames, layoutIsDegenerate, LAYOUTS };

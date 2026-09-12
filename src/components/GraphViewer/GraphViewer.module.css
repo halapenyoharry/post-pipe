@@ -16,6 +16,12 @@
   overflow: visible;
   user-select: none;
   -webkit-user-select: none;
+
+  /* The canvas owns every touch gesture on it: d3.zoom does the panning and
+     pinching, and the browser must not also try to scroll the page or
+     double-tap-zoom underneath it. Elements that need a gesture back — the
+     scrollable body inside a card — opt in individually. */
+  touch-action: none;
 }
 
 .graphContainer :global(.node) {
@@ -61,4 +67,14 @@
 .graphContainer :global(.rp-scroll)::-webkit-scrollbar-thumb {
   background: rgba(100, 255, 218, 0.3);
   border-radius: 2px;
+}
+
+
+/* A coarse pointer has no hover and a much larger contact patch, so the small
+   controls that are fine under a mouse are not reachable under a thumb. The
+   node itself is already thumb-sized; these are the parts that were not. */
+@media (pointer: coarse) {
+  .graphContainer :global(.node) {
+    cursor: default;
+  }
 }
