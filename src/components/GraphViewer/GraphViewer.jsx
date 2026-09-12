@@ -113,6 +113,11 @@ const GLOW_PAD = 16;
 // Uniform padding on all four sides of a tag bubble.
 const TAG_PAD = 11;
 
+// Bounds for a hand-resized card. Below the minimum the label stops fitting;
+// above the maximum one node eats the graph.
+const MIN_CARD = { width: 110, height: 80 };
+const MAX_CARD = { width: 620, height: 520 };
+
 function cardSizeFor({ hovered, pinned }) {
   if (pinned) return { width: 230, height: 190 };
   if (hovered) return { width: 200, height: 160 };
@@ -209,6 +214,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           d.x = saved.x; d.y = saved.y;
           d.fx = saved.x; d.fy = saved.y;
         }
+        if (saved && typeof saved.w === 'number' && typeof saved.h === 'number') {
+          d._size = { width: saved.w, height: saved.h };
+        }
       }
     }
 
@@ -252,8 +260,37 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           // incident link endpoints below. Nothing else in the graph
           // moves, period.
           d.fx = d.x; d.fy = d.y;
+
+          // A drag that begins on the resize grip resizes instead of moving.
+          // Same gesture, same handler; only the thing it changes differs.
+          const target = event.sourceEvent && event.sourceEvent.target;
+          d._resizing = Boolean(target && target.closest && target.closest('[data-resize="1"]'));
+          if (d._resizing) {
+            const start = d._size || cardSizeFor({
+              hovered: hoveredIdRef.current === d.id,
+              pinned: pinnedIdRef.current === d.id,
+            });
+            d._resizeFrom = { w: start.width, h: start.height, x: event.x, y: event.y };
+          }
         })
         .on('drag', (event, d) => {
+          if (d._resizing) {
+            // The card is centred on the node, so the grip travels half as far
+            // as the edge it is pulling — hence the doubling.
+            const f = d._resizeFrom;
+            const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+            d._size = {
+              width: clamp(f.w + (event.x - f.x) * 2, MIN_CARD.width, MAX_CARD.width),
+              height: clamp(f.h + (event.y - f.y) * 2, MIN_CARD.height, MAX_CARD.height),
+            };
+            renderArticleBody(d);
+            if (viewStateRef.current) {
+              viewStateRef.current.setNodeSize(
+                persistKey(d), d._size.width, d._size.height, { transient: true },
+              );
+            }
+            return;
+          }
           d.x = event.x; d.y = event.y;
           d.fx = event.x; d.fy = event.y;
           if (viewStateRef.current) {
@@ -274,9 +311,15 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
           });
         })
         .on('end', (event, d) => {
+          const vs = viewStateRef.current;
+          if (d._resizing) {
+            d._resizing = false;
+            // The resize is one history entry, like the drag.
+            if (vs) vs.commit();
+            return;
+          }
           d.fx = d.x; d.fy = d.y;
           // One history entry for the whole drag, not one per frame.
-          const vs = viewStateRef.current;
           if (vs) {
             vs.setNodePosition(persistKey(d), d.x, d.y, { transient: true });
             vs.commit();
@@ -517,7 +560,10 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState }
       const hovered = hoveredIdRef.current === d.id;
       const pinned = pinnedIdRef.current === d.id;
       const lod = getLOD(zoomScaleRef.current);
-      const { width: w, height: h } = cardSizeFor({ hovered, pinned });
+      // A size the reader set outright replaces the state-based default. They
+      // asked for that size; growing it further on hover would be the graph
+      // arguing with them.
+      const { width: w, height: h } = d._size || cardSizeFor({ hovered, pinned });
 
       d3.select(entry.fo)
         .attr('width', w + GLOW_PAD * 2).attr('height', h + GLOW_PAD * 2)

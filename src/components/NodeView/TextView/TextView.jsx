@@ -120,6 +120,7 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         fullContent={fullContent}
       />
       {pinned && <PopoutButton />}
+      {pinned && <ResizeGrip />}
     </div>
   );
 }
@@ -276,6 +277,26 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft }) {
         {article.short_title || article.title || article.label}
       </div>
       {pinned && <PopoutButton />}
+      {pinned && <ResizeGrip />}
+    </div>
+  );
+}
+
+// Grip for resizing the card. Only while pinned: at rest a card is a label,
+// and a handle sitting on every node would be a hundred invitations to fiddle.
+// D3 owns the gesture — this element only marks where it starts.
+function ResizeGrip() {
+  return (
+    <div data-resize="1" title="Drag to resize" className={styles.resizeGrip}>
+      <svg
+        data-resize="1"
+        viewBox="0 0 12 12"
+        width="12"
+        height="12"
+        style={{ pointerEvents: 'none' }}
+      >
+        <path d="M11 4 L4 11 M11 8 L8 11" stroke="currentColor" strokeWidth="1.4" fill="none" />
+      </svg>
     </div>
   );
 }

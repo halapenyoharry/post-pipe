@@ -290,10 +290,15 @@ function createViewState(opts = {}) {
       });
     },
 
+    // Resizing is as much an act of arrangement as moving, so it clears the
+    // generated flag too. Without this, a card the reader sized but never
+    // dragged would still count as the layout's and be thrown away by the next
+    // layout-version bump.
     setNodeSize(id, w, h, { transient = false, silent = false } = {}) {
       const apply = silent ? updateSilent : transient ? updateTransient : update;
       apply((s) => {
         s.nodes[id] = { ...(s.nodes[id] || {}), w, h, t: now() };
+        if (!silent) delete s.nodes[id].auto;
       });
     },
 

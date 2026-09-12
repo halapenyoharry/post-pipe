@@ -259,3 +259,17 @@ test('dragging a generated position makes it the reader\'s', async () => {
   await b.ready();
   assert.strictEqual(b.nodeState('n').x, 9, 'a node you touched is no longer the layout\'s to reset');
 });
+
+test('resizing a generated node makes it the reader\'s, like moving it does', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
+  await a.ready();
+  a.setNodePosition('n', 1, 1, { silent: true });   // the layout placed it
+  a.setNodeSize('n', 400, 300);                     // the reader sized it
+  await a.flush();
+
+  const b = mk({ backend, corpusId: 'c', layoutVersion: 'v2' });
+  await b.ready();
+  assert.ok(b.nodeState('n'), 'a card you resized is not the layout\'s to discard');
+  assert.strictEqual(b.nodeState('n').w, 400);
+});
