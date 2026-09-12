@@ -4,7 +4,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { radialLayout, timelineLayout, computeLayout, layoutNames, layoutIsDegenerate } = require('../src/components/GraphViewer/layouts');
+const {
+  radialLayout, timelineLayout, computeLayout, layoutNames,
+  layoutIsDegenerate, timeAxisGeometry, compressedTimeScale,
+} = require('../src/components/GraphViewer/layouts');
 
 const article = (id, extra = {}) => ({ id, type: 'article', ...extra });
 const tag = (id) => ({ id, type: 'tag', _r: 60 });
@@ -191,4 +194,76 @@ test('a real arrangement is not mistaken for a heap', () => {
 test('too few nodes to judge is left alone', () => {
   const few = [...Array(5)].map((_, i) => ({ x: i, y: i }));
   assert.strictEqual(layoutIsDegenerate(few, { width: 180, height: 140 }), false);
+});
+
+// ── the time axis ───────────────────────────────────────────────────────────
+// A spine with pieces hanging off their own date. Unlike the timeline layout it
+// spends no position, so it composes with whatever arrangement is on screen.
+
+const dat = (id, date) => article(id, { date });
+const SPAN = 4000;
+const axisOpts = (orientation) => ({ orientation, origin: { x: 0, y: -900 }, length: SPAN });
+
+test('axis runs the direction its orientation says', () => {
+  const nodes = [dat('a', '2024-01-01'), dat('b', '2026-01-01')];
+  const dirs = {
+    ltr: (g) => g.to.x > g.from.x && g.to.y === g.from.y,
+    rtl: (g) => g.to.x < g.from.x && g.to.y === g.from.y,
+    ttb: (g) => g.to.y > g.from.y && g.to.x === g.from.x,
+    btt: (g) => g.to.y < g.from.y && g.to.x === g.from.x,
+  };
+  for (const [o, ok] of Object.entries(dirs)) {
+    assert.ok(ok(timeAxisGeometry(nodes, axisOpts(o))), `${o} ran the wrong way`);
+  }
+});
+
+test('earlier is always earlier, whichever way the axis points', () => {
+  const nodes = [dat('old', '2020-01-01'), dat('mid', '2023-01-01'), dat('new', '2026-01-01')];
+  for (const o of ['ltr', 'rtl', 'ttb', 'btt']) {
+    const g = timeAxisGeometry(nodes, axisOpts(o));
+    const d = (id) => Math.hypot(g.anchors[id].x - g.from.x, g.anchors[id].y - g.from.y);
+    assert.ok(d('old') < d('mid') && d('mid') < d('new'), `order broke under ${o}`);
+  }
+});
+
+test('right-to-left is a mirror, not a reversal of meaning', () => {
+  // The Arabic reader sees the same shape, not the corpus backwards.
+  const nodes = [dat('old', '2020-01-01'), dat('new', '2026-01-01')];
+  const l = timeAxisGeometry(nodes, axisOpts('ltr'));
+  const r = timeAxisGeometry(nodes, axisOpts('rtl'));
+  assert.strictEqual(l.anchors.new.x - l.from.x, -(r.anchors.new.x - r.from.x));
+});
+
+test('every dated piece gets an anchor and no undated one is invented', () => {
+  const nodes = [dat('a', '2024-01-01'), dat('b', '2025-01-01'), article('nodate')];
+  const g = timeAxisGeometry(nodes, axisOpts('ltr'));
+  assert.deepStrictEqual(Object.keys(g.anchors).sort(), ['a', 'b']);
+});
+
+test('ticks are round dates, not the corpus\'s own timestamps', () => {
+  const nodes = [dat('a', '2021-03-17T04:21:00Z'), dat('b', '2025-11-02T19:03:00Z')];
+  const g = timeAxisGeometry(nodes, axisOpts('ltr'));
+  assert.ok(g.ticks.length >= 3, 'a four-year span should carry year ticks');
+  assert.deepStrictEqual(g.ticks.map((t) => t.label), ['2022', '2023', '2024', '2025']);
+});
+
+test('ticks tighten to months once the span is short', () => {
+  const nodes = [dat('a', '2026-02-01'), dat('b', '2026-08-01')];
+  const g = timeAxisGeometry(nodes, axisOpts('ltr'));
+  assert.ok(g.ticks.every((t) => /[A-Za-z]{3} \d\d/.test(t.label)), g.ticks.map(t => t.label).join(','));
+});
+
+test('the axis and the timeline layout agree about where a date sits', () => {
+  // Both go through compressedTimeScale, so a piece cannot be at one point on
+  // the spine and a different one in the layout.
+  const times = [Date.parse('2020-01-01'), Date.parse('2026-01-01'), Date.parse('2026-01-02')];
+  const s = compressedTimeScale(times, { span: 1000 });
+  assert.strictEqual(s.position(times[0]), 0);
+  assert.strictEqual(Math.round(s.position(times[2])), 1000);
+  assert.ok(s.position(times[1]) > 0 && s.position(times[1]) < 1000);
+});
+
+test('a corpus with nothing to date has no axis rather than a broken one', () => {
+  assert.strictEqual(timeAxisGeometry([article('a'), article('b')], axisOpts('ltr')), null);
+  assert.strictEqual(timeAxisGeometry([dat('a', '2026-01-01')], axisOpts('ltr')), null);
 });

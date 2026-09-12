@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
-import { computeLayout, layoutIsDegenerate } from './layouts';
+import { computeLayout, layoutIsDegenerate, timeAxisGeometry } from './layouts';
 
 // Transform the raw feed JSON into graph nodes and links.
 function feedToGraph(feed, config = {}) {
@@ -125,7 +125,7 @@ function cardSizeFor({ hovered, pinned }) {
   return { width: 180, height: 140 };
 }
 
-export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, layout = 'force' }) {
+export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, layout = 'force', timeAxis }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -141,6 +141,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
   // The live graph, reachable from effects that must not rebuild it.
   const graphRef = useRef(null);
   const layoutRef = useRef(layout);
+  const axisFittedRef = useRef(false);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -281,6 +282,10 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       svg.attr('width', width).attr('height', height);
     };
     window.addEventListener('resize', handleResize);
+
+    // The time axis lives under everything else: it is a reference the corpus
+    // hangs from, not another thing competing for the foreground.
+    const axisLayer = g.append('g').attr('class', 'time-axis-layer');
 
     // Render links + nodes.
     const links = g.selectAll('.link')
@@ -843,7 +848,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
     }
 
-    graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport, simulation };
+    graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g };
 
     simulation.nodes(data.nodes).on('tick', applyPositions);
     simulation.force('link').links(data.links);
@@ -863,10 +868,21 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
-      const minX = Math.min(...pts.map(d => d.x)) - pad;
-      const maxX = Math.max(...pts.map(d => d.x)) + pad;
-      const minY = Math.min(...pts.map(d => d.y)) - pad;
-      const maxY = Math.max(...pts.map(d => d.y)) + pad;
+      const xsAll = pts.map(d => d.x);
+      const ysAll = pts.map(d => d.y);
+      // Include the axis when it is showing, or turning it on would push the
+      // reference off the edge of the view it is a reference for.
+      const box = axisLayer.node() && axisLayer.node().childNodes.length
+        ? axisLayer.node().getBBox()
+        : null;
+      if (box && box.width && box.height) {
+        xsAll.push(box.x, box.x + box.width);
+        ysAll.push(box.y, box.y + box.height);
+      }
+      const minX = Math.min(...xsAll) - pad;
+      const maxX = Math.max(...xsAll) + pad;
+      const minY = Math.min(...ysAll) - pad;
+      const maxY = Math.max(...ysAll) + pad;
       const w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
       const h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
       // A container with no size yet — hidden tab, collapsed pane, a layout
@@ -936,6 +952,119 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources, viewState, 
     // Deliberately depend only on feedData — onNodeSelect changes are
     // handled through onNodeSelectRef without rebuilding the simulation.
   }, [feedData]);
+
+  // The time axis. Drawn rather than laid out: it spends no position, so it
+  // composes with whatever arrangement is on screen and you can read topic and
+  // chronology at once. Redraws on its own state and on layout changes, since
+  // the pieces it connects to have moved.
+  useEffect(() => {
+    const g = graphRef.current;
+    if (!g || !g.axisLayer) return;
+    const axis = timeAxis || {};
+    g.axisLayer.selectAll('*').remove();
+    if (!axis.on) { axisFittedRef.current = false; return; }
+
+    // First time it is switched on, put it where the corpus actually is. A
+    // fixed default coordinate is fine until the graph has settled somewhere
+    // else entirely, at which point the reader turns the axis on and sees
+    // connectors leaving for somewhere off screen.
+    const arts = g.data.nodes.filter(n => n.type === 'article' && Number.isFinite(n.x));
+    if (!axis.placed && arts.length && viewStateRef.current) {
+      const xs = arts.map(n => n.x);
+      const ys = arts.map(n => n.y);
+      const vertical = axis.orientation === 'ttb' || axis.orientation === 'btt';
+      const origin = vertical
+        ? { x: Math.min(...xs) - 520, y: Math.min(...ys) - 120 }
+        : { x: Math.min(...xs) - 120, y: Math.min(...ys) - 520 };
+      viewStateRef.current.setTimeAxis({ ...origin, placed: true }, { transient: true });
+      viewStateRef.current.commit();
+      return; // the state change re-runs this effect with the new position
+    }
+
+    const geo = timeAxisGeometry(g.data.nodes, {
+      orientation: axis.orientation || 'ltr',
+      origin: { x: axis.x || 0, y: axis.y || 0 },
+      length: 4200,
+    });
+    if (!geo) return;
+
+    const root = g.axisLayer.append('g').attr('class', 'time-axis');
+
+    // Connectors first, so the spine sits on top of them. Faint on purpose:
+    // ninety of these at full strength would be a net thrown over the graph.
+    const conn = root.append('g').attr('class', 'time-connectors');
+    g.data.nodes.forEach((d) => {
+      const a = geo.anchors[d.id];
+      if (!a) return;
+      conn.append('line')
+        .attr('class', 'time-connector')
+        .attr('data-node', d.id)
+        .attr('x1', a.x).attr('y1', a.y)
+        .attr('x2', d.x).attr('y2', d.y)
+        .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
+        .attr('stroke-width', 1.4)
+        .attr('stroke-opacity', 0.22);
+    });
+
+    const spine = root.append('g').attr('class', 'time-spine').style('cursor', 'grab');
+    spine.append('line')
+      .attr('x1', geo.from.x).attr('y1', geo.from.y)
+      .attr('x2', geo.to.x).attr('y2', geo.to.y)
+      .attr('stroke', 'rgba(255,255,255,0.45)')
+      .attr('stroke-width', 3);
+
+    // A fat invisible line so the spine can be grabbed without precision.
+    spine.append('line')
+      .attr('x1', geo.from.x).attr('y1', geo.from.y)
+      .attr('x2', geo.to.x).attr('y2', geo.to.y)
+      .attr('stroke', 'transparent')
+      .attr('stroke-width', 46);
+
+    geo.ticks.forEach((t) => {
+      const across = geo.vertical ? { x: 16, y: 0 } : { x: 0, y: -16 };
+      spine.append('line')
+        .attr('x1', t.x).attr('y1', t.y)
+        .attr('x2', t.x + (geo.vertical ? -10 : 0)).attr('y2', t.y + (geo.vertical ? 0 : 10))
+        .attr('stroke', 'rgba(255,255,255,0.5)').attr('stroke-width', 2);
+      spine.append('text')
+        .attr('x', t.x + across.x).attr('y', t.y + across.y)
+        .attr('text-anchor', geo.vertical ? 'start' : 'middle')
+        .attr('dominant-baseline', geo.vertical ? 'central' : 'auto')
+        .style('font-family', "'Atkinson', sans-serif")
+        .style('font-size', '26px')
+        .style('fill', 'rgba(255,255,255,0.6)')
+        .style('pointer-events', 'none')
+        .text(t.label);
+    });
+
+    // Drag the whole axis. Grabbing it moves the reference, not the corpus.
+    let from = null;
+    spine.call(d3.drag()
+      .on('start', (event) => {
+        from = { x: axis.x || 0, y: axis.y || 0, ex: event.x, ey: event.y };
+        spine.style('cursor', 'grabbing');
+      })
+      .on('drag', (event) => {
+        if (!from || !viewStateRef.current) return;
+        viewStateRef.current.setTimeAxis({
+          x: from.x + (event.x - from.ex),
+          y: from.y + (event.y - from.ey),
+        }, { transient: true });
+      })
+      .on('end', () => {
+        spine.style('cursor', 'grab');
+        if (viewStateRef.current) viewStateRef.current.commit();
+        from = null;
+      }));
+
+    // Reframe once, when it first appears, so the axis and the corpus are on
+    // screen together. Not on every redraw — that would yank the view back
+    // every time the reader dragged the spine somewhere deliberate.
+    if (!axisFittedRef.current && g.fitToViewport) {
+      axisFittedRef.current = true;
+      setTimeout(() => g.fitToViewport(), 60);
+    }
+  }, [timeAxis, layout, feedData]);
 
   // Switching layout moves nodes; it does not rebuild the graph. Everything
   // already on screen stays mounted, so a reader who has a card open keeps it.

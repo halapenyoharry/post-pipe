@@ -290,3 +290,28 @@ test('prune matches the item, not the layout-prefixed position key', async () =>
   assert.ok(s.nodeState('https://x/a.html'), 'the unprefixed size entry survives too');
   assert.strictEqual(s.nodeState('force::https://x/gone.html'), null, 'a departed item still goes');
 });
+
+test('the time axis is positioned, oriented and remembered', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
+  assert.strictEqual(a.timeAxis().on, false, 'off until asked for');
+  a.setTimeAxis({ on: true, orientation: 'rtl' });
+  a.setTimeAxis({ x: 500, y: -200 });
+  await a.flush();
+
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  assert.deepStrictEqual(b.timeAxis(), { on: true, orientation: 'rtl', x: 500, y: -200 });
+});
+
+test('dragging the axis is one undo, not one per frame', async () => {
+  const s = mk(); await s.ready();
+  s.setTimeAxis({ on: true });
+  for (let x = 0; x < 20; x++) s.setTimeAxis({ x }, { transient: true });
+  s.commit();
+  assert.strictEqual(s.timeAxis().x, 19);
+  s.undo();
+  assert.strictEqual(s.timeAxis().x, 0, 'the whole drag came back');
+  assert.strictEqual(s.timeAxis().on, true, 'and nothing before it was disturbed');
+});

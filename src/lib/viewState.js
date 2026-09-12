@@ -26,6 +26,10 @@ function emptyState(corpusId, layoutVersion) {
     layout: 'force',
     hiddenSources: [],
     nodes: {},      // id -> { x, y, w, h, pinned, t }
+    // The time axis is a thing the reader positions and keeps, not a mode they
+    // re-enable every visit. Orientation lives here too: left-to-right is one
+    // culture's reading order, not a property of time.
+    timeAxis: { on: false, orientation: 'ltr', x: 0, y: -1000 },
     reading: {},    // id -> { scroll, seenAt, t }
   };
 }
@@ -303,6 +307,16 @@ function createViewState(opts = {}) {
     },
 
     setLayout(layout) { update((s) => { s.layout = layout; }); },
+
+    timeAxis() {
+      return state.timeAxis || { on: false, orientation: 'ltr', x: 0, y: -1000 };
+    },
+
+    setTimeAxis(patch, { transient = false } = {}) {
+      (transient ? updateTransient : update)((s) => {
+        s.timeAxis = { ...(s.timeAxis || {}), ...patch };
+      });
+    },
 
     toggleSource(sourceId) {
       update((s) => {

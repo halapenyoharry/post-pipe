@@ -311,6 +311,7 @@ ${reactJs}
         React.createElement(GraphViewer, {
           feedData: feed,
           layout: viewState.state.layout,
+          timeAxis: viewState.state.timeAxis,
           onNodeSelect: function (article) {
             if (article && article.originalItem) viewState.markSeen(article.originalItem.id);
             setSelectedArticle(article);
@@ -324,6 +325,7 @@ ${reactJs}
           onToggleSource: toggleSource
         }),
         React.createElement(LayoutControls, null),
+        React.createElement(TimeAxisControls, null),
         React.createElement(HistoryControls, null),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
@@ -369,6 +371,55 @@ ${reactJs}
           }
         }, l.label);
       }));
+    }
+
+    // The time axis: a spine the corpus hangs from, drawn over whatever layout
+    // is showing. Direction is a setting because left-to-right is one culture's
+    // reading order, not a property of time.
+    const ORIENTATIONS = [
+      { id: 'ltr', glyph: '\u2192', title: 'Time runs left to right' },
+      { id: 'rtl', glyph: '\u2190', title: 'Time runs right to left' },
+      { id: 'ttb', glyph: '\u2193', title: 'Time runs top to bottom' },
+      { id: 'btt', glyph: '\u2191', title: 'Time runs bottom to top' }
+    ];
+
+    function TimeAxisControls() {
+      const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
+      React.useEffect(function () { return viewState.subscribe(bump); }, []);
+      const axis = viewState.timeAxis();
+
+      function chip(content, title, on, onClick) {
+        return React.createElement('button', {
+          title: title,
+          onClick: onClick,
+          style: {
+            border: 0, borderRadius: '6px', padding: '5px 9px', cursor: 'pointer',
+            background: on ? 'rgba(255,255,255,0.14)' : 'transparent',
+            color: on ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
+            font: '12px/1 system-ui, sans-serif'
+          }
+        }, content);
+      }
+
+      const children = [
+        chip('time', 'Draw a time axis across the graph', axis.on,
+          function () { viewState.setTimeAxis({ on: !axis.on }); })
+      ];
+      if (axis.on) {
+        ORIENTATIONS.forEach(function (o) {
+          children.push(chip(o.glyph, o.title, axis.orientation === o.id,
+            function () { viewState.setTimeAxis({ orientation: o.id }); }));
+        });
+      }
+
+      return React.createElement('div', {
+        style: {
+          position: 'fixed', bottom: '14px', left: '268px',
+          display: 'flex', gap: '2px', zIndex: 40,
+          background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
+          border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
+        }
+      }, children);
     }
 
     // Previous / next through the reader's own arrangement.

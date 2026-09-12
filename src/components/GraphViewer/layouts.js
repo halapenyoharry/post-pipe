@@ -148,6 +148,53 @@ function radialLayout(nodes, opts = {}) {
 }
 
 /**
+ * Map times onto a compressed axis, shared by the timeline layout and the time
+ * axis so the two can never disagree about where a date sits.
+ *
+ * Gaps are compressed by a fourth root. This corpus is not linearly
+ * distributed in time — years of writing alongside eighty feed items from the
+ * last two days — and on a true scale the feed collapses into a single column
+ * while everything older smears into one edge. A year still reads as much
+ * wider than an hour, about ten times so rather than nine thousand. Order is
+ * exact; only spacing is compressed.
+ *
+ * @returns {{ position: (t:number)=>number, times: number[], span: number }}
+ */
+function compressedTimeScale(times, { span = 4200, minAdvance = 22, compression = 0.25 } = {}) {
+  const sorted = [...new Set(times)].sort((a, b) => a - b);
+  const raw = new Map();
+  let cursor = 0;
+  sorted.forEach((t, i) => {
+    if (i > 0) cursor += Math.max(minAdvance, Math.pow(t - sorted[i - 1], compression));
+    raw.set(t, cursor);
+  });
+  const rawSpan = Math.max(cursor, 1);
+
+  // Interpolate for a time that is not one of the corpus's own, which is what
+  // axis ticks are: round dates that no piece happens to sit on.
+  const position = (t) => {
+    if (raw.has(t)) return (raw.get(t) / rawSpan) * span;
+    if (!sorted.length) return 0;
+    if (t <= sorted[0]) return 0;
+    if (t >= sorted[sorted.length - 1]) return span;
+    let lo = 0;
+    let hi = sorted.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (sorted[mid] <= t) lo = mid;
+      else hi = mid;
+    }
+    const a = sorted[lo];
+    const b = sorted[hi];
+    const f = (t - a) / Math.max(b - a, 1);
+    const p = raw.get(a) + (raw.get(b) - raw.get(a)) * f;
+    return (p / rawSpan) * span;
+  };
+
+  return { position, times: sorted, span };
+}
+
+/**
  * Timeline. One real axis spent on time, which is the cheapest legibility a
  * corpus of this shape can buy: your own writing becomes a sparse spine across
  * years and a subscribed feed becomes a dense bar at today.
@@ -266,6 +313,93 @@ function layoutIsDegenerate(positions, card, fraction = 0.3) {
   return area < needed * fraction;
 }
 
+/**
+ * The time axis: a spine with pieces hanging off their own date.
+ *
+ * Different from the timeline layout, and complementary to it. The layout
+ * spends position on time, so it answers "when" at the cost of every other
+ * arrangement. The axis leaves position alone and draws time as a relation
+ * instead — which means it composes with the cluster or the ring, and you can
+ * read topic and chronology at the same time.
+ *
+ * Direction is a setting rather than an assumption. Left-to-right is one
+ * culture's reading order, not time's; right-to-left and both verticals are
+ * as valid, and a person who reads Arabic or traditional Japanese should not
+ * have to read this backwards.
+ *
+ * @param {Array} nodes
+ * @param {Object} axis
+ * @param {'ltr'|'rtl'|'ttb'|'btt'} axis.orientation
+ * @param {{x:number,y:number}} axis.origin  where the axis begins
+ * @param {number} axis.length
+ * @returns {{from, to, ticks, anchors, connectors}|null}
+ */
+function timeAxisGeometry(nodes, axis = {}) {
+  const { orientation = 'ltr', origin = { x: 0, y: 0 }, length = 4200 } = axis;
+
+  const timeOf = (n) => {
+    const t = Date.parse(n.date || '');
+    return Number.isNaN(t) ? null : t;
+  };
+  const dated = (nodes || []).filter((n) => n.type === 'article' && timeOf(n) !== null);
+  if (dated.length < 2) return null;
+
+  const scale = compressedTimeScale(dated.map(timeOf), { span: length });
+
+  // One vector for the whole thing. Everything downstream — the spine, the
+  // ticks, where a piece attaches — is this vector times a distance, so a new
+  // orientation is four numbers rather than four code paths.
+  const dir = {
+    ltr: { x: 1, y: 0 },
+    rtl: { x: -1, y: 0 },
+    ttb: { x: 0, y: 1 },
+    btt: { x: 0, y: -1 },
+  }[orientation] || { x: 1, y: 0 };
+
+  const along = (d) => ({ x: origin.x + dir.x * d, y: origin.y + dir.y * d });
+
+  const anchors = {};
+  dated.forEach((n) => { anchors[n.id] = along(scale.position(timeOf(n))); });
+
+  // Ticks on round dates rather than on the corpus's own timestamps, so the
+  // axis reads as a calendar and not as a list of when things happened to be
+  // published. Years while the span is long, months once it is not.
+  const first = scale.times[0];
+  const last = scale.times[scale.times.length - 1];
+  const YEAR = 365.25 * 24 * 3600 * 1000;
+  const byMonth = (last - first) < YEAR * 2;
+
+  const ticks = [];
+  const cursor = new Date(first);
+  cursor.setUTCDate(1);
+  cursor.setUTCHours(0, 0, 0, 0);
+  if (!byMonth) cursor.setUTCMonth(0);
+  for (let guard = 0; guard < 400; guard++) {
+    const t = cursor.getTime();
+    if (t > last) break;
+    if (t >= first) {
+      ticks.push({
+        t,
+        label: byMonth
+          ? cursor.toLocaleDateString('en', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+          : String(cursor.getUTCFullYear()),
+        ...along(scale.position(t)),
+      });
+    }
+    if (byMonth) cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    else cursor.setUTCFullYear(cursor.getUTCFullYear() + 1);
+  }
+
+  return {
+    orientation,
+    vertical: dir.x === 0,
+    from: along(0),
+    to: along(length),
+    ticks,
+    anchors,
+  };
+}
+
 const LAYOUTS = {
   force: null,        // the simulation owns this one; see GraphViewer
   radial: radialLayout,
@@ -281,4 +415,7 @@ function computeLayout(name, nodes, opts) {
   return fn ? fn(nodes, opts) : null;
 }
 
-module.exports = { radialLayout, timelineLayout, computeLayout, layoutNames, layoutIsDegenerate, LAYOUTS };
+module.exports = {
+  radialLayout, timelineLayout, computeLayout, layoutNames,
+  layoutIsDegenerate, timeAxisGeometry, compressedTimeScale, LAYOUTS,
+};
