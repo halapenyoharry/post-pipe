@@ -306,10 +306,26 @@ function layoutIsDegenerate(positions, card, fraction = 0.3) {
   );
   if (pts.length <= 8) return false;   // too few to judge; leave it alone
 
+  // Plain min/max is fooled by a couple of legitimately far-flung nodes —
+  // this corpus has plenty of orphans (no edges at all), which charge
+  // repulsion flings away from the mass with nothing to pull them back.
+  // One such node sitting far from an otherwise crushed-to-a-point pile
+  // makes the bounding box look roomy even though the pile itself never
+  // settled — seen for real on a phone whose tab was throttled/backgrounded
+  // mid-settle, which persisted the pile because this check passed it.
+  // Measuring the middle 80% of each axis instead of the full extent keeps
+  // a few real outliers from masking a collapsed core.
+  const trimmedSpan = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const lo = sorted[Math.floor(sorted.length * 0.1)];
+    const hi = sorted[Math.ceil(sorted.length * 0.9) - 1];
+    return hi - lo;
+  };
+
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
-  const area = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
-  const needed = pts.length * card.width * card.height;
+  const area = trimmedSpan(xs) * trimmedSpan(ys);
+  const needed = pts.length * 0.8 * card.width * card.height;
   return area < needed * fraction;
 }
 

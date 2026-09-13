@@ -289,6 +289,10 @@ ${reactJs}
         let off = null;
         viewState.ready().then(function () {
           viewState.prune((feed.items || []).map(function (i) { return i.id; }));
+          // Timeline was pulled from the layout picker below — a reader
+          // stranded on it from before would otherwise have no button left
+          // that could get them off it.
+          if (viewState.state.layout === 'timeline') viewState.setLayout('force');
           off = viewState.subscribe(bump);
           setHydrated(true);
         });
@@ -365,14 +369,18 @@ ${reactJs}
       );
     }
 
-    // How the corpus is arranged. Force finds clusters, radial puts the writing
-    // on a rim with its vocabulary in the middle, timeline spends an axis on
-    // time — which is the one that shows your own work against a subscribed
-    // firehose without anything having to explain it.
+    // How the corpus is arranged. Force finds clusters, radial puts the
+    // writing on a rim with its vocabulary in the middle.
+    //
+    // The timeline layout is pulled from this list deliberately, not
+    // deleted — computeLayout('timeline', ...) and its tests still exist in
+    // layouts.js for whenever it gets redesigned. Removing the option here
+    // is enough to stop anyone from selecting it; ripping out working,
+    // tested code that is explicitly coming back later would just be
+    // throwing work away.
     const LAYOUTS = [
       { id: 'force',    label: 'cluster',  title: 'Force-directed: related pieces attract' },
       { id: 'radial',   label: 'ring',     title: 'Radial: pieces on the rim, tags in the middle' },
-      { id: 'timeline', label: 'timeline', title: 'Timeline: arranged by date' }
     ];
 
     function LayoutControls() {

@@ -191,6 +191,22 @@ test('a real arrangement is not mistaken for a heap', () => {
   );
 });
 
+test('a collapsed core is still a heap even with a couple of real outliers', () => {
+  // The corpus has genuine orphans — no edges at all — that charge
+  // repulsion legitimately flings far from the mass. A plain min/max
+  // bounding box would call this roomy because of them, even though 190
+  // of the 192 nodes never actually spread out.
+  const heap = [...Array(178)].map((_, i) => {
+    const r = 10 * Math.sqrt(i);
+    const a = i * 2.4;
+    return { x: r * Math.cos(a), y: r * Math.sin(a) };
+  });
+  const outliers = [{ x: 2400, y: -1800 }, { x: -2100, y: 2600 }];
+  assert.strictEqual(
+    layoutIsDegenerate([...heap, ...outliers], { width: 180, height: 140 }), true,
+  );
+});
+
 test('too few nodes to judge is left alone', () => {
   const few = [...Array(5)].map((_, i) => ({ x: i, y: i }));
   assert.strictEqual(layoutIsDegenerate(few, { width: 180, height: 140 }), false);

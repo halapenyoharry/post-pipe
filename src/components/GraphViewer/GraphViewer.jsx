@@ -377,6 +377,15 @@ export function GraphViewer({
           return true;
         })
         .on('start', (event, d) => {
+          // Without this, a touch-drag on a node is ambiguous between "move
+          // this card" and "pan the canvas" — d3.zoom is bound to the same
+          // svg and listens for the same touch sequence on any descendant,
+          // since touch events bubble the way mouse events used by drag
+          // here do not conflict with it. Stopping the underlying touch
+          // event here is what lets a card win that race instead of the
+          // whole canvas panning under a finger that meant to drag one node.
+          if (event.sourceEvent) event.sourceEvent.stopPropagation();
+
           // Bypass the simulation entirely. We don't restart d3-force —
           // dragging directly updates this node's transform and its
           // incident link endpoints below. Nothing else in the graph
