@@ -11692,10 +11692,13 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 		function be() {
 			let e = a.nodes.filter((e) => e.type === "article");
 			if (e.length < 2) return !1;
-			let t = e.map((e) => e.x), n = e.map((e) => e.y), r = Math.min(...t) - 140, i = Math.max(...t) + 140, s = Math.min(...n) - 140, l = Math.max(...n) + 140, u = p.current ? p.current.clientWidth : window.innerWidth, d = p.current ? p.current.clientHeight : window.innerHeight;
-			if (u < 50 || d < 50) return !1;
-			let f = Math.max(Math.min(u / Math.max(i - r, 1), d / Math.max(l - s, 1), 1), .2), m = u / 2 - (r + i) / 2 * f, h = d / 2 - (s + l) / 2 * f;
-			return o.call(c.transform, Xa.translate(m, h).scale(f)), !0;
+			let t = (e) => {
+				let t = [...e].sort((e, t) => e - t);
+				return [t[Math.floor(t.length * .1)], t[Math.ceil(t.length * .9) - 1]];
+			}, [n, r] = t(e.map((e) => e.x)), [i, s] = t(e.map((e) => e.y)), l = n - 140, u = r + 140, d = i - 140, f = s + 140, m = p.current ? p.current.clientWidth : window.innerWidth, h = p.current ? p.current.clientHeight : window.innerHeight;
+			if (m < 50 || h < 50) return !1;
+			let g = Math.max(Math.min(m / Math.max(u - l, 1), h / Math.max(f - d, 1), 1), .2), _ = m / 2 - (l + u) / 2 * g, v = h / 2 - (d + f) / 2 * g;
+			return o.call(c.transform, Xa.translate(_, v).scale(g)), !0;
 		}
 		let xe = !1;
 		ae.on("end", () => {
