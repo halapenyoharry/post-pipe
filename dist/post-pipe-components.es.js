@@ -11151,8 +11151,11 @@ var B = (/* @__PURE__ */ o(((e, t) => {
 	function s(e, t, n = .3) {
 		let r = (e || []).filter((e) => e && Number.isFinite(e.x) && Number.isFinite(e.y));
 		if (r.length <= 8) return !1;
-		let i = r.map((e) => e.x), a = r.map((e) => e.y);
-		return (Math.max(...i) - Math.min(...i)) * (Math.max(...a) - Math.min(...a)) < r.length * t.width * t.height * n;
+		let i = (e) => {
+			let t = [...e].sort((e, t) => e - t), n = t[Math.floor(t.length * .1)];
+			return t[Math.ceil(t.length * .9) - 1] - n;
+		}, a = r.map((e) => e.x), o = r.map((e) => e.y);
+		return i(a) * i(o) < r.length * .8 * t.width * t.height * n;
 	}
 	function c(e, t = {}) {
 		let { orientation: n = "ltr", origin: r = {
@@ -11438,7 +11441,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			}
 			return !0;
 		}).on("start", (e, t) => {
-			t.fx = t.x, t.fy = t.y;
+			e.sourceEvent && e.sourceEvent.stopPropagation(), t.fx = t.x, t.fy = t.y;
 			let n = e.sourceEvent && e.sourceEvent.target;
 			if (t._resizing = !!(n && n.closest && n.closest("[data-resize=\"1\"]")), t._resizing) {
 				let n = t._size || _({
