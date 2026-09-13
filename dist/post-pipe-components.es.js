@@ -11694,7 +11694,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			if (e.length < 2) return !1;
 			let t = e.map((e) => e.x), n = e.map((e) => e.y), r = Math.min(...t) - 140, i = Math.max(...t) + 140, s = Math.min(...n) - 140, l = Math.max(...n) + 140, u = p.current ? p.current.clientWidth : window.innerWidth, d = p.current ? p.current.clientHeight : window.innerHeight;
 			if (u < 50 || d < 50) return !1;
-			let f = Math.min(u / Math.max(i - r, 1), d / Math.max(l - s, 1), 1), m = u / 2 - (r + i) / 2 * f, h = d / 2 - (s + l) / 2 * f;
+			let f = Math.max(Math.min(u / Math.max(i - r, 1), d / Math.max(l - s, 1), 1), .2), m = u / 2 - (r + i) / 2 * f, h = d / 2 - (s + l) / 2 * f;
 			return o.call(c.transform, Xa.translate(m, h).scale(f)), !0;
 		}
 		let xe = !1;
