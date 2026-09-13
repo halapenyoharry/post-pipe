@@ -19,12 +19,18 @@
   cursor: pointer;
   backdrop-filter: blur(6px);
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
-.gearBtn:hover {
-  background: rgba(20, 22, 30, 0.9);
-  color: #64ffda;
-  border-color: rgba(100, 255, 218, 0.35);
+@media (hover: hover) {
+  .gearBtn:hover {
+    background: rgba(20, 22, 30, 0.9);
+    color: #64ffda;
+    border-color: rgba(100, 255, 218, 0.35);
+  }
 }
 
 .backdrop {
@@ -96,8 +102,10 @@
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-.presetBtn:hover {
-  background: rgba(255, 255, 255, 0.08);
+@media (hover: hover) {
+  .presetBtn:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }
 .presetActive {
   border-color: #64ffda;

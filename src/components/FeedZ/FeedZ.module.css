@@ -36,11 +36,24 @@
   cursor: pointer;
   backdrop-filter: blur(6px);
   transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  /* The dot's dwell-to-open-ring gesture is "touch and hold without moving"
+     — the same gesture iOS uses to select text and pop up its selection
+     handles. Without this, holding a dot on an iPhone shows two blue
+     selection-loupe circles instead of (or on top of) the color ring. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
-.pill:hover {
-  background: rgba(17, 24, 39, 0.75);
-  border-color: var(--pill-color);
+/* (hover: hover) excludes touch devices, which fake a hover on tap and then
+   have no way to un-hover — without this, tapping a pill on a phone leaves
+   its border stuck lit until something else is tapped. */
+@media (hover: hover) {
+  .pill:hover {
+    background: rgba(17, 24, 39, 0.75);
+    border-color: var(--pill-color);
+  }
 }
 
 .pill.hidden {
@@ -70,6 +83,10 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .dot {
@@ -83,9 +100,13 @@
 }
 
 /* Hovering the dot itself invites the interaction; opening the ring
-   promotes it further so it's unambiguous which dot is being edited. */
-.dotWrap:hover .dot {
-  transform: scale(1.6);
+   promotes it further so it's unambiguous which dot is being edited.
+   (hover: hover) excludes touch, which has no real hover and would
+   otherwise leave a dot stuck grown after a single tap. */
+@media (hover: hover) {
+  .dotWrap:hover .dot {
+    transform: scale(1.6);
+  }
 }
 
 .dotActive {
@@ -119,9 +140,15 @@
   cursor: pointer;
   pointer-events: auto;
   transition: transform 0.1s ease, border-color 0.1s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
-.swatch:hover {
-  transform: scale(1.3);
+@media (hover: hover) {
+  .swatch:hover {
+    transform: scale(1.3);
+  }
 }
 .swatchCurrent {
   border-color: #fff;
