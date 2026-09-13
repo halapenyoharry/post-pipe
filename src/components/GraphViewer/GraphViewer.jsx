@@ -1007,7 +1007,24 @@ export function GraphViewer({
       // graph to a point. Leave the view alone and fit when there is a
       // viewport to fit to.
       if (w < 50 || h < 50) return false;
-      const k = Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1);
+      // On a phone-width viewport this corpus's real spread (orphans flung
+      // out by charge repulsion included) can be 25-30x the screen width —
+      // confirmed via the debug overlay on an actual device: a 375px-wide
+      // container against a >10,000px bounding box computes k≈0.03, which
+      // shrinks every card and every label into single-digit pixels. That
+      // reads as "everything collapsed into a corner," not as a graph — the
+      // physics and the persistence logic were both working correctly, the
+      // fit itself just had no floor. MIN_SCALE keeps the initial overview
+      // at a size where card shapes and colors are still legible at a
+      // glance; the reader pinch/scroll-zooms in from there for detail, the
+      // same way they always could. Some far-flung orphans will sit outside
+      // the initial frame rather than every node being crammed on screen at
+      // once — a readable core beats a technically-complete but illegible one.
+      const MIN_SCALE = 0.2;
+      const k = Math.max(
+        Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1),
+        MIN_SCALE,
+      );
       const tx = w / 2 - ((minX + maxX) / 2) * k;
       const ty = h / 2 - ((minY + maxY) / 2) * k;
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
