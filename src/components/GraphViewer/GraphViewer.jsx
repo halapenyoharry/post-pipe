@@ -319,6 +319,41 @@ export function GraphViewer({
       }
     }
 
+    // Temporary on-device diagnostic readout, opt-in via ?debug=1. Added to
+    // chase a mobile-only "everything collapses into one corner" report that
+    // could not be reproduced from any tool available here — no iOS device,
+    // and even mobile-viewport emulation runs on desktop Chromium, not the
+    // WebKit engine every iOS browser actually uses. Screenshottable numbers
+    // beat guessing blind. Safe to delete once that's diagnosed.
+    let debugEl = null;
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')) {
+      debugEl = document.createElement('pre');
+      debugEl.style.cssText = 'position:fixed;bottom:0;left:0;z-index:9999;margin:0;padding:6px 8px;'
+        + 'max-width:100vw;font:10px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.85);'
+        + 'white-space:pre-wrap;pointer-events:none;';
+      document.body.appendChild(debugEl);
+    }
+    function updateDebug(extra) {
+      if (!debugEl) return;
+      const pts = data.nodes.filter(d => Number.isFinite(d.x) && Number.isFinite(d.y));
+      const xs = pts.map(d => d.x), ys = pts.map(d => d.y);
+      const spanX = xs.length ? Math.max(...xs) - Math.min(...xs) : 0;
+      const spanY = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+      debugEl.textContent = [
+        'container: ' + width + 'x' + height + ' (window: ' + window.innerWidth + 'x' + window.innerHeight
+          + ', dpr: ' + window.devicePixelRatio + ')',
+        'nodes: ' + data.nodes.length + '  layout: ' + layoutRef.current,
+        'positionsWereDegenerate on restore: ' + positionsWereDegenerate,
+        'live bbox span: ' + Math.round(spanX) + ' x ' + Math.round(spanY),
+        'visibility: ' + document.visibilityState,
+        extra || '',
+      ].join('\n');
+    }
+    updateDebug('(initial, before simulation)');
+    // Independent of ticks/rAF, so it still updates (with a stale tick count)
+    // if ticking has genuinely stalled rather than just running slowly.
+    const debugHeartbeat = debugEl ? setInterval(() => updateDebug('heartbeat, tick ' + tickCount), 1000) : null;
+
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(SIM.linkDistance))
       .force('charge', d3.forceManyBody().strength(SIM.chargeStrength))
@@ -938,7 +973,9 @@ export function GraphViewer({
     simulation.nodes(data.nodes).on('tick', () => {
       applyPositions();
       if (connectorUpdateRef.current) connectorUpdateRef.current();
-      if (redrawAxisRef.current && ++tickCount % 25 === 0) redrawAxisRef.current();
+      ++tickCount;
+      if (redrawAxisRef.current && tickCount % 25 === 0) redrawAxisRef.current();
+      if (debugEl && tickCount % 10 === 0) updateDebug('ticks: ' + tickCount + '  alpha: ' + simulation.alpha().toFixed(4));
     });
     simulation.force('link').links(data.links);
 
@@ -980,6 +1017,7 @@ export function GraphViewer({
     let hasSettled = false;
     simulation.on('end', () => {
       hasSettled = true;
+      updateDebug('SETTLED at tick ' + tickCount + '  layoutRef: ' + layoutRef.current);
       // This simulation runs for the whole mount's lifetime regardless of
       // which layout is on screen — switching to ring or timeline just pins
       // every node's fx/fy to that layout's coordinates while this keeps
@@ -1021,6 +1059,7 @@ export function GraphViewer({
     // entirely. Nothing is wrong with it — it simply never got to run. So run
     // it when the page is first actually looked at.
     const handleVisibility = () => {
+      updateDebug('visibilitychange -> ' + document.visibilityState + '  hasSettled: ' + hasSettled);
       if (document.hidden) return;
       if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
       // Settled while there was nothing to settle into. Frame it now that
@@ -1033,6 +1072,8 @@ export function GraphViewer({
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
+      if (debugHeartbeat) clearInterval(debugHeartbeat);
+      if (debugEl && debugEl.parentNode) debugEl.parentNode.removeChild(debugEl);
       // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
       // would try to reconcile against a detached DOM tree on the next
       // effect run. Defer the unmount so it doesn't fire inside a render.
