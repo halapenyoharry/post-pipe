@@ -994,12 +994,29 @@ export function GraphViewer({
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
-      const xsAll = pts.map(d => d.x);
-      const ysAll = pts.map(d => d.y);
-      const minX = Math.min(...xsAll) - pad;
-      const maxX = Math.max(...xsAll) + pad;
-      const minY = Math.min(...ysAll) - pad;
-      const maxY = Math.max(...ysAll) + pad;
+
+      // The full min/max extent is not where the graph actually lives —
+      // this corpus has plenty of orphan nodes (no edges) that charge
+      // repulsion legitimately flings far from the mass. Fitting to the
+      // full extent either shrinks everything to a speck (see MIN_SCALE
+      // below) or, once that is floored, centers the viewport on the empty
+      // space between the dense core and its outliers rather than on the
+      // core itself — confirmed on an actual phone via the debug overlay: a
+      // few isolated orphans legible on screen, the other ~200 nodes
+      // nowhere in the frame. The middle 80% of each axis is a much better
+      // proxy for "the graph," consistent with layoutIsDegenerate's own
+      // trimmed measure of the same corpus.
+      const trimmedRange = (values) => {
+        const sorted = [...values].sort((a, b) => a - b);
+        return [sorted[Math.floor(sorted.length * 0.1)], sorted[Math.ceil(sorted.length * 0.9) - 1]];
+      };
+      const [trimMinX, trimMaxX] = trimmedRange(pts.map(d => d.x));
+      const [trimMinY, trimMaxY] = trimmedRange(pts.map(d => d.y));
+      const minX = trimMinX - pad;
+      const maxX = trimMaxX + pad;
+      const minY = trimMinY - pad;
+      const maxY = trimMaxY + pad;
+
       const w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
       const h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
       // A container with no size yet — hidden tab, collapsed pane, a layout
@@ -1007,19 +1024,15 @@ export function GraphViewer({
       // graph to a point. Leave the view alone and fit when there is a
       // viewport to fit to.
       if (w < 50 || h < 50) return false;
-      // On a phone-width viewport this corpus's real spread (orphans flung
-      // out by charge repulsion included) can be 25-30x the screen width —
-      // confirmed via the debug overlay on an actual device: a 375px-wide
-      // container against a >10,000px bounding box computes k≈0.03, which
-      // shrinks every card and every label into single-digit pixels. That
-      // reads as "everything collapsed into a corner," not as a graph — the
-      // physics and the persistence logic were both working correctly, the
-      // fit itself just had no floor. MIN_SCALE keeps the initial overview
-      // at a size where card shapes and colors are still legible at a
-      // glance; the reader pinch/scroll-zooms in from there for detail, the
-      // same way they always could. Some far-flung orphans will sit outside
-      // the initial frame rather than every node being crammed on screen at
-      // once — a readable core beats a technically-complete but illegible one.
+      // Even the trimmed core can still be large relative to a phone-width
+      // viewport (confirmed: a 375px-wide container against a >10,000px
+      // full extent computed k≈0.03 before this fix existed at all). This
+      // floor keeps the initial overview at a size where card shapes and
+      // colors are still legible at a glance; the reader pinch/scroll-zooms
+      // in from there for detail, the same way they always could. Far-flung
+      // orphans sit outside the initial frame rather than every node being
+      // crammed on screen at once — a readable core beats a technically-
+      // complete but illegible one.
       const MIN_SCALE = 0.2;
       const k = Math.max(
         Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1),
