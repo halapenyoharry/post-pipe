@@ -64,7 +64,8 @@ export function TextView({ article, width, height, viewState, fullContent }) {
     styles.card,
     isDraft ? styles.draft : styles.published,
     expanded && styles.expanded,
-    pinned && styles.pinned
+    pinned && styles.pinned,
+    viewState.lod === 'marker' && !expanded && styles.marker
   ].filter(Boolean).join(' ');
 
   return (
@@ -113,10 +114,10 @@ function CardContent({ article, viewState, expanded, useFullArticle, fullContent
     );
   }
 
-  // Slug-LOD: the floating SVG slug-label overlay (in GraphViewer) does the
-  // labeling. The card itself is empty — just a marker for hit-testing.
-  if (viewState.lod === 'slug') {
-    return null;
+  // Marker-LOD: small dot, empty content inside. The container's size and
+  // border-radius makes it look like a dot. 
+  if (viewState.lod === 'marker') {
+    return null; // The background tint creates the marker dot
   }
 
   // Title-only LOD: centered title, larger font, no description.
