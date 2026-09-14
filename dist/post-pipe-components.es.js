@@ -11417,7 +11417,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			pinned: !1
 		}))), g.current && !d) for (let e of a.nodes) {
 			let t = g.current.nodeState(T(e)), n = g.current.nodeState(w(e));
-			t && typeof t.x == "number" && typeof t.y == "number" && (e.x = t.x, e.y = t.y, e.fx = t.x, e.fy = t.y), n && typeof n.w == "number" && typeof n.h == "number" && (e._size = {
+			t && typeof t.x == "number" && typeof t.y == "number" && (e.x = t.x, e.y = t.y, t.auto || (e.fx = t.x, e.fy = t.y)), n && typeof n.w == "number" && typeof n.h == "number" && (e._size = {
 				width: n.w,
 				height: n.h
 			});
@@ -11429,7 +11429,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				height: t.h
 			});
 		}
-		let x = Ga().force("link", Ia().id((e) => e.id).distance(f.linkDistance)).force("charge", Ka().strength(f.chargeStrength)).force("collide", Na().radius((e) => (e._r || e.size / 2) + f.collidePadding).strength(1).iterations(3)).force("center", oa(n / 2, r / 2)).velocityDecay(f.velocityDecay).alphaDecay(f.alphaDecay), ne = () => {
+		let x = Ga().force("link", Ia().id((e) => e.id).distance(f.linkDistance)).force("charge", Ka().strength(f.chargeStrength)).force("collide", Na().radius((e) => (e._r || (e.type === "article" ? Math.hypot(l.width, l.height) / 2 : e.size / 2)) + f.collidePadding).strength(1).iterations(3)).force("center", oa(n / 2, r / 2)).velocityDecay(f.velocityDecay).alphaDecay(f.alphaDecay), ne = () => {
 			S.current && S.current(), p.current && (n = p.current.clientWidth, r = p.current.clientHeight, o.attr("width", n).attr("height", r));
 		};
 		window.addEventListener("resize", ne);
