@@ -220,7 +220,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
         d.fx = event.x; d.fy = event.y;
         if (d.type === 'article') {
           articleNodes.filter(nd => nd.id === d.id)
-            .style('left', event.x + 'px').style('top', event.y + 'px');
+            .style('transform', `translate(${event.x}px, ${event.y}px)`);
         } else {
           tagNodesSelection.filter(nd => nd.id === d.id)
             .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
@@ -281,6 +281,8 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
       .enter().append('div')
       .attr('class', 'node-card')
       .style('position', 'absolute')
+      .style('left', '0')
+      .style('top', '0')
       .style('pointer-events', 'auto')
       .call(dragHandler);
 
@@ -465,7 +467,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
       links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
       tagNodesSelection.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-      articleNodes.style('left', d => d.x + 'px').style('top', d => d.y + 'px');
+      articleNodes.style('transform', d => `translate(${d.x}px, ${d.y}px)`);
     });
     simulation.force('link').links(data.links);
 
