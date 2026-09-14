@@ -11703,12 +11703,15 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			let t = a.nodes.filter((e) => e.type === "article");
 			if (t.length < 2) return !1;
 			let n = (e) => {
+				let t = [...e].sort((e, t) => e - t), n = Math.floor(t.length / 2);
+				return t.length % 2 ? t[n] : (t[n - 1] + t[n]) / 2;
+			}, r = (e) => {
 				let t = [...e].sort((e, t) => e - t);
 				return [t[Math.floor(t.length * .1)], t[Math.ceil(t.length * .9) - 1]];
-			}, [r, i] = n(t.map((e) => e.x)), [s, l] = n(t.map((e) => e.y)), u = r - 140, d = i + 140, f = s - 140, m = l + 140, h = p.current ? p.current.clientWidth : window.innerWidth, g = p.current ? p.current.clientHeight : window.innerHeight;
-			if (h < 50 || g < 50) return !1;
-			let _ = Math.max(Math.min(h / Math.max(d - u, 1), g / Math.max(m - f, 1), 1), .2), v = h / 2 - (u + d) / 2 * _, y = g / 2 - (f + m) / 2 * _;
-			return o.call(c.transform, Xa.translate(v, y).scale(_)), re("fitToViewport() applied: k=" + _.toFixed(4) + " tx=" + Math.round(v) + " ty=" + Math.round(y) + "  trimmed core " + Math.round(d - u) + "x" + Math.round(m - f)), !0;
+			}, i = t.map((e) => e.x), s = t.map((e) => e.y), [l, u] = r(i), [d, f] = r(s), m = l - 140, h = u + 140, g = d - 140, _ = f + 140, v = n(i), y = n(s), b = p.current ? p.current.clientWidth : window.innerWidth, x = p.current ? p.current.clientHeight : window.innerHeight;
+			if (b < 50 || x < 50) return !1;
+			let S = Math.max(Math.min(b / Math.max(h - m, 1), x / Math.max(_ - g, 1), 1), .2), C = b / 2 - v * S, w = x / 2 - y * S;
+			return o.call(c.transform, Xa.translate(C, w).scale(S)), re("fitToViewport() applied: k=" + S.toFixed(4) + " tx=" + Math.round(C) + " ty=" + Math.round(w) + "  trimmed core " + Math.round(h - m) + "x" + Math.round(_ - g) + "  center(median) " + Math.round(v) + "," + Math.round(y)), !0;
 		}
 		let we = !1;
 		k.on("end", () => {
