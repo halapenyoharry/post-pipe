@@ -328,7 +328,12 @@ export function GraphViewer({
     let debugEl = null;
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')) {
       debugEl = document.createElement('pre');
-      debugEl.style.cssText = 'position:fixed;bottom:0;left:0;z-index:9999;margin:0;padding:6px 8px;'
+      // top, not bottom — the layout/history/time-axis buttons all live in
+      // the bottom strip (bottom:14px), and a bottom-anchored panel tall
+      // enough to hold the event log sits right on top of them, visible but
+      // untappable underneath. Below the FeedZ pill bar (which can wrap to
+      // a second row on a narrow phone) instead.
+      debugEl.style.cssText = 'position:fixed;top:110px;left:0;z-index:9999;margin:0;padding:6px 8px;'
         + 'max-width:100vw;font:10px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.85);'
         + 'white-space:pre-wrap;pointer-events:none;';
       document.body.appendChild(debugEl);
