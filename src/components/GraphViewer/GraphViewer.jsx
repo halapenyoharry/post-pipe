@@ -303,7 +303,17 @@ export function GraphViewer({
         const savedSize = viewStateRef.current.nodeState(persistKey(d));
         if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
           d.x = saved.x; d.y = saved.y;
-          d.fx = saved.x; d.fy = saved.y;
+          // Only a position the *reader* placed earns a hard pin. Pinning a
+          // layout-generated one (saved.auto) freezes it against every force
+          // including collide — so a stored arrangement with cards sitting on
+          // top of each other stays on top of each other permanently, no
+          // matter how many times the graph is reloaded or re-settled. That
+          // is the "stuck there artificially" pile: articles restored into
+          // overlap and nailed down, while tags (which settle freshly) spread
+          // around them normally. Seeding x/y without fx/fy keeps the
+          // arrangement the reader is used to and still lets physics push
+          // overlapping cards apart.
+          if (!saved.auto) { d.fx = saved.x; d.fy = saved.y; }
         }
         if (savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
           d._size = { width: savedSize.w, height: savedSize.h };
@@ -323,7 +333,19 @@ export function GraphViewer({
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(SIM.linkDistance))
       .force('charge', d3.forceManyBody().strength(SIM.chargeStrength))
-      .force('collide', d3.forceCollide().radius(d => (d._r || d.size / 2) + SIM.collidePadding).strength(1).iterations(3))
+      // d._r is the node's real measured footprint, assigned during the
+      // render pass — but forceCollide caches every radius when the force is
+      // initialized, so if that pass has not run yet the fallback is what
+      // sticks for the whole simulation. `size / 2` is 30 for an article
+      // whose card is actually 180x140 (true radius 114), so the fallback
+      // alone would let cards overlap almost completely — the same
+      // footprint-vs-radius mismatch as before, just reachable by timing
+      // rather than by arithmetic. Fall back to the real card geometry.
+      .force('collide', d3.forceCollide()
+        .radius(d => (d._r || (d.type === 'article'
+          ? Math.hypot(CARD.width, CARD.height) / 2
+          : d.size / 2)) + SIM.collidePadding)
+        .strength(1).iterations(3))
       .force('center', d3.forceCenter(width / 2, height / 2))
       // Damping was heavy enough, and the run short enough, that collisions
       // never finished resolving before the simulation froze — nodes were
