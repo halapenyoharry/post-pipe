@@ -319,60 +319,6 @@ export function GraphViewer({
       }
     }
 
-    // Temporary on-device diagnostic readout, opt-in via ?debug=1. Added to
-    // chase a mobile-only "everything collapses into one corner" report that
-    // could not be reproduced from any tool available here — no iOS device,
-    // and even mobile-viewport emulation runs on desktop Chromium, not the
-    // WebKit engine every iOS browser actually uses. Screenshottable numbers
-    // beat guessing blind. Safe to delete once that's diagnosed.
-    let debugEl = null;
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')) {
-      debugEl = document.createElement('pre');
-      // top, not bottom — the layout/history/time-axis buttons all live in
-      // the bottom strip (bottom:14px), and a bottom-anchored panel tall
-      // enough to hold the event log sits right on top of them, visible but
-      // untappable underneath. Below the FeedZ pill bar (which can wrap to
-      // a second row on a narrow phone) instead.
-      debugEl.style.cssText = 'position:fixed;top:110px;left:0;z-index:9999;margin:0;padding:6px 8px;'
-        + 'max-width:100vw;font:10px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.85);'
-        + 'white-space:pre-wrap;pointer-events:none;';
-      document.body.appendChild(debugEl);
-    }
-    // One-time events (fitToViewport calls, on-end, visibilitychange) append
-    // here so a screenshot taken at any moment shows the full history, not
-    // just whatever the most recent per-second heartbeat happened to say —
-    // the first version of this overlay overwrote itself every render, so a
-    // "fitToViewport() applied" line could come and go between two
-    // heartbeats without ever being seen.
-    const debugLog = [];
-    function logEvent(msg) {
-      debugLog.push(msg);
-      if (debugLog.length > 10) debugLog.shift();
-      renderDebug();
-    }
-    function renderDebug(liveExtra) {
-      if (!debugEl) return;
-      const pts = data.nodes.filter(d => Number.isFinite(d.x) && Number.isFinite(d.y));
-      const xs = pts.map(d => d.x), ys = pts.map(d => d.y);
-      const spanX = xs.length ? Math.max(...xs) - Math.min(...xs) : 0;
-      const spanY = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
-      debugEl.textContent = [
-        'container: ' + width + 'x' + height + ' (window: ' + window.innerWidth + 'x' + window.innerHeight
-          + ', dpr: ' + window.devicePixelRatio + ')',
-        'nodes: ' + data.nodes.length + '  layout: ' + layoutRef.current,
-        'positionsWereDegenerate on restore: ' + positionsWereDegenerate,
-        'live bbox span: ' + Math.round(spanX) + ' x ' + Math.round(spanY),
-        'visibility: ' + document.visibilityState,
-        liveExtra || '',
-        '--- event log ---',
-        ...debugLog,
-      ].join('\n');
-    }
-    function updateDebug(liveExtra) { renderDebug(liveExtra); }
-    updateDebug('(initial, before simulation)');
-    // Independent of ticks/rAF, so it still updates (with a stale tick count)
-    // if ticking has genuinely stalled rather than just running slowly.
-    const debugHeartbeat = debugEl ? setInterval(() => updateDebug('heartbeat, tick ' + tickCount), 1000) : null;
 
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(SIM.linkDistance))
@@ -995,7 +941,6 @@ export function GraphViewer({
       if (connectorUpdateRef.current) connectorUpdateRef.current();
       ++tickCount;
       if (redrawAxisRef.current && tickCount % 25 === 0) redrawAxisRef.current();
-      if (debugEl && tickCount % 10 === 0) updateDebug('ticks: ' + tickCount + '  alpha: ' + simulation.alpha().toFixed(4));
     });
     simulation.force('link').links(data.links);
 
@@ -1010,8 +955,7 @@ export function GraphViewer({
     // the corpus over far more space than before, and a layout you have to go
     // looking for is not an improvement on one that overlaps.
     let hasFitted = false;
-    function fitToViewport(reason) {
-      logEvent('fitToViewport() called — reason: ' + (reason || '(none given)'));
+    function fitToViewport() {
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
@@ -1076,16 +1020,12 @@ export function GraphViewer({
       const tx = w / 2 - centerX * k;
       const ty = h / 2 - centerY * k;
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
-      logEvent('fitToViewport() applied: k=' + k.toFixed(4) + ' tx=' + Math.round(tx) + ' ty=' + Math.round(ty)
-        + '  trimmed core ' + Math.round(maxX - minX) + 'x' + Math.round(maxY - minY)
-        + '  center(median) ' + Math.round(centerX) + ',' + Math.round(centerY));
       return true;
     }
 
     let hasSettled = false;
     simulation.on('end', () => {
       hasSettled = true;
-      logEvent('SETTLED at tick ' + tickCount + '  layoutRef: ' + layoutRef.current);
       // This simulation runs for the whole mount's lifetime regardless of
       // which layout is on screen — switching to ring or timeline just pins
       // every node's fx/fy to that layout's coordinates while this keeps
@@ -1115,7 +1055,6 @@ export function GraphViewer({
           else vs.setNodePosition(positionKey(d), d.x, d.y, { silent: true });
         }
       }
-      logEvent('on end: anyRestored=' + anyRestored + '  positionsWereDegenerate=' + positionsWereDegenerate);
       // anyRestored used to gate this — skip fitting if the reader already
       // has an arrangement, on the theory that fitting would clobber a
       // camera position they'd set up. But no zoom/pan transform is ever
@@ -1130,7 +1069,7 @@ export function GraphViewer({
       // A reader who opened this on a 1024px desktop and now opens the same
       // saved arrangement on a 375px phone needs a fresh fit every time,
       // not the one time anyRestored happened to be false.
-      if (!hasFitted) hasFitted = fitToViewport('simulation end');
+      if (!hasFitted) hasFitted = fitToViewport();
       // The axis is measured against where the pieces ended up, so it is drawn
       // again now that they have stopped moving.
       if (redrawAxisRef.current) redrawAxisRef.current();
@@ -1142,12 +1081,11 @@ export function GraphViewer({
     // entirely. Nothing is wrong with it — it simply never got to run. So run
     // it when the page is first actually looked at.
     const handleVisibility = () => {
-      logEvent('visibilitychange -> ' + document.visibilityState + '  hasSettled: ' + hasSettled);
       if (document.hidden) return;
       if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
       // Settled while there was nothing to settle into. Frame it now that
       // there is.
-      if (!hasFitted) hasFitted = fitToViewport('visibilitychange, settled but never fitted');
+      if (!hasFitted) hasFitted = fitToViewport();
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -1155,8 +1093,6 @@ export function GraphViewer({
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
-      if (debugHeartbeat) clearInterval(debugHeartbeat);
-      if (debugEl && debugEl.parentNode) debugEl.parentNode.removeChild(debugEl);
       // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
       // would try to reconcile against a detached DOM tree on the next
       // effect run. Defer the unmount so it doesn't fire inside a render.
