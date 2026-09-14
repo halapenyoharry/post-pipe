@@ -163,9 +163,11 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
     const cardsLayer = d3.select(container).append('div')
       .attr('class', 'cards-layer')
       .style('position', 'absolute')
-      .style('inset', '0')
-      .style('pointer-events', 'none')
-      .style('overflow', 'hidden');
+      .style('left', '0')
+      .style('top', '0')
+      .style('width', '100%')
+      .style('height', '100%')
+      .style('pointer-events', 'none');
 
     cardsLayerRef.current = cardsLayer.node();
 
@@ -183,7 +185,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
 
     const zoom = d3.zoom().on('zoom', (event) => {
       g.attr('transform', event.transform);
-      cardsTransform.style('transform', `translate3d(${event.transform.x}px, ${event.transform.y}px, 0) scale(${event.transform.k})`);
+      cardsTransform.style('transform', `translate3d(${event.transform.x}px, ${event.transform.y}px, 0px) scale(${event.transform.k})`);
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
       const newLod = getLOD(newScale);
@@ -224,7 +226,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
         d.fx = event.x; d.fy = event.y;
         if (d.type === 'article') {
           articleNodes.filter(nd => nd.id === d.id)
-            .style('transform', `translate3d(${event.x}px, ${event.y}px, 0)`);
+            .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px)`);
         } else {
           tagNodesSelection.filter(nd => nd.id === d.id)
             .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
@@ -472,7 +474,7 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
       links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
       tagNodesSelection.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-      articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0)`);
+      articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
     });
     simulation.force('link').links(data.links);
 
