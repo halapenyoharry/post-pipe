@@ -1018,25 +1018,39 @@ export function GraphViewer({
 
       // The full min/max extent is not where the graph actually lives —
       // this corpus has plenty of orphan nodes (no edges) that charge
-      // repulsion legitimately flings far from the mass. Fitting to the
-      // full extent either shrinks everything to a speck (see MIN_SCALE
-      // below) or, once that is floored, centers the viewport on the empty
-      // space between the dense core and its outliers rather than on the
-      // core itself — confirmed on an actual phone via the debug overlay: a
-      // few isolated orphans legible on screen, the other ~200 nodes
-      // nowhere in the frame. The middle 80% of each axis is a much better
-      // proxy for "the graph," consistent with layoutIsDegenerate's own
-      // trimmed measure of the same corpus.
+      // repulsion legitimately flings far from the mass. The middle 80% of
+      // each axis is a much better proxy for "the graph," consistent with
+      // layoutIsDegenerate's own trimmed measure — but the *midpoint* of
+      // that trimmed range is still not reliably where the dense majority
+      // sits, if the range itself is skewed: a tight cluster of articles
+      // plus a sparser trail extending toward one edge (which tags, pulled
+      // toward many different articles at once, naturally spread wider
+      // than) puts the range's midpoint somewhere between the cluster and
+      // the trail — landing right at the cluster's corner rather than
+      // inside it. Confirmed on an actual phone: tags nicely spread across
+      // the screen, but the articles themselves only a fragment of one
+      // visible at the very edge. The median is robust to exactly this kind
+      // of skew, so it drives the *center*; the trimmed range still drives
+      // how much *area* to show.
+      const median = (values) => {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      };
       const trimmedRange = (values) => {
         const sorted = [...values].sort((a, b) => a - b);
         return [sorted[Math.floor(sorted.length * 0.1)], sorted[Math.ceil(sorted.length * 0.9) - 1]];
       };
-      const [trimMinX, trimMaxX] = trimmedRange(pts.map(d => d.x));
-      const [trimMinY, trimMaxY] = trimmedRange(pts.map(d => d.y));
+      const xsAll = pts.map(d => d.x);
+      const ysAll = pts.map(d => d.y);
+      const [trimMinX, trimMaxX] = trimmedRange(xsAll);
+      const [trimMinY, trimMaxY] = trimmedRange(ysAll);
       const minX = trimMinX - pad;
       const maxX = trimMaxX + pad;
       const minY = trimMinY - pad;
       const maxY = trimMaxY + pad;
+      const centerX = median(xsAll);
+      const centerY = median(ysAll);
 
       const w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
       const h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
@@ -1059,11 +1073,12 @@ export function GraphViewer({
         Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1),
         MIN_SCALE,
       );
-      const tx = w / 2 - ((minX + maxX) / 2) * k;
-      const ty = h / 2 - ((minY + maxY) / 2) * k;
+      const tx = w / 2 - centerX * k;
+      const ty = h / 2 - centerY * k;
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
       logEvent('fitToViewport() applied: k=' + k.toFixed(4) + ' tx=' + Math.round(tx) + ' ty=' + Math.round(ty)
-        + '  trimmed core ' + Math.round(maxX - minX) + 'x' + Math.round(maxY - minY));
+        + '  trimmed core ' + Math.round(maxX - minX) + 'x' + Math.round(maxY - minY)
+        + '  center(median) ' + Math.round(centerX) + ',' + Math.round(centerY));
       return true;
     }
 
