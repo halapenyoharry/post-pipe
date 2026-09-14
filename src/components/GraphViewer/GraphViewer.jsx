@@ -333,7 +333,19 @@ export function GraphViewer({
         + 'white-space:pre-wrap;pointer-events:none;';
       document.body.appendChild(debugEl);
     }
-    function updateDebug(extra) {
+    // One-time events (fitToViewport calls, on-end, visibilitychange) append
+    // here so a screenshot taken at any moment shows the full history, not
+    // just whatever the most recent per-second heartbeat happened to say —
+    // the first version of this overlay overwrote itself every render, so a
+    // "fitToViewport() applied" line could come and go between two
+    // heartbeats without ever being seen.
+    const debugLog = [];
+    function logEvent(msg) {
+      debugLog.push(msg);
+      if (debugLog.length > 10) debugLog.shift();
+      renderDebug();
+    }
+    function renderDebug(liveExtra) {
       if (!debugEl) return;
       const pts = data.nodes.filter(d => Number.isFinite(d.x) && Number.isFinite(d.y));
       const xs = pts.map(d => d.x), ys = pts.map(d => d.y);
@@ -346,9 +358,12 @@ export function GraphViewer({
         'positionsWereDegenerate on restore: ' + positionsWereDegenerate,
         'live bbox span: ' + Math.round(spanX) + ' x ' + Math.round(spanY),
         'visibility: ' + document.visibilityState,
-        extra || '',
+        liveExtra || '',
+        '--- event log ---',
+        ...debugLog,
       ].join('\n');
     }
+    function updateDebug(liveExtra) { renderDebug(liveExtra); }
     updateDebug('(initial, before simulation)');
     // Independent of ticks/rAF, so it still updates (with a stale tick count)
     // if ticking has genuinely stalled rather than just running slowly.
@@ -991,7 +1006,7 @@ export function GraphViewer({
     // looking for is not an improvement on one that overlaps.
     let hasFitted = false;
     function fitToViewport(reason) {
-      updateDebug('fitToViewport() called — reason: ' + (reason || '(none given)'));
+      logEvent('fitToViewport() called — reason: ' + (reason || '(none given)'));
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
@@ -1042,7 +1057,7 @@ export function GraphViewer({
       const tx = w / 2 - ((minX + maxX) / 2) * k;
       const ty = h / 2 - ((minY + maxY) / 2) * k;
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
-      updateDebug('fitToViewport() applied: k=' + k.toFixed(4) + ' tx=' + Math.round(tx) + ' ty=' + Math.round(ty)
+      logEvent('fitToViewport() applied: k=' + k.toFixed(4) + ' tx=' + Math.round(tx) + ' ty=' + Math.round(ty)
         + '  trimmed core ' + Math.round(maxX - minX) + 'x' + Math.round(maxY - minY));
       return true;
     }
@@ -1050,7 +1065,7 @@ export function GraphViewer({
     let hasSettled = false;
     simulation.on('end', () => {
       hasSettled = true;
-      updateDebug('SETTLED at tick ' + tickCount + '  layoutRef: ' + layoutRef.current);
+      logEvent('SETTLED at tick ' + tickCount + '  layoutRef: ' + layoutRef.current);
       // This simulation runs for the whole mount's lifetime regardless of
       // which layout is on screen — switching to ring or timeline just pins
       // every node's fx/fy to that layout's coordinates while this keeps
@@ -1080,7 +1095,7 @@ export function GraphViewer({
           else vs.setNodePosition(positionKey(d), d.x, d.y, { silent: true });
         }
       }
-      updateDebug('on end: anyRestored=' + anyRestored + '  positionsWereDegenerate=' + positionsWereDegenerate);
+      logEvent('on end: anyRestored=' + anyRestored + '  positionsWereDegenerate=' + positionsWereDegenerate);
       // anyRestored used to gate this — skip fitting if the reader already
       // has an arrangement, on the theory that fitting would clobber a
       // camera position they'd set up. But no zoom/pan transform is ever
@@ -1107,7 +1122,7 @@ export function GraphViewer({
     // entirely. Nothing is wrong with it — it simply never got to run. So run
     // it when the page is first actually looked at.
     const handleVisibility = () => {
-      updateDebug('visibilitychange -> ' + document.visibilityState + '  hasSettled: ' + hasSettled);
+      logEvent('visibilitychange -> ' + document.visibilityState + '  hasSettled: ' + hasSettled);
       if (document.hidden) return;
       if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
       // Settled while there was nothing to settle into. Frame it now that
