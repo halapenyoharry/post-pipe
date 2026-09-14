@@ -11408,7 +11408,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			let t = e.transform.k;
 			O.current = t, C.current && C.current();
 			let n = bo(t);
-			n !== ee.current && (ee.current = n, pe());
+			n !== ee.current && (ee.current = n, ge());
 		});
 		o.call(c).on("dblclick.zoom", null);
 		let d = !1;
@@ -11431,7 +11431,11 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 		}
 		let x = null;
 		typeof window < "u" && new URLSearchParams(window.location.search).has("debug") && (x = document.createElement("pre"), x.style.cssText = "position:fixed;bottom:0;left:0;z-index:9999;margin:0;padding:6px 8px;max-width:100vw;font:10px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.85);white-space:pre-wrap;pointer-events:none;", document.body.appendChild(x));
-		function ne(e) {
+		let ne = [];
+		function re(e) {
+			ne.push(e), ne.length > 10 && ne.shift(), ie();
+		}
+		function ie(e) {
 			if (!x) return;
 			let t = a.nodes.filter((e) => Number.isFinite(e.x) && Number.isFinite(e.y)), i = t.map((e) => e.x), o = t.map((e) => e.y), s = i.length ? Math.max(...i) - Math.min(...i) : 0, c = o.length ? Math.max(...o) - Math.min(...o) : 0;
 			x.textContent = [
@@ -11440,15 +11444,20 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				"positionsWereDegenerate on restore: " + d,
 				"live bbox span: " + Math.round(s) + " x " + Math.round(c),
 				"visibility: " + document.visibilityState,
-				e || ""
+				e || "",
+				"--- event log ---",
+				...ne
 			].join("\n");
 		}
-		ne("(initial, before simulation)");
-		let re = x ? setInterval(() => ne("heartbeat, tick " + ve), 1e3) : null, ie = Ga().force("link", Ia().id((e) => e.id).distance(f.linkDistance)).force("charge", Ka().strength(f.chargeStrength)).force("collide", Na().radius((e) => (e._r || e.size / 2) + f.collidePadding).strength(1).iterations(3)).force("center", oa(n / 2, r / 2)).velocityDecay(f.velocityDecay).alphaDecay(f.alphaDecay), ae = () => {
+		function ae(e) {
+			ie(e);
+		}
+		ae("(initial, before simulation)");
+		let oe = x ? setInterval(() => ae("heartbeat, tick " + xe), 1e3) : null, k = Ga().force("link", Ia().id((e) => e.id).distance(f.linkDistance)).force("charge", Ka().strength(f.chargeStrength)).force("collide", Na().radius((e) => (e._r || e.size / 2) + f.collidePadding).strength(1).iterations(3)).force("center", oa(n / 2, r / 2)).velocityDecay(f.velocityDecay).alphaDecay(f.alphaDecay), A = () => {
 			S.current && S.current(), p.current && (n = p.current.clientWidth, r = p.current.clientHeight, o.attr("width", n).attr("height", r));
 		};
-		window.addEventListener("resize", ae);
-		let oe = o.append("g").attr("class", "time-axis-layer"), k = s.selectAll(".link").data(a.links).enter().append("line").attr("class", "link"), A = s.selectAll(".node").data(a.nodes).enter().append("g").attr("class", "node").call(an().filter((e) => {
+		window.addEventListener("resize", A);
+		let se = o.append("g").attr("class", "time-axis-layer"), ce = s.selectAll(".link").data(a.links).enter().append("line").attr("class", "link"), le = s.selectAll(".node").data(a.nodes).enter().append("g").attr("class", "node").call(an().filter((e) => {
 			if (e.ctrlKey || e.button !== void 0 && e.button !== 0) return !1;
 			if (e.pointerType === "touch" || e.type === "touchstart") {
 				let t = e.target;
@@ -11476,10 +11485,10 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				t._size = {
 					width: r(n.w + (e.x - n.x) * 2, l.minWidth, l.maxWidth),
 					height: r(n.h + (e.y - n.y) * 2, l.minHeight, l.maxHeight)
-				}, fe(t), g.current && g.current.setNodeSize(w(t), t._size.width, t._size.height, { transient: !0 });
+				}, he(t), g.current && g.current.setNodeSize(w(t), t._size.width, t._size.height, { transient: !0 });
 				return;
 			}
-			t.x = e.x, t.y = e.y, t.fx = e.x, t.fy = e.y, g.current && g.current.setNodePosition(w(t), e.x, e.y, { transient: !0 }), A.filter((e) => e.id === t.id).attr("transform", "translate(" + e.x + "," + e.y + ")"), C.current && C.current(), k.each(function(e) {
+			t.x = e.x, t.y = e.y, t.fx = e.x, t.fy = e.y, g.current && g.current.setNodePosition(w(t), e.x, e.y, { transient: !0 }), le.filter((e) => e.id === t.id).attr("transform", "translate(" + e.x + "," + e.y + ")"), C.current && C.current(), ce.each(function(e) {
 				let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 				if (n === t.id || r === t.id) {
 					let t = typeof e.source == "object" ? e.source.x : 0, n = typeof e.source == "object" ? e.source.y : 0, r = typeof e.target == "object" ? e.target.x : 0, i = typeof e.target == "object" ? e.target.y : 0;
@@ -11493,34 +11502,34 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				return;
 			}
 			t.fx = t.x, t.fy = t.y, n && (n.setNodePosition(T(t), t.x, t.y, { transient: !0 }), n.commit());
-		})), se = o.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden"), ce = typeof document < "u" ? document.createElement("canvas").getContext("2d") : null;
-		function le(e, t) {
-			if (!ce) return {
+		})), ue = o.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden"), de = typeof document < "u" ? document.createElement("canvas").getContext("2d") : null;
+		function j(e, t) {
+			if (!de) return {
 				width: e.length * t * .5,
 				ascent: t * .7,
 				descent: t * .2
 			};
-			ce.font = "500 " + t + "px 'Atkinson', sans-serif";
-			let n = ce.measureText(e);
+			de.font = "500 " + t + "px 'Atkinson', sans-serif";
+			let n = de.measureText(e);
 			return {
 				width: n.actualBoundingBoxLeft + n.actualBoundingBoxRight,
 				ascent: n.actualBoundingBoxAscent,
 				descent: n.actualBoundingBoxDescent
 			};
 		}
-		let ue = [];
-		function de(e) {
-			let { d: t, textEl: n, rectEl: r, lines: i, fontSize: a, lineH: o } = e, s = i.map((e) => le(e, a)), c = i.map((e, t) => t * o), l = Math.min(...c.map((e, t) => e - s[t].ascent)), d = Math.max(...c.map((e, t) => e + s[t].descent)), f = -(l + d) / 2, p = l + f, m = d + f, h = Math.max(...s.map((e) => e.width));
+		let fe = [];
+		function pe(e) {
+			let { d: t, textEl: n, rectEl: r, lines: i, fontSize: a, lineH: o } = e, s = i.map((e) => j(e, a)), c = i.map((e, t) => t * o), l = Math.min(...c.map((e, t) => e - s[t].ascent)), d = Math.max(...c.map((e, t) => e + s[t].descent)), f = -(l + d) / 2, p = l + f, m = d + f, h = Math.max(...s.map((e) => e.width));
 			n.selectAll("tspan").each(function(e, t) {
 				Ut(this).attr("y", c[t] + f);
 			}), r.attr("x", -h / 2 - u.padding).attr("y", p - u.padding).attr("width", h + u.padding * 2).attr("height", m - p + u.padding * 2), t._r = Math.hypot(h + u.padding * 2, m - p + u.padding * 2) / 2;
 		}
-		A.each(function(e) {
+		le.each(function(e) {
 			let t = Ut(this);
 			if (e.type !== "article") {
 				let n = u.fontSize, r = u.padding, i = u.maxWidth, a = u.maxLines;
-				se.style("font-size", n + "px").style("font-weight", "500");
-				let o = (e) => (se.text(e), se.node().getComputedTextLength()), s = e.label.split(/(?<=-)|\s+/).filter(Boolean), c = (e) => e.join("").replace(/\s+$/, "").trim(), l = [e.label];
+				ue.style("font-size", n + "px").style("font-weight", "500");
+				let o = (e) => (ue.text(e), ue.node().getComputedTextLength()), s = e.label.split(/(?<=-)|\s+/).filter(Boolean), c = (e) => e.join("").replace(/\s+$/, "").trim(), l = [e.label];
 				if (o(e.label) + r * 2 > i && s.length > 1) {
 					l = [];
 					let e = [];
@@ -11550,7 +11559,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 					fontSize: n,
 					lineH: d
 				};
-				ue.push(p), de(p);
+				fe.push(p), pe(p);
 			} else {
 				t.append("foreignObject").attr("class", "article-fo");
 				let n = _({
@@ -11559,21 +11568,21 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				});
 				e._r = Math.hypot(n.width, n.height) / 2;
 			}
-		}), se.remove(), typeof document < "u" && document.fonts && document.fonts.ready && document.fonts.ready.then(() => {
-			ue.forEach(de);
+		}), ue.remove(), typeof document < "u" && document.fonts && document.fonts.ready && document.fonts.ready.then(() => {
+			fe.forEach(pe);
 		}).catch(() => {});
-		let j = /* @__PURE__ */ new Map();
-		A.filter((e) => e.type === "article").each(function(e) {
+		let me = /* @__PURE__ */ new Map();
+		le.filter((e) => e.type === "article").each(function(e) {
 			let t = Ut(this).select("foreignObject.article-fo").node(), n = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-			n.style.width = "100%", n.style.height = "100%", n.style.boxSizing = "border-box", t.appendChild(n), j.set(e.id, {
+			n.style.width = "100%", n.style.height = "100%", n.style.boxSizing = "border-box", t.appendChild(n), me.set(e.id, {
 				root: (0, Rr.createRoot)(n),
 				fo: t,
 				wrapper: n
 			});
 		});
-		function fe(e) {
+		function he(e) {
 			if (e.type !== "article") return;
-			let t = j.get(e.id);
+			let t = me.get(e.id);
 			if (!t) return;
 			let n = D.current === e.id, r = E.current === e.id, i = bo(O.current), { width: a, height: o } = e._size || _({
 				hovered: n,
@@ -11593,15 +11602,15 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				fullContent: e._fullContent || null
 			}));
 		}
-		A.filter((e) => e.type === "article").select("foreignObject.article-fo").on("wheel", (e) => e.stopPropagation());
-		function pe() {
+		le.filter((e) => e.type === "article").select("foreignObject.article-fo").on("wheel", (e) => e.stopPropagation());
+		function ge() {
 			a.nodes.forEach((e) => {
-				e.type === "article" && fe(e);
+				e.type === "article" && he(e);
 			});
 		}
-		let me = /* @__PURE__ */ new Map();
-		function he(e) {
-			if (me.has(e.id)) return e._fullContent = me.get(e.id), Promise.resolve();
+		let _e = /* @__PURE__ */ new Map();
+		function ve(e) {
+			if (_e.has(e.id)) return e._fullContent = _e.get(e.id), Promise.resolve();
 			let t = !1;
 			try {
 				t = new URL(e.url, window.location.href).origin === window.location.origin;
@@ -11615,42 +11624,42 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 				let n = new DOMParser().parseFromString(t, "text/html"), r = n.querySelector("h1");
 				r && r.remove();
 				let i = n.querySelector("body") ? n.querySelector("body").innerHTML : t;
-				me.set(e.id, i), e._fullContent = i;
+				_e.set(e.id, i), e._fullContent = i;
 			}).catch(() => {
-				me.set(e.id, null), e._fullContent = null;
-			}) : (me.set(e.id, null), e._fullContent = null, Promise.resolve());
+				_e.set(e.id, null), e._fullContent = null;
+			}) : (_e.set(e.id, null), e._fullContent = null, Promise.resolve());
 		}
-		pe(), _o(o, te.current), A.filter((e) => e.type === "article").on("mouseover", (e, t) => {
-			D.current !== t.id && (D.current = t.id, fe(t));
+		ge(), _o(o, te.current), le.filter((e) => e.type === "article").on("mouseover", (e, t) => {
+			D.current !== t.id && (D.current = t.id, he(t));
 		}).on("mouseout", (e, t) => {
 			let n = e.relatedTarget;
-			n && e.currentTarget.contains(n) || D.current === t.id && (D.current = null, fe(t));
+			n && e.currentTarget.contains(n) || D.current === t.id && (D.current = null, he(t));
 		}).on("dblclick", (e, t) => {
-			e.stopPropagation(), e.preventDefault(), h.current && h.current(t.originalItem || t), E.current = null, D.current = null, fe(t);
+			e.stopPropagation(), e.preventDefault(), h.current && h.current(t.originalItem || t), E.current = null, D.current = null, he(t);
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {
-				e.stopPropagation(), h.current && h.current(t.originalItem || t), E.current === t.id && (E.current = null, D.current = null, fe(t));
+				e.stopPropagation(), h.current && h.current(t.originalItem || t), E.current === t.id && (E.current = null, D.current = null, he(t));
 				return;
 			}
 			e.stopPropagation();
 			let r = E.current;
-			if (r === t.id) E.current = null, fe(t);
+			if (r === t.id) E.current = null, he(t);
 			else {
-				if (E.current = t.id, fe(t), A.filter((e) => e.id === t.id).raise(), r) {
+				if (E.current = t.id, he(t), le.filter((e) => e.id === t.id).raise(), r) {
 					let e = a.nodes.find((e) => e.id === r);
-					e && fe(e);
+					e && he(e);
 				}
-				he(t).then(() => {
-					E.current === t.id && fe(t);
+				ve(t).then(() => {
+					E.current === t.id && he(t);
 				});
 			}
 		});
-		let ge = null;
-		A.filter((e) => e.type !== "article").on("click", (e, t) => {
-			if (e.stopPropagation(), ge === t.id) ge = null, A.classed("dimmed", !1).classed("tag-active", !1), k.classed("highlighted", !1);
+		let ye = null;
+		le.filter((e) => e.type !== "article").on("click", (e, t) => {
+			if (e.stopPropagation(), ye === t.id) ye = null, le.classed("dimmed", !1).classed("tag-active", !1), ce.classed("highlighted", !1);
 			else {
-				ge = t.id;
+				ye = t.id;
 				let e = new Set(a.links.filter((e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id || r === t.id;
@@ -11658,39 +11667,39 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id ? r : n;
 				}));
-				e.add(t.id), A.classed("dimmed", (t) => !e.has(t.id)), A.classed("tag-active", (e) => e.id === t.id), k.classed("highlighted", (e) => {
+				e.add(t.id), le.classed("dimmed", (t) => !e.has(t.id)), le.classed("tag-active", (e) => e.id === t.id), ce.classed("highlighted", (e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id || r === t.id;
 				});
 			}
 		}), o.on("click", () => {
-			if (ge && (ge = null, A.classed("dimmed", !1).classed("tag-active", !1), k.classed("highlighted", !1)), E.current, E.current) {
+			if (ye && (ye = null, le.classed("dimmed", !1).classed("tag-active", !1), ce.classed("highlighted", !1)), E.current, E.current) {
 				let e = a.nodes.find((e) => e.id === E.current);
-				E.current = null, e && fe(e);
+				E.current = null, e && he(e);
 			}
 		});
-		function _e() {
-			k.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), A.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")");
+		function be() {
+			ce.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), le.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")");
 		}
 		y.current = {
 			data: a,
-			nodes: A,
-			links: k,
-			applyPositions: _e,
+			nodes: le,
+			links: ce,
+			applyPositions: be,
 			svg: o,
 			zoom: c,
-			fitToViewport: be,
-			simulation: ie,
-			axisLayer: oe,
+			fitToViewport: Ce,
+			simulation: k,
+			axisLayer: se,
 			g: s
 		};
-		let ve = 0;
-		ie.nodes(a.nodes).on("tick", () => {
-			_e(), C.current && C.current(), ++ve, S.current && ve % 25 == 0 && S.current(), x && ve % 10 == 0 && ne("ticks: " + ve + "  alpha: " + ie.alpha().toFixed(4));
-		}), ie.force("link").links(a.links), _e();
-		let ye = !1;
-		function be(e) {
-			ne("fitToViewport() called — reason: " + (e || "(none given)"));
+		let xe = 0;
+		k.nodes(a.nodes).on("tick", () => {
+			be(), C.current && C.current(), ++xe, S.current && xe % 25 == 0 && S.current(), x && xe % 10 == 0 && ae("ticks: " + xe + "  alpha: " + k.alpha().toFixed(4));
+		}), k.force("link").links(a.links), be();
+		let Se = !1;
+		function Ce(e) {
+			re("fitToViewport() called — reason: " + (e || "(none given)"));
 			let t = a.nodes.filter((e) => e.type === "article");
 			if (t.length < 2) return !1;
 			let n = (e) => {
@@ -11699,11 +11708,11 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			}, [r, i] = n(t.map((e) => e.x)), [s, l] = n(t.map((e) => e.y)), u = r - 140, d = i + 140, f = s - 140, m = l + 140, h = p.current ? p.current.clientWidth : window.innerWidth, g = p.current ? p.current.clientHeight : window.innerHeight;
 			if (h < 50 || g < 50) return !1;
 			let _ = Math.max(Math.min(h / Math.max(d - u, 1), g / Math.max(m - f, 1), 1), .2), v = h / 2 - (u + d) / 2 * _, y = g / 2 - (f + m) / 2 * _;
-			return o.call(c.transform, Xa.translate(v, y).scale(_)), ne("fitToViewport() applied: k=" + _.toFixed(4) + " tx=" + Math.round(v) + " ty=" + Math.round(y) + "  trimmed core " + Math.round(d - u) + "x" + Math.round(m - f)), !0;
+			return o.call(c.transform, Xa.translate(v, y).scale(_)), re("fitToViewport() applied: k=" + _.toFixed(4) + " tx=" + Math.round(v) + " ty=" + Math.round(y) + "  trimmed core " + Math.round(d - u) + "x" + Math.round(m - f)), !0;
 		}
-		let xe = !1;
-		ie.on("end", () => {
-			if (xe = !0, ne("SETTLED at tick " + ve + "  layoutRef: " + b.current), b.current !== "force") return;
+		let we = !1;
+		k.on("end", () => {
+			if (we = !0, re("SETTLED at tick " + xe + "  layoutRef: " + b.current), b.current !== "force") return;
 			a.nodes.forEach((e) => {
 				e.fx = e.x, e.fy = e.y, e._forcePos = {
 					x: e.x,
@@ -11717,21 +11726,21 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			}))) return;
 			let t = !1;
 			if (e) for (let n of a.nodes) !d && e.nodeState(T(n)) ? t = !0 : e.setNodePosition(T(n), n.x, n.y, { silent: !0 });
-			ne("on end: anyRestored=" + t + "  positionsWereDegenerate=" + d), ye ||= be("simulation end"), S.current && S.current();
+			re("on end: anyRestored=" + t + "  positionsWereDegenerate=" + d), Se ||= Ce("simulation end"), S.current && S.current();
 		});
-		let Se = () => {
-			if (ne("visibilitychange -> " + document.visibilityState + "  hasSettled: " + xe), !document.hidden) {
-				if (!xe) {
-					ie.alpha(.8).restart();
+		let Te = () => {
+			if (re("visibilitychange -> " + document.visibilityState + "  hasSettled: " + we), !document.hidden) {
+				if (!we) {
+					k.alpha(.8).restart();
 					return;
 				}
-				ye ||= be("visibilitychange, settled but never fitted");
+				Se ||= Ce("visibilitychange, settled but never fitted");
 			}
 		};
-		return document.addEventListener("visibilitychange", Se), () => {
-			ie.stop(), document.removeEventListener("visibilitychange", Se), window.removeEventListener("resize", ae), re && clearInterval(re), x && x.parentNode && x.parentNode.removeChild(x), j.forEach(({ root: e }) => {
+		return document.addEventListener("visibilitychange", Te), () => {
+			k.stop(), document.removeEventListener("visibilitychange", Te), window.removeEventListener("resize", A), oe && clearInterval(oe), x && x.parentNode && x.parentNode.removeChild(x), me.forEach(({ root: e }) => {
 				queueMicrotask(() => e.unmount());
-			}), j.clear();
+			}), me.clear();
 		};
 	}, [e]), (0, M.useEffect)(() => {
 		let e = y.current;
