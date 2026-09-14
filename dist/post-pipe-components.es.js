@@ -11430,7 +11430,7 @@ function So({ feedData: e, onNodeSelect: t, hiddenSources: n, viewState: r, layo
 			});
 		}
 		let x = null;
-		typeof window < "u" && new URLSearchParams(window.location.search).has("debug") && (x = document.createElement("pre"), x.style.cssText = "position:fixed;bottom:0;left:0;z-index:9999;margin:0;padding:6px 8px;max-width:100vw;font:10px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.85);white-space:pre-wrap;pointer-events:none;", document.body.appendChild(x));
+		typeof window < "u" && new URLSearchParams(window.location.search).has("debug") && (x = document.createElement("pre"), x.style.cssText = "position:fixed;top:110px;left:0;z-index:9999;margin:0;padding:6px 8px;max-width:100vw;font:10px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.85);white-space:pre-wrap;pointer-events:none;", document.body.appendChild(x));
 		let ne = [];
 		function re(e) {
 			ne.push(e), ne.length > 10 && ne.shift(), ie();
