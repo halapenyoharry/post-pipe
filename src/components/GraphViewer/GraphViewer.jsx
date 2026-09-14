@@ -990,7 +990,8 @@ export function GraphViewer({
     // the corpus over far more space than before, and a layout you have to go
     // looking for is not an improvement on one that overlaps.
     let hasFitted = false;
-    function fitToViewport() {
+    function fitToViewport(reason) {
+      updateDebug('fitToViewport() called — reason: ' + (reason || '(none given)'));
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
@@ -1041,6 +1042,8 @@ export function GraphViewer({
       const tx = w / 2 - ((minX + maxX) / 2) * k;
       const ty = h / 2 - ((minY + maxY) / 2) * k;
       svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+      updateDebug('fitToViewport() applied: k=' + k.toFixed(4) + ' tx=' + Math.round(tx) + ' ty=' + Math.round(ty)
+        + '  trimmed core ' + Math.round(maxX - minX) + 'x' + Math.round(maxY - minY));
       return true;
     }
 
@@ -1077,7 +1080,22 @@ export function GraphViewer({
           else vs.setNodePosition(positionKey(d), d.x, d.y, { silent: true });
         }
       }
-      if (!anyRestored) hasFitted = fitToViewport();
+      updateDebug('on end: anyRestored=' + anyRestored + '  positionsWereDegenerate=' + positionsWereDegenerate);
+      // anyRestored used to gate this — skip fitting if the reader already
+      // has an arrangement, on the theory that fitting would clobber a
+      // camera position they'd set up. But no zoom/pan transform is ever
+      // persisted anywhere; every fresh mount starts at the SVG's default
+      // identity transform regardless of anyRestored, so that guard never
+      // preserved anything — it just left the camera at an arbitrary
+      // default. Worse: this corpus's *positions* are legitimately
+      // viewport-independent (that's the point — an arrangement made on a
+      // desktop is still the same arrangement on a phone), but the
+      // *zoom/pan needed to view them usefully* is emphatically not, and
+      // this guard skipped exactly the step that adapts one to the other.
+      // A reader who opened this on a 1024px desktop and now opens the same
+      // saved arrangement on a 375px phone needs a fresh fit every time,
+      // not the one time anyRestored happened to be false.
+      if (!hasFitted) hasFitted = fitToViewport('simulation end');
       // The axis is measured against where the pieces ended up, so it is drawn
       // again now that they have stopped moving.
       if (redrawAxisRef.current) redrawAxisRef.current();
@@ -1094,7 +1112,7 @@ export function GraphViewer({
       if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
       // Settled while there was nothing to settle into. Frame it now that
       // there is.
-      if (!hasFitted) hasFitted = fitToViewport();
+      if (!hasFitted) hasFitted = fitToViewport('visibilitychange, settled but never fitted');
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
