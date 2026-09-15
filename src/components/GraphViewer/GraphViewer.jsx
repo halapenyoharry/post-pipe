@@ -90,6 +90,32 @@ function applyVisibility(svg, cardsLayer, hiddenSet) {
     });
 }
 
+// Walk article nodes + links and dim non-matching nodes when a time filter is active.
+function applyTimeFilter(svg, cardsLayer, filteredSet) {
+  if (!filteredSet) {
+    cardsLayer.selectAll('.node-card').classed('dimmed', false);
+    svg.selectAll('.node').classed('dimmed', false);
+    svg.selectAll('.link').classed('dimmed', false);
+    return;
+  }
+
+  cardsLayer.selectAll('.node-card')
+    .classed('dimmed', d => !filteredSet.has(d.id));
+
+  svg.selectAll('.node')
+    .classed('dimmed', d => {
+      if (d.type === 'article') return !filteredSet.has(d.id);
+      return false;
+    });
+
+  svg.selectAll('.link')
+    .classed('dimmed', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return !filteredSet.has(sid) && !filteredSet.has(tid);
+    });
+}
+
 // Zoom-aware level of detail.
 const LOD_MARKER = 0.35;
 const LOD_TITLE = 0.6;
@@ -107,7 +133,7 @@ function cardSizeFor({ hovered, pinned, lod }) {
   return { width: 180, height: 140 };
 }
 
-export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
+export function GraphViewer({ feedData, onNodeSelect, hiddenSources, filteredArticleIds }) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const cardsLayerRef = useRef(null);
@@ -132,6 +158,12 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
     if (!svgRef.current || !cardsLayerRef.current) return;
     applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current);
   }, [hiddenSources]);
+
+  // Apply time filter dimming
+  useEffect(() => {
+    if (!svgRef.current || !cardsLayerRef.current) return;
+    applyTimeFilter(svgRef.current, d3.select(cardsLayerRef.current), filteredArticleIds);
+  }, [filteredArticleIds]);
 
   useEffect(() => {
     if (!feedData || !containerRef.current) return;
@@ -306,7 +338,9 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
       const hovered = hoveredIdRef.current === d.id;
       const pinned = pinnedIdRef.current === d.id;
       const lod = getLOD(zoomScaleRef.current);
-      const { width: w, height: h } = cardSizeFor({ hovered, pinned, lod });
+      const defaultSize = cardSizeFor({ hovered, pinned, lod });
+      const w = (lod === 'marker' && !hovered && !pinned) ? defaultSize.width : (d._customWidth || defaultSize.width);
+      const h = (lod === 'marker' && !hovered && !pinned) ? defaultSize.height : (d._customHeight || defaultSize.height);
 
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
@@ -319,8 +353,18 @@ export function GraphViewer({ feedData, onNodeSelect, hiddenSources }) {
           article: d,
           width: w,
           height: h,
-          viewState: { hovered, pinned, lod },
-          fullContent: d._fullContent || null
+          viewState: { hovered, pinned, lod, zoomScale: zoomScaleRef.current },
+          fullContent: d._fullContent || null,
+          onResize: ({ width: newW, height: newH }) => {
+            d._customWidth = newW;
+            d._customHeight = newH;
+            entry.wrapper.style.width = newW + 'px';
+            entry.wrapper.style.height = newH + 'px';
+            entry.wrapper.style.marginLeft = (-newW / 2) + 'px';
+            entry.wrapper.style.marginTop = (-newH / 2) + 'px';
+            d._r = Math.max(newW, newH) / 2;
+            renderArticleBody(d);
+          }
         })
       );
       d._r = Math.max(w, h) / 2;

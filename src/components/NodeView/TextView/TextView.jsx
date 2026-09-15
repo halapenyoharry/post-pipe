@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './TextView.module.css';
+import { ResizeHandles } from '../ResizeHandles';
 
 /**
  * TextView — the lens that renders a text-substrate node (essay, fragment,
@@ -13,16 +14,17 @@ import styles from './TextView.module.css';
  * Props:
  *   article: the corpus item (title, short_title, description, image, etc.)
  *   width, height: render dimensions in pixels
- *   viewState: { hovered, pinned, lod } — current display mode
+ *   viewState: { hovered, pinned, lod, zoomScale } — current display mode
  *     lod ∈ { 'slug' | 'title' | 'full' } — zoom-derived level of detail
  *     hovered/pinned promote the card to "expanded" (scrollable text)
  *   fullContent: optional pre-fetched article HTML; when present and pinned,
  *     replaces the summary as the scrollable body
+ *   onResize: optional callback ({ width, height }) => void
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
-export function TextView({ article, width, height, viewState, fullContent }) {
-  const { hovered = false, pinned = false, lod = 'full' } = viewState || {};
+export function TextView({ article, width, height, viewState, fullContent, onResize }) {
+  const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
 
@@ -47,6 +49,8 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         pinned={pinned}
         hovered={hovered}
         isDraft={isDraft}
+        zoomScale={zoomScale}
+        onResize={onResize}
       />
     );
   }
@@ -67,6 +71,8 @@ export function TextView({ article, width, height, viewState, fullContent }) {
     pinned && styles.pinned,
     viewState.lod === 'marker' && !expanded && styles.marker
   ].filter(Boolean).join(' ');
+
+  const showHandles = viewState.lod !== 'marker';
 
   return (
     <div
@@ -90,6 +96,14 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         fullContent={fullContent}
       />
       {pinned && <PopoutButton />}
+      {showHandles && (
+        <ResizeHandles
+          width={width}
+          height={height}
+          zoomScale={zoomScale}
+          onResize={onResize}
+        />
+      )}
     </div>
   );
 }
@@ -144,7 +158,7 @@ function CardContent({ article, viewState, expanded, useFullArticle, fullContent
   );
 }
 
-function ImageCard({ article, width, height, pinned, hovered, isDraft }) {
+function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale, onResize }) {
   // Photo-on-top, caption-below. Hover/pin slightly enlarges.
   const cardClassNames = [
     styles.imageCard,
@@ -171,6 +185,12 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft }) {
         {article.short_title || article.title || article.label}
       </div>
       {pinned && <PopoutButton />}
+      <ResizeHandles
+        width={width}
+        height={height}
+        zoomScale={zoomScale}
+        onResize={onResize}
+      />
     </div>
   );
 }

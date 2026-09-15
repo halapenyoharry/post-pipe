@@ -11,6 +11,8 @@ export function TTS({ targetRef }) {
   const [selectedVoice, setSelectedVoice] = useState('');
   const [capabilities, setCapabilities] = useState({});
   const [params, setParams] = useState({});
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
     // Wait for the window.TTS global to be populated (e.g. from injected tts.js)
@@ -18,7 +20,30 @@ export function TTS({ targetRef }) {
     const tts = window.TTS;
     setT(tts);
 
-    const updateState = (s) => setState(s);
+    const updateState = (s) => {
+      setState(s);
+      if (s === 'playing' || s === 'stopped') {
+        if (!isError) setStatusMessage(null);
+      }
+    };
+
+    const handleProgress = ({ engine, progress }) => {
+      if (progress && progress.status === 'progress' && progress.progress !== undefined) {
+        const pct = Math.round(progress.progress * 100);
+        setStatusMessage(`Loading ${engine}: ${pct}%`);
+      } else if (progress && progress.status) {
+        setStatusMessage(`Loading ${engine}...`);
+      }
+    };
+
+    const handleError = ({ engine, error }) => {
+      setIsError(true);
+      setStatusMessage(`${engine || 'TTS'} error: ${error || 'Playback failed'}`);
+      setTimeout(() => {
+        setStatusMessage(null);
+        setIsError(false);
+      }, 5000);
+    };
 
     const refreshEngines = () => {
       setEngines(tts.engines());
@@ -26,14 +51,24 @@ export function TTS({ targetRef }) {
     };
 
     const refreshCapabilities = () => {
-      setVoices(tts.voices());
-      setCapabilities(tts.capabilities());
+      const vList = tts.voices();
+      setVoices(vList);
+      const caps = tts.capabilities();
+      setCapabilities(caps);
       // Initialize local params state from engine current values
       const newParams = {};
-      const caps = tts.capabilities();
       for (const key of Object.keys(caps)) {
         if (key === 'voice') {
-          setSelectedVoice(tts.get('voice') || caps.voice.default);
+          let chosen = tts.get('voice') || caps.voice.default;
+          // If no voice chosen yet or browser engine is active, search for Google US English 7 (Natural)
+          if (!chosen && vList.length) {
+            const match7 = vList.find(v => /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.id || v.label));
+            if (match7) chosen = match7.id;
+          }
+          if (chosen) {
+            tts.set('voice', chosen);
+            setSelectedVoice(chosen);
+          }
         } else {
           newParams[key] = tts.get(key) !== undefined ? tts.get(key) : caps[key].default;
         }
@@ -43,6 +78,8 @@ export function TTS({ targetRef }) {
 
     tts.on('state', updateState);
     tts.on('capabilitiesChanged', refreshCapabilities);
+    tts.on('loadingProgress', handleProgress);
+    tts.on('error', handleError);
 
     refreshEngines();
     refreshCapabilities();
@@ -53,7 +90,10 @@ export function TTS({ targetRef }) {
     }
 
     return () => {
-      // We do not have off() methods in current tts.js implementation so we are careful
+      tts.off('state', updateState);
+      tts.off('capabilitiesChanged', refreshCapabilities);
+      tts.off('loadingProgress', handleProgress);
+      tts.off('error', handleError);
       if (window.speechSynthesis) {
         window.speechSynthesis.removeEventListener('voiceschanged', refreshCapabilities);
       }
@@ -65,6 +105,8 @@ export function TTS({ targetRef }) {
     const engineId = e.target.value;
     T.select(engineId);
     setSelectedEngine(engineId);
+    setStatusMessage(null);
+    setIsError(false);
     setVoices(T.voices());
     setCapabilities(T.capabilities());
   };
@@ -84,6 +126,8 @@ export function TTS({ targetRef }) {
 
   const handlePlay = () => {
     if (!T || !targetRef.current) return;
+    setStatusMessage(null);
+    setIsError(false);
     T.play(targetRef.current, { scrollContainer: targetRef.current });
   };
 
@@ -132,6 +176,12 @@ export function TTS({ targetRef }) {
       )}
       {(state === 'playing' || state === 'paused' || state === 'loading') && (
         <button className={styles.tb} onClick={handleStop} title="Stop" dangerouslySetInnerHTML={{ __html: `${ICONS.stop}<span class="${styles.tbTooltip}">Stop</span>` }} />
+      )}
+
+      {statusMessage && (
+        <span className={`${styles.statusBadge} ${isError ? styles.error : ''}`}>
+          {statusMessage}
+        </span>
       )}
 
       <select

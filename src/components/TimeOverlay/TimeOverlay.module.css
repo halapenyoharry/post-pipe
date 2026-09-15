@@ -1,0 +1,228 @@
+.timeOverlay {
+  --to-accent: #64ffda;
+  --to-bg-start: rgba(17, 24, 39, 0.85);
+  --to-bg-mid: rgba(17, 24, 39, 0.45);
+  --to-bg-end: rgba(17, 24, 39, 0);
+  --to-border: rgba(100, 255, 218, 0.22);
+  --to-text: #e0e0e0;
+  --to-text-muted: rgba(224, 224, 224, 0.45);
+
+  position: fixed;
+  top: 56px;
+  left: 12px;
+  bottom: 24px;
+  width: 280px;
+  z-index: 45;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Atkinson', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.header {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: linear-gradient(to right, var(--to-bg-start), var(--to-bg-end));
+  border-left: 2px solid var(--to-accent);
+  border-top-left-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--to-accent);
+}
+
+.rangeBadge {
+  font-size: 10px;
+  color: var(--to-text-muted);
+  letter-spacing: 0.05em;
+}
+
+.clearBtn {
+  background: transparent;
+  border: none;
+  color: var(--to-accent);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(100, 255, 218, 0.12);
+  transition: all 0.15s ease;
+}
+
+.clearBtn:hover {
+  background: rgba(100, 255, 218, 0.25);
+}
+
+.stackScroll {
+  pointer-events: auto;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.stackScroll::-webkit-scrollbar {
+  width: 3px;
+}
+.stackScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.stackScroll::-webkit-scrollbar-thumb {
+  background: rgba(100, 255, 218, 0.2);
+  border-radius: 2px;
+}
+
+/* Month box — stacked container fading from left to right */
+.monthBox {
+  background: linear-gradient(to right, var(--to-bg-start) 0%, var(--to-bg-mid) 65%, var(--to-bg-end) 100%);
+  border-left: 2px solid rgba(100, 255, 218, 0.35);
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.monthBox.emptyMonth {
+  opacity: 0.65;
+  border-left-color: rgba(255, 255, 255, 0.15);
+}
+
+.monthBox.activeMonth {
+  border-left-color: var(--to-accent);
+  background: linear-gradient(to right, rgba(100, 255, 218, 0.18) 0%, var(--to-bg-mid) 70%, var(--to-bg-end) 100%);
+}
+
+.monthBox:hover {
+  border-left-color: var(--to-accent);
+  opacity: 1;
+}
+
+/* Left column of month box: Month Name & count */
+.monthHeader {
+  width: 58px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.monthName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.yearTag {
+  font-size: 9px;
+  font-weight: normal;
+  color: var(--to-text-muted);
+}
+
+.monthMeta {
+  font-size: 10px;
+  color: var(--to-text-muted);
+  margin-top: 2px;
+}
+
+.monthMeta.hasItems {
+  color: var(--to-accent);
+  font-weight: 600;
+}
+
+/* Branching connectors: SVG or border branching out to the right */
+.branchArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 6px;
+}
+
+.branchLine {
+  width: 12px;
+  height: 1px;
+  background: rgba(100, 255, 218, 0.25);
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+/* Weeks grid/row projecting horizontally to the right */
+.weeksRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.weekPill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-size: 10px;
+  color: var(--to-text-muted);
+  cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.weekPill.hasContent {
+  color: #fff;
+  border-color: rgba(100, 255, 218, 0.3);
+  background: rgba(17, 24, 39, 0.5);
+  cursor: pointer;
+}
+
+.weekPill.hasContent:hover {
+  border-color: var(--to-accent);
+  background: rgba(100, 255, 218, 0.15);
+  color: var(--to-accent);
+}
+
+.weekPill.activeWeek {
+  border-color: var(--to-accent);
+  background: var(--to-accent);
+  color: #0d131f;
+  font-weight: 700;
+}
+
+.weekBadge {
+  font-size: 9px;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: rgba(100, 255, 218, 0.2);
+  color: var(--to-accent);
+}
+
+.weekPill.activeWeek .weekBadge {
+  background: #0d131f;
+  color: var(--to-accent);
+}

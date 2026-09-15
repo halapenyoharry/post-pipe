@@ -211,11 +211,12 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, TimeOverlay, React, ReactDOM } = window.PostPipeComponents;
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
       const [hiddenSources, setHiddenSources] = React.useState(new Set());
+      const [filteredArticleIds, setFilteredArticleIds] = React.useState(null);
 
       const toggleSource = React.useCallback((sourceId) => {
         setHiddenSources(prev => {
@@ -226,16 +227,25 @@ ${reactJs}
         });
       }, []);
 
+      const handleTimeFilter = React.useCallback((ids) => {
+        setFilteredArticleIds(ids);
+      }, []);
+
       return React.createElement(React.Fragment, null,
         React.createElement(GraphViewer, {
           feedData: feed,
           onNodeSelect: (article) => setSelectedArticle(article),
-          hiddenSources: hiddenSources
+          hiddenSources: hiddenSources,
+          filteredArticleIds: filteredArticleIds
         }),
         React.createElement(FeedZ, {
           sources: feed._sources || [],
           hiddenSources: hiddenSources,
           onToggleSource: toggleSource
+        }),
+        React.createElement(TimeOverlay, {
+          feedData: feed,
+          onFilterChange: handleTimeFilter
         }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
@@ -293,6 +303,11 @@ async function main() {
 
   fs.writeFileSync(path.join(SITE_DIR, 'feed.json'), JSON.stringify(feed, null, 2));
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
+
+  const workerSrc = path.join(__dirname, 'kokoro-worker.js');
+  if (fs.existsSync(workerSrc)) {
+    fs.copyFileSync(workerSrc, path.join(SITE_DIR, 'kokoro-worker.js'));
+  }
 
   console.log(`Generated _site/feed.json (${feed.items.length} items)`);
   console.log('Generated _site/index.html');
