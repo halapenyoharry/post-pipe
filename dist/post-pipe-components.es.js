@@ -10795,20 +10795,21 @@ function lo() {
 	}, _;
 }
 var uo = { graphContainer: "_graphContainer_7uvsx_1" }, M = {
-	card: "_card_f0j2g_5",
-	draft: "_draft_f0j2g_22",
-	published: "_published_f0j2g_26",
-	pinned: "_pinned_f0j2g_30",
-	title: "_title_f0j2g_38",
-	titleCentered: "_titleCentered_f0j2g_47",
-	titleInline: "_titleInline_f0j2g_60",
-	preview: "_preview_f0j2g_70",
-	scroll: "_scroll_f0j2g_80",
-	full: "_full_f0j2g_92",
-	popout: "_popout_f0j2g_109",
-	imageCard: "_imageCard_f0j2g_128",
-	imageFrame: "_imageFrame_f0j2g_141",
-	imageCaption: "_imageCaption_f0j2g_158"
+	card: "_card_10o0a_5",
+	draft: "_draft_10o0a_22",
+	published: "_published_10o0a_26",
+	pinned: "_pinned_10o0a_30",
+	marker: "_marker_10o0a_35",
+	title: "_title_10o0a_44",
+	titleCentered: "_titleCentered_10o0a_53",
+	titleInline: "_titleInline_10o0a_66",
+	preview: "_preview_10o0a_76",
+	scroll: "_scroll_10o0a_86",
+	full: "_full_10o0a_98",
+	popout: "_popout_10o0a_115",
+	imageCard: "_imageCard_10o0a_134",
+	imageFrame: "_imageFrame_10o0a_147",
+	imageCaption: "_imageCaption_10o0a_164"
 }, fo = /* @__PURE__ */ o(((e) => {
 	var t = Symbol.for("react.transitional.element"), n = Symbol.for("react.fragment");
 	function r(e, n, r) {
@@ -10843,7 +10844,8 @@ function po({ article: e, width: t, height: n, viewState: r, fullContent: i }) {
 			M.card,
 			u ? M.draft : M.published,
 			c && M.expanded,
-			o && M.pinned
+			o && M.pinned,
+			r.lod === "marker" && !c && M.marker
 		].filter(Boolean).join(" "),
 		style: {
 			width: t,
@@ -10873,7 +10875,7 @@ function mo({ article: e, viewState: t, expanded: n, useFullArticle: r, fullCont
 			dangerouslySetInnerHTML: { __html: t }
 		})] });
 	}
-	if (t.lod === "slug") return null;
+	if (t.lod === "marker") return null;
 	if (t.lod === "title") return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: M.titleCentered,
 		children: e.short_title || e.title || e.label
@@ -11008,63 +11010,68 @@ function vo(e, t = {}) {
 		links: r
 	};
 }
-function F(e, t) {
-	let n = (e) => e && e.type === "article" && e._source && t.has(e._source.id);
-	e.selectAll(".node").style("display", (e) => n(e) ? "none" : null), e.selectAll(".link").style("display", (e) => {
-		let t = typeof e.source == "object" ? e.source : null, r = typeof e.target == "object" ? e.target : null;
-		return n(t) || n(r) ? "none" : null;
+function F(e, t, n) {
+	let r = (e) => e && e.type === "article" && e._source && n.has(e._source.id);
+	e.selectAll(".node").style("display", (e) => r(e) ? "none" : null), t.selectAll(".node-card").style("display", (e) => r(e) ? "none" : null), e.selectAll(".link").style("display", (e) => {
+		let t = typeof e.source == "object" ? e.source : null, n = typeof e.target == "object" ? e.target : null;
+		return r(t) || r(n) ? "none" : null;
 	});
 }
-var I = .4, L = .7;
+var I = .35, L = .6;
 function yo(e) {
-	return e < I ? "slug" : e < L ? "title" : "full";
+	return e < I ? "marker" : e < L ? "title" : "full";
 }
-function bo({ hovered: e, pinned: t }) {
+function bo({ hovered: e, pinned: t, lod: n }) {
 	return t ? {
 		width: 230,
 		height: 190
 	} : e ? {
 		width: 200,
 		height: 160
+	} : n === "marker" ? {
+		width: 16,
+		height: 16
 	} : {
 		width: 180,
 		height: 140
 	};
 }
 function xo({ feedData: e, onNodeSelect: t, hiddenSources: n }) {
-	let r = (0, O.useRef)(null), i = (0, O.useRef)(null), a = (0, O.useRef)(t);
+	let r = (0, O.useRef)(null), i = (0, O.useRef)(null), a = (0, O.useRef)(null), o = (0, O.useRef)(t);
 	(0, O.useEffect)(() => {
-		a.current = t;
+		o.current = t;
 	}, [t]);
-	let o = (0, O.useRef)(null), s = (0, O.useRef)(null), c = (0, O.useRef)(1), l = (0, O.useRef)("full"), u = (0, O.useRef)(/* @__PURE__ */ new Set());
+	let s = (0, O.useRef)(null), c = (0, O.useRef)(null), l = (0, O.useRef)(1), u = (0, O.useRef)("full"), d = (0, O.useRef)(/* @__PURE__ */ new Set());
 	return (0, O.useEffect)(() => {
-		u.current = n instanceof Set ? n : new Set(n || []), i.current && F(i.current, u.current);
+		d.current = n instanceof Set ? n : new Set(n || []), !(!i.current || !a.current) && F(i.current, qt(a.current), d.current);
 	}, [n]), (0, O.useEffect)(() => {
 		if (!e || !r.current) return;
-		let t = r.current, n = t.clientWidth, d = t.clientHeight, f = getComputedStyle(t), p = vo(e, {
-			nodeDraftColor: f.getPropertyValue("--gv-node-draft").trim() || "#555",
-			nodePublishedColor: f.getPropertyValue("--gv-node-published").trim() || "#2ecc71",
-			tagColor: f.getPropertyValue("--gv-tag-color").trim() || "#f39c12"
+		let t = r.current, n = t.clientWidth, f = t.clientHeight, p = getComputedStyle(t), m = vo(e, {
+			nodeDraftColor: p.getPropertyValue("--gv-node-draft").trim() || "#555",
+			nodePublishedColor: p.getPropertyValue("--gv-node-published").trim() || "#2ecc71",
+			tagColor: p.getPropertyValue("--gv-tag-color").trim() || "#f39c12"
 		});
-		qt(t).selectAll("svg").remove();
-		let m = qt(t).append("svg").attr("width", n).attr("height", d);
-		i.current = m;
-		let h = m.append("g"), g = lo().on("zoom", (e) => {
-			h.attr("transform", e.transform);
+		qt(t).selectAll("*").remove();
+		let h = qt(t).append("svg").attr("width", n).attr("height", f).style("position", "absolute").style("inset", "0").style("pointer-events", "all");
+		i.current = h;
+		let g = qt(t).append("div").attr("class", "cards-layer").style("position", "absolute").style("left", "0").style("top", "0").style("width", "100%").style("height", "100%").style("pointer-events", "none");
+		a.current = g.node();
+		let _ = g.append("div").attr("class", "cards-transform").style("transform-origin", "0 0").style("position", "absolute").style("left", "0").style("top", "0").style("width", "0").style("height", "0").style("overflow", "visible"), v = h.append("g"), y = lo().on("zoom", (e) => {
+			v.attr("transform", e.transform), _.style("transform", `translate3d(${e.transform.x}px, ${e.transform.y}px, 0px) scale(${e.transform.k})`);
 			let t = e.transform.k;
-			c.current = t;
+			l.current = t;
 			let n = yo(t);
-			n !== l.current && (l.current = n, ne()), re(t);
+			n !== u.current && (u.current = n, ie());
 		});
-		m.call(g).on("dblclick.zoom", null);
-		let _ = Ja().force("link", za().id((e) => e.id).distance(160)).force("charge", Ya().strength(-500)).force("collide", Ia().radius((e) => (e._r || e.size / 2) + 8).strength(.9)).force("center", ua(n / 2, d / 2)).velocityDecay(.85).alphaDecay(.05), v = () => {
-			r.current && (n = r.current.clientWidth, d = r.current.clientHeight, m.attr("width", n).attr("height", d));
+		h.call(y).on("dblclick.zoom", null);
+		let b = Ja().force("link", za().id((e) => e.id).distance(160)).force("charge", Ya().strength(-500)).force("collide", Ia().radius((e) => (e._r || e.size / 2) + 8).strength(.9)).force("center", ua(n / 2, f / 2)).velocityDecay(.85).alphaDecay(.05), x = () => {
+			r.current && (n = r.current.clientWidth, f = r.current.clientHeight, h.attr("width", n).attr("height", f));
 		};
-		window.addEventListener("resize", v);
-		let y = h.selectAll(".link").data(p.links).enter().append("line").attr("class", "link"), b = h.selectAll(".node").data(p.nodes).enter().append("g").attr("class", "node").call(ln().on("start", (e, t) => {
+		window.addEventListener("resize", x);
+		let ee = v.selectAll(".link").data(m.links).enter().append("line").attr("class", "link"), S = ln().on("start", (e, t) => {
 			t.fx = t.x, t.fy = t.y;
 		}).on("drag", (e, t) => {
-			t.x = e.x, t.y = e.y, t.fx = e.x, t.fy = e.y, b.filter((e) => e.id === t.id).attr("transform", "translate(" + e.x + "," + e.y + ")"), y.each(function(e) {
+			t.x = e.x, t.y = e.y, t.fx = e.x, t.fy = e.y, t.type === "article" ? ne.filter((e) => e.id === t.id).style("transform", `translate3d(${e.x}px, ${e.y}px, 0px)`) : C.filter((e) => e.id === t.id).attr("transform", "translate(" + e.x + "," + e.y + ")"), ee.each(function(e) {
 				let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 				if (n === t.id || r === t.id) {
 					let t = typeof e.source == "object" ? e.source.x : 0, n = typeof e.source == "object" ? e.source.y : 0, r = typeof e.target == "object" ? e.target.x : 0, i = typeof e.target == "object" ? e.target.y : 0;
@@ -11073,144 +11080,119 @@ function xo({ feedData: e, onNodeSelect: t, hiddenSources: n }) {
 			});
 		}).on("end", (e, t) => {
 			t.fx = t.x, t.fy = t.y;
-		})), x = m.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden");
-		b.each(function(e) {
+		}), C = v.selectAll(".node").data(m.nodes.filter((e) => e.type === "tag")).enter().append("g").attr("class", "node").call(S), te = h.append("text").style("font-family", "'Atkinson', sans-serif").style("visibility", "hidden");
+		C.each(function(e) {
 			let t = qt(this);
-			if (e.type === "tag") {
-				x.style("font-size", "14px").style("font-weight", "400"), x.text(e.label);
-				let n = x.node().getComputedTextLength() + 28, r = 35.599999999999994;
-				t.append("rect").attr("x", -n / 2).attr("y", -r / 2).attr("width", n).attr("height", r).attr("rx", r / 2).attr("ry", r / 2).attr("fill", e.color).attr("opacity", .7), t.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("fill", "#1a1a2e").style("font-size", "14px").style("font-weight", "400").style("pointer-events", "none").text(e.label), e._r = Math.max(n, r) / 2;
-			} else t.append("foreignObject").attr("class", "article-fo"), t.append("text").attr("class", "slug-label").attr("text-anchor", "middle").attr("dominant-baseline", "central").style("fill", "#fff").style("font-family", "'Atkinson', sans-serif").style("font-weight", "700").style("pointer-events", "none").style("paint-order", "stroke").style("stroke", "#000").style("stroke-width", "4px").style("stroke-opacity", "0.75").style("display", "none").text(e.label), e._r = 100;
-		}), x.style("font-family", "'Atkinson', sans-serif").style("font-weight", "700").style("font-size", "100px");
-		let ee = 1;
-		p.nodes.forEach((e) => {
-			if (e.type === "article") {
-				x.text(e.label);
-				let t = x.node().getComputedTextLength();
-				t > ee && (ee = t);
-			}
-		});
-		let S = ee / 100;
-		x.remove();
-		let C = /* @__PURE__ */ new Map();
-		b.filter((e) => e.type === "article").each(function(e) {
-			let t = qt(this).select("foreignObject.article-fo").node(), n = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-			n.style.width = "100%", n.style.height = "100%", t.appendChild(n), C.set(e.id, {
-				root: (0, Hr.createRoot)(n),
-				fo: t,
-				wrapper: n
+			te.style("font-size", "14px").style("font-weight", "400"), te.text(e.label);
+			let n = te.node().getComputedTextLength() + 28, r = 35.599999999999994;
+			t.append("rect").attr("x", -n / 2).attr("y", -r / 2).attr("width", n).attr("height", r).attr("rx", r / 2).attr("ry", r / 2).attr("fill", e.color).attr("opacity", .7), t.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("fill", "#1a1a2e").style("font-size", "14px").style("font-weight", "400").style("pointer-events", "none").text(e.label), e._r = Math.max(n, r) / 2;
+		}), te.remove();
+		let ne = _.selectAll(".node-card").data(m.nodes.filter((e) => e.type === "article")).enter().append("div").attr("class", "node-card").style("position", "absolute").style("left", "0").style("top", "0").style("will-change", "transform").style("pointer-events", "auto").call(S), re = /* @__PURE__ */ new Map();
+		ne.each(function(e) {
+			e._r = 100, re.set(e.id, {
+				root: (0, Hr.createRoot)(this),
+				wrapper: this
 			});
 		});
-		function te(e) {
+		function w(e) {
 			if (e.type !== "article") return;
-			let t = C.get(e.id);
+			let t = re.get(e.id);
 			if (!t) return;
-			let n = s.current === e.id, r = o.current === e.id, i = yo(c.current), { width: a, height: l } = bo({
+			let n = c.current === e.id, r = s.current === e.id, i = yo(l.current), { width: a, height: o } = bo({
 				hovered: n,
-				pinned: r
+				pinned: r,
+				lod: i
 			});
-			qt(t.fo).attr("width", a).attr("height", l).attr("x", -a / 2).attr("y", -l / 2), t.wrapper.style.width = a + "px", t.wrapper.style.height = l + "px";
+			t.wrapper.style.width = a + "px", t.wrapper.style.height = o + "px", t.wrapper.style.marginLeft = -a / 2 + "px", t.wrapper.style.marginTop = -o / 2 + "px";
 			let u = _o(e.kind);
 			t.root.render(O.createElement(u, {
 				article: e,
 				width: a,
-				height: l,
+				height: o,
 				viewState: {
 					hovered: n,
 					pinned: r,
 					lod: i
 				},
 				fullContent: e._fullContent || null
-			})), e._r = Math.max(a, l) / 2;
+			})), e._r = Math.max(a, o) / 2;
 		}
-		b.filter((e) => e.type === "article").select("foreignObject.article-fo").on("wheel", (e) => e.stopPropagation());
-		function ne() {
-			p.nodes.forEach((e) => {
-				e.type === "article" && te(e);
+		ne.on("wheel", (e) => e.stopPropagation());
+		function ie() {
+			m.nodes.forEach((e) => {
+				e.type === "article" && w(e);
 			});
 		}
-		function re(e) {
-			let t = e < I, n = b.filter((e) => e.type === "article").select(".slug-label");
-			if (!t) {
-				n.style("display", "none");
-				return;
-			}
-			let i = (r.current ? r.current.clientWidth : window.innerWidth) * .9 / S / Math.max(e, .01);
-			n.style("font-size", i + "px").style("display", (e) => e.id === s.current || e.id === o.current ? "none" : null);
-		}
-		let w = /* @__PURE__ */ new Map();
-		function ie(e) {
-			return w.has(e.id) ? (e._fullContent = w.get(e.id), Promise.resolve()) : fetch(e.url).then((e) => {
+		let ae = /* @__PURE__ */ new Map();
+		function oe(e) {
+			return ae.has(e.id) ? (e._fullContent = ae.get(e.id), Promise.resolve()) : fetch(e.url).then((e) => {
 				if (!e.ok) throw Error("HTTP " + e.status);
 				return e.text();
 			}).then((t) => {
 				let n = new DOMParser().parseFromString(t, "text/html"), r = n.querySelector("h1");
 				r && r.remove();
 				let i = n.querySelector("body") ? n.querySelector("body").innerHTML : t;
-				w.set(e.id, i), e._fullContent = i;
+				ae.set(e.id, i), e._fullContent = i;
 			}).catch(() => {
-				w.set(e.id, null), e._fullContent = null;
+				ae.set(e.id, null), e._fullContent = null;
 			});
 		}
-		ne(), re(c.current), F(m, u.current), b.filter((e) => e.type === "article").on("mouseover", (e, t) => {
-			s.current !== t.id && (s.current = t.id, te(t), re(c.current));
+		ie(), F(h, g, d.current), ne.on("mouseover", (e, t) => {
+			c.current !== t.id && (c.current = t.id, w(t), e.currentTarget.style.zIndex = 10);
 		}).on("mouseout", (e, t) => {
 			let n = e.relatedTarget;
-			n && e.currentTarget.contains(n) || s.current === t.id && (s.current = null, te(t), re(c.current));
+			n && e.currentTarget.contains(n) || c.current === t.id && (c.current = null, w(t), e.currentTarget.style.zIndex = "");
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {
-				e.stopPropagation(), a.current && a.current(t.originalItem || t), o.current === t.id && (o.current = null, s.current = null, te(t), re(c.current));
+				e.stopPropagation(), o.current && o.current(t.originalItem || t), s.current === t.id && (s.current = null, c.current = null, w(t), e.currentTarget.style.zIndex = "");
 				return;
 			}
 			e.stopPropagation();
-			let r = o.current;
-			if (r === t.id) o.current = null, te(t), re(c.current);
+			let r = s.current;
+			if (r === t.id) s.current = null, w(t), e.currentTarget.style.zIndex = "";
 			else {
-				if (o.current = t.id, te(t), b.filter((e) => e.id === t.id).raise(), r) {
-					let e = p.nodes.find((e) => e.id === r);
-					e && te(e);
+				if (s.current = t.id, w(t), e.currentTarget.style.zIndex = 10, r) {
+					let e = m.nodes.find((e) => e.id === r);
+					e && (w(e), ne.filter((t) => t.id === e.id).style("z-index", ""));
 				}
-				re(c.current), ie(t).then(() => {
-					o.current === t.id && te(t);
+				oe(t).then(() => {
+					s.current === t.id && w(t);
 				});
 			}
 		});
-		let ae = null;
-		return b.filter((e) => e.type === "tag").on("click", (e, t) => {
-			if (e.stopPropagation(), ae === t.id) ae = null, b.classed("dimmed", !1).classed("tag-active", !1), y.classed("highlighted", !1);
+		let se = null;
+		return C.on("click", (e, t) => {
+			if (e.stopPropagation(), se === t.id) se = null, C.classed("dimmed", !1).classed("tag-active", !1), ne.classed("dimmed", !1), ee.classed("highlighted", !1);
 			else {
-				ae = t.id;
-				let e = new Set(p.links.filter((e) => {
+				se = t.id;
+				let e = new Set(m.links.filter((e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id || r === t.id;
 				}).map((e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id ? r : n;
 				}));
-				e.add(t.id), b.classed("dimmed", (t) => !e.has(t.id)), b.classed("tag-active", (e) => e.id === t.id), y.classed("highlighted", (e) => {
+				e.add(t.id), C.classed("dimmed", (t) => !e.has(t.id)), C.classed("tag-active", (e) => e.id === t.id), ne.classed("dimmed", (t) => !e.has(t.id)), ee.classed("highlighted", (e) => {
 					let n = typeof e.source == "object" ? e.source.id : e.source, r = typeof e.target == "object" ? e.target.id : e.target;
 					return n === t.id || r === t.id;
 				});
 			}
-		}), m.on("click", () => {
-			ae && (ae = null, b.classed("dimmed", !1).classed("tag-active", !1), y.classed("highlighted", !1));
-			let e = !!o.current;
-			if (o.current) {
-				let e = p.nodes.find((e) => e.id === o.current);
-				o.current = null, e && te(e);
+		}), h.on("click", () => {
+			if (se && (se = null, C.classed("dimmed", !1).classed("tag-active", !1), ne.classed("dimmed", !1), ee.classed("highlighted", !1)), s.current) {
+				let e = m.nodes.find((e) => e.id === s.current);
+				s.current = null, e && (w(e), ne.filter((t) => t.id === e.id).style("z-index", ""));
 			}
-			e && re(c.current);
-		}), _.nodes(p.nodes).on("tick", () => {
-			y.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), b.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")");
-		}), _.force("link").links(p.links), _.on("end", () => {
-			p.nodes.forEach((e) => {
+		}), b.nodes(m.nodes).on("tick", () => {
+			ee.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), C.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")"), ne.style("transform", (e) => `translate3d(${e.x}px, ${e.y}px, 0px)`);
+		}), b.force("link").links(m.links), b.on("end", () => {
+			m.nodes.forEach((e) => {
 				e.fx = e.x, e.fy = e.y;
 			});
 		}), () => {
-			_.stop(), window.removeEventListener("resize", v), C.forEach(({ root: e }) => {
+			b.stop(), window.removeEventListener("resize", x), re.forEach(({ root: e }) => {
 				queueMicrotask(() => e.unmount());
-			}), C.clear();
+			}), re.clear();
 		};
 	}, [e]), /* @__PURE__ */ (0, N.jsx)("div", {
 		ref: r,
