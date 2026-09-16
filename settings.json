@@ -99,7 +99,7 @@
         "available": true,
         "exposed": true,
         "cost": "free \u2014 runs on lumen's RTX 3090, no key, no per-request billing",
-        "mode": "server",
+        "mode": "wasm",
         "host": "http://192.168.1.3:8880",
         "_host_note": "mode 'wasm' would run the model in the browser via kokoro-worker.js, which was never actually built (no worker file, no ONNX runtime dependency in package.json) \u2014 that path always hung on \"loading\". 'server' mode instead calls the real self-hosted Kokoro instance on lumen (see ~/Projects/localNetworkZ/services-registry.json, service \"kokoro-tts\") over its OpenAI-compatible /v1/audio/speech endpoint. Only reachable from devices on lothal's 10GbE/Tailscale network \u2014 a page viewed from off that network will get a fetch failure and should fall back to another engine."
       },
