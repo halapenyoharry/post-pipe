@@ -11,6 +11,8 @@ export function TTS({ targetRef }) {
   const [selectedVoice, setSelectedVoice] = useState('');
   const [capabilities, setCapabilities] = useState({});
   const [params, setParams] = useState({});
+  const [engineProgress, setEngineProgress] = useState(0);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     // Wait for the window.TTS global to be populated (e.g. from injected tts.js)
@@ -18,7 +20,16 @@ export function TTS({ targetRef }) {
     const tts = window.TTS;
     setT(tts);
 
-    const updateState = (s) => setState(s);
+    const updateState = (s) => {
+      setState(s);
+      if (s !== 'loading') setEngineProgress(0); // Reset progress when leaving loading
+    };
+    
+    const handleProgress = (p) => setEngineProgress(p * 100);
+    const handleError = (e) => {
+      setErrorMsg(e.error);
+      setTimeout(() => setErrorMsg(''), 4000);
+    };
 
     const refreshEngines = () => {
       setEngines(tts.engines());
@@ -43,6 +54,8 @@ export function TTS({ targetRef }) {
 
     tts.on('state', updateState);
     tts.on('capabilitiesChanged', refreshCapabilities);
+    tts.on('engineProgress', handleProgress);
+    tts.on('error', handleError);
 
     refreshEngines();
     refreshCapabilities();
@@ -123,7 +136,7 @@ export function TTS({ targetRef }) {
   };
 
   return (
-    <div className={styles.ttsGroup}>
+    <div className={styles.ttsGroup} style={{ position: 'relative' }}>
       {state !== 'playing' && (
         <button className={styles.tb} onClick={handlePlay} title="Play" dangerouslySetInnerHTML={{ __html: `${ICONS.play}<span class="${styles.tbTooltip}">Play</span>` }} />
       )}
@@ -133,6 +146,25 @@ export function TTS({ targetRef }) {
       {(state === 'playing' || state === 'paused' || state === 'loading') && (
         <button className={styles.tb} onClick={handleStop} title="Stop" dangerouslySetInnerHTML={{ __html: `${ICONS.stop}<span class="${styles.tbTooltip}">Stop</span>` }} />
       )}
+      
+      {state === 'loading' && engineProgress > 0 && (
+        <div className={styles.loadingBarContainer}>
+          <div className={styles.loadingBarFill} style={{ width: `${engineProgress}%` }} />
+        </div>
+      )}
+
+      {state === 'playing' && (
+        <div className={styles.visualizer}>
+          <div className={styles.bar}></div>
+          <div className={styles.bar}></div>
+          <div className={styles.bar}></div>
+          <div className={styles.bar}></div>
+        </div>
+      )}
+
+      <div className={`${styles.errorToast} ${errorMsg ? styles.show : ''}`}>
+        {errorMsg}
+      </div>
 
       <select
         className={styles.select}

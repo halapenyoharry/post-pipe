@@ -572,6 +572,14 @@
               worker.removeEventListener('message', handler);
               reject(new Error(msg.error));
             }
+            if (msg.status === 'progress') {
+              emit('engineProgress', msg.progress);
+            }
+          });
+          
+          worker.addEventListener('error', function errHandler(e) {
+            worker.removeEventListener('error', errHandler);
+            reject(new Error(e.message || 'Worker script failed to load.'));
           });
           // Worker auto-inits on creation — it loads the model immediately
         });
@@ -633,9 +641,10 @@
               worker.removeEventListener('message', onMsg);
               // Play the audio blob
               if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-              currentAudio = new Audio(msg.audio);
-              currentAudio.onended = () => { currentAudio = null; resolve(); };
-              currentAudio.onerror = (e) => { currentAudio = null; reject(e); };
+              const url = URL.createObjectURL(msg.audio);
+              currentAudio = new Audio(url);
+              currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+              currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
               currentAudio.play();
             }
             if (msg.status === 'error') {

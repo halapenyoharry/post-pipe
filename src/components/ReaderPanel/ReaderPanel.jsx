@@ -104,6 +104,20 @@ export function ReaderPanel({ article, onClose, settings }) {
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
+  let authorName = settings?.author?.display;
+  let authorLink = settings?.author?.url;
+  
+  if (article.authors && article.authors.length > 0 && article.authors[0].name) {
+    authorName = article.authors.map(a => a.name).join(', ');
+    authorLink = article.authors[0].url || article.canonical_url || article.url;
+  } else if (article.author) {
+    authorName = article.author;
+    authorLink = article.canonical_url || article.url;
+  } else if (article._source && article._source.title && article._source.title !== settings?.author?.name) {
+    authorName = article._source.title;
+    authorLink = article._source.id || article.canonical_url || article.url;
+  }
+
   return (
     <>
       <div
@@ -199,7 +213,11 @@ export function ReaderPanel({ article, onClose, settings }) {
           <div className={styles.articleHeader}>
             <div className={styles.articleTitle}>{article.title || article.label}</div>
             <div className={styles.articleByline}>
-              by <a href={settings?.author?.url} target="_blank" rel="noopener noreferrer">{settings?.author?.display}</a>
+              by {authorLink ? (
+                <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
+              ) : (
+                authorName
+              )}
             </div>
             {metaParts.length > 0 && (
               <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
