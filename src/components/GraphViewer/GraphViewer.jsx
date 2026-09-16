@@ -246,12 +246,35 @@ export function GraphViewer({
     const data = feedToGraph(feedData, config);
 
     d3.select(container).selectAll('svg').remove();
+    d3.select(container).selectAll('.cards-layer').remove();
 
     const svg = d3.select(container).append('svg')
       .attr('width', width)
       .attr('height', height);
 
     svgRef.current = svg;
+    
+    // The two-layer architecture: SVG handles lines/bubbles, HTML handles cards.
+    // Width/height 100% on the layer, but the transform container is 0x0
+    // so Safari doesn't clip out-of-bounds accelerated children.
+    const cardsLayer = d3.select(container).append('div')
+      .attr('class', 'cards-layer')
+      .style('position', 'absolute')
+      .style('left', '0')
+      .style('top', '0')
+      .style('width', '100%')
+      .style('height', '100%')
+      .style('pointer-events', 'none');
+
+    const cardsTransform = cardsLayer.append('div')
+      .attr('class', 'cards-transform')
+      .style('transform-origin', '0 0')
+      .style('position', 'absolute')
+      .style('left', '0')
+      .style('top', '0')
+      .style('width', '0')
+      .style('height', '0')
+      .style('overflow', 'visible');
 
     const g = svg.append('g');
 
@@ -261,6 +284,9 @@ export function GraphViewer({
     // constant as the user zooms in/out.
     const zoom = d3.zoom().on('zoom', (event) => {
       g.attr('transform', event.transform);
+      if (cardsTransform) {
+        cardsTransform.style('transform', `translate3d(${event.transform.x}px, ${event.transform.y}px, 0px) scale(${event.transform.k})`);
+      }
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
       // The rail is pinned to the window and the nodes are not, so every pan
@@ -383,7 +409,7 @@ export function GraphViewer({
       .data(data.nodes)
       .enter().append('g')
       .attr('class', 'node')
-      .call(d3.drag()
+    const dragHandler = d3.drag()
         // Under a mouse, moving a card and scrolling its text are different
         // gestures — drag versus wheel. Under a thumb they are the same
         // gesture, and drag would win every time, so a card's text could never
@@ -452,6 +478,10 @@ export function GraphViewer({
           }
           nodes.filter(nd => nd.id === d.id)
             .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
+          if (articleNodes) {
+            articleNodes.filter(nd => nd.id === d.id)
+              .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px)`);
+          }
           if (connectorUpdateRef.current) connectorUpdateRef.current();
           links.each(function(l) {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
@@ -479,8 +509,9 @@ export function GraphViewer({
             vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
             vs.commit();
           }
-        })
-      );
+        });
+        
+    nodes.call(dragHandler);
 
     // Tag-node rendering uses a probe to size the bubble.
     const probe = svg.append('text')
@@ -669,8 +700,8 @@ export function GraphViewer({
         fitBubble(entry);
 
       } else {
-        // Article nodes get a foreignObject that we'll re-fill on state change.
-        el.append('foreignObject').attr('class', 'article-fo');
+        // SVG representation for articles is empty or just a group.
+        // We track the geometry here. The actual HTML cards live in cardsTransform.
         // Collision radius from the card's real footprint. This was size/2,
         // which is 30 for a card that is 180x140 — the reason cards sat on top
         // of each other and tags landed inside them. A circle round a rectangle
@@ -694,22 +725,31 @@ export function GraphViewer({
       }).catch(() => {});
     }
 
-    // One React root per article node, mounted inside that node's
-    // foreignObject. Keyed by node id. Roots are unmounted on cleanup so we
+    // One React root per article node, mounted in the HTML cardsTransform layer.
+    // Keyed by node id. Roots are unmounted on cleanup so we
     // don't leak across feedData changes. The React tree inside each root
     // is pure — TextView is presentational; D3 still owns all events on
-    // the parent <g>.
+    // the parent HTML wrapper.
     const reactRoots = new Map();
-    nodes.filter(d => d.type === 'article').each(function(d) {
-      const fo = d3.select(this).select('foreignObject.article-fo').node();
-      // React needs an HTML element to mount into (not the SVG foreignObject
-      // itself). Append a single xhtml wrapper inside.
-      const wrapper = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-      wrapper.style.width = '100%';
-      wrapper.style.height = '100%';
-      wrapper.style.boxSizing = 'border-box';
-      fo.appendChild(wrapper);
-      reactRoots.set(d.id, { root: createRoot(wrapper), fo, wrapper });
+    
+    // Explicitly scope the articleNodes selection so it can be updated
+    let articleNodes = cardsTransform.selectAll('.node-card')
+      .data(data.nodes.filter(d => d.type === 'article'));
+      
+    const articleNodesEnter = articleNodes.enter().append('div')
+      .attr('class', 'node-card')
+      .style('position', 'absolute')
+      .style('left', '0')
+      .style('top', '0')
+      .style('will-change', 'transform')
+      .style('pointer-events', 'auto')
+      .call(dragHandler);
+      
+    articleNodes = articleNodes.merge(articleNodesEnter);
+
+    articleNodesEnter.each(function(d) {
+      const root = createRoot(this);
+      reactRoots.set(d.id, { root, wrapper: this, cardSelection: d3.select(this) });
     });
 
     // Paint one article node's lens based on its current state. Sizes the
@@ -726,12 +766,12 @@ export function GraphViewer({
       // arguing with them.
       const { width: w, height: h } = d._size || cardSizeFor({ hovered, pinned });
 
-      d3.select(entry.fo)
-        .attr('width', w + GLOW_PAD * 2).attr('height', h + GLOW_PAD * 2)
-        .attr('x', -w / 2 - GLOW_PAD).attr('y', -h / 2 - GLOW_PAD);
+      // Instead of sizing a foreignObject and adding glow padding, we size the wrapper
+      // exactly and shift its transform origin to its own center.
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
-      entry.wrapper.style.margin = GLOW_PAD + 'px';
+      entry.wrapper.style.marginLeft = (-w / 2) + 'px';
+      entry.wrapper.style.marginTop = (-h / 2) + 'px';
 
       const Lens = lensFor(d.kind);
       entry.root.render(
@@ -749,11 +789,8 @@ export function GraphViewer({
     }
 
     // Block wheel events from inside any article node from reaching the
-    // SVG zoom handler. Attached on the foreignObject so wheel anywhere
-    // inside the card is consumed; the browser's default scroll on
-    // .rp-scroll still fires because we only stop propagation.
-    nodes.filter(d => d.type === 'article').select('foreignObject.article-fo')
-      .on('wheel', (e) => e.stopPropagation());
+    // SVG zoom handler.
+    articleNodes.on('wheel', (e) => e.stopPropagation());
 
     function renderAllArticleBodies() {
       data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
@@ -818,7 +855,7 @@ export function GraphViewer({
     // and mouseenter sometimes fails to re-fire on the new content.
     // We guard with relatedTarget so child-to-child cursor moves inside
     // the same node don't toggle the state.
-    nodes.filter(d => d.type === 'article')
+    articleNodes
       .on('mouseover', (event, d) => {
         if (hoveredIdRef.current === d.id) return;
         hoveredIdRef.current = d.id;
@@ -874,6 +911,7 @@ export function GraphViewer({
           pinnedIdRef.current = d.id;
           renderArticleBody(d);
           nodes.filter(nd => nd.id === d.id).raise();
+          articleNodes.filter(nd => nd.id === d.id).raise();
           if (prevPinned) {
             const prev = data.nodes.find(nd => nd.id === prevPinned);
             if (prev) renderArticleBody(prev);
@@ -949,9 +987,12 @@ export function GraphViewer({
       links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
            .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+      if (articleNodes) {
+        articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
+      }
     }
 
-    graphRef.current = { data, nodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g };
+    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g };
 
     // The axis is measured against the corpus extent, which keeps changing
     // while the simulation runs — so drawing it once at the start pins it to
@@ -1111,10 +1152,53 @@ export function GraphViewer({
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
+    // ── External reset actions ──────────────────────────────────────────────
+    // LayoutControls dispatches these from outside the component. They reach
+    // into the closure that owns the simulation, the zoom, and the data.
+
+    const handleZoomToFit = () => { fitToViewport(); };
+
+    const handleUnpinAll = () => {
+      data.nodes.forEach(d => {
+        d.fx = null;
+        d.fy = null;
+        delete d._forcePos;
+      });
+      // Wipe per-layout saved positions so they don't re-pin on next load.
+      const vs = viewStateRef.current;
+      if (vs) {
+        for (const d of data.nodes) {
+          const key = positionKey(d);
+          if (vs.nodeState(key)) vs.setNodePosition(key, d.x, d.y, { silent: true });
+        }
+      }
+      simulation.alpha(0.8).restart();
+    };
+
+    const handleResetSizes = () => {
+      const rest = cardSizeFor({ hovered: false, pinned: false });
+      data.nodes.forEach(d => { delete d._size; });
+      const vs = viewStateRef.current;
+      if (vs) {
+        for (const d of data.nodes) {
+          vs.setNodeSize(persistKey(d), rest.width, rest.height, { silent: true });
+        }
+      }
+      // Repaint every card at the default size.
+      applyPositions();
+    };
+
+    window.addEventListener('graph:zoom-to-fit', handleZoomToFit);
+    window.addEventListener('graph:unpin-all', handleUnpinAll);
+    window.addEventListener('graph:reset-sizes', handleResetSizes);
+
     return () => {
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
+      window.removeEventListener('graph:unpin-all', handleUnpinAll);
+      window.removeEventListener('graph:reset-sizes', handleResetSizes);
       // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
       // would try to reconcile against a detached DOM tree on the next
       // effect run. Defer the unmount so it doesn't fire inside a render.
@@ -1341,6 +1425,10 @@ export function GraphViewer({
 
     g.nodes.transition().duration(760).ease(d3.easeCubicInOut)
       .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+    if (g.articleNodes) {
+      g.articleNodes.transition().duration(760).ease(d3.easeCubicInOut)
+        .style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
+    }
     g.links.transition().duration(760).ease(d3.easeCubicInOut)
       .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x).attr('y2', d => d.target.y);

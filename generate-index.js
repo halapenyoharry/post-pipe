@@ -384,10 +384,83 @@ ${reactJs}
     ];
 
     function LayoutControls() {
-      const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
+      var _ref = React.useReducer(function (n) { return n + 1; }, 0);
+      var bump = _ref[1];
       React.useEffect(function () { return viewState.subscribe(bump); }, []);
-      const active = viewState.state.layout;
+      var active = viewState.state.layout;
 
+      // ── Hover / dwell popover state ──
+      var showPopover = React.useState(false);
+      var popoverOpen = showPopover[0];
+      var setPopoverOpen = showPopover[1];
+      var dwellTimer = React.useRef(null);
+      var DWELL_MS = 350;
+
+      function clearDwell() {
+        if (dwellTimer.current) { clearTimeout(dwellTimer.current); dwellTimer.current = null; }
+      }
+      function startDwell() {
+        clearDwell();
+        dwellTimer.current = setTimeout(function () { setPopoverOpen(true); }, DWELL_MS);
+      }
+      function closePopover() { clearDwell(); setPopoverOpen(false); }
+
+      // Clean up on unmount.
+      React.useEffect(function () { return clearDwell; }, []);
+
+      var RESET_ACTIONS = [
+        { icon: '⊞', label: 'Zoom to Fit', event: 'graph:zoom-to-fit',
+          title: 'Reset zoom and pan to frame all nodes' },
+        { icon: '⊘', label: 'Unpin All',   event: 'graph:unpin-all',
+          title: 'Release all dragged nodes, re-run simulation' },
+        { icon: '▣', label: 'Reset Sizes', event: 'graph:reset-sizes',
+          title: 'Return all cards to their default dimensions' },
+      ];
+
+      // Shared button styling for the popover items.
+      var popoverBtnStyle = {
+        border: 0, borderRadius: '5px', padding: '5px 9px',
+        background: 'transparent', cursor: 'pointer',
+        color: 'rgba(255,255,255,0.72)', font: '11px/1.3 system-ui, sans-serif',
+        display: 'flex', alignItems: 'center', gap: '6px',
+        width: '100%', textAlign: 'left', whiteSpace: 'nowrap'
+      };
+
+      // The popover itself — absolutely positioned above the label.
+      var popover = !popoverOpen ? null : React.createElement('div', {
+        key: 'popover',
+        onMouseEnter: clearDwell,
+        onMouseLeave: closePopover,
+        style: {
+          position: 'absolute', bottom: '100%', left: 0, marginBottom: '6px',
+          background: 'rgba(20,22,30,0.92)', backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px',
+          padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px',
+          zIndex: 50, minWidth: '130px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)'
+        }
+      }, RESET_ACTIONS.map(function (a) {
+        return React.createElement('button', {
+          key: a.event,
+          title: a.title,
+          onClick: function () {
+            window.dispatchEvent(new CustomEvent(a.event));
+            closePopover();
+          },
+          onMouseEnter: function (e) {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.12)';
+          },
+          onMouseLeave: function (e) {
+            e.currentTarget.style.background = 'transparent';
+          },
+          style: popoverBtnStyle
+        }, [
+          React.createElement('span', { key: 'icon', style: { fontSize: '13px', opacity: 0.6 } }, a.icon),
+          React.createElement('span', { key: 'label' }, a.label)
+        ]);
+      }));
+
+      // The pill container — wraps the label + layout buttons.
       return React.createElement('div', {
         style: {
           position: 'fixed', bottom: '14px', left: '92px',
@@ -395,15 +468,31 @@ ${reactJs}
           background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
           border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px'
         }
-      }, [React.createElement('span', {
-        key: 'label',
-        style: {
-          font: '10px/1 system-ui, sans-serif', letterSpacing: '0.08em',
-          textTransform: 'uppercase', color: 'rgba(255,255,255,0.32)',
-          padding: '0 5px 0 6px'
-        }
-      }, 'layout')].concat(LAYOUTS.map(function (l) {
-        const on = active === l.id;
+      }, [
+        // The 'layout' label — hover/dwell trigger for the popover.
+        React.createElement('span', {
+          key: 'label-wrap',
+          style: { position: 'relative', display: 'inline-flex' }
+        }, [
+          popover,
+          React.createElement('span', {
+            key: 'label',
+            onMouseEnter: startDwell,
+            onMouseLeave: function () { if (!popoverOpen) clearDwell(); else closePopover(); },
+            // Touch: long-press to open, tap to close.
+            onTouchStart: function (e) { e.preventDefault(); startDwell(); },
+            onTouchEnd: function () { if (!popoverOpen) clearDwell(); },
+            style: {
+              font: '10px/1 system-ui, sans-serif', letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: popoverOpen ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.32)',
+              padding: '0 5px 0 6px', cursor: 'default',
+              transition: 'color 0.15s ease'
+            }
+          }, 'layout')
+        ])
+      ].concat(LAYOUTS.map(function (l) {
+        var on = active === l.id;
         return React.createElement('button', {
           key: l.id,
           title: l.title,

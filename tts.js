@@ -378,6 +378,32 @@
       'Google US English', 'Google UK English Male', 'Google UK English Female',
     ]);
 
+    // Ranked preference list for the default voice. The first match found in
+    // the browser's available voices wins. "Google UK English Male" is the
+    // closest to "Google English 7 Natural" available in Chrome's Web Speech
+    // API on desktop; the numbered variants (if present on Android/ChromeOS)
+    // are checked first.
+    const PREFERRED_VOICES = [
+      'Google UK English Male',
+      'Google US English',
+      'Google UK English Female',
+      'Daniel',
+      'Samantha',
+    ];
+
+    function pickDefaultVoice() {
+      const all = synth.getVoices();
+      for (const name of PREFERRED_VOICES) {
+        const match = all.find(v => v.name === name || v.name.replace(/ \(English.*\)/, '') === name);
+        if (match) return match.name;
+      }
+      // Last resort: first English voice, or first voice period
+      const eng = all.find(v => v.lang && v.lang.startsWith('en'));
+      return eng ? eng.name : (all[0] ? all[0].name : null);
+    }
+
+    let defaultVoiceName = null;
+
     window.TTS.register({
       id: 'browser',
       label: 'Browser (Device)',
@@ -385,12 +411,13 @@
         speed:  { type: 'range', min: 0.5, max: 3, step: 0.1, default: 1, label: 'Speed' },
         pitch:  { type: 'range', min: 0, max: 2, step: 0.1, default: 1, label: 'Pitch' },
         volume: { type: 'range', min: 0, max: 1, step: 0.1, default: 1, label: 'Volume' },
-        voice:  { type: 'voice', default: null, label: 'Voice' },
+        voice:  { type: 'voice', get default() { return defaultVoiceName; }, label: 'Voice' },
       },
 
       init: async function () {
         // Browser TTS is always ready — no model to load
         refreshVoices();
+        if (!defaultVoiceName) defaultVoiceName = pickDefaultVoice();
       },
 
       voices: function () {
@@ -468,6 +495,7 @@
     let voiceMeta = {};       // { id: { name, language, gender, overallGrade } } (wasm mode)
     let currentAudio = null;
     let resolveSpeak = null;
+    let abortController = null;  // AbortController for in-flight server requests
 
     const LANG_MAP = {
       a: 'en-US', b: 'en-GB', e: 'es', f: 'fr', h: 'hi', i: 'it', j: 'ja', p: 'pt', z: 'zh'
@@ -562,9 +590,15 @@
         const voice = p.voice || (staticVoices[0] && staticVoices[0].id) || 'af_heart';
 
         if (mode === 'server') {
+          // Abort any previous in-flight request
+          if (abortController) { try { abortController.abort(); } catch (_) {} }
+          abortController = new AbortController();
+          const timeout = setTimeout(() => abortController.abort(), 10000);
+
           return fetch(host + '/v1/audio/speech', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: abortController.signal,
             body: JSON.stringify({
               model: 'kokoro',
               input: text,
@@ -573,12 +607,20 @@
               response_format: 'mp3',
             }),
           }).then(res => {
+            clearTimeout(timeout);
             if (!res.ok) {
               return res.text().then(t => {
                 throw new Error('Kokoro server HTTP ' + res.status + ': ' + t.slice(0, 200));
               });
             }
             return res.blob();
+          }).catch(err => {
+            clearTimeout(timeout);
+            abortController = null;
+            if (err.name === 'AbortError') {
+              throw new Error('Kokoro server unreachable (timed out after 10s)');
+            }
+            throw err;
           }).then(playBlob);
         }
 
@@ -615,6 +657,8 @@
       pause: function () { if (currentAudio) currentAudio.pause(); },
       resume: function () { if (currentAudio) currentAudio.play(); },
       stop: function () {
+        // Abort any in-flight server request so the fetch rejects immediately
+        if (abortController) { try { abortController.abort(); } catch (_) {} abortController = null; }
         if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
         if (resolveSpeak) { resolveSpeak(); resolveSpeak = null; }
       },

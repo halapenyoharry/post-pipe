@@ -120,7 +120,7 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         fullContent={fullContent}
       />
       {pinned && <PopoutButton />}
-      {pinned && <ResizeGrip />}
+      {(pinned || hovered) && <ResizeGrip />}
     </div>
   );
 }
@@ -277,13 +277,15 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft }) {
         {article.short_title || article.title || article.label}
       </div>
       {pinned && <PopoutButton />}
-      {pinned && <ResizeGrip />}
+      {(pinned || hovered) && <ResizeGrip />}
     </div>
   );
 }
 
-// Grip for resizing the card. Only while pinned: at rest a card is a label,
-// and a handle sitting on every node would be a hundred invitations to fiddle.
+// Grip for resizing the card. Shown on hover and pinned: at rest a card is
+// a label, and a handle on every node at once would be a hundred invitations
+// to fiddle — but appearing on hover means the user actively looking at a
+// card can immediately resize it.
 // D3 owns the gesture — this element only marks where it starts.
 function ResizeGrip() {
   return (
