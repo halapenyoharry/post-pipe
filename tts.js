@@ -144,8 +144,12 @@
     highlightSentence(sentenceIndex);
     emit('progress', { index: sentenceIndex, total: sentences.length });
 
-    if (sentenceIndex + 1 < sentences.length && activeEngine.prefetch) {
-      activeEngine.prefetch(sentences[sentenceIndex + 1].text, params).catch(()=>{});
+    // Prefetch current sentence FIRST so it gets enqueued to the worker before the next sentence!
+    if (activeEngine.prefetch) {
+      activeEngine.prefetch(sentences[sentenceIndex].text, params).catch(()=>{});
+      if (sentenceIndex + 1 < sentences.length) {
+        activeEngine.prefetch(sentences[sentenceIndex + 1].text, params).catch(()=>{});
+      }
     }
 
     try {
@@ -312,6 +316,7 @@
       paused = false;
 
       try {
+        emit('state', 'loading');
         await ensureReady();
         // After init, voices may now be available — notify UI
         emit('capabilitiesChanged', activeEngine.capabilities);
@@ -588,7 +593,14 @@
               reject(new Error(msg.error));
             }
             if (msg.status === 'progress') {
-              emit('engineProgress', msg.progress);
+              let p = 0;
+              if (msg.progress && typeof msg.progress.progress === 'number') {
+                // Transformers.js progress is 0-100
+                p = msg.progress.progress / 100;
+              } else if (msg.progress && msg.progress.loaded && msg.progress.total) {
+                p = msg.progress.loaded / msg.progress.total;
+              }
+              emit('engineProgress', p);
             }
           });
           
@@ -633,7 +645,13 @@
           return staticVoices.map(v => idToVoice(v.id, v))
             .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
         }
-        return voiceList.map(id => idToVoice(id, voiceMeta[id]))
+        // In wasm mode, return the static list immediately so the UI can populate.
+        // It will update to the real list if/when the worker sends the 'ready' message.
+        if (voiceList && voiceList.length > 0) {
+          return voiceList.map(id => idToVoice(id, voiceMeta[id] || { name: id }))
+            .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
+        }
+        return staticVoices.map(v => idToVoice(v.id, v))
           .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
       },
 
