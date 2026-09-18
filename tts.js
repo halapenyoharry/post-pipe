@@ -48,6 +48,16 @@
   // ── Sentence extraction ────────────────────────────────────────────────────
   function extractSentences(container) {
     const result = [];
+    const blockTags = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'TD', 'TH']);
+
+    function getBlockParent(node) {
+      let p = node.parentElement;
+      while (p && p !== container && !blockTags.has(p.tagName)) {
+        p = p.parentElement;
+      }
+      return p || node.parentElement;
+    }
+
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         const parent = node.parentElement;
@@ -58,69 +68,71 @@
         return NodeFilter.FILTER_ACCEPT;
       }
     });
-    let node;
-    while ((node = walker.nextNode())) {
-      const text = node.textContent;
-      const parts = text.match(/[^.!?]*[.!?]+[\s]*/g);
-      if (parts) {
-        let offset = 0;
-        for (const part of parts) {
-          const trimmed = part.trim();
-          if (trimmed.length > 0) {
-            result.push({ text: trimmed, node: node, offset: offset, length: part.length });
+
+    let currentBlockElement = null;
+    let currentBlockText = '';
+
+    function flushBlock() {
+      if (currentBlockText.trim().length > 0) {
+        const parts = currentBlockText.match(/[^.!?]*[.!?]+[\s]*/g);
+        if (parts) {
+          for (const part of parts) {
+            const trimmed = part.trim();
+            if (trimmed.length > 0) {
+              result.push({ text: trimmed, block: currentBlockElement });
+            }
           }
-          offset += part.length;
-        }
-        const consumed = parts.join('').length;
-        if (consumed < text.length) {
-          const remainder = text.slice(consumed).trim();
-          if (remainder.length > 0) {
-            result.push({ text: remainder, node: node, offset: consumed, length: text.length - consumed });
-          }
-        }
-      } else {
-        const trimmed = text.trim();
-        if (trimmed.length > 0) {
-          result.push({ text: trimmed, node: node, offset: 0, length: text.length });
+        } else {
+          result.push({ text: currentBlockText.trim(), block: currentBlockElement });
         }
       }
+      currentBlockText = '';
     }
+
+    let node;
+    while ((node = walker.nextNode())) {
+      const block = getBlockParent(node);
+      if (block !== currentBlockElement) {
+        flushBlock();
+        currentBlockElement = block;
+      }
+      currentBlockText += node.textContent + ' ';
+    }
+    flushBlock();
     return result;
   }
 
   // ── Highlighting & scroll sync ─────────────────────────────────────────────
-  let highlightMark = null;
+  let highlightBlock = null;
 
   function highlightSentence(idx) {
     clearHighlight();
     if (idx < 0 || idx >= sentences.length) return;
     const s = sentences[idx];
-    if (!s.node.parentElement) return;
-    try {
-      const range = document.createRange();
-      range.setStart(s.node, s.offset);
-      range.setEnd(s.node, Math.min(s.offset + s.length, s.node.textContent.length));
-      highlightMark = document.createElement('mark');
-      highlightMark.className = 'tts-active';
-      range.surroundContents(highlightMark);
-    } catch (e) { return; }
+    if (!s.block) return;
+    
+    highlightBlock = s.block;
+    highlightBlock.dataset.originalBg = highlightBlock.style.backgroundColor || '';
+    highlightBlock.style.backgroundColor = 'rgba(100, 255, 218, 0.15)';
+    highlightBlock.dataset.originalRadius = highlightBlock.style.borderRadius || '';
+    highlightBlock.style.borderRadius = '4px';
 
-    if (scrollContainer && highlightMark) {
+    if (scrollContainer && highlightBlock) {
       const cr = scrollContainer.getBoundingClientRect();
-      const mr = highlightMark.getBoundingClientRect();
+      const mr = highlightBlock.getBoundingClientRect();
       const rel = mr.top - cr.top;
       scrollContainer.scrollTo({ top: scrollContainer.scrollTop + rel - cr.height * 0.33, behavior: 'smooth' });
     }
   }
 
   function clearHighlight() {
-    if (highlightMark && highlightMark.parentNode) {
-      const parent = highlightMark.parentNode;
-      while (highlightMark.firstChild) parent.insertBefore(highlightMark.firstChild, highlightMark);
-      parent.removeChild(highlightMark);
-      parent.normalize();
+    if (highlightBlock) {
+      highlightBlock.style.backgroundColor = highlightBlock.dataset.originalBg;
+      if (!highlightBlock.style.backgroundColor) highlightBlock.style.removeProperty('background-color');
+      highlightBlock.style.borderRadius = highlightBlock.dataset.originalRadius;
+      if (!highlightBlock.style.borderRadius) highlightBlock.style.removeProperty('border-radius');
+      highlightBlock = null;
     }
-    highlightMark = null;
   }
 
   // ── Playback loop ──────────────────────────────────────────────────────────
@@ -131,6 +143,10 @@
     }
     highlightSentence(sentenceIndex);
     emit('progress', { index: sentenceIndex, total: sentences.length });
+
+    if (sentenceIndex + 1 < sentences.length && activeEngine.prefetch) {
+      activeEngine.prefetch(sentences[sentenceIndex + 1].text, params).catch(()=>{});
+    }
 
     try {
       await activeEngine.speak(sentences[sentenceIndex].text, params);
@@ -563,12 +579,11 @@
             if (msg.status === 'ready') {
               ready = true;
               voiceList = msg.voices || [];
-              // Parse voice metadata if provided
               if (msg.voiceMeta) voiceMeta = msg.voiceMeta;
               worker.removeEventListener('message', handler);
               resolve();
             }
-            if (msg.status === 'error') {
+            if (msg.status === 'error' && !ready) {
               worker.removeEventListener('message', handler);
               reject(new Error(msg.error));
             }
@@ -581,8 +596,36 @@
             worker.removeEventListener('error', errHandler);
             reject(new Error(e.message || 'Worker script failed to load.'));
           });
+          
+          // Background listener for generated audio blobs
+          worker.addEventListener('message', function bgHandler(e) {
+            const msg = e.data;
+            if (msg.status === 'complete' || (msg.status === 'error' && msg.text)) {
+              const resolver = prefetchMap.get(msg.text);
+              if (resolver) {
+                if (msg.status === 'complete') resolver.resolve(msg.audio);
+                else resolver.reject(new Error(msg.error));
+                prefetchMap.delete(msg.text);
+              }
+            }
+          });
           // Worker auto-inits on creation — it loads the model immediately
         });
+      },
+
+      prefetch: function (text, p) {
+        if (!worker) return Promise.reject(new Error("Worker not initialized"));
+        if (prefetchMap.has(text)) return prefetchMap.get(text).promise;
+        const voice = p.voice || 'af_heart';
+        let resolver = {};
+        const promise = new Promise((resolve, reject) => {
+          resolver.resolve = resolve;
+          resolver.reject = reject;
+        });
+        resolver.promise = promise;
+        prefetchMap.set(text, resolver);
+        worker.postMessage({ action: 'generate', text: text, voice: voice, speed: p.speed || 1 });
+        return promise;
       },
 
       voices: function () {
@@ -629,36 +672,26 @@
               throw new Error('Kokoro server unreachable (timed out after 10s)');
             }
             throw err;
-          }).then(playBlob);
-        }
-
-        return new Promise((resolve, reject) => {
-          resolveSpeak = resolve;
-
-          const onMsg = function (e) {
-            const msg = e.data;
-            if (msg.status === 'complete') {
-              worker.removeEventListener('message', onMsg);
-              // Play the audio blob
+          }).then(blob => {
+            return new Promise((resolve, reject) => {
               if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-              const url = URL.createObjectURL(msg.audio);
+              const url = URL.createObjectURL(blob);
               currentAudio = new Audio(url);
               currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
               currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
               currentAudio.play();
-            }
-            if (msg.status === 'error') {
-              worker.removeEventListener('message', onMsg);
-              reject(new Error(msg.error));
-            }
-          };
-          worker.addEventListener('message', onMsg);
+            });
+          });
+        }
 
-          worker.postMessage({
-            action: 'generate',
-            text: text,
-            voice: voice,
-            speed: p.speed || 1,
+        return this.prefetch(text, p).then(blob => {
+          return new Promise((resolve, reject) => {
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+            const url = URL.createObjectURL(blob);
+            currentAudio = new Audio(url);
+            currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+            currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
+            currentAudio.play();
           });
         });
       },
