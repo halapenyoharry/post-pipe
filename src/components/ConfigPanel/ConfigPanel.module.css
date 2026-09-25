@@ -1,0 +1,396 @@
+/* ── ConfigPanel ──────────────────────────────────────────────────────────────
+   A slide-out configuration panel for the embeddable viewer. Lets the user
+   toggle features, adjust theme, and export/import config JSON.
+
+   Design language matches the existing Settings popover and FeedZ bar:
+   dark glassy surface, subtle borders, the accent color for active states.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Trigger button ─────────────────────────────────────────────────────── */
+
+.triggerBtn {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 22, 30, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.triggerBtn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(30, 34, 48, 0.85);
+}
+.triggerBtn.open {
+  color: var(--accent, #64ffda);
+  border-color: var(--accent, #64ffda);
+}
+
+/* ── Backdrop ───────────────────────────────────────────────────────────── */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ── Panel ──────────────────────────────────────────────────────────────── */
+
+.panel {
+  position: fixed;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 61;
+
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+
+  background: rgba(14, 16, 24, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1);
+  padding: 0;
+
+  /* subtle entrance */
+  animation: panelIn 0.2s ease-out;
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* Scrollbar */
+.panel::-webkit-scrollbar { width: 5px; }
+.panel::-webkit-scrollbar-track { background: transparent; }
+.panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.panelTitle {
+  font: 600 13px/1 system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.closeBtn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+}
+.closeBtn:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+
+.section {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionTitle {
+  font: 600 10px/1 system-ui, -apple-system, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 10px;
+}
+
+/* ── Toggle row ─────────────────────────────────────────────────────────── */
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  min-height: 32px;
+}
+
+.toggleLabel {
+  font: 400 12px/1.3 system-ui, -apple-system, sans-serif;
+  color: rgba(255, 255, 255, 0.72);
+  flex: 1;
+}
+
+.toggleSub {
+  display: block;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 2px;
+}
+
+/* The switch itself */
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.switchInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switchTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.switchTrack::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.switchInput:checked + .switchTrack {
+  background: rgba(100, 255, 218, 0.25);
+  border-color: rgba(100, 255, 218, 0.5);
+}
+.switchInput:checked + .switchTrack::after {
+  transform: translateX(16px);
+  background: var(--accent, #64ffda);
+}
+
+/* ── Theme color inputs ─────────────────────────────────────────────────── */
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.colorLabel {
+  font: 400 12px/1 system-ui, -apple-system, sans-serif;
+  color: rgba(255, 255, 255, 0.55);
+  flex: 1;
+}
+
+.colorInput {
+  width: 28px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.colorInput::-webkit-color-swatch-wrapper { padding: 1px; }
+.colorInput::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+.colorHex {
+  font: 400 10px/1 monospace;
+  color: rgba(255, 255, 255, 0.3);
+  width: 58px;
+}
+
+/* ── Text input (feed URL, etc.) ────────────────────────────────────────── */
+
+.textInputRow {
+  padding: 4px 0;
+}
+
+.textInput {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.8);
+  font: 400 12px/1.3 system-ui, -apple-system, sans-serif;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.textInput:focus {
+  border-color: rgba(100, 255, 218, 0.4);
+}
+.textInput::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Select dropdown ────────────────────────────────────────────────────── */
+
+.selectRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.select {
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  font: 400 12px/1 system-ui, -apple-system, sans-serif;
+  outline: none;
+  cursor: pointer;
+}
+.select:focus {
+  border-color: rgba(100, 255, 218, 0.4);
+}
+
+/* ── Action buttons (Export / Import / Reset) ───────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0 2px;
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  flex: 1;
+  min-width: 90px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  font: 500 11px/1 system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  text-align: center;
+}
+.actionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.actionBtnAccent {
+  composes: actionBtn;
+  border-color: rgba(100, 255, 218, 0.3);
+  color: var(--accent, #64ffda);
+}
+.actionBtnAccent:hover {
+  background: rgba(100, 255, 218, 0.1);
+  border-color: rgba(100, 255, 218, 0.5);
+}
+
+.actionBtnDanger {
+  composes: actionBtn;
+  border-color: rgba(231, 76, 60, 0.3);
+  color: #e74c3c;
+}
+.actionBtnDanger:hover {
+  background: rgba(231, 76, 60, 0.1);
+  border-color: rgba(231, 76, 60, 0.5);
+}
+
+/* ── Snippet preview ────────────────────────────────────────────────────── */
+
+.snippet {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+}
+
+.snippetCode {
+  font: 400 10px/1.5 'SF Mono', 'Fira Code', monospace;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: pre;
+  display: block;
+}
+
+/* ── Copy toast ─────────────────────────────────────────────────────────── */
+
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(100, 255, 218, 0.15);
+  border: 1px solid rgba(100, 255, 218, 0.3);
+  color: var(--accent, #64ffda);
+  font: 500 12px/1 system-ui, sans-serif;
+  animation: toastIn 0.2s ease-out;
+  pointer-events: none;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 440px) {
+  .panel {
+    width: calc(100vw - 16px);
+    bottom: 52px;
+  }
+}

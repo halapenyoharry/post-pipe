@@ -284,6 +284,12 @@ function createViewState(opts = {}) {
       return () => { listeners = listeners.filter((f) => f !== fn); };
     },
 
+    resetLayout() {
+      update((s) => {
+        s.nodes = {};
+      });
+    },
+
     // ── typed helpers ────────────────────────────────────────────────────────
 
     nodeState(id) { return state.nodes[id] || null; },

@@ -6,4 +6,5 @@ export { ReaderPanel } from './components/ReaderPanel/ReaderPanel';
 export { TTS } from './components/TTS/TTS';
 export { FeedZ } from './components/FeedZ';
 export { Settings } from './components/Settings';
+export { ConfigPanel } from './components/ConfigPanel';
 export { React, ReactDOM };

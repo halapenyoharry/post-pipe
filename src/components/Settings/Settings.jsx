@@ -117,12 +117,27 @@ export function Settings({ viewState }) {
               ))}
             </div>
 
-            <button
-              className={styles.resetBtn}
-              onClick={() => viewState.applyColorProfile('default', DEFAULT_COLORS)}
-            >
-              Reset to Default
-            </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+              <button
+                className={styles.resetBtn}
+                onClick={() => viewState.applyColorProfile('default', DEFAULT_COLORS)}
+              >
+                Reset Colors
+              </button>
+              <button
+                className={styles.resetBtn}
+                style={{ color: '#e74c3c', borderColor: '#e74c3c4d' }}
+                onClick={() => {
+                  if (confirm('Reset all node positions and layout arrangements?')) {
+                    viewState.resetLayout();
+                    // Optional: force reload so the graph redraws from scratch
+                    window.location.reload();
+                  }
+                }}
+              >
+                Reset Layout
+              </button>
+            </div>
           </div>
         </>
       )}

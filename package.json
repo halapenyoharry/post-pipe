@@ -9,6 +9,7 @@
   "scripts": {
     "build": "vite build",
     "build:lib": "vite build --config vite.config.lib.js",
+    "build:embed": "vite build --config vite.config.embed.js",
     "test": "node --test test/*.test.js",
     "login:medium": "node index.js medium --login",
     "login:substack": "node index.js substack --login",
