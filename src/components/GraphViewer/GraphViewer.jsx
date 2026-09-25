@@ -1001,6 +1001,7 @@ export function GraphViewer({
     let tickCount = 0;
     simulation.nodes(data.nodes).on('tick', () => {
       applyPositions();
+      if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
       if (connectorUpdateRef.current) connectorUpdateRef.current();
       ++tickCount;
       if (redrawAxisRef.current && tickCount % 25 === 0) redrawAxisRef.current();
@@ -1141,36 +1142,8 @@ export function GraphViewer({
         }
         if (savedAny) vs.notify(); // Commit the batch.
       }
-      
-      // Gently pan/zoom in once nodes settle
-      fitToViewport({ animate: true });
-    });
 
-    simulation.on('tick', () => {
-      // Because positions update continually, but connections aren't React
-      // state, we have to push coordinates into the DOM manually here.
-      applyPositions();
-      // Wait for the container to have layout (which might take a frame) before
-      // fitting. The first time we successfully fit, we stop doing it,
-      // otherwise the viewport would furiously lock to the moving nodes and the
-      // reader couldn't pan.
-      // anyRestored used to gate this — skip fitting if the reader already
-      // has an arrangement, on the theory that fitting would clobber a
-      // camera position they'd set up. But no zoom/pan transform is ever
-      // persisted anywhere; every fresh mount starts at the SVG's default
-      // identity transform regardless of anyRestored, so that guard never
-      // preserved anything — it just left the camera at an arbitrary
-      // default. Worse: this corpus's *positions* are legitimately
-      // viewport-independent (that's the point — an arrangement made on a
-      // desktop is still the same arrangement on a phone), but the
-      // *zoom/pan needed to view them usefully* is emphatically not, and
-      // this guard skipped exactly the step that adapts one to the other.
-      // A reader who opened this on a 1024px desktop and now opens the same
-      // saved arrangement on a 375px phone needs a fresh fit every time,
-      // not the one time anyRestored happened to be false.
-      if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
-      // The axis is measured against where the pieces ended up, so it is drawn
-      // again now that they have stopped moving.
+      // Redraw the axis once more now that nodes have come to rest.
       if (redrawAxisRef.current) redrawAxisRef.current();
     });
 
