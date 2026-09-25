@@ -358,7 +358,7 @@ ${reactJs}
           viewState: viewState
         }),
         React.createElement(LayoutControls, null),
-        React.createElement(TimeAxisControls, null),
+        React.createElement(DimensionsControls, null),
         React.createElement(HistoryControls, null),
         React.createElement(Settings, { viewState: viewState }),
         React.createElement(ReaderPanel, {
@@ -415,6 +415,8 @@ ${reactJs}
           title: 'Release all dragged nodes, re-run simulation' },
         { icon: '▣', label: 'Reset Sizes', event: 'graph:reset-sizes',
           title: 'Return all cards to their default dimensions' },
+        { icon: '×', label: 'Reset Layout', event: 'graph:reset-layout',
+          title: 'Completely clear remembered positions and reset layout' },
       ];
 
       // Shared button styling for the popover items.
@@ -516,10 +518,24 @@ ${reactJs}
     // orientations still work and still persist; they live in settings.json
     // under graph.timeAxis.orientation, which is the right place for a thing
     // that matters enormously to a few people and not at all to everyone else.
-    function TimeAxisControls() {
+    function DimensionsControls() {
       const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
       React.useEffect(function () { return viewState.subscribe(bump); }, []);
       const axis = viewState.timeAxis();
+
+      function dimensionButton(key, label, isActive, onClick, title) {
+        return React.createElement('button', {
+          key: key,
+          title: title,
+          onClick: onClick,
+          style: {
+            border: 0, borderRadius: '6px', padding: '5px 9px', cursor: 'pointer',
+            background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
+            color: isActive ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
+            font: '12px/1 system-ui, sans-serif'
+          }
+        }, label);
+      }
 
       return React.createElement('div', {
         style: {
@@ -536,18 +552,10 @@ ${reactJs}
             textTransform: 'uppercase', color: 'rgba(255,255,255,0.32)',
             padding: '0 7px 0 4px'
           }
-        }, 'overlay'),
-        React.createElement('button', {
-          key: 'time',
-          title: 'Draw a time axis across the graph',
-          onClick: function () { viewState.setTimeAxis({ on: !axis.on }); },
-          style: {
-            border: 0, borderRadius: '6px', padding: '5px 9px', cursor: 'pointer',
-            background: axis.on ? 'rgba(255,255,255,0.14)' : 'transparent',
-            color: axis.on ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
-            font: '12px/1 system-ui, sans-serif'
-          }
-        }, 'time')
+        }, 'dimensions'),
+        dimensionButton('time', 'time', axis.on, function () { viewState.setTimeAxis({ on: !axis.on }); }, 'Draw a time axis across the graph'),
+        dimensionButton('narrative', 'narrative', false, function () {}, 'Narrative position (coming soon)'),
+        dimensionButton('chronology', 'chronology', false, function () {}, 'Chronological position (coming soon)')
       ]);
     }
 

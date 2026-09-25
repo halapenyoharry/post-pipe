@@ -991,7 +991,7 @@ export function GraphViewer({
         articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
       }
     }
-
+    let hasFitted = false;
     graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g };
 
     // The axis is measured against the corpus extent, which keeps changing
@@ -1009,16 +1009,15 @@ export function GraphViewer({
 
     // Paint once now, from whatever positions were restored or seeded, so the
     // first frame is correct with or without the simulation ever running.
+    if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
     applyPositions();
 
     // When the simulation ends, freeze every node by copying x/y to fx/fy.
     // Any later interaction (drag, etc.) keeps positions stable.
     // Frame the whole graph once it has settled, but only when the reader has
     // not arranged it themselves. Giving every node its true footprint spreads
-    // the corpus over far more space than before, and a layout you have to go
     // looking for is not an improvement on one that overlaps.
-    let hasFitted = false;
-    function fitToViewport() {
+    function fitToViewport({ animate = false, initialZoomOut = false } = {}) {
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
@@ -1059,8 +1058,10 @@ export function GraphViewer({
       const centerX = median(xsAll);
       const centerY = median(ysAll);
 
-      const w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
-      const h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
+      let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
+      let h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
+      if (w < 50) w = window.innerWidth;
+      if (h < 50) h = window.innerHeight;
       // A container with no size yet — hidden tab, collapsed pane, a layout
       // that has not run — would give a scale of zero and collapse the whole
       // graph to a point. Leave the view alone and fit when there is a
@@ -1076,13 +1077,26 @@ export function GraphViewer({
       // crammed on screen at once — a readable core beats a technically-
       // complete but illegible one.
       const MIN_SCALE = 0.2;
-      const k = Math.max(
+      let k = Math.max(
         Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1),
         MIN_SCALE,
       );
+      if (initialZoomOut) {
+        if (positionsWereDegenerate) {
+          // Force the maximum zoomed-out state so the user can watch the physics explode
+          k = MIN_SCALE * 0.85;
+        } else {
+          k *= 0.85;
+        }
+      }
       const tx = w / 2 - centerX * k;
       const ty = h / 2 - centerY * k;
-      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+      const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
+      if (animate) {
+        svg.transition().duration(750).call(zoom.transform, transform);
+      } else {
+        svg.call(zoom.transform, transform);
+      }
       return true;
     }
 
@@ -1099,25 +1113,47 @@ export function GraphViewer({
       // capture the arrangement when cluster is actually what's displayed.
       if (layoutRef.current !== 'force') return;
       data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; d._forcePos = { x: d.x, y: d.y }; });
+
       // The layout the simulation settled on is itself an arrangement worth
-      // keeping — otherwise every reload reshuffles a graph the reader has
-      // started to learn the shape of. Recorded without history: the reader
-      // did not do this, so there is nothing for them to undo.
-      const vs = viewStateRef.current;
-      // Symmetric to the restore guard: a heap is not worth writing either.
-      // Whatever produced this one, storing it would hand the next load a
+      // remembering. It becomes the saved layout so a returning reader sees
+      // what they left, rather than watching physics happen again. But we
+      // only want to save a *good* layout. A simulation starting from an
+      // already-saved arrangement barely ticks, and if that arrangement was
+      // degenerate (shoved offscreen, over-compressed), saving it here
+      // would just lock it in. The reader would never see the fresh fallback
       // layout it would then have to reject.
       if (layoutIsDegenerate(data.nodes, cardSizeFor({ hovered: false, pinned: false }))) return;
 
-      let anyRestored = false;
+      const vs = viewStateRef.current;
       if (vs) {
+        // We only want to save positions that were derived from the *current*
+        // layout pass, not positions loaded from a prior one. The data-prep
+        // phase tags freshly computed force coordinates with `_forcePos` so
+        // we can distinguish them here. We explicitly *delete* that flag when
+        // a user unpins everything, because the simulation resumes and computes
+        // a fresh layout that is now worth saving.
+        let savedAny = false;
         for (const d of data.nodes) {
-          // A rejected arrangement is overwritten rather than preserved,
-          // otherwise the bad layout survives the very pass that replaced it.
-          if (!positionsWereDegenerate && vs.nodeState(positionKey(d))) anyRestored = true;
-          else vs.setNodePosition(positionKey(d), d.x, d.y, { silent: true });
+          if (!d.pinned && d._forcePos) {
+            vs.setNodePosition('force::' + persistKey(d), d.x, d.y, { silent: true });
+            savedAny = true;
+          }
         }
+        if (savedAny) vs.notify(); // Commit the batch.
       }
+      
+      // Gently pan/zoom in once nodes settle
+      fitToViewport({ animate: true });
+    });
+
+    simulation.on('tick', () => {
+      // Because positions update continually, but connections aren't React
+      // state, we have to push coordinates into the DOM manually here.
+      applyPositions();
+      // Wait for the container to have layout (which might take a frame) before
+      // fitting. The first time we successfully fit, we stop doing it,
+      // otherwise the viewport would furiously lock to the moving nodes and the
+      // reader couldn't pan.
       // anyRestored used to gate this — skip fitting if the reader already
       // has an arrangement, on the theory that fitting would clobber a
       // camera position they'd set up. But no zoom/pan transform is ever
@@ -1132,7 +1168,7 @@ export function GraphViewer({
       // A reader who opened this on a 1024px desktop and now opens the same
       // saved arrangement on a 375px phone needs a fresh fit every time,
       // not the one time anyRestored happened to be false.
-      if (!hasFitted) hasFitted = fitToViewport();
+      if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
       // The axis is measured against where the pieces ended up, so it is drawn
       // again now that they have stopped moving.
       if (redrawAxisRef.current) redrawAxisRef.current();
@@ -1148,7 +1184,7 @@ export function GraphViewer({
       if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
       // Settled while there was nothing to settle into. Frame it now that
       // there is.
-      if (!hasFitted) hasFitted = fitToViewport();
+      if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -1156,7 +1192,7 @@ export function GraphViewer({
     // LayoutControls dispatches these from outside the component. They reach
     // into the closure that owns the simulation, the zoom, and the data.
 
-    const handleZoomToFit = () => { fitToViewport(); };
+    const handleZoomToFit = () => { fitToViewport({ animate: true }); };
 
     const handleUnpinAll = () => {
       data.nodes.forEach(d => {
@@ -1188,9 +1224,22 @@ export function GraphViewer({
       applyPositions();
     };
 
+    const handleResetLayout = () => {
+      const vs = viewStateRef.current;
+      if (vs && vs.resetLayout) vs.resetLayout();
+      data.nodes.forEach(d => {
+        d.fx = null;
+        d.fy = null;
+        delete d._forcePos;
+      });
+      simulation.alpha(0.8).restart();
+      fitToViewport({ animate: true });
+    };
+
     window.addEventListener('graph:zoom-to-fit', handleZoomToFit);
     window.addEventListener('graph:unpin-all', handleUnpinAll);
     window.addEventListener('graph:reset-sizes', handleResetSizes);
+    window.addEventListener('graph:reset-layout', handleResetLayout);
 
     return () => {
       simulation.stop();
@@ -1199,6 +1248,7 @@ export function GraphViewer({
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
       window.removeEventListener('graph:reset-sizes', handleResetSizes);
+      window.removeEventListener('graph:reset-layout', handleResetLayout);
       // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
       // would try to reconcile against a detached DOM tree on the next
       // effect run. Defer the unmount so it doesn't fire inside a render.

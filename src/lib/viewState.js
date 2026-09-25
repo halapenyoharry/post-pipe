@@ -314,6 +314,14 @@ function createViewState(opts = {}) {
 
     setLayout(layout) { update((s) => { s.layout = layout; }); },
 
+    resetLayout() {
+      update((s) => {
+        s.nodes = {};
+        s.layout = 'force';
+      });
+      gestureBase = null;
+    },
+
     timeAxis() {
       return state.timeAxis || { on: false, x: 0, y: -1000 };
     },
