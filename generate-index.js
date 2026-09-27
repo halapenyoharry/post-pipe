@@ -679,40 +679,9 @@ async function main() {
     console.log(`  (${withTodos} flagged with TODO files — see ~/Posts/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
   }
 
-  // Synthesize container chapter placeholders if defined (e.g. Act 2 & Act 3)
-  const existingSlugs = new Set(items.map(it => (it.url || it.id || '').split('/').pop().replace('.html', '')));
-  for (const c of (SETTINGS.containment || [])) {
-    if (!c.chapters || !Array.isArray(c.chapters)) continue;
-    for (const chNum of c.chapters) {
-      const chSlug = `ch${chNum}`;
-      if (!existingSlugs.has(chSlug)) {
-        const pagesUrl = `${PAGES_BASE}/${chSlug}.html`;
-        const chItem = {
-          id: pagesUrl,
-          url: pagesUrl,
-          title: String(chNum),
-          short_title: String(chNum),
-          summary: '',
-          date_published: undefined,
-          reading_time: '',
-          author: (SETTINGS.author?.name || 'harold young').toLowerCase(),
-          authors: [{ name: (SETTINGS.author?.name || 'harold young').toLowerCase(), url: SETTINGS.author?.url || pagesUrl }],
-          tags: c.tag ? [c.tag, 'epic-of-elinor-jones'] : ['epic-of-elinor-jones'],
-          series: c.series || c.label,
-          series_part: chNum,
-          kind: 'placeholder',
-          substrate: 'placeholder',
-          status: 'draft',
-          _status: 'draft',
-          _references: c.tag ? [{ type: 'tag', value: c.tag }] : [],
-          todos: [],
-          labels: { short: String(chNum), medium: String(chNum), full: String(chNum) }
-        };
-        items.push(chItem);
-        existingSlugs.add(chSlug);
-      }
-    }
-  }
+  // Nodes come only from content on disk. The engine never synthesizes items:
+  // a chapter that isn't written yet exists as a placeholder bundle in the
+  // site's content folder, not as something invented here.
 
   // Every item gets a label ladder: two words, four words, the whole title.
   // Computed here rather than in the viewer so it costs nothing at render, is
