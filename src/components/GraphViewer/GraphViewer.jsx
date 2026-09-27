@@ -541,98 +541,154 @@ export function GraphViewer({
     const closedContainers = new Set();
     const containerCentroids = new Map();
 
+    function getContainerColor(c) {
+      return c.badgeColor || c.color || c.stroke || '#d4af37';
+    }
+
     const containerBadges = containerGroups.append('g')
-      .attr('class', 'container-badge')
-      .style('cursor', 'pointer');
+      .attr('class', 'container-badge');
 
-    containerBadges.append('rect')
-      .attr('class', 'container-badge-bg')
-      .attr('fill', (d) => d.badgeBg || 'rgba(15, 15, 18, 0.85)')
-      .attr('stroke', (d) => d.stroke || 'rgba(212, 175, 55, 0.4)')
-      .attr('stroke-width', 1)
-      .attr('rx', 6)
-      .attr('ry', 6);
-
-    containerBadges.append('text')
+    const containerBadgeTexts = containerBadges.append('text')
       .attr('class', 'container-badge-text')
-      .attr('fill', (d) => d.badgeColor || '#d4af37')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .style('user-select', 'none')
+      .attr('fill', (d) => getContainerColor(d))
+      .attr('opacity', 0.55)
+      .attr('font-size', (d) => (!d.parent ? '28px' : '22px'));
+
+    containerBadgeTexts.append('tspan')
+      .attr('class', 'container-badge-name')
       .text((d) => d.label || d.id);
+
+    containerBadgeTexts.append('tspan')
+      .attr('class', 'container-badge-count')
+      .attr('font-size', (d) => (!d.parent ? '18px' : '15px'))
+      .attr('dx', '8px');
 
     // Collapsed container macro node (when container is closed, represented like a single node)
     const containerMacroNodes = containerGroups.append('g')
       .attr('class', 'container-macro-node')
-      .style('cursor', 'pointer')
       .style('display', 'none');
 
     containerMacroNodes.append('rect')
       .attr('class', 'container-macro-bg')
-      .attr('width', 170)
-      .attr('height', 80)
-      .attr('x', -85)
-      .attr('y', -40)
       .attr('rx', 12)
       .attr('ry', 12)
-      .attr('fill', (d) => d.badgeBg || 'rgba(20, 24, 38, 0.94)')
-      .attr('stroke', (d) => d.badgeColor || d.stroke || '#d4af37')
+      .attr('fill', (d) => d.fill || 'rgba(212, 175, 55, 0.08)')
+      .attr('stroke', (d) => getContainerColor(d))
       .attr('stroke-width', 1.8)
       .style('filter', 'drop-shadow(0 10px 25px rgba(0, 0, 0, 0.6))');
 
-    containerMacroNodes.append('text')
-      .attr('class', 'container-macro-title')
-      .attr('y', -12)
-      .attr('fill', (d) => d.badgeColor || '#fff')
+    const containerMacroTexts = containerMacroNodes.append('text')
+      .attr('class', 'container-macro-text')
       .attr('text-anchor', 'middle')
-      .attr('font-size', '14px')
-      .attr('font-weight', 'bold')
+      .attr('dominant-baseline', 'central')
+      .attr('fill', (d) => getContainerColor(d))
+      .attr('font-size', (d) => (!d.parent ? '28px' : '22px'))
       .attr('font-family', "'Atkinson', sans-serif")
-      .text((d) => `⊞ ${d.label || d.id}`);
+      .attr('font-weight', '700')
+      .attr('letter-spacing', '0.05em');
 
-    containerMacroNodes.append('text')
-      .attr('class', 'container-macro-sub')
-      .attr('y', 10)
-      .attr('fill', 'rgba(255, 255, 255, 0.7)')
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '11px')
-      .attr('font-family', "'Atkinson', sans-serif")
-      .text((d) => `${(getAllMemberSlugs(d.id) || []).length} Chapters`);
+    containerMacroTexts.append('tspan')
+      .attr('class', 'container-macro-name')
+      .text((d) => d.label || d.id);
 
-    containerMacroNodes.append('text')
-      .attr('class', 'container-macro-hint')
-      .attr('y', 27)
-      .attr('fill', (d) => d.badgeColor || '#64ffda')
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '10px')
-      .attr('font-weight', '600')
-      .attr('letter-spacing', '0.5px')
-      .text('CLICK TO OPEN');
+    containerMacroTexts.append('tspan')
+      .attr('class', 'container-macro-count')
+      .attr('font-size', (d) => (!d.parent ? '18px' : '15px'))
+      .attr('font-weight', '500')
+      .attr('dx', '8px');
 
-    // Clicking open container badge collapses it into a single node
-    containerBadges.on('click', (event, d) => {
-      event.stopPropagation();
-      if (!d.parent) return; // Parent outer container stays open
-      if (closedContainers.has(d.id)) {
-        closedContainers.delete(d.id);
-      } else {
-        closedContainers.add(d.id);
-      }
-      applyContainerVisibility();
-    });
+    function createContainerDragHandler({ isCollapsed }) {
+      return d3.drag()
+        .filter((event) => {
+          if (event.ctrlKey) return false;
+          if (event.button !== undefined && event.button !== 0) return false;
+          return true;
+        })
+        .on('start', function (event, c) {
+          if (event.sourceEvent) event.sourceEvent.stopPropagation();
+          const startX = event.x;
+          const startY = event.y;
+          d3.select(this).datum()._dragState = {
+            startX,
+            startY,
+            lastX: startX,
+            lastY: startY,
+            totalMove: 0,
+          };
+        })
+        .on('drag', function (event, c) {
+          const state = d3.select(this).datum()._dragState;
+          if (!state) return;
+          const dx = event.x - state.lastX;
+          const dy = event.y - state.lastY;
+          state.lastX = event.x;
+          state.lastY = event.y;
+          state.totalMove += Math.hypot(dx, dy);
 
-    // Clicking collapsed container macro node opens it back up
-    containerMacroNodes.on('click', (event, d) => {
-      event.stopPropagation();
-      closedContainers.delete(d.id);
-      applyContainerVisibility();
-    });
+          const memberSlugs = getAllMemberSlugs(c.id);
+          for (const slug of memberSlugs) {
+            const node = nodeBySlug.get(slug);
+            if (node) {
+              node.x += dx;
+              node.y += dy;
+              node.fx = node.x;
+              node.fy = node.y;
+              if (viewStateRef.current) {
+                viewStateRef.current.setNodePosition(positionKey(node), node.x, node.y, { transient: true });
+              }
+            }
+          }
+          applyPositions();
+          if (connectorUpdateRef.current) connectorUpdateRef.current();
+        })
+        .on('end', function (event, c) {
+          const state = d3.select(this).datum()._dragState;
+          delete d3.select(this).datum()._dragState;
+          const totalMove = state ? state.totalMove : 0;
+
+          if (totalMove >= 4) {
+            const memberSlugs = getAllMemberSlugs(c.id);
+            const vs = viewStateRef.current;
+            for (const slug of memberSlugs) {
+              const node = nodeBySlug.get(slug);
+              if (node) {
+                node.fx = node.x;
+                node.fy = node.y;
+                if (vs) {
+                  vs.setNodePosition(positionKey(node), node.x, node.y, { transient: true });
+                }
+              }
+            }
+            if (vs) vs.commit();
+            applyPositions();
+          } else {
+            // Click with < 4px movement: toggle collapse
+            if (isCollapsed) {
+              closedContainers.delete(c.id);
+            } else {
+              if (closedContainers.has(c.id)) {
+                closedContainers.delete(c.id);
+              } else {
+                closedContainers.add(c.id);
+              }
+            }
+            applyContainerVisibility();
+          }
+        });
+    }
+
+    containerBadges.call(createContainerDragHandler({ isCollapsed: false }));
+    containerMacroNodes.call(createContainerDragHandler({ isCollapsed: true }));
 
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
 
     function updateContainers() {
       if (sortedContainers.length === 0) return;
+
       containerGroups.each(function (c) {
         const group = d3.select(this);
         const memberSlugs = getAllMemberSlugs(c.id);
