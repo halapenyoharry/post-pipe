@@ -37,7 +37,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     article._status === 'bloomed' ||
     !!(article.syndication && article.syndication.canonical)
   );
-  const sourceColor = article._source && article._source.color;
+  const sourceColor = article.containerColor || article.color || (article._source && article._source.color);
 
   // Image-kind nodes are a different visual: photo card with caption.
   if (article.kind === 'image' && article.image) {

@@ -147,12 +147,20 @@
 }
 
 .graphContainer :global(.container-badge) {
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.graphContainer :global(.container-badge:hover .container-badge-bg) {
+  filter: brightness(1.4);
+  stroke-width: 1.5;
 }
 
 .graphContainer :global(.container-badge-bg) {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  transition: filter 0.2s ease, stroke 0.2s ease;
 }
 
 .graphContainer :global(.container-badge-text) {
@@ -161,5 +169,25 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  pointer-events: none;
+}
+
+.graphContainer :global(.container-macro-node) {
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.graphContainer :global(.container-macro-node text) {
+  pointer-events: none;
+  user-select: none;
+}
+
+.graphContainer :global(.container-macro-node:hover) {
+  filter: brightness(1.25);
+}
+
+.graphContainer :global(.container-macro-node:hover .container-macro-bg) {
+  stroke-width: 2.5;
 }
 

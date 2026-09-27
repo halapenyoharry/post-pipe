@@ -28,6 +28,15 @@ function feedToGraph(feed, config = {}) {
     idToSlug.set(item.id, slug);
     articleSlugs.add(slug);
 
+    let containerColor = null;
+    const containersList = feed.containers || config.containment || [];
+    for (const c of containersList) {
+      if (c.parent && c.tag && (item.tags || []).includes(c.tag)) {
+        containerColor = c.badgeColor || c.color || c.stroke;
+        break;
+      }
+    }
+
     nodes.push({
       id: slug,
       // The zoomed-out label. Was the raw slug, which for a feed item is
@@ -54,7 +63,8 @@ function feedToGraph(feed, config = {}) {
       canonical_url: item.canonical_url || item.url,
       syndication: item.syndication || {},
       size: 60,
-      color: status === 'published' ? publishedColor : draftColor,
+      containerColor,
+      color: containerColor || (status === 'published' ? publishedColor : draftColor),
       kind: item.kind || 'essay',
       substrate: item.substrate || 'essay',
       seed: item.seed || '',
@@ -528,8 +538,12 @@ export function GraphViewer({
       .attr('stroke-width', (d) => d.strokeWidth || 1.5)
       .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
 
+    const closedContainers = new Set();
+    const containerCentroids = new Map();
+
     const containerBadges = containerGroups.append('g')
-      .attr('class', 'container-badge');
+      .attr('class', 'container-badge')
+      .style('cursor', 'pointer');
 
     containerBadges.append('rect')
       .attr('class', 'container-badge-bg')
@@ -544,7 +558,75 @@ export function GraphViewer({
       .attr('fill', (d) => d.badgeColor || '#d4af37')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
+      .style('user-select', 'none')
       .text((d) => d.label || d.id);
+
+    // Collapsed container macro node (when container is closed, represented like a single node)
+    const containerMacroNodes = containerGroups.append('g')
+      .attr('class', 'container-macro-node')
+      .style('cursor', 'pointer')
+      .style('display', 'none');
+
+    containerMacroNodes.append('rect')
+      .attr('class', 'container-macro-bg')
+      .attr('width', 170)
+      .attr('height', 80)
+      .attr('x', -85)
+      .attr('y', -40)
+      .attr('rx', 12)
+      .attr('ry', 12)
+      .attr('fill', (d) => d.badgeBg || 'rgba(20, 24, 38, 0.94)')
+      .attr('stroke', (d) => d.badgeColor || d.stroke || '#d4af37')
+      .attr('stroke-width', 1.8)
+      .style('filter', 'drop-shadow(0 10px 25px rgba(0, 0, 0, 0.6))');
+
+    containerMacroNodes.append('text')
+      .attr('class', 'container-macro-title')
+      .attr('y', -12)
+      .attr('fill', (d) => d.badgeColor || '#fff')
+      .attr('text-anchor', 'middle')
+      .attr('font-size', '14px')
+      .attr('font-weight', 'bold')
+      .attr('font-family', "'Atkinson', sans-serif")
+      .text((d) => `⊞ ${d.label || d.id}`);
+
+    containerMacroNodes.append('text')
+      .attr('class', 'container-macro-sub')
+      .attr('y', 10)
+      .attr('fill', 'rgba(255, 255, 255, 0.7)')
+      .attr('text-anchor', 'middle')
+      .attr('font-size', '11px')
+      .attr('font-family', "'Atkinson', sans-serif")
+      .text((d) => `${(getAllMemberSlugs(d.id) || []).length} Chapters`);
+
+    containerMacroNodes.append('text')
+      .attr('class', 'container-macro-hint')
+      .attr('y', 27)
+      .attr('fill', (d) => d.badgeColor || '#64ffda')
+      .attr('text-anchor', 'middle')
+      .attr('font-size', '10px')
+      .attr('font-weight', '600')
+      .attr('letter-spacing', '0.5px')
+      .text('CLICK TO OPEN');
+
+    // Clicking open container badge collapses it into a single node
+    containerBadges.on('click', (event, d) => {
+      event.stopPropagation();
+      if (!d.parent) return; // Parent outer container stays open
+      if (closedContainers.has(d.id)) {
+        closedContainers.delete(d.id);
+      } else {
+        closedContainers.add(d.id);
+      }
+      applyContainerVisibility();
+    });
+
+    // Clicking collapsed container macro node opens it back up
+    containerMacroNodes.on('click', (event, d) => {
+      event.stopPropagation();
+      closedContainers.delete(d.id);
+      applyContainerVisibility();
+    });
 
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
@@ -562,13 +644,61 @@ export function GraphViewer({
           group.style('display', 'none');
           return;
         }
+
+        const avgX = d3.mean(memberNodes, (n) => n.x);
+        const avgY = d3.mean(memberNodes, (n) => n.y);
+        containerCentroids.set(c.id, { x: avgX, y: avgY });
+
+        const isClosed = closedContainers.has(c.id);
+        if (isClosed) {
+          group.style('display', null);
+          group.select('.container-hull').style('display', 'none');
+          group.select('.container-badge').style('display', 'none');
+          group.select('.container-macro-node')
+            .style('display', null)
+            .attr('transform', `translate(${avgX}, ${avgY})`);
+          return;
+        }
+
         group.style('display', null);
+        group.select('.container-macro-node').style('display', 'none');
+        group.select('.container-hull').style('display', null);
+        group.select('.container-badge').style('display', null);
 
         const points = [];
         const isRoot = !c.parent;
         const pad = c.padding || (isRoot ? 75 : 42);
 
-        for (const n of memberNodes) {
+        // If child containers are closed, include their macro node bounds
+        for (const childId of (containerChildren.get(c.id) || [])) {
+          if (closedContainers.has(childId)) {
+            const cp = containerCentroids.get(childId);
+            if (cp) {
+              points.push(
+                [cp.x - 90, cp.y - 45],
+                [cp.x + 90, cp.y - 45],
+                [cp.x + 90, cp.y + 45],
+                [cp.x - 90, cp.y + 45]
+              );
+            }
+          }
+        }
+
+        // Only include open nodes in hull calculations
+        const openMemberNodes = memberNodes.filter((n) => {
+          for (const cId of closedContainers) {
+            if (getAllMemberSlugs(cId).includes(n.id)) return false;
+          }
+          return true;
+        });
+
+        if (openMemberNodes.length === 0 && points.length === 0) {
+          group.select('.container-hull').style('display', 'none');
+          group.select('.container-badge').style('display', 'none');
+          return;
+        }
+
+        for (const n of openMemberNodes) {
           const w = n._size?.width || (n.type === 'article' ? CARD.width : n.size);
           const h = n._size?.height || (n.type === 'article' ? CARD.height : n.size);
           const halfW = w / 2 + pad;
@@ -588,12 +718,14 @@ export function GraphViewer({
         group.select('.container-hull').attr('d', pathD);
 
         const minY = Math.min(...hull.map((p) => p[1]));
-        const avgX = d3.mean(hull, (p) => p[0]);
+        const hullAvgX = d3.mean(hull, (p) => p[0]);
 
         const badge = group.select('.container-badge');
+        const badgeLabel = c.parent ? `⊟ ${c.label} (${memberNodes.length})` : c.label;
+        badge.select('text').text(badgeLabel);
         const textNode = badge.select('text').node();
         const bbox = textNode ? textNode.getBBox() : { width: 80, height: 18 };
-        const badgeW = bbox.width + 20;
+        const badgeW = bbox.width + 24;
         const badgeH = Math.max(bbox.height + 8, 22);
 
         badge.select('rect')
@@ -603,46 +735,85 @@ export function GraphViewer({
           .attr('height', badgeH);
 
         const badgeY = isRoot ? minY + 14 : minY + 8;
-        badge.attr('transform', `translate(${avgX}, ${badgeY})`);
+        badge.attr('transform', `translate(${hullAvgX}, ${badgeY})`);
       });
     }
 
+    function applyContainerVisibility() {
+      const hiddenSlugs = new Set();
+      for (const cId of closedContainers) {
+        for (const s of getAllMemberSlugs(cId)) hiddenSlugs.add(s);
+      }
+
+      if (articleNodes) {
+        articleNodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
+      }
+      nodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
+      updateContainers();
+      applyPositions();
+    }
+
     function linkEndpoints(l) {
-      const sx = typeof l.source === 'object' ? l.source.x : 0;
-      const sy = typeof l.source === 'object' ? l.source.y : 0;
-      const tx = typeof l.target === 'object' ? l.target.x : 0;
-      const ty = typeof l.target === 'object' ? l.target.y : 0;
+      let sx = typeof l.source === 'object' ? l.source.x : 0;
+      let sy = typeof l.source === 'object' ? l.source.y : 0;
+      let tx = typeof l.target === 'object' ? l.target.x : 0;
+      let ty = typeof l.target === 'object' ? l.target.y : 0;
+
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+
+      let srcClosed = null;
+      let tgtClosed = null;
+      for (const cId of closedContainers) {
+        const slugs = getAllMemberSlugs(cId);
+        if (slugs.includes(sid)) srcClosed = cId;
+        if (slugs.includes(tid)) tgtClosed = cId;
+      }
+
+      // If both source and target are inside the same closed container, link is hidden
+      if (srcClosed && srcClosed === tgtClosed) {
+        return { x1: 0, y1: 0, x2: 0, y2: 0, hidden: true };
+      }
+
+      if (srcClosed) {
+        const cp = containerCentroids.get(srcClosed);
+        if (cp) { sx = cp.x; sy = cp.y; }
+      }
+      if (tgtClosed) {
+        const cp = containerCentroids.get(tgtClosed);
+        if (cp) { tx = cp.x; ty = cp.y; }
+      }
 
       if (l.layer !== 'sequence') {
-        return { x1: sx, y1: sy, x2: tx, y2: ty };
+        return { x1: sx, y1: sy, x2: tx, y2: ty, hidden: false };
       }
 
       const dx = tx - sx;
       const dy = ty - sy;
       const dist = Math.hypot(dx, dy);
       if (dist < 40) {
-        return { x1: sx, y1: sy, x2: tx, y2: ty };
+        return { x1: sx, y1: sy, x2: tx, y2: ty, hidden: false };
       }
 
       const cos = dx / dist;
       const sin = dy / dist;
 
-      const srcW = (l.source._size?.width || CARD.width) / 2 + 4;
-      const srcH = (l.source._size?.height || CARD.height) / 2 + 4;
+      const srcW = srcClosed ? 90 : ((l.source._size?.width || CARD.width) / 2 + 4);
+      const srcH = srcClosed ? 45 : ((l.source._size?.height || CARD.height) / 2 + 4);
       const rSrc = Math.min(
         Math.abs(cos) > 1e-4 ? srcW / Math.abs(cos) : Infinity,
         Math.abs(sin) > 1e-4 ? srcH / Math.abs(sin) : Infinity
       );
 
-      const tgtW = (l.target._size?.width || CARD.width) / 2 + 8;
-      const tgtH = (l.target._size?.height || CARD.height) / 2 + 8;
+      const tgtW = tgtClosed ? 90 : ((l.target._size?.width || CARD.width) / 2 + 4);
+      const tgtH = tgtClosed ? 45 : ((l.target._size?.height || CARD.height) / 2 + 4);
       const rTgt = Math.min(
         Math.abs(cos) > 1e-4 ? tgtW / Math.abs(cos) : Infinity,
         Math.abs(sin) > 1e-4 ? tgtH / Math.abs(sin) : Infinity
       );
 
       if (dist <= rSrc + rTgt) {
-        return { x1: sx, y1: sy, x2: tx, y2: ty };
+        return { x1: sx, y1: sy, x2: tx, y2: ty, hidden: false };
       }
 
       return {
@@ -650,10 +821,12 @@ export function GraphViewer({
         y1: sy + sin * rSrc,
         x2: tx - cos * rTgt,
         y2: ty - sin * rTgt,
+        hidden: false,
       };
     }
 
     function linkPath(l, ep) {
+      if (ep.hidden) return 'M 0 0';
       if (l.layer !== 'sequence') {
         return `M ${ep.x1} ${ep.y1} L ${ep.x2} ${ep.y2}`;
       }
@@ -678,7 +851,7 @@ export function GraphViewer({
       return `M ${ep.x1} ${ep.y1} Q ${cx} ${cy} ${ep.x2} ${ep.y2}`;
     }
 
-    // Render links + nodes.
+    // Render links + nodes without arrowheads (relying solely on the moving bead)
     const links = g.selectAll('.link')
       .data(data.links)
       .enter().append('path')
@@ -688,15 +861,33 @@ export function GraphViewer({
         d.role ? `link-role-${d.role}` : '',
       ].filter(Boolean).join(' '))
       .attr('fill', 'none')
-      .attr('marker-end', (d) => (d.layer === 'sequence' ? 'url(#sequence-arrow)' : null));
+      .style('stroke', (d) => {
+        if (d.layer !== 'sequence') return null;
+        const sid = typeof d.source === 'object' ? d.source.id : d.source;
+        const sn = nodeBySlug.get(sid);
+        return sn?.containerColor || 'var(--gv-accent, #d4af37)';
+      })
+      .style('stroke-opacity', (d) => (d.layer === 'sequence' ? 0.45 : null));
 
-    // Traveling single bead on sequence rail
+    // Traveling single bead on sequence rail (matches act color)
     const sequencePulses = g.selectAll('.link-sequence-pulse')
       .data(data.links.filter(d => d.layer === 'sequence'))
       .enter().append('path')
       .attr('class', 'link-sequence-pulse')
       .attr('fill', 'none')
-      .attr('pathLength', 100);
+      .attr('pathLength', 100)
+      .style('stroke', (d) => {
+        const sid = typeof d.source === 'object' ? d.source.id : d.source;
+        const sn = nodeBySlug.get(sid);
+        return sn?.containerColor || '#ffe066';
+      })
+      .style('filter', (d) => {
+        const sid = typeof d.source === 'object' ? d.source.id : d.source;
+        const sn = nodeBySlug.get(sid);
+        const col = sn?.containerColor || '#ffd700';
+        return `drop-shadow(0 0 4px ${col})`;
+      });
+
 
     const nodes = g.selectAll('.node')
       .data(data.nodes)

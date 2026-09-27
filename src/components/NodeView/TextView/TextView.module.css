@@ -216,11 +216,16 @@
    the site's theme-color said, which may be hex or hsl(). The plain-colour
    shadow before it is the fallback where color-mix is unavailable. */
 .glow {
+  border-color: var(--nv-src) !important;
   box-shadow:
-    0 0 10px -2px var(--nv-src),
-    0 0 14px 1px color-mix(in srgb, var(--nv-src) 55%, transparent),
-    0 0 3px 0 color-mix(in srgb, var(--nv-src) 70%, transparent);
-  border-color: color-mix(in srgb, var(--nv-src) 45%, rgba(255, 255, 255, 0.12));
+    0 0 14px -1px color-mix(in srgb, var(--nv-src) 55%, transparent),
+    0 0 24px 2px color-mix(in srgb, var(--nv-src) 25%, transparent),
+    inset 0 0 10px -3px color-mix(in srgb, var(--nv-src) 25%, transparent);
+}
+
+.glow .titleCentered,
+.glow .titleInline {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--nv-src) 60%, transparent);
 }
 
 /* Resize grip. Bottom-right, where a resize handle has lived since windows
