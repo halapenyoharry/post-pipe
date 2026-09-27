@@ -547,6 +547,19 @@ ${reactJs}
       React.useEffect(function () { return viewState.subscribe(bump); }, []);
       const axis = viewState.timeAxis();
 
+      // One rail at a time. Clicking the active dimension turns the rail off;
+      // clicking another switches the rail to it.
+      function pick(dim) {
+        const current = axis.dimension || 'time';
+        if (axis.on && current === dim) viewState.setTimeAxis({ on: false });
+        else viewState.setTimeAxis({ on: true, dimension: dim });
+      }
+      const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
+      function cycleGranularity() {
+        const i = GRANULARITIES.indexOf(axis.granularity || 'auto');
+        viewState.setTimeAxis({ granularity: GRANULARITIES[(i + 1) % GRANULARITIES.length] });
+      }
+
       function dimensionButton(key, label, isActive, onClick, title) {
         return React.createElement('button', {
           key: key,
@@ -577,9 +590,13 @@ ${reactJs}
             padding: '0 7px 0 4px'
           }
         }, 'dimensions'),
-        dimensionButton('time', 'time', axis.on, function () { viewState.setTimeAxis({ on: !axis.on }); }, 'Draw a time axis across the graph'),
-        dimensionButton('narrative', 'narrative', false, function () {}, 'Narrative position (coming soon)'),
-        dimensionButton('chronology', 'chronology', false, function () {}, 'Chronological position (coming soon)')
+        dimensionButton('time', 'published', axis.on && (axis.dimension || 'time') === 'time', function () { pick('time'); }, 'Published date'),
+        dimensionButton('commits', 'commits', axis.on && axis.dimension === 'commits', function () { pick('commits'); }, 'Edit history: one link per commit bucket'),
+        dimensionButton('narrative', 'narrative', axis.on && axis.dimension === 'narrative', function () { pick('narrative'); }, 'Narrative position: reading order, 0 to 1'),
+        dimensionButton('chronology', 'chronology', axis.on && axis.dimension === 'chronology', function () { pick('chronology'); }, 'Chronological position in story-world time'),
+        (axis.on && (axis.dimension === 'chronology' || axis.dimension === 'commits'))
+          ? dimensionButton('granularity', '\u00b7 ' + (axis.granularity || 'auto'), false, cycleGranularity, 'Bucket size: auto, day, week, month, year')
+          : null
       ]);
     }
 

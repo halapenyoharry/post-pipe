@@ -485,6 +485,20 @@ function DimensionsControls({ viewState }) {
   React.useEffect(() => viewState.subscribe(bump), [viewState]);
   const axis = viewState.timeAxis();
 
+  // One rail at a time. Clicking the active dimension turns the rail off;
+  // clicking another switches the rail to it.
+  const pick = (dim) => {
+    const current = axis.dimension || 'time';
+    if (axis.on && current === dim) viewState.setTimeAxis({ on: false });
+    else viewState.setTimeAxis({ on: true, dimension: dim });
+  };
+  const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
+  const cycleGranularity = () => {
+    const i = GRANULARITIES.indexOf(axis.granularity || 'auto');
+    viewState.setTimeAxis({ granularity: GRANULARITIES[(i + 1) % GRANULARITIES.length] });
+  };
+  const isOn = (dim) => axis.on && (axis.dimension || 'time') === dim;
+
   function dimBtn(key, label, isActive, onClick, title) {
     return (
       <button
@@ -517,9 +531,13 @@ function DimensionsControls({ viewState }) {
       }}>
         dimensions
       </span>
-      {dimBtn('time', 'time', axis.on, () => viewState.setTimeAxis({ on: !axis.on }), 'Draw a time axis across the graph')}
-      {dimBtn('narrative', 'narrative', false, () => {}, 'Narrative position (coming soon)')}
-      {dimBtn('chronology', 'chronology', false, () => {}, 'Chronological position (coming soon)')}
+      {dimBtn('time', 'published', isOn('time'), () => pick('time'), 'Published date')}
+      {dimBtn('commits', 'commits', isOn('commits'), () => pick('commits'), 'Edit history: one link per commit bucket')}
+      {dimBtn('narrative', 'narrative', isOn('narrative'), () => pick('narrative'), 'Narrative position: reading order, 0 to 1')}
+      {dimBtn('chronology', 'chronology', isOn('chronology'), () => pick('chronology'), 'Chronological position in story-world time')}
+      {(isOn('chronology') || isOn('commits'))
+        ? dimBtn('granularity', '\u00b7 ' + (axis.granularity || 'auto'), false, cycleGranularity, 'Bucket size: auto, day, week, month, year')
+        : null}
     </div>
   );
 }
