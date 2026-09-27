@@ -1,0 +1,23 @@
+The merge task described in `_handoff/T1-merge-task.md` has been completed.
+
+### Summary of Completed Work
+
+1. **Group A (Conflict Resolutions):**
+   - [generate-index.js](file:///Users/harold/Projects/post-pipe/generate-index.js): Combined `TimeOverlay` from `fix` with `Settings`, `colorOverrides`, and Kokoro worker copying from `main`. Cleaned all conflict markers.
+   - [GraphViewer.jsx](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/GraphViewer.jsx): Combined `lod === 'marker'` card sizing with dynamic card dimensioning, merged `filteredArticleIds` and `colorOverrides` props, and wired `applyTimeFilter` alongside `applyVisibility`. Cleaned all conflict markers.
+   - [TTS.jsx](file:///Users/harold/Projects/post-pipe/src/components/TTS/TTS.jsx): Merged `engineProgress` bar from `main` and `statusMessage`/`isError` badge UI from `fix`. Cleaned all conflict markers.
+   - [tts.js](file:///Users/harold/Projects/post-pipe/tts.js): Retained self-hosted Kokoro server transport from `main` with enhanced error handling, adopted `findDefaultBrowserVoice` targeting Google US English 7 (Natural) from `fix`, and combined both highlight cleanup sweeps. Cleaned all conflict markers.
+
+2. **Group B (Verification & Reconciliation):**
+   - [TextView.jsx](file:///Users/harold/Projects/post-pipe/src/components/NodeView/TextView/TextView.jsx): Verified that both `lod === 'marker'` / `ResizeHandles` (from fix) and image marks / `fitFontSize` (from main) are present.
+   - [TTS.module.css](file:///Users/harold/Projects/post-pipe/src/components/TTS/TTS.module.css): Verified that both `.loadingBarContainer` (from main) and `.statusBadge` / animations (from fix) are present.
+   - [src/index.jsx](file:///Users/harold/Projects/post-pipe/src/index.jsx): Verified all exports (`GraphViewer`, `ReaderPanel`, `TTS`, `FeedZ`, `Settings`, `ConfigPanel`, `TimeOverlay`, `React`, `ReactDOM`) are present.
+   - [kokoro-worker.js](file:///Users/harold/Projects/post-pipe/kokoro-worker.js): Verified worker implementation matches the audio blob messaging required by the prefetch and playback loop.
+
+3. **Verification:**
+   - None of the 8 files contain any git conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+   - No terminal or shell commands were executed.
+   - `dist/` was not touched.
+
+4. **Report:**
+   - Created [_handoff/T1-merge-report.md](file:///Users/harold/Projects/post-pipe/_handoff/T1-merge-report.md) with details on contributions and resolution steps for all 8 files.

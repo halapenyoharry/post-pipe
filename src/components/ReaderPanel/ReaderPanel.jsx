@@ -4,35 +4,105 @@ import { ICONS } from '../../utils/icons'; // We'll extract icons into a utility
 
 export function ReaderPanel({ article, onClose, settings }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [floatingPos, setFloatingPos] = useState(null);
   const [showFrontmatter, setShowFrontmatter] = useState(false);
   const [contentHtml, setContentHtml] = useState('');
   const [scrollProgress, setScrollProgress] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
   // Reader always leaves the graph visible — `wide` toggles between
-  // narrow (~50% on small / 38% on big) and wide (~70% / 55%).
+  // narrow (540px) and wide (760px).
   const [wide, setWide] = useState(false);
   const bodyRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
 
   // Derive initial state when article changes
   useEffect(() => {
     if (article) {
       setIsOpen(true);
+      setIsMinimized(false);
       fetchContent(article);
     } else {
       setIsOpen(false);
+      setIsMinimized(false);
       setContentHtml('');
       setScrollProgress(0);
       setShowFrontmatter(false);
     }
   }, [article]);
 
+  const handleToolbarMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+    isDraggingRef.current = true;
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      posX: floatingPos ? floatingPos.x : 0,
+      posY: floatingPos ? floatingPos.y : 0,
+    };
+    window.addEventListener('mousemove', handleToolbarMouseMove);
+    window.addEventListener('mouseup', handleToolbarMouseUp);
+  };
+
+  const handleToolbarMouseMove = (e) => {
+    if (!isDraggingRef.current) return;
+    const dx = e.clientX - dragStartRef.current.mouseX;
+    const dy = e.clientY - dragStartRef.current.mouseY;
+    setFloatingPos({
+      x: dragStartRef.current.posX + dx,
+      y: dragStartRef.current.posY + dy,
+    });
+  };
+
+  const handleToolbarMouseUp = () => {
+    isDraggingRef.current = false;
+    window.removeEventListener('mousemove', handleToolbarMouseMove);
+    window.removeEventListener('mouseup', handleToolbarMouseUp);
+  };
+
   const fetchContent = async (item) => {
     const kind = item.kind || 'essay';
 
+    if (kind === 'placeholder' || item.substrate === 'placeholder') {
+      const partNum = item.series_part || item.title || '';
+      const actNum = Number(partNum) >= 21 ? '3' : '2';
+      setContentHtml(`
+        <div style="padding: 40px 24px; text-align: center; border: 1px dashed rgba(212, 175, 55, 0.35); border-radius: 12px; background: rgba(20, 24, 38, 0.6); margin-top: 24px;">
+          <div style="font-size: 32px; margin-bottom: 12px; opacity: 0.9;">📖</div>
+          <div style="font-size: 20px; font-weight: 600; color: var(--rp-accent, #d4af37); margin-bottom: 8px;">Chapter ${partNum}</div>
+          <div style="font-size: 13px; color: var(--rp-text, #a8b2d1); opacity: 0.8; letter-spacing: 0.5px;">Act ${actNum} · In Progress</div>
+        </div>
+      `);
+      return;
+    }
+
     if (kind === 'essay' || kind === 'multi') {
       try {
-        const r = await fetch(item.url);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const filename = (item.url || '').split('/').pop();
+        let r;
+        // If current origin differs from item.url (e.g. previewing on localhost),
+        // try the local sibling file first
+        try {
+          const isSameOrigin = item.url && new URL(item.url, window.location.href).origin === window.location.origin;
+          if (!isSameOrigin && filename) {
+            r = await fetch('./' + filename);
+          }
+        } catch (_) {}
+
+        if (!r || !r.ok) {
+          try {
+            r = await fetch(item.url);
+          } catch (_) {}
+        }
+
+        if (!r || !r.ok) {
+          if (filename) {
+            r = await fetch('./' + filename);
+          }
+        }
+
+        if (!r || !r.ok) throw new Error('HTTP ' + (r ? r.status : 'failed'));
         const html = await r.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const h1 = doc.querySelector('h1');
@@ -104,29 +174,35 @@ export function ReaderPanel({ article, onClose, settings }) {
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
-  let authorName = settings?.author?.display;
+  let authorName = (settings?.author?.name || settings?.author?.display || 'harold young').toLowerCase();
   let authorLink = settings?.author?.url;
-  
+
   if (article.authors && article.authors.length > 0 && article.authors[0].name) {
-    authorName = article.authors.map(a => a.name).join(', ');
+    authorName = article.authors.map(a => a.name).join(', ').toLowerCase();
     authorLink = article.authors[0].url || article.canonical_url || article.url;
   } else if (article.author) {
-    authorName = article.author;
+    authorName = article.author.replace(/\s*\[humxn\]/i, '').trim().toLowerCase();
     authorLink = article.canonical_url || article.url;
-  } else if (article._source && article._source.title && article._source.title !== settings?.author?.name) {
-    authorName = article._source.title;
-    authorLink = article._source.id || article.canonical_url || article.url;
   }
 
   return (
     <>
       <div
-        className={`${styles.overlay} ${isOpen ? styles.open : ''}`}
+        className={`${styles.overlay} ${isOpen && !isMinimized ? styles.open : ''}`}
         onClick={onClose}
       />
-      <div className={`${styles.panel} ${isOpen ? styles.open : ''} ${wide ? styles.wide : ''}`}>
-        <div className={styles.toolbar}>
-          {/* TTS Toolbar Placeholder - We will mount the TTS component here or externally */}
+      <div
+        className={`${styles.panel} ${isOpen && !isMinimized ? styles.open : ''} ${isMinimized ? styles.minimized : ''} ${wide ? styles.wide : ''}`}
+        style={floatingPos ? { transform: `translate3d(${floatingPos.x}px, ${floatingPos.y}px, 0px)` } : undefined}
+      >
+        <div
+          className={styles.toolbar}
+          onMouseDown={handleToolbarMouseDown}
+          onDoubleClick={() => setFloatingPos(null)}
+          title="Drag toolbar to move window · Double-click to reset"
+        >
+          <div className={styles.dragGrip} title="Drag to move reading window">⋮⋮</div>
+          {/* TTS Toolbar Placeholder */}
           <div id="tts-mount-point" className={styles.toolbarGroup}></div>
 
           <div className={styles.toolbarSeparator}></div>
@@ -188,12 +264,20 @@ export function ReaderPanel({ article, onClose, settings }) {
 
           <div className={styles.toolbarSpacer}></div>
 
-          <button
-            className={`${styles.tb} ${styles.closeBtn}`}
-            onClick={onClose}
-            title="Close"
-            dangerouslySetInnerHTML={{ __html: `${ICONS.close}<span class="${styles.tbTooltip}">Close</span>` }}
-          />
+          <div className={styles.windowControls}>
+            <button
+              className={`${styles.tb} ${styles.minimizeBtn}`}
+              onClick={() => setIsMinimized(true)}
+              title="Minimize reading window (turn off)"
+              dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="${styles.tbTooltip}">Minimize</span>` }}
+            />
+            <button
+              className={`${styles.tb} ${styles.closeBtn}`}
+              onClick={onClose}
+              title="Close reading window"
+              dangerouslySetInnerHTML={{ __html: `${ICONS.close}<span class="${styles.tbTooltip}">Close</span>` }}
+            />
+          </div>
         </div>
 
         <div className={styles.progress}>
@@ -235,6 +319,21 @@ export function ReaderPanel({ article, onClose, settings }) {
       <div className={`${styles.copyToast} ${toastVisible ? styles.show : ''}`}>
         Copied to clipboard
       </div>
+
+      {isMinimized && article && (
+        <div
+          className={styles.restorePill}
+          onClick={() => setIsMinimized(false)}
+          title="Bring reading window back"
+        >
+          <span className={styles.pillIcon}>📖</span>
+          <span className={styles.pillLabel}>
+            <span className={styles.pillTitle}>{article.title || article.label}</span>
+            <span className={styles.pillAuthor}>by {authorName}</span>
+          </span>
+          <span className={styles.pillAction}>Restore ↗</span>
+        </div>
+      )}
     </>
   );
 }
@@ -247,7 +346,9 @@ function renderPlaceholder(article, reason) {
   if (article.todos && article.todos.length) {
     html += `<p style="color:#f39c12;font-size:13px;">Pending: ${article.todos.join(', ')}</p>`;
   }
-  html += `<p style="color:#888;font-size:13px;margin-top:12px;">The folder exists at <code>~/Posts/${article.id}/</code>.</p>`;
+  const slug = (article.url || article.id || '').split('/').pop().replace('.html', '');
+  const folderPath = article._source?.path || `chapters/${slug}`;
+  html += `<p style="color:#888;font-size:13px;margin-top:12px;">The bundle exists at <code>${folderPath}</code>.</p>`;
   html += `</div>`;
   return html;
 }

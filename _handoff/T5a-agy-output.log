@@ -1,0 +1,24 @@
+I have completed task **T5a** strictly adhering to the instructions: no shell commands were executed, and only the specified files were read and edited.
+
+### Summary of Modifications:
+1. [**`ingest.js`**](file:///Users/harold/Projects/post-pipe/ingest.js):
+   - In [`buildFromFrontmatterJson`](file:///Users/harold/Projects/post-pipe/ingest.js#L129), added `timeline: fm.timeline || null`.
+   - In [`buildFromQmd`](file:///Users/harold/Projects/post-pipe/ingest.js#L167) and [`buildFromUnstructured`](file:///Users/harold/Projects/post-pipe/ingest.js#L206), added `timeline: null`.
+
+2. [**`src/adapters/LocalFolderAdapter.js`**](file:///Users/harold/Projects/post-pipe/src/adapters/LocalFolderAdapter.js):
+   - In [`contentToItem`](file:///Users/harold/Projects/post-pipe/src/adapters/LocalFolderAdapter.js#L58), added `timeline: c.timeline || undefined` and computed `commit_times` using `child_process.execFileSync` on `git log --format=%cI --reverse -- .` inside the item folder (defaulting to `[]` on failure).
+
+3. [**`src/components/GraphViewer/GraphViewer.jsx`**](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/GraphViewer.jsx):
+   - In [`feedToGraph`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/GraphViewer.jsx#L12), added `series_part: item.series_part ?? null`, `timeline: item.timeline || null`, and `commit_times: item.commit_times || []` to the node mapping object.
+   - Imported [`dimensionAxisGeometry`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/layouts.js#L663) from `./layouts`.
+   - In [`drawAxis`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/GraphViewer.jsx#L1230), replaced the `timeAxisGeometry` call with `dimensionAxisGeometry(g.data.nodes, { ... })` and updated connector generation to iterate through `geo.anchors[d.id]` as an array of anchors.
+
+4. [**`src/components/GraphViewer/layouts.js`**](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/layouts.js):
+   - Implemented [`parseLooseDate(str, side)`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/layouts.js#L427) handling wildcard years/months/days (`X`), optional trailing `?`, time splits, and UTC conversions.
+   - Implemented [`dimensionIntervals(nodes, dimension)`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/layouts.js#L487) handling `'time'`, `'commits'`, `'chronology'`, and `'narrative'`.
+   - Implemented [`dimensionAxisGeometry(nodes, axis)`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/layouts.js#L663) supporting granularity bucketing (`auto`, `day`, `week`, `month`, `year`), auto selection (≤ 60 distinct buckets), 12-bucket clipping per node, linear `'narrative'`, and wrapping `'time'` anchors in an array.
+   - Preserved [`timeAxisGeometry`](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/layouts.js#L353) untouched for single-anchor geometry backward compatibility.
+   - Exported `dimensionAxisGeometry`, `dimensionIntervals`, and `parseLooseDate` in `module.exports`.
+
+5. [**`_handoff/T5a-report.md`**](file:///Users/harold/Projects/post-pipe/_handoff/T5a-report.md):
+   - Created the report document detailing all function changes and noting any uncertainties.

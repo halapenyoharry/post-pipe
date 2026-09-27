@@ -15,7 +15,7 @@ function slugOf(item) {
   return item.url.split('/').pop().replace('.html', '');
 }
 
-function buildEdges(items) {
+function buildEdges(items, options = {}) {
   const edges = [];
   const idBySlug = new Map();
   for (const item of items) idBySlug.set(slugOf(item), item.id);
@@ -24,6 +24,26 @@ function buildEdges(items) {
   // consumer materializes it as a bare node, so an edge can point at a piece
   // that has not been written. Not an error — a placeholder with gravity.
   const resolve = (slug) => idBySlug.get(slug) || slug;
+
+  const containmentConfigs = options.containment || [];
+  const containerByTag = new Map();
+  for (const c of containmentConfigs) {
+    if (c.tag) containerByTag.set(c.tag, c);
+  }
+
+  // Hierarchical containment edges between containers (e.g. Epic contains Act 1)
+  for (const c of containmentConfigs) {
+    if (c.parent) {
+      edges.push({
+        source: c.parent,
+        target: c.id,
+        directed: true,
+        role: 'contains',
+        layer: 'containment',
+        attrs: { parent: c.parent, child: c.id, label: c.label || c.id },
+      });
+    }
+  }
 
   const seriesMembers = new Map();
 
@@ -42,15 +62,39 @@ function buildEdges(items) {
       });
     }
 
-    // Subject keywords. Membership, so undirected. The tag id is materialized
-    // by the consumer; it is not an item.
+    // Subject keywords. Check if any tags belong to containment hierarchy.
+    const itemContainers = [];
     for (const tag of item.tags || []) {
+      const container = containerByTag.get(tag);
+      if (container) {
+        itemContainers.push(container);
+      } else {
+        // Regular tag -> normal undirected tag edge
+        edges.push({
+          source,
+          target: `tag:${tag}`,
+          directed: false,
+          role: 'tagged',
+          layer: 'tag',
+        });
+      }
+    }
+
+    // Connect item to its immediate enclosing container.
+    // If multiple container tags apply (e.g. Epic and Act 1), connect to the leaf container;
+    // the parent container already hierarchically contains the child container.
+    if (itemContainers.length > 0) {
+      const parentIds = new Set(itemContainers.map((c) => c.parent).filter(Boolean));
+      const leafContainers = itemContainers.filter((c) => !parentIds.has(c.id));
+      const targetContainer = leafContainers[0] || itemContainers[0];
+
       edges.push({
-        source,
-        target: `tag:${tag}`,
-        directed: false,
-        role: 'tagged',
-        layer: 'tag',
+        source: targetContainer.id,
+        target: source,
+        directed: true,
+        role: 'contains',
+        layer: 'containment',
+        attrs: { container: targetContainer.id, label: targetContainer.label || targetContainer.id },
       });
     }
 

@@ -84,3 +84,43 @@ test('every edge carries the fields a renderer dispatches on', () => {
     assert.ok(typeof e.layer === 'string' && e.layer);
   }
 });
+
+test('hierarchical containment connects parent to child and eliminates radial tag lines', () => {
+  const containment = [
+    { id: 'container:epic', label: 'The Epic', parent: null, tag: 'epic' },
+    { id: 'container:act-1', label: 'Act 1', parent: 'container:epic', tag: 'act-1' },
+  ];
+  const items = [
+    item('ch1', { tags: ['epic', 'act-1', 'philosophy'] }),
+    item('ch2', { tags: ['epic', 'act-1'] }),
+  ];
+
+  const edges = buildEdges(items, { containment });
+  const containmentEdges = edges.filter((e) => e.layer === 'containment');
+  const tagEdges = edges.filter((e) => e.layer === 'tag');
+
+  // Hierarchy edge: Epic contains Act 1
+  const hierarchyEdge = containmentEdges.find(
+    (e) => e.source === 'container:epic' && e.target === 'container:act-1'
+  );
+  assert.ok(hierarchyEdge, 'Epic must contain Act 1');
+  assert.strictEqual(hierarchyEdge.role, 'contains');
+
+  // Member edges: Act 1 contains each chapter
+  const ch1Edge = containmentEdges.find(
+    (e) => e.source === 'container:act-1' && e.target === 'https://example.test/ch1.html'
+  );
+  const ch2Edge = containmentEdges.find(
+    (e) => e.source === 'container:act-1' && e.target === 'https://example.test/ch2.html'
+  );
+  assert.ok(ch1Edge, 'Act 1 contains ch1');
+  assert.ok(ch2Edge, 'Act 1 contains ch2');
+
+  // Tag lines to epic and act-1 are eliminated!
+  assert.strictEqual(tagEdges.filter((e) => e.target === 'tag:epic').length, 0);
+  assert.strictEqual(tagEdges.filter((e) => e.target === 'tag:act-1').length, 0);
+
+  // But regular non-containment tags still get their tag edge
+  assert.strictEqual(tagEdges.filter((e) => e.target === 'tag:philosophy').length, 1);
+});
+

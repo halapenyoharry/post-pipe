@@ -72,6 +72,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     image: imageUrl,
     date_published: c.written ? toIsoDate(c.written) : undefined,
     reading_time: c.reading_time || '',
+    author: (c.author ? c.author.replace(/\s*\[humxn\]/i, '').trim() : 'harold young').toLowerCase(),
+    authors: [{ name: (c.author ? c.author.replace(/\s*\[humxn\]/i, '').trim() : 'harold young').toLowerCase(), url: c.syndication?.canonical || pagesUrl }],
     tags,
     series: c.series || '',
     series_part: c.series_part || null,

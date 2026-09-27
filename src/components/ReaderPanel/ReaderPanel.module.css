@@ -19,56 +19,73 @@
 
 .panel {
   --rp-bg: #16213e;
-  --rp-surface: #1a1a2e;
-  --rp-border: #0f3460;
+  --rp-surface: #141829;
+  --rp-border: rgba(100, 255, 218, 0.25);
   --rp-accent: #64ffda;
-  --rp-text: #e0e0e0;
+  --rp-text: #ccd6f6;
   --rp-text-bright: #fff;
-  /* Default narrow width — graph always visible behind. */
-  --rp-width: 38vw;
-  --rp-toolbar-bg: rgba(17, 24, 39, 0.95);
+  /* Default floating width */
+  --rp-width: 520px;
+  --rp-toolbar-bg: rgba(17, 24, 39, 0.96);
 
   position: fixed;
-  top: 0;
-  right: calc(-1 * var(--rp-width));
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
   width: var(--rp-width);
-  height: 100vh;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
   background: var(--rp-surface);
-  border-left: 1px solid var(--rp-border);
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 35px rgba(100, 255, 218, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   z-index: 101;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-family: 'Atkinson', sans-serif;
-  transition: right 0.3s ease, width 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, width 0.3s ease;
+  transform: translateX(calc(100% + 40px)) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .panel.open {
-  right: 0;
+  transform: translateX(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panel.minimized {
+  transform: translateX(calc(100% + 40px)) scale(0.92);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Wide state — toggled via the widen button. */
 .panel.wide {
-  --rp-width: 55vw;
+  --rp-width: 740px;
 }
 
-/* On smaller windows, reader is bigger but never full-screen.
-   Hard cap is 70vw so the graph always has space. */
-@media (max-width: 1200px) {
-  .panel { --rp-width: 50vw; }
-  .panel.wide { --rp-width: 65vw; }
-}
 @media (max-width: 900px) {
-  .panel { --rp-width: 60vw; }
-  .panel.wide { --rp-width: 70vw; }
-}
-@media (max-width: 600px) {
-  .panel { --rp-width: 70vw; }
-  .panel.wide { --rp-width: 70vw; }
+  .panel {
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    max-height: none;
+  }
+  .panel.wide {
+    width: auto;
+  }
 }
 
 .toolbar {
-  padding: 8px 16px;
+  padding: 8px 14px;
   background: var(--rp-toolbar-bg);
   border-bottom: 1px solid var(--rp-border);
   display: flex;
@@ -76,6 +93,96 @@
   gap: 4px;
   flex-shrink: 0;
   flex-wrap: wrap;
+  cursor: grab;
+  user-select: none;
+}
+
+.toolbar:active {
+  cursor: grabbing;
+}
+
+.dragGrip {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+  letter-spacing: -2px;
+  padding: 0 4px 0 2px;
+  cursor: grab;
+}
+
+.windowControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.restorePill {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(20, 24, 38, 0.94);
+  border: 1px solid rgba(100, 255, 218, 0.4);
+  border-radius: 30px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75), 0 0 20px rgba(100, 255, 218, 0.2);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 102;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  font-family: 'Atkinson', sans-serif;
+  color: #fff;
+  user-select: none;
+  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.restorePill:hover {
+  transform: translateY(-2px);
+  border-color: rgba(100, 255, 218, 0.75);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(100, 255, 218, 0.35);
+}
+
+.pillIcon {
+  font-size: 16px;
+}
+
+.pillLabel {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.pillTitle {
+  font-size: 13px;
+  font-weight: bold;
+  color: #ccd6f6;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pillAuthor {
+  font-size: 11px;
+  color: #64ffda;
+  opacity: 0.85;
+}
+
+.pillAction {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(100, 255, 218, 0.15);
+  color: #64ffda;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.85) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
 }
 
 .toolbarGroup {

@@ -1,0 +1,19 @@
+I have completed the tasks specified in [`_handoff/T2-site-and-pages-task.md`](file:///Users/harold/Projects/post-pipe/_handoff/T2-site-and-pages-task.md).
+
+### Summary of Changes
+
+1. **[`generate-index.js`](file:///Users/harold/Projects/post-pipe/generate-index.js)**:
+   - Added `expandHome(p)` and `SITE_ROOT` respecting `process.env.POSTPIPE_SITE` (defaulting to `__dirname`).
+   - Pointed `settings.json`, `OPML_PATH`, and `SITE_DIR` to `SITE_ROOT`.
+   - Kept engine assets (`auth/.env`, `fonts/`, `tts.js`, `src/lib/viewState.js`, `dist/`, `kokoro-worker.js`) referencing `__dirname`.
+   - Updated `configFor` to resolve relative `local://` paths against `SITE_ROOT` and passed `pagesDir: SITE_DIR`.
+   - Added `console.log(\`Site root: ${SITE_ROOT}\`);` to the beginning of `main()`.
+
+2. **[`src/adapters/LocalFolderAdapter.js`](file:///Users/harold/Projects/post-pipe/src/adapters/LocalFolderAdapter.js)**:
+   - Imported `{ marked }` from `'marked'`.
+   - Accepted `pagesDir` in `load(config)` and called `generateItemPage(c, rootPath, pagesDir)` for each ingested item.
+   - Handled body formats: rendered `md` with default `marked` wrapped in the specified HTML shell with escaped titles, copied `html` as-is, and skipped other formats (e.g. `qmd`).
+   - Wrapped rendering/copying in error handling that logs a warning and continues.
+
+3. **Report**:
+   - Generated the report at [`_handoff/T2-report.md`](file:///Users/harold/Projects/post-pipe/_handoff/T2-report.md).

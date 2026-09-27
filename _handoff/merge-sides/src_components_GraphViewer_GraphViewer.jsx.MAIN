@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
-import { computeLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
+import { computeLayout, layoutIsDegenerate, timeAxisGeometry } from './layouts';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -47,9 +47,6 @@ function feedToGraph(feed, config = {}) {
       reading_time: item.reading_time || '',
       tags: item.tags || [],
       series: item.series || '',
-      series_part: item.series_part ?? null,
-      timeline: item.timeline || null,
-      commit_times: item.commit_times || [],
       license: item.license || '',
       canonical_url: item.canonical_url || item.url,
       syndication: item.syndication || {},
@@ -78,18 +75,7 @@ function feedToGraph(feed, config = {}) {
     return idToSlug.get(rawId) || rawId;
   }
 
-  const containmentEdges = [];
-
   for (const edge of (feed.edges || [])) {
-    if (edge.layer === 'containment' || edge.role === 'contains') {
-      containmentEdges.push({
-        source: edge.source,
-        target: resolveEndpoint(edge.target),
-        attrs: edge.attrs || {},
-      });
-      continue;
-    }
-
     const source = resolveEndpoint(edge.source);
     const target = resolveEndpoint(edge.target);
 
@@ -107,37 +93,17 @@ function feedToGraph(feed, config = {}) {
   }
 
   nodes.push(...auxNodes.values());
-
-  let containers = feed.containers || config.containment || [];
-  if (containers.length === 0 && containmentEdges.length > 0) {
-    const inferred = new Map();
-    for (const edge of containmentEdges) {
-      if (!articleSlugs.has(edge.source) && !inferred.has(edge.source)) {
-        const rawLabel = edge.attrs?.label || edge.source.replace(/^container:/, '').replace(/^tag:/, '').replace(/-/g, ' ');
-        inferred.set(edge.source, {
-          id: edge.source,
-          label: rawLabel.toUpperCase(),
-          parent: edge.attrs?.parent || null,
-        });
-      }
-    }
-    containers = Array.from(inferred.values());
-  }
-
-  return { nodes, links, containmentEdges, containers };
+  return { nodes, links };
 }
 
 // Walk article nodes + links and toggle their display based on whether
 // the item's source is currently in the hidden set. Pure DOM mutation,
 // no simulation involvement — node positions stay locked.
-function applyVisibility(svg, cardsLayer, hiddenSet) {
+function applyVisibility(svg, hiddenSet) {
   const isHiddenArticle = (d) =>
     d && d.type === 'article' && d._source && hiddenSet.has(d._source.id);
 
   svg.selectAll('.node')
-    .style('display', (d) => isHiddenArticle(d) ? 'none' : null);
-
-  cardsLayer.selectAll('.node-card')
     .style('display', (d) => isHiddenArticle(d) ? 'none' : null);
 
   svg.selectAll('.link')
@@ -149,54 +115,36 @@ function applyVisibility(svg, cardsLayer, hiddenSet) {
     });
 }
 
-// Walk article nodes + links and dim non-matching nodes when a time filter is active.
-function applyTimeFilter(svg, cardsLayer, filteredSet) {
-  if (!filteredSet) {
-    cardsLayer.selectAll('.node-card').classed('dimmed', false);
-    svg.selectAll('.node').classed('dimmed', false);
-    svg.selectAll('.link').classed('dimmed', false);
-    return;
-  }
-
-  cardsLayer.selectAll('.node-card')
-    .classed('dimmed', d => !filteredSet.has(d.id));
-
-  svg.selectAll('.node')
-    .classed('dimmed', d => {
-      if (d.type === 'article') return !filteredSet.has(d.id);
-      return false;
-    });
-
-  svg.selectAll('.link')
-    .classed('dimmed', l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      return !filteredSet.has(sid) && !filteredSet.has(tid);
-    });
-}
-
-// Zoom-aware level of detail.
-const LOD_MARKER = 0.35;
-const LOD_TITLE = 0.6;
+// Zoom-aware level of detail. Three levels of precision built into the
+// graph: at deep zoom-out the node is just the slug; closer in, the
+// short_title; closer still, the full card.
+const LOD_SLUG_ONLY = 0.4;
+const LOD_TITLE_ONLY = 0.7;
 function getLOD(scale) {
-  if (scale < LOD_MARKER) return 'marker';
-  if (scale < LOD_TITLE) return 'title';
+  if (scale < LOD_SLUG_ONLY) return 'slug';
+  if (scale < LOD_TITLE_ONLY) return 'title';
   return 'full';
 }
+
+// Card dimensions per view state. Returned to both GraphViewer (which sizes
+// the foreignObject) and the host wrapper (which sizes the React mount).
+// Space left around the card inside its foreignObject. An SVG foreignObject
+// clips at its own bounds, so a card sized exactly to the frame has its glow
+// sliced off square — worse than no glow. This gutter gives it room.
+
 
 // Bounds for a hand-resized card. Below the minimum the label stops fitting;
 // above the maximum one node eats the graph.
 function makeCardSizeFor(CARD) {
-  return function cardSizeFor({ hovered, pinned, lod }) {
+  return function cardSizeFor({ hovered, pinned }) {
     if (pinned) return { width: CARD.pinnedWidth, height: CARD.pinnedHeight };
     if (hovered) return { width: CARD.hoverWidth, height: CARD.hoverHeight };
-    if (lod === 'marker') return { width: 16, height: 16 };
     return { width: CARD.width, height: CARD.height };
   };
 }
 
 export function GraphViewer({
-  feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout = 'force', timeAxis, graphSettings,
+  feedData, onNodeSelect, hiddenSources, viewState, layout = 'force', timeAxis, graphSettings,
   colorOverrides,
 }) {
   // Visual parameters come from settings.json so they can be tuned without a
@@ -213,9 +161,9 @@ export function GraphViewer({
     ...(GS.timeAxis || {}) };
   const SIM = { linkDistance: 160, chargeStrength: -500, collidePadding: 10,
     velocityDecay: 0.7, alphaDecay: 0.028, ...(GS.simulation || {}) };
+
   const containerRef = useRef(null);
   const svgRef = useRef(null);
-  const cardsLayerRef = useRef(null);
 
   // Stable refs for callbacks so the simulation never rebuilds on prop change.
   const onNodeSelectRef = useRef(onNodeSelect);
@@ -252,19 +200,21 @@ export function GraphViewer({
 
   // View state lives in refs because it must not trigger React re-renders or
   // re-run the useEffect that owns the simulation.
-  const pinnedIdsRef = useRef(new Set());
+  const pinnedIdRef = useRef(null);
   const hoveredIdRef = useRef(null);
   const zoomScaleRef = useRef(1);
   const currentLodRef = useRef('full');
   const hiddenSourcesRef = useRef(new Set());
 
-  // Apply visibility from outside the main simulation effect.
+  // Apply visibility from outside the main simulation effect, so toggling
+  // a feed never rebuilds the graph. We query the SVG via d3 directly and
+  // flip display/visibility on the existing nodes and links.
   useEffect(() => {
     hiddenSourcesRef.current = hiddenSources instanceof Set
       ? hiddenSources
       : new Set(hiddenSources || []);
-    if (!svgRef.current || !cardsLayerRef.current) return;
-    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current);
+    if (!svgRef.current) return;
+    applyVisibility(svgRef.current, hiddenSourcesRef.current);
   }, [hiddenSources]);
 
   // Settings writes a color profile to viewState; this repaints instantly by
@@ -276,12 +226,6 @@ export function GraphViewer({
       if (value) containerRef.current.style.setProperty(prop, value);
     }
   }, [colorOverrides]);
-
-  // Apply time filter dimming
-  useEffect(() => {
-    if (!svgRef.current || !cardsLayerRef.current) return;
-    applyTimeFilter(svgRef.current, d3.select(cardsLayerRef.current), filteredArticleIds);
-  }, [filteredArticleIds]);
 
   useEffect(() => {
     if (!feedData || !containerRef.current) return;
@@ -306,25 +250,9 @@ export function GraphViewer({
 
     const svg = d3.select(container).append('svg')
       .attr('width', width)
-      .attr('height', height)
-      .style('position', 'absolute')
-      .style('inset', '0')
-      .style('pointer-events', 'all');
+      .attr('height', height);
 
     svgRef.current = svg;
-
-    const defs = svg.append('defs');
-    defs.append('marker')
-      .attr('id', 'sequence-arrow')
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 7)
-      .attr('markerHeight', 7)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M 0 1.5 L 8 5 L 0 8.5 z')
-      .attr('fill', 'var(--gv-accent, #d4af37)');
     
     // The two-layer architecture: SVG handles lines/bubbles, HTML handles cards.
     // Width/height 100% on the layer, but the transform container is 0x0
@@ -337,8 +265,6 @@ export function GraphViewer({
       .style('width', '100%')
       .style('height', '100%')
       .style('pointer-events', 'none');
-
-    cardsLayerRef.current = cardsLayer.node();
 
     const cardsTransform = cardsLayer.append('div')
       .attr('class', 'cards-transform')
@@ -419,16 +345,7 @@ export function GraphViewer({
           d._size = { width: savedSize.w, height: savedSize.h };
         }
       }
-    }
-    // Nodes the reader left open stay open across visits.
-    pinnedIdsRef.current = new Set();
-    if (viewStateRef.current) {
-      for (const d of data.nodes) {
-        const saved = viewStateRef.current.nodeState(persistKey(d));
-        if (d.type === 'article' && saved && saved.pinned) pinnedIdsRef.current.add(d.id);
-      }
-    }
-    if (viewStateRef.current && positionsWereDegenerate) {
+    } else if (viewStateRef.current) {
       // Positions rejected, but a card the reader resized is still their work.
       for (const d of data.nodes) {
         const savedSize = viewStateRef.current.nodeState(persistKey(d));
@@ -464,6 +381,8 @@ export function GraphViewer({
       .velocityDecay(SIM.velocityDecay)
       .alphaDecay(SIM.alphaDecay);
 
+    // Resize: rescale the SVG canvas only. Never restart the simulation —
+    // node positions in graph-space stay fixed; only the viewport changes.
     const handleResize = () => {
       if (redrawAxisRef.current) redrawAxisRef.current();
       if (!containerRef.current) return;
@@ -480,229 +399,16 @@ export function GraphViewer({
     // up bisecting it.
     const axisLayer = svg.append('g').attr('class', 'time-axis-layer');
 
-    // Hierarchical containment layer (rendered underneath links and cards).
-    const containersLayer = g.append('g').attr('class', 'containers-layer');
-
-    const containerChildren = new Map();
-    const containerMembers = new Map();
-
-    for (const c of (data.containers || [])) {
-      containerChildren.set(c.id, new Set());
-      containerMembers.set(c.id, new Set());
-    }
-
-    for (const edge of (data.containmentEdges || [])) {
-      if (containerChildren.has(edge.source) && containerChildren.has(edge.target)) {
-        containerChildren.get(edge.source).add(edge.target);
-      } else if (containerMembers.has(edge.source)) {
-        containerMembers.get(edge.source).add(edge.target);
-      }
-    }
-
-    function getAllMemberSlugs(cId, visited = new Set()) {
-      if (visited.has(cId)) return [];
-      visited.add(cId);
-      const direct = Array.from(containerMembers.get(cId) || []);
-      const children = Array.from(containerChildren.get(cId) || []);
-      const fromChildren = children.flatMap((chId) => getAllMemberSlugs(chId, visited));
-      return Array.from(new Set([...direct, ...fromChildren]));
-    }
-
-    // Sort so parent containers render first (bottom-most in SVG z-index)
-    const sortedContainers = [...(data.containers || [])].sort((a, b) => {
-      if (b.parent === a.id) return -1;
-      if (a.parent === b.id) return 1;
-      return 0;
-    });
-
-    const containerGroups = containersLayer.selectAll('.container-group')
-      .data(sortedContainers, (d) => d.id)
-      .enter().append('g')
-      .attr('class', 'container-group')
-      .attr('data-container-id', (d) => d.id);
-
-    containerGroups.append('path')
-      .attr('class', 'container-hull')
-      .attr('fill', (d) => d.fill || 'rgba(212, 175, 55, 0.03)')
-      .attr('stroke', (d) => d.stroke || 'rgba(212, 175, 55, 0.45)')
-      .attr('stroke-width', (d) => d.strokeWidth || 1.5)
-      .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
-
-    const containerBadges = containerGroups.append('g')
-      .attr('class', 'container-badge');
-
-    containerBadges.append('rect')
-      .attr('class', 'container-badge-bg')
-      .attr('fill', (d) => d.badgeBg || 'rgba(15, 15, 18, 0.85)')
-      .attr('stroke', (d) => d.stroke || 'rgba(212, 175, 55, 0.4)')
-      .attr('stroke-width', 1)
-      .attr('rx', 6)
-      .attr('ry', 6);
-
-    containerBadges.append('text')
-      .attr('class', 'container-badge-text')
-      .attr('fill', (d) => d.badgeColor || '#d4af37')
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .text((d) => d.label || d.id);
-
-    const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
-    const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
-
-    function updateContainers() {
-      if (sortedContainers.length === 0) return;
-      containerGroups.each(function (c) {
-        const group = d3.select(this);
-        const memberSlugs = getAllMemberSlugs(c.id);
-        const memberNodes = memberSlugs
-          .map((slug) => nodeBySlug.get(slug))
-          .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
-
-        if (memberNodes.length === 0) {
-          group.style('display', 'none');
-          return;
-        }
-        group.style('display', null);
-
-        const points = [];
-        const isRoot = !c.parent;
-        const pad = c.padding || (isRoot ? 75 : 42);
-
-        for (const n of memberNodes) {
-          const w = n._size?.width || (n.type === 'article' ? CARD.width : n.size);
-          const h = n._size?.height || (n.type === 'article' ? CARD.height : n.size);
-          const halfW = w / 2 + pad;
-          const halfH = h / 2 + pad;
-          points.push(
-            [n.x - halfW, n.y - halfH],
-            [n.x + halfW, n.y - halfH],
-            [n.x + halfW, n.y + halfH],
-            [n.x - halfW, n.y + halfH]
-          );
-        }
-
-        const hull = d3.polygonHull(points);
-        if (!hull || hull.length < 3) return;
-
-        const pathD = hullLine(hull);
-        group.select('.container-hull').attr('d', pathD);
-
-        const minY = Math.min(...hull.map((p) => p[1]));
-        const avgX = d3.mean(hull, (p) => p[0]);
-
-        const badge = group.select('.container-badge');
-        const textNode = badge.select('text').node();
-        const bbox = textNode ? textNode.getBBox() : { width: 80, height: 18 };
-        const badgeW = bbox.width + 20;
-        const badgeH = Math.max(bbox.height + 8, 22);
-
-        badge.select('rect')
-          .attr('x', -badgeW / 2)
-          .attr('y', -badgeH / 2)
-          .attr('width', badgeW)
-          .attr('height', badgeH);
-
-        const badgeY = isRoot ? minY + 14 : minY + 8;
-        badge.attr('transform', `translate(${avgX}, ${badgeY})`);
-      });
-    }
-
-    function linkEndpoints(l) {
-      const sx = typeof l.source === 'object' ? l.source.x : 0;
-      const sy = typeof l.source === 'object' ? l.source.y : 0;
-      const tx = typeof l.target === 'object' ? l.target.x : 0;
-      const ty = typeof l.target === 'object' ? l.target.y : 0;
-
-      if (l.layer !== 'sequence') {
-        return { x1: sx, y1: sy, x2: tx, y2: ty };
-      }
-
-      const dx = tx - sx;
-      const dy = ty - sy;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 40) {
-        return { x1: sx, y1: sy, x2: tx, y2: ty };
-      }
-
-      const cos = dx / dist;
-      const sin = dy / dist;
-
-      const srcW = (l.source._size?.width || CARD.width) / 2 + 4;
-      const srcH = (l.source._size?.height || CARD.height) / 2 + 4;
-      const rSrc = Math.min(
-        Math.abs(cos) > 1e-4 ? srcW / Math.abs(cos) : Infinity,
-        Math.abs(sin) > 1e-4 ? srcH / Math.abs(sin) : Infinity
-      );
-
-      const tgtW = (l.target._size?.width || CARD.width) / 2 + 8;
-      const tgtH = (l.target._size?.height || CARD.height) / 2 + 8;
-      const rTgt = Math.min(
-        Math.abs(cos) > 1e-4 ? tgtW / Math.abs(cos) : Infinity,
-        Math.abs(sin) > 1e-4 ? tgtH / Math.abs(sin) : Infinity
-      );
-
-      if (dist <= rSrc + rTgt) {
-        return { x1: sx, y1: sy, x2: tx, y2: ty };
-      }
-
-      return {
-        x1: sx + cos * rSrc,
-        y1: sy + sin * rSrc,
-        x2: tx - cos * rTgt,
-        y2: ty - sin * rTgt,
-      };
-    }
-
-    function linkPath(l, ep) {
-      if (l.layer !== 'sequence') {
-        return `M ${ep.x1} ${ep.y1} L ${ep.x2} ${ep.y2}`;
-      }
-      const dx = ep.x2 - ep.x1;
-      const dy = ep.y2 - ep.y1;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 2) return `M ${ep.x1} ${ep.y1} L ${ep.x2} ${ep.y2}`;
-
-      const mx = (ep.x1 + ep.x2) / 2;
-      const my = (ep.y1 + ep.y2) / 2;
-
-      // Normal perpendicular: (-dy / dist, dx / dist)
-      const nx = -dy / dist;
-      const ny = dx / dist;
-
-      // Graceful bend: noticeable arc between 36px and 80px offset
-      const bend = Math.min(80, Math.max(36, dist * 0.22));
-
-      const cx = mx + nx * bend;
-      const cy = my + ny * bend;
-
-      return `M ${ep.x1} ${ep.y1} Q ${cx} ${cy} ${ep.x2} ${ep.y2}`;
-    }
-
     // Render links + nodes.
     const links = g.selectAll('.link')
       .data(data.links)
-      .enter().append('path')
-      .attr('class', (d) => [
-        'link',
-        d.layer ? `link-${d.layer}` : '',
-        d.role ? `link-role-${d.role}` : '',
-      ].filter(Boolean).join(' '))
-      .attr('fill', 'none')
-      .attr('marker-end', (d) => (d.layer === 'sequence' ? 'url(#sequence-arrow)' : null));
-
-    // Traveling single bead on sequence rail
-    const sequencePulses = g.selectAll('.link-sequence-pulse')
-      .data(data.links.filter(d => d.layer === 'sequence'))
-      .enter().append('path')
-      .attr('class', 'link-sequence-pulse')
-      .attr('fill', 'none')
-      .attr('pathLength', 100);
+      .enter().append('line')
+      .attr('class', 'link');
 
     const nodes = g.selectAll('.node')
       .data(data.nodes)
       .enter().append('g')
-      .attr('class', 'node');
-
+      .attr('class', 'node')
     const dragHandler = d3.drag()
         // Under a mouse, moving a card and scrolling its text are different
         // gestures — drag versus wheel. Under a thumb they are the same
@@ -742,7 +448,7 @@ export function GraphViewer({
           if (d._resizing) {
             const start = d._size || cardSizeFor({
               hovered: hoveredIdRef.current === d.id,
-              pinned: pinnedIdsRef.current.has(d.id),
+              pinned: pinnedIdRef.current === d.id,
             });
             d._resizeFrom = { w: start.width, h: start.height, x: event.x, y: event.y };
           }
@@ -763,7 +469,6 @@ export function GraphViewer({
                 persistKey(d), d._size.width, d._size.height, { transient: true },
               );
             }
-            updateContainers();
             return;
           }
           d.x = event.x; d.y = event.y;
@@ -782,19 +487,13 @@ export function GraphViewer({
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
             if (sid === d.id || tid === d.id) {
-              const ep = linkEndpoints(l);
-              d3.select(this).attr('d', linkPath(l, ep));
+              const sx = typeof l.source === 'object' ? l.source.x : 0;
+              const sy = typeof l.source === 'object' ? l.source.y : 0;
+              const tx = typeof l.target === 'object' ? l.target.x : 0;
+              const ty = typeof l.target === 'object' ? l.target.y : 0;
+              d3.select(this).attr('x1', sx).attr('y1', sy).attr('x2', tx).attr('y2', ty);
             }
           });
-          sequencePulses.each(function(l) {
-            const sid = typeof l.source === 'object' ? l.source.id : l.source;
-            const tid = typeof l.target === 'object' ? l.target.id : l.target;
-            if (sid === d.id || tid === d.id) {
-              const ep = linkEndpoints(l);
-              d3.select(this).attr('d', linkPath(l, ep));
-            }
-          });
-          updateContainers();
         })
         .on('end', (event, d) => {
           const vs = viewStateRef.current;
@@ -802,7 +501,6 @@ export function GraphViewer({
             d._resizing = false;
             // The resize is one history entry, like the drag.
             if (vs) vs.commit();
-            updateContainers();
             return;
           }
           d.fx = d.x; d.fy = d.y;
@@ -811,11 +509,11 @@ export function GraphViewer({
             vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
             vs.commit();
           }
-          updateContainers();
         });
         
     nodes.call(dragHandler);
 
+    // Tag-node rendering uses a probe to size the bubble.
     const probe = svg.append('text')
       .style('font-family', "'Atkinson', sans-serif")
       .style('visibility', 'hidden');
@@ -883,7 +581,40 @@ export function GraphViewer({
     nodes.each(function(d) {
       const el = d3.select(this);
       if (d.type !== 'article') {
+        // Every non-article node (tag, topology, placeholder) gets the same
+        // bubble treatment, distinguished only by color — a tag, a topology
+        // handle, and an unwritten piece are all "a labeled handle on the
+        // corpus, not an item in it."
+        // Tag bubbles are measured from their text, so every constant here is
+        // real estate. Three things were wasting it:
+        //
+        //   The pill shape. rx = height/2 means each rounded cap is as wide as
+        //   the bubble is tall, and the text has to clear the curve — so the
+        //   apparent padding grew with the font rather than staying put. It
+        //   reads as percentage padding even though the padding was constant.
+        //   A modest corner radius instead.
+        //
+        //   Vertical padding sized for a pill, which a two-line bubble does
+        //   not need.
+        //
+        //   A long tag growing sideways forever. It wraps now, and a second
+        //   line costs one line-height rather than doubling the width.
+        //
+        // What comes back from all three goes into the type: 26 to 32, in the
+        // same band as the card labels so the two read as one system.
+        // A tag is a handle on the corpus, not an item in it. At 32 units it
+        // was rendering wider than the article cards it points at, which
+        // inverts the hierarchy — the label for a pile of writing should not
+        // outweigh the writing. 22 is still half again the 14 it started at,
+        // and the width cap keeps a tag narrower than a card no matter how
+        // long its text, by wrapping instead of growing.
         const fontSize = TAG.fontSize;
+        // One padding value for all four sides. Keeping separate padX/padY
+        // could not make the margins match, because the vertical one was
+        // measured against the line box and the horizontal one against the
+        // glyphs — line-height already carries leading above and below the
+        // text, so an identical number produced visibly different gaps. The
+        // bubble is measured from the rendered ink instead, below.
         const PAD = TAG.padding;
         const MAX_BUBBLE_W = TAG.maxWidth;
         const MAX_LINES = TAG.maxLines;
@@ -891,11 +622,16 @@ export function GraphViewer({
         probe.style('font-size', fontSize + 'px').style('font-weight', '500');
         const widthOf = (t) => { probe.text(t); return probe.node().getComputedTextLength(); };
 
+        // Break on hyphens as well as spaces. Half this corpus's tags are
+        // 'surveillance-capitalism' shaped, and a space-only rule left exactly
+        // those growing sideways forever.
         const pieces = d.label.split(/(?<=-)|\s+/).filter(Boolean);
         const join = (arr) => arr.join('').replace(/\s+$/, '').trim();
 
         let lines = [d.label];
         if (widthOf(d.label) + PAD * 2 > MAX_BUBBLE_W && pieces.length > 1) {
+          // Greedy fill, then rebalance the common two-line case so a wrapped
+          // tag reads as a block rather than as an overflow.
           lines = [];
           let current = [];
           for (const piece of pieces) {
@@ -921,14 +657,23 @@ export function GraphViewer({
             }
             lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
           }
+          // A tag long enough to need a fourth line is pathological; fold the
+          // remainder onto the last allowed one and let it run a little wide
+          // rather than growing the bubble downward without limit.
           if (lines.length > MAX_LINES) {
             const head = lines.slice(0, MAX_LINES - 1);
             lines = head.concat([lines.slice(MAX_LINES - 1).join(' ')]);
           }
         }
 
+        // Tighter leading once it wraps: a second line should cost a line, not
+        // double the bubble.
         const effLineH = lines.length > 1 ? fontSize * 1.0 : fontSize * 1.1;
 
+        // Text first, then measure what was actually drawn, then wrap the
+        // bubble round it. getBBox reports the ink, so PAD is the same real
+        // distance on every side regardless of whether the text has capitals,
+        // descenders, or one line or three.
         const textEl = el.append('text')
           .attr('text-anchor', 'middle')
           .attr('fill', '#1a1a2e')
@@ -936,12 +681,18 @@ export function GraphViewer({
           .style('font-size', fontSize + 'px')
           .style('font-weight', String(TAG_WEIGHT))
           .style('pointer-events', 'none');
+        // Baselines are set by fitBubble; no dominant-baseline, because the
+        // whole point is that this code knows where the baseline is.
         lines.forEach((line) => {
           textEl.append('tspan').attr('x', 0).text(line);
         });
 
+        // Behind the text, not over it. Geometry is applied by fitBubble so the
+        // same code can run again once the webfont has loaded.
         const rectEl = el.insert('rect', 'text')
           .attr('rx', TAG.cornerRadius).attr('ry', TAG.cornerRadius)
+          // A CSS var reference, not the baked d.color value, so changing a
+          // color in Settings repaints every bubble instantly — no rebuild.
           .attr('fill', 'var(--gv-' + (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') + ')')
           .attr('opacity', TAG.opacity);
         const entry = { d, textEl, rectEl, lines, fontSize, lineH: effLineH };
@@ -949,6 +700,14 @@ export function GraphViewer({
         fitBubble(entry);
 
       } else {
+        // SVG representation for articles is empty or just a group.
+        // We track the geometry here. The actual HTML cards live in cardsTransform.
+        // Collision radius from the card's real footprint. This was size/2,
+        // which is 30 for a card that is 180x140 — the reason cards sat on top
+        // of each other and tags landed inside them. A circle round a rectangle
+        // is approximate either way; half the diagonal is the version that
+        // guarantees no overlap rather than the version that looks tidy in
+        // isolation.
         const rest = cardSizeFor({ hovered: false, pinned: false });
         d._r = Math.hypot(rest.width, rest.height) / 2;
       }
@@ -956,14 +715,24 @@ export function GraphViewer({
 
     probe.remove();
 
+    // Text metrics change when the webfont finishes loading, and the bubbles
+    // were sized against the fallback face — which is why the horizontal and
+    // vertical margins came out one or two pixels apart despite being the same
+    // number. Re-fit once the real font is in.
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
         tagBubbles.forEach(fitBubble);
       }).catch(() => {});
     }
 
+    // One React root per article node, mounted in the HTML cardsTransform layer.
+    // Keyed by node id. Roots are unmounted on cleanup so we
+    // don't leak across feedData changes. The React tree inside each root
+    // is pure — TextView is presentational; D3 still owns all events on
+    // the parent HTML wrapper.
     const reactRoots = new Map();
     
+    // Explicitly scope the articleNodes selection so it can be updated
     let articleNodes = cardsTransform.selectAll('.node-card')
       .data(data.nodes.filter(d => d.type === 'article'));
       
@@ -983,24 +752,22 @@ export function GraphViewer({
       reactRoots.set(d.id, { root, wrapper: this, cardSelection: d3.select(this) });
     });
 
+    // Paint one article node's lens based on its current state. Sizes the
+    // foreignObject and re-renders the TextView with fresh props.
     function renderArticleBody(d) {
       if (d.type !== 'article') return;
       const entry = reactRoots.get(d.id);
       if (!entry) return;
       const hovered = hoveredIdRef.current === d.id;
-      const pinned = pinnedIdsRef.current.has(d.id);
+      const pinned = pinnedIdRef.current === d.id;
       const lod = getLOD(zoomScaleRef.current);
-      const defaultSize = cardSizeFor({ hovered, pinned, lod });
-      let w, h;
-      if (lod === 'marker' && !hovered && !pinned) {
-        w = defaultSize.width;
-        h = defaultSize.height;
-      } else {
-        const customSize = d._size || (d._customWidth && d._customHeight ? { width: d._customWidth, height: d._customHeight } : null);
-        w = customSize ? customSize.width : defaultSize.width;
-        h = customSize ? customSize.height : defaultSize.height;
-      }
+      // A size the reader set outright replaces the state-based default. They
+      // asked for that size; growing it further on hover would be the graph
+      // arguing with them.
+      const { width: w, height: h } = d._size || cardSizeFor({ hovered, pinned });
 
+      // Instead of sizing a foreignObject and adding glow padding, we size the wrapper
+      // exactly and shift its transform origin to its own center.
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
       entry.wrapper.style.marginLeft = (-w / 2) + 'px';
@@ -1012,19 +779,8 @@ export function GraphViewer({
           article: d,
           width: w,
           height: h,
-          viewState: { hovered, pinned, lod, zoomScale: zoomScaleRef.current },
-          fullContent: d._fullContent || null,
-          onResize: ({ width: newW, height: newH }) => {
-            d._customWidth = newW;
-            d._customHeight = newH;
-            d._size = { width: newW, height: newH };
-            entry.wrapper.style.width = newW + 'px';
-            entry.wrapper.style.height = newH + 'px';
-            entry.wrapper.style.marginLeft = (-newW / 2) + 'px';
-            entry.wrapper.style.marginTop = (-newH / 2) + 'px';
-            d._r = Math.max(newW, newH) / 2;
-            renderArticleBody(d);
-          }
+          viewState: { hovered, pinned, lod },
+          fullContent: d._fullContent || null
         })
       );
       // Keep the collision radius on the resting footprint. Growing it on
@@ -1040,6 +796,10 @@ export function GraphViewer({
       data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
     }
 
+    // Slug-label overlay: shown only at slug-LOD. Font-size is chosen so the
+    // LONGEST slug exactly fits the viewport width — all slugs share that
+    // size for consistency. As large as it can get without overflowing.
+    // Hidden when the node is hovered or pinned.
     // Article-content fetch cache. Keyed by node id. Value is the body HTML
     // (with <h1> removed) or null on fetch failure.
     const articleContentCache = new Map();
@@ -1055,26 +815,21 @@ export function GraphViewer({
       // fail, and fail loudly in the console, a hundred times over. The summary
       // the feed already gave us is what there is; reading the rest is what the
       // link is for.
-      const filename = (d.url || '').split('/').pop();
-      const tryFetch = async () => {
-        let r;
-        try {
-          const isSameOrigin = d.url && new URL(d.url, window.location.href).origin === window.location.origin;
-          if (!isSameOrigin && filename) {
-            r = await fetch('./' + filename);
-          }
-        } catch (_) {}
-        if (!r || !r.ok) {
-          try { r = await fetch(d.url); } catch (_) {}
-        }
-        if (!r || !r.ok) {
-          if (filename) r = await fetch('./' + filename);
-        }
-        if (!r || !r.ok) throw new Error('HTTP ' + (r ? r.status : 'failed'));
-        return r.text();
-      };
+      let sameOrigin = false;
+      try {
+        sameOrigin = new URL(d.url, window.location.href).origin === window.location.origin;
+      } catch (_) { sameOrigin = false; }
+      if (!sameOrigin) {
+        articleContentCache.set(d.id, null);
+        d._fullContent = null;
+        return Promise.resolve();
+      }
 
-      return tryFetch()
+      return fetch(d.url)
+        .then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        })
         .then(html => {
           const doc = new DOMParser().parseFromString(html, 'text/html');
           const h1 = doc.querySelector('h1');
@@ -1091,18 +846,12 @@ export function GraphViewer({
         });
     }
 
+    // Initial paint.
     renderAllArticleBodies();
-    // Restored open nodes: fetch their text and bring them to the front.
-    pinnedIdsRef.current.forEach((id) => {
-      const d = data.nodes.find(nd => nd.id === id);
-      if (!d) return;
-      articleNodes.filter(nd => nd.id === id).raise().style('z-index', 10);
-      loadFullContent(d).then(() => { if (pinnedIdsRef.current.has(id)) renderArticleBody(d); });
-    });
-    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current);
+    applyVisibility(svg, hiddenSourcesRef.current);
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
-    // because the card's inner HTML gets replaced on re-render
+    // because the foreignObject's inner HTML gets replaced on re-render
     // and mouseenter sometimes fails to re-fire on the new content.
     // We guard with relatedTarget so child-to-child cursor moves inside
     // the same node don't toggle the state.
@@ -1111,8 +860,6 @@ export function GraphViewer({
         if (hoveredIdRef.current === d.id) return;
         hoveredIdRef.current = d.id;
         renderArticleBody(d);
-        // Bring HTML node to front
-        event.currentTarget.style.zIndex = 10;
       })
       .on('mouseout', (event, d) => {
         const related = event.relatedTarget;
@@ -1120,7 +867,6 @@ export function GraphViewer({
         if (hoveredIdRef.current === d.id) {
           hoveredIdRef.current = null;
           renderArticleBody(d);
-          event.currentTarget.style.zIndex = '';
         }
       })
       .on('dblclick', (event, d) => {
@@ -1133,8 +879,7 @@ export function GraphViewer({
         if (onNodeSelectRef.current) {
           onNodeSelectRef.current(d.originalItem || d);
         }
-        pinnedIdsRef.current.delete(d.id);
-        if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
+        pinnedIdRef.current = null;
         hoveredIdRef.current = null;
         renderArticleBody(d);
       })
@@ -1143,39 +888,39 @@ export function GraphViewer({
         const isPopout = target && (target.dataset?.popout === '1' ||
                                     target.closest?.('[data-popout="1"]'));
         if (isPopout) {
+          // Open the side reader AND return this node to its default size.
           event.stopPropagation();
           if (onNodeSelectRef.current) {
             onNodeSelectRef.current(d.originalItem || d);
           }
-          if (pinnedIdsRef.current.has(d.id)) {
-            pinnedIdsRef.current.delete(d.id);
-            if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
+          if (pinnedIdRef.current === d.id) {
+            pinnedIdRef.current = null;
+            // Also clear hover so the node truly returns to default.
             hoveredIdRef.current = null;
             renderArticleBody(d);
-            event.currentTarget.style.zIndex = '';
           }
           return;
         }
+        // Toggle pin on this node.
         event.stopPropagation();
-        // Any number of nodes can be open at once. Opening one never closes
-        // another: text you have open stays open until you close that node.
-        if (pinnedIdsRef.current.has(d.id)) {
-          pinnedIdsRef.current.delete(d.id);
-          if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
+        const prevPinned = pinnedIdRef.current;
+        if (prevPinned === d.id) {
+          pinnedIdRef.current = null;
           renderArticleBody(d);
-          event.currentTarget.style.zIndex = '';
         } else {
-          pinnedIdsRef.current.add(d.id);
-          if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), true);
+          pinnedIdRef.current = d.id;
           renderArticleBody(d);
           nodes.filter(nd => nd.id === d.id).raise();
           articleNodes.filter(nd => nd.id === d.id).raise();
-          event.currentTarget.style.zIndex = 10;
+          if (prevPinned) {
+            const prev = data.nodes.find(nd => nd.id === prevPinned);
+            if (prev) renderArticleBody(prev);
+          }
           // Fetch full article body so the pinned node becomes a mini-reader.
           // Re-render when content arrives, but only if this node is still
-          // open (user might have closed it in the meantime).
+          // the pinned one (user might have unpinned in the meantime).
           loadFullContent(d).then(() => {
-            if (pinnedIdsRef.current.has(d.id)) renderArticleBody(d);
+            if (pinnedIdRef.current === d.id) renderArticleBody(d);
           });
         }
       });
@@ -1189,7 +934,6 @@ export function GraphViewer({
         if (activeTag === d.id) {
           activeTag = null;
           nodes.classed('dimmed', false).classed('tag-active', false);
-          articleNodes.classed('dimmed', false);
           links.classed('highlighted', false);
         } else {
           activeTag = d.id;
@@ -1207,7 +951,6 @@ export function GraphViewer({
           connected.add(d.id);
           nodes.classed('dimmed', nd => !connected.has(nd.id));
           nodes.classed('tag-active', nd => nd.id === d.id);
-          articleNodes.classed('dimmed', nd => !connected.has(nd.id));
           links.classed('highlighted', l => {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
@@ -1216,14 +959,19 @@ export function GraphViewer({
         }
       });
 
+    // Background click: unpin any pinned node, clear any active tag.
     svg.on('click', () => {
       if (activeTag) {
         activeTag = null;
         nodes.classed('dimmed', false).classed('tag-active', false);
-        articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
       }
-      // Open nodes stay open on a background click; each closes by clicking it.
+      const hadPinned = !!pinnedIdRef.current;
+      if (pinnedIdRef.current) {
+        const prev = data.nodes.find(nd => nd.id === pinnedIdRef.current);
+        pinnedIdRef.current = null;
+        if (prev) renderArticleBody(prev);
+      }
     });
 
     // Simulation tick → position nodes. When alpha falls below alphaMin,
@@ -1236,22 +984,15 @@ export function GraphViewer({
     // gets no frames at all. A reader whose whole arrangement is already saved
     // needs no simulation — and would have got a graph stacked at the origin.
     function applyPositions() {
-      links.each(function(l) {
-        const ep = linkEndpoints(l);
-        d3.select(this).attr('d', linkPath(l, ep));
-      });
-      sequencePulses.each(function(l) {
-        const ep = linkEndpoints(l);
-        d3.select(this).attr('d', linkPath(l, ep));
-      });
+      links.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+           .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
       if (articleNodes) {
         articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
       }
-      updateContainers();
     }
     let hasFitted = false;
-    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers };
+    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g };
 
     // The axis is measured against the corpus extent, which keeps changing
     // while the simulation runs — so drawing it once at the start pins it to
@@ -1489,6 +1230,8 @@ export function GraphViewer({
       });
       reactRoots.clear();
     };
+    // Deliberately depend only on feedData — onNodeSelect changes are
+    // handled through onNodeSelectRef without rebuilding the simulation.
   }, [feedData]);
 
   // The time axis. Drawn rather than laid out: it spends no position, so it
@@ -1534,12 +1277,10 @@ export function GraphViewer({
 
     // A side rail runs earliest at the top; a top or bottom rail earliest at
     // the left. Both are the western reading order for the direction they run.
-    const geo = dimensionAxisGeometry(g.data.nodes, {
+    const geo = timeAxisGeometry(g.data.nodes, {
       orientation: vertical ? 'ttb' : 'ltr',
       origin,
       length,
-      dimension: axis.dimension || 'time',
-      granularity: axis.granularity || 'auto',
     });
     if (!geo) return;
 
@@ -1549,18 +1290,16 @@ export function GraphViewer({
     const conn = root.append('g').attr('class', 'time-connectors');
     const connected = [];
     g.data.nodes.forEach((d) => {
-      const anchors = geo.anchors[d.id];
-      if (!anchors || !anchors.length) return;
-      anchors.forEach((a2) => {
-        const line = conn.append('line')
-          .attr('class', 'time-connector')
-          .attr('data-node', d.id)
-          .attr('x1', a2.x).attr('y1', a2.y)
-          .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
-          .attr('stroke-width', AX.connectorWidth)
-          .attr('stroke-opacity', AX.connectorOpacity);
-        connected.push({ node: d, anchor: a2, line });
-      });
+      const a2 = geo.anchors[d.id];
+      if (!a2) return;
+      const line = conn.append('line')
+        .attr('class', 'time-connector')
+        .attr('data-node', d.id)
+        .attr('x1', a2.x).attr('y1', a2.y)
+        .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
+        .attr('stroke-width', AX.connectorWidth)
+        .attr('stroke-opacity', AX.connectorOpacity);
+      connected.push({ node: d, anchor: a2, line });
     });
 
     // The rail is in screen space and the nodes are in graph space, so the
@@ -1720,7 +1459,6 @@ export function GraphViewer({
     const t = setTimeout(() => {
       if (redrawAxisRef.current) redrawAxisRef.current();
       if (g.fitToViewport) g.fitToViewport();
-      if (g.updateContainers) g.updateContainers();
     }, 800);
     return () => clearTimeout(t);
   }, [layout]);

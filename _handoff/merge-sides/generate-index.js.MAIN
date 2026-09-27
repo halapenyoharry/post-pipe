@@ -15,21 +15,12 @@ const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
 const { loadCorpus }     = require('./src/aggregator');
 const { parseOpml }      = require('./src/lib/opml');
 
-function expandHome(p) {
-  if (!p) return p;
-  if (p.startsWith('~')) {
-    return path.resolve(path.join(process.env.HOME || '', p.slice(1)));
-  }
-  return path.resolve(p);
-}
-
-const SITE_ROOT    = process.env.POSTPIPE_SITE ? expandHome(process.env.POSTPIPE_SITE) : __dirname;
-const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
-const SITE_DIR     = path.join(SITE_ROOT, '_site');
+const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
+const SITE_DIR     = path.join(__dirname, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
 const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
-const OPML_PATH    = path.resolve(SITE_ROOT, SETTINGS.feeds_opml_path || 'feeds.opml');
+const OPML_PATH    = path.join(__dirname, SETTINGS.feeds_opml_path || 'feeds.opml');
 const PAGES_BASE   = SETTINGS.site.base_url;
 
 // Registry of adapter modules keyed by OPML type attribute.
@@ -70,16 +61,11 @@ function configFor(entry) {
     prominence: entry.prominence,
   };
   if (entry.type === 'local') {
-    let localPath = entry.xmlUrl.replace(/^local:\/\//, '');
-    if (!localPath.startsWith('/') && !localPath.startsWith('~')) {
-      localPath = path.resolve(SITE_ROOT, localPath);
-    }
     return {
       ...base,
-      path: localPath,
+      path: entry.xmlUrl.replace(/^local:\/\//, ''),
       pagesBase: PAGES_BASE,
       coversDir: COVERS_DIR,
-      pagesDir: SITE_DIR,
     };
   }
   return { ...base, xmlUrl: entry.xmlUrl };
@@ -276,7 +262,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -293,7 +279,6 @@ ${reactJs}
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
-      const [filteredArticleIds, setFilteredArticleIds] = React.useState(null);
       const [hydrated, setHydrated] = React.useState(false);
       const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
 
@@ -334,10 +319,6 @@ ${reactJs}
         viewState.toggleSource(sourceId);
       }, []);
 
-      const handleTimeFilter = React.useCallback(function (ids) {
-        setFilteredArticleIds(ids);
-      }, []);
-
       // Settings writes logical color keys (draft/published/tag/topology/
       // placeholder); this translates them to the actual CSS custom
       // property names the graph and article cards read via var(...).
@@ -367,7 +348,6 @@ ${reactJs}
             setSelectedArticle(article);
           },
           hiddenSources: hiddenSources,
-          filteredArticleIds: filteredArticleIds,
           viewState: viewState,
           colorOverrides: colorOverrides
         }),
@@ -376,10 +356,6 @@ ${reactJs}
           hiddenSources: hiddenSources,
           onToggleSource: toggleSource,
           viewState: viewState
-        }),
-        React.createElement(TimeOverlay, {
-          feedData: feed,
-          onFilterChange: handleTimeFilter
         }),
         React.createElement(LayoutControls, null),
         React.createElement(DimensionsControls, null),
@@ -547,19 +523,6 @@ ${reactJs}
       React.useEffect(function () { return viewState.subscribe(bump); }, []);
       const axis = viewState.timeAxis();
 
-      // One rail at a time. Clicking the active dimension turns the rail off;
-      // clicking another switches the rail to it.
-      function pick(dim) {
-        const current = axis.dimension || 'time';
-        if (axis.on && current === dim) viewState.setTimeAxis({ on: false });
-        else viewState.setTimeAxis({ on: true, dimension: dim });
-      }
-      const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
-      function cycleGranularity() {
-        const i = GRANULARITIES.indexOf(axis.granularity || 'auto');
-        viewState.setTimeAxis({ granularity: GRANULARITIES[(i + 1) % GRANULARITIES.length] });
-      }
-
       function dimensionButton(key, label, isActive, onClick, title) {
         return React.createElement('button', {
           key: key,
@@ -590,13 +553,9 @@ ${reactJs}
             padding: '0 7px 0 4px'
           }
         }, 'dimensions'),
-        dimensionButton('time', 'published', axis.on && (axis.dimension || 'time') === 'time', function () { pick('time'); }, 'Published date'),
-        dimensionButton('commits', 'commits', axis.on && axis.dimension === 'commits', function () { pick('commits'); }, 'Edit history: one link per commit bucket'),
-        dimensionButton('narrative', 'narrative', axis.on && axis.dimension === 'narrative', function () { pick('narrative'); }, 'Narrative position: reading order, 0 to 1'),
-        dimensionButton('chronology', 'chronology', axis.on && axis.dimension === 'chronology', function () { pick('chronology'); }, 'Chronological position in story-world time'),
-        (axis.on && (axis.dimension === 'chronology' || axis.dimension === 'commits'))
-          ? dimensionButton('granularity', '\u00b7 ' + (axis.granularity || 'auto'), false, cycleGranularity, 'Bucket size: auto, day, week, month, year')
-          : null
+        dimensionButton('time', 'time', axis.on, function () { viewState.setTimeAxis({ on: !axis.on }); }, 'Draw a time axis across the graph'),
+        dimensionButton('narrative', 'narrative', false, function () {}, 'Narrative position (coming soon)'),
+        dimensionButton('chronology', 'chronology', false, function () {}, 'Chronological position (coming soon)')
       ]);
     }
 
@@ -669,7 +628,6 @@ ${reactJs}
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`Site root: ${SITE_ROOT}`);
   const entries = buildAdapterEntries();
   const { items, sources } = await loadCorpus(entries);
 
@@ -677,41 +635,6 @@ async function main() {
   const withTodos = items.filter(a => (a.todos || []).length).length;
   if (withTodos) {
     console.log(`  (${withTodos} flagged with TODO files — see ~/Posts/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
-  }
-
-  // Synthesize container chapter placeholders if defined (e.g. Act 2 & Act 3)
-  const existingSlugs = new Set(items.map(it => (it.url || it.id || '').split('/').pop().replace('.html', '')));
-  for (const c of (SETTINGS.containment || [])) {
-    if (!c.chapters || !Array.isArray(c.chapters)) continue;
-    for (const chNum of c.chapters) {
-      const chSlug = `ch${chNum}`;
-      if (!existingSlugs.has(chSlug)) {
-        const pagesUrl = `${PAGES_BASE}/${chSlug}.html`;
-        const chItem = {
-          id: pagesUrl,
-          url: pagesUrl,
-          title: String(chNum),
-          short_title: String(chNum),
-          summary: '',
-          date_published: undefined,
-          reading_time: '',
-          author: (SETTINGS.author?.name || 'harold young').toLowerCase(),
-          authors: [{ name: (SETTINGS.author?.name || 'harold young').toLowerCase(), url: SETTINGS.author?.url || pagesUrl }],
-          tags: c.tag ? [c.tag, 'epic-of-elinor-jones'] : ['epic-of-elinor-jones'],
-          series: c.series || c.label,
-          series_part: chNum,
-          kind: 'placeholder',
-          substrate: 'placeholder',
-          status: 'draft',
-          _status: 'draft',
-          _references: c.tag ? [{ type: 'tag', value: c.tag }] : [],
-          todos: [],
-          labels: { short: String(chNum), medium: String(chNum), full: String(chNum) }
-        };
-        items.push(chItem);
-        existingSlugs.add(chSlug);
-      }
-    }
   }
 
   // Every item gets a label ladder: two words, four words, the whole title.
@@ -724,10 +647,7 @@ async function main() {
   }
 
   const feed = buildFeed(items);
-  feed.edges = buildEdges(items, SETTINGS);
-  if (SETTINGS.containment) {
-    feed.containers = SETTINGS.containment;
-  }
+  feed.edges = buildEdges(items);
   feed._sources = sources;
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
