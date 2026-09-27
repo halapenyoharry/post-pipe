@@ -262,7 +262,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -279,6 +279,7 @@ ${reactJs}
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
+      const [filteredArticleIds, setFilteredArticleIds] = React.useState(null);
       const [hydrated, setHydrated] = React.useState(false);
       const [, bump] = React.useReducer(function (n) { return n + 1; }, 0);
 
@@ -319,6 +320,10 @@ ${reactJs}
         viewState.toggleSource(sourceId);
       }, []);
 
+      const handleTimeFilter = React.useCallback(function (ids) {
+        setFilteredArticleIds(ids);
+      }, []);
+
       // Settings writes logical color keys (draft/published/tag/topology/
       // placeholder); this translates them to the actual CSS custom
       // property names the graph and article cards read via var(...).
@@ -348,6 +353,7 @@ ${reactJs}
             setSelectedArticle(article);
           },
           hiddenSources: hiddenSources,
+          filteredArticleIds: filteredArticleIds,
           viewState: viewState,
           colorOverrides: colorOverrides
         }),
@@ -356,6 +362,10 @@ ${reactJs}
           hiddenSources: hiddenSources,
           onToggleSource: toggleSource,
           viewState: viewState
+        }),
+        React.createElement(TimeOverlay, {
+          feedData: feed,
+          onFilterChange: handleTimeFilter
         }),
         React.createElement(LayoutControls, null),
         React.createElement(DimensionsControls, null),

@@ -104,6 +104,7 @@
 
   // ── Highlighting & scroll sync ─────────────────────────────────────────────
   let highlightBlock = null;
+  let highlightMark = null;
 
   function highlightSentence(idx) {
     clearHighlight();
@@ -133,6 +134,20 @@
       if (!highlightBlock.style.borderRadius) highlightBlock.style.removeProperty('border-radius');
       highlightBlock = null;
     }
+    highlightMark = null;
+
+    // Defensive sweep: ensure no orphaned <mark class="tts-active"> elements remain in DOM
+    try {
+      const marks = document.querySelectorAll('mark.tts-active');
+      marks.forEach(m => {
+        const p = m.parentNode;
+        if (p) {
+          while (m.firstChild) p.insertBefore(m.firstChild, m);
+          p.removeChild(m);
+          p.normalize();
+        }
+      });
+    } catch (e) { /* ignore cleanup errors */ }
   }
 
   // ── Playback loop ──────────────────────────────────────────────────────────
@@ -399,31 +414,21 @@
       'Google US English', 'Google UK English Male', 'Google UK English Female',
     ]);
 
-    // Ranked preference list for the default voice. The first match found in
-    // the browser's available voices wins. "Google UK English Male" is the
-    // closest to "Google English 7 Natural" available in Chrome's Web Speech
-    // API on desktop; the numbered variants (if present on Android/ChromeOS)
-    // are checked first.
-    const PREFERRED_VOICES = [
-      'Google UK English Male',
-      'Google US English',
-      'Google UK English Female',
-      'Daniel',
-      'Samantha',
-    ];
-
-    function pickDefaultVoice() {
-      const all = synth.getVoices();
-      for (const name of PREFERRED_VOICES) {
-        const match = all.find(v => v.name === name || v.name.replace(/ \(English.*\)/, '') === name);
-        if (match) return match.name;
-      }
-      // Last resort: first English voice, or first voice period
-      const eng = all.find(v => v.lang && v.lang.startsWith('en'));
-      return eng ? eng.name : (all[0] ? all[0].name : null);
+    function findDefaultBrowserVoice(allVoices) {
+      // 1. Explicit target requested by user: Google US English 7 (Natural)
+      const target = allVoices.find(v => /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.name));
+      if (target) return target.name;
+      // 2. Any Google US English Natural
+      const naturalFallback = allVoices.find(v => /Google.*(?:US\s*)?English.*(?:Natural)/i.test(v.name));
+      if (naturalFallback) return naturalFallback.name;
+      // 3. Any Google English
+      const googleFallback = allVoices.find(v => /Google.*English/i.test(v.name));
+      if (googleFallback) return googleFallback.name;
+      // 4. Any curated voice
+      const curated = allVoices.find(v => CURATED.has(v.name.replace(/ \(English.*\)/, '')));
+      if (curated) return curated.name;
+      return allVoices[0]?.name || null;
     }
-
-    let defaultVoiceName = null;
 
     window.TTS.register({
       id: 'browser',
@@ -432,27 +437,36 @@
         speed:  { type: 'range', min: 0.5, max: 3, step: 0.1, default: 1, label: 'Speed' },
         pitch:  { type: 'range', min: 0, max: 2, step: 0.1, default: 1, label: 'Pitch' },
         volume: { type: 'range', min: 0, max: 1, step: 0.1, default: 1, label: 'Volume' },
-        voice:  { type: 'voice', get default() { return defaultVoiceName; }, label: 'Voice' },
+        voice:  {
+          type: 'voice',
+          get default() {
+            return findDefaultBrowserVoice(synth ? synth.getVoices() : []);
+          },
+          label: 'Voice'
+        },
       },
 
       init: async function () {
         // Browser TTS is always ready — no model to load
         refreshVoices();
-        if (!defaultVoiceName) defaultVoiceName = pickDefaultVoice();
       },
 
       voices: function () {
         const all = synth.getVoices();
-        // Group by language, curated first
+        // Group by language, prioritized voice first, then curated
         return all.map(v => {
           const clean = v.name.replace(/ \(English.*\)/, '');
+          const isTarget = /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.name);
           return {
             id: v.name,
-            label: clean,
+            label: v.name, // Keep descriptive name so specific voice variants are distinct
             lang: v.lang,
-            curated: CURATED.has(clean),
+            curated: isTarget || CURATED.has(clean),
+            isTarget: isTarget,
           };
         }).sort((a, b) => {
+          if (a.isTarget && !b.isTarget) return -1;
+          if (!a.isTarget && b.isTarget) return 1;
           if (a.curated && !b.curated) return -1;
           if (!a.curated && b.curated) return 1;
           return a.label.localeCompare(b.label);
@@ -581,6 +595,9 @@
         return new Promise((resolve, reject) => {
           worker.addEventListener('message', function handler(e) {
             const msg = e.data;
+            if (msg.status === 'progress') {
+              emit('loadingProgress', { engine: 'kokoro', progress: msg.progress });
+            }
             if (msg.status === 'ready') {
               ready = true;
               voiceList = msg.voices || [];
@@ -697,7 +714,14 @@
               currentAudio = new Audio(url);
               currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
               currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
-              currentAudio.play();
+              const playPromise = currentAudio.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                  URL.revokeObjectURL(url);
+                  currentAudio = null;
+                  reject(new Error('Audio play prevented: ' + (err.message || err)));
+                });
+              }
             });
           });
         }

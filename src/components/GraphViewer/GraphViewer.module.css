@@ -62,6 +62,16 @@
   transition: opacity 0.2s ease;
 }
 
+.graphContainer :global(.node-card.dimmed) {
+  opacity: 0.22;
+  transition: opacity 0.25s ease;
+}
+
+.graphContainer :global(.link.dimmed) {
+  opacity: 0.08;
+  transition: opacity 0.25s ease;
+}
+
 .graphContainer :global(.tag-active rect),
 .graphContainer :global(.tag-active ellipse) {
   filter: drop-shadow(0 0 6px var(--gv-accent));

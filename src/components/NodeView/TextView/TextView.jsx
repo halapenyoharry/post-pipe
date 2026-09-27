@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './TextView.module.css';
+import { ResizeHandles } from '../ResizeHandles';
 
 /**
  * TextView — the lens that renders a text-substrate node (essay, fragment,
@@ -13,16 +14,17 @@ import styles from './TextView.module.css';
  * Props:
  *   article: the corpus item (title, short_title, description, image, etc.)
  *   width, height: render dimensions in pixels
- *   viewState: { hovered, pinned, lod } — current display mode
+ *   viewState: { hovered, pinned, lod, zoomScale } — current display mode
  *     lod ∈ { 'slug' | 'title' | 'full' } — zoom-derived level of detail
  *     hovered/pinned promote the card to "expanded" (scrollable text)
  *   fullContent: optional pre-fetched article HTML; when present and pinned,
  *     replaces the summary as the scrollable body
+ *   onResize: optional callback ({ width, height }) => void
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
-export function TextView({ article, width, height, viewState, fullContent }) {
-  const { hovered = false, pinned = false, lod = 'full' } = viewState || {};
+export function TextView({ article, width, height, viewState, fullContent, onResize }) {
+  const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
 
@@ -47,6 +49,8 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         pinned={pinned}
         hovered={hovered}
         isDraft={isDraft}
+        zoomScale={zoomScale}
+        onResize={onResize}
       />
     );
   }
@@ -81,8 +85,11 @@ export function TextView({ article, width, height, viewState, fullContent }) {
     sourceColor && !pinned && styles.glow,
     isDraft ? styles.draft : styles.published,
     expanded && styles.expanded,
-    pinned && styles.pinned
+    pinned && styles.pinned,
+    viewState.lod === 'marker' && !expanded && styles.marker
   ].filter(Boolean).join(' ');
+
+  const showHandles = viewState.lod !== 'marker';
 
   return (
     <div
@@ -120,7 +127,14 @@ export function TextView({ article, width, height, viewState, fullContent }) {
         fullContent={fullContent}
       />
       {pinned && <PopoutButton />}
-      {(pinned || hovered) && <ResizeGrip />}
+      {showHandles && (
+        <ResizeHandles
+          width={width}
+          height={height}
+          zoomScale={zoomScale}
+          onResize={onResize}
+        />
+      )}
     </div>
   );
 }
@@ -201,10 +215,12 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     );
   }
 
-  // Slug-LOD: the shortest rung of the ladder, filling the card. This used to
-  // render nothing and lean on a separate counter-scaled SVG overlay, which
-  // meant that whenever the overlay was suppressed the cards went blank —
-  // a hundred empty boxes. The card owns its own label at every zoom now.
+  // Marker-LOD: small dot, empty content inside.
+  if (viewState.lod === 'marker') {
+    return null;
+  }
+
+  // Slug-LOD: the shortest rung of the ladder, filling the card.
   if (viewState.lod === 'slug') {
     const slugLabel =
       article.label || article.labelMedium || article.short_title || article.title || '';
@@ -250,7 +266,7 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
   );
 }
 
-function ImageCard({ article, width, height, pinned, hovered, isDraft }) {
+function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale, onResize }) {
   // Photo-on-top, caption-below. Hover/pin slightly enlarges.
   const cardClassNames = [
     styles.imageCard,
@@ -277,28 +293,12 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft }) {
         {article.short_title || article.title || article.label}
       </div>
       {pinned && <PopoutButton />}
-      {(pinned || hovered) && <ResizeGrip />}
-    </div>
-  );
-}
-
-// Grip for resizing the card. Shown on hover and pinned: at rest a card is
-// a label, and a handle on every node at once would be a hundred invitations
-// to fiddle — but appearing on hover means the user actively looking at a
-// card can immediately resize it.
-// D3 owns the gesture — this element only marks where it starts.
-function ResizeGrip() {
-  return (
-    <div data-resize="1" title="Drag to resize" className={styles.resizeGrip}>
-      <svg
-        data-resize="1"
-        viewBox="0 0 12 12"
-        width="12"
-        height="12"
-        style={{ pointerEvents: 'none' }}
-      >
-        <path d="M11 4 L4 11 M11 8 L8 11" stroke="currentColor" strokeWidth="1.4" fill="none" />
-      </svg>
+      <ResizeHandles
+        width={width}
+        height={height}
+        zoomScale={zoomScale}
+        onResize={onResize}
+      />
     </div>
   );
 }

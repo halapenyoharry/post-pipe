@@ -34,6 +34,12 @@
   border-color: var(--nv-accent);
 }
 
+.marker {
+  border-radius: 50%;
+  padding: 0;
+  border-width: 0;
+}
+
 /* ─── Text content variants ─── */
 
 /* Title on its own (expanded state) — block, with margin below for scroll area. */

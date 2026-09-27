@@ -187,3 +187,26 @@
 .errorToast.show {
   opacity: 1;
 }
+
+.statusBadge {
+  font-size: 11px;
+  color: var(--tts-accent);
+  background: rgba(100, 255, 218, 0.12);
+  border: 1px solid var(--tts-border);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.statusBadge.error {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.15);
+  border-color: rgba(255, 107, 107, 0.4);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}

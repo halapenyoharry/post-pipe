@@ -13,6 +13,8 @@ export function TTS({ targetRef }) {
   const [params, setParams] = useState({});
   const [engineProgress, setEngineProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
     // Wait for the window.TTS global to be populated (e.g. from injected tts.js)
@@ -23,12 +25,32 @@ export function TTS({ targetRef }) {
     const updateState = (s) => {
       setState(s);
       if (s !== 'loading') setEngineProgress(0); // Reset progress when leaving loading
+      if (s === 'playing' || s === 'stopped') {
+        if (!isError) setStatusMessage(null);
+      }
     };
     
-    const handleProgress = (p) => setEngineProgress(p * 100);
+    const handleEngineProgress = (p) => setEngineProgress(p * 100);
+    const handleLoadingProgress = ({ engine, progress }) => {
+      if (progress && progress.status === 'progress' && progress.progress !== undefined) {
+        const pct = Math.round(progress.progress * 100);
+        setStatusMessage(`Loading ${engine}: ${pct}%`);
+      } else if (progress && progress.status) {
+        setStatusMessage(`Loading ${engine}...`);
+      }
+    };
+
     const handleError = (e) => {
-      setErrorMsg(e.error);
-      setTimeout(() => setErrorMsg(''), 4000);
+      const err = e && (e.error || e.message || String(e));
+      const engine = e && e.engine;
+      setErrorMsg(err || 'TTS error');
+      setIsError(true);
+      setStatusMessage(`${engine || 'TTS'} error: ${err || 'Playback failed'}`);
+      setTimeout(() => {
+        setErrorMsg('');
+        setStatusMessage(null);
+        setIsError(false);
+      }, 5000);
     };
 
     const refreshEngines = () => {
@@ -37,14 +59,24 @@ export function TTS({ targetRef }) {
     };
 
     const refreshCapabilities = () => {
-      setVoices(tts.voices());
-      setCapabilities(tts.capabilities());
+      const vList = tts.voices();
+      setVoices(vList);
+      const caps = tts.capabilities();
+      setCapabilities(caps);
       // Initialize local params state from engine current values
       const newParams = {};
-      const caps = tts.capabilities();
       for (const key of Object.keys(caps)) {
         if (key === 'voice') {
-          setSelectedVoice(tts.get('voice') || caps.voice.default);
+          let chosen = tts.get('voice') || caps.voice.default;
+          // If no voice chosen yet or browser engine is active, search for Google US English 7 (Natural)
+          if (!chosen && vList.length) {
+            const match7 = vList.find(v => /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.id || v.label));
+            if (match7) chosen = match7.id;
+          }
+          if (chosen) {
+            tts.set('voice', chosen);
+            setSelectedVoice(chosen);
+          }
         } else {
           newParams[key] = tts.get(key) !== undefined ? tts.get(key) : caps[key].default;
         }
@@ -54,7 +86,8 @@ export function TTS({ targetRef }) {
 
     tts.on('state', updateState);
     tts.on('capabilitiesChanged', refreshCapabilities);
-    tts.on('engineProgress', handleProgress);
+    tts.on('engineProgress', handleEngineProgress);
+    tts.on('loadingProgress', handleLoadingProgress);
     tts.on('error', handleError);
 
     refreshEngines();
@@ -66,7 +99,13 @@ export function TTS({ targetRef }) {
     }
 
     return () => {
-      // We do not have off() methods in current tts.js implementation so we are careful
+      if (tts.off) {
+        tts.off('state', updateState);
+        tts.off('capabilitiesChanged', refreshCapabilities);
+        tts.off('engineProgress', handleEngineProgress);
+        tts.off('loadingProgress', handleLoadingProgress);
+        tts.off('error', handleError);
+      }
       if (window.speechSynthesis) {
         window.speechSynthesis.removeEventListener('voiceschanged', refreshCapabilities);
       }
@@ -78,6 +117,8 @@ export function TTS({ targetRef }) {
     const engineId = e.target.value;
     T.select(engineId);
     setSelectedEngine(engineId);
+    setStatusMessage(null);
+    setIsError(false);
     setVoices(T.voices());
     setCapabilities(T.capabilities());
   };
@@ -97,6 +138,8 @@ export function TTS({ targetRef }) {
 
   const handlePlay = () => {
     if (!T || !targetRef.current) return;
+    setStatusMessage(null);
+    setIsError(false);
     T.play(targetRef.current, { scrollContainer: targetRef.current });
   };
 
@@ -165,6 +208,12 @@ export function TTS({ targetRef }) {
       <div className={`${styles.errorToast} ${errorMsg ? styles.show : ''}`}>
         {errorMsg}
       </div>
+
+      {statusMessage && (
+        <span className={`${styles.statusBadge} ${isError ? styles.error : ''}`}>
+          {statusMessage}
+        </span>
+      )}
 
       <select
         className={styles.select}
