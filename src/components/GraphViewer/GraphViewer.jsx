@@ -1885,33 +1885,68 @@ export function GraphViewer({
       : computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
     if (!computed) return;
 
+    const startPositions = new Map(g.data.nodes.map(d => [d.id, { x: d.x, y: d.y }]));
+
     g.data.nodes.forEach((d) => {
       const saved = vs && vs.nodeState(layout + '::' + persistKey(d));
       const target = (saved && typeof saved.x === 'number' && !saved.auto)
         ? { x: saved.x, y: saved.y }
         : computed[d.id];
       if (!target) return;
-      d.x = target.x; d.y = target.y;
-      d.fx = target.x; d.fy = target.y;
+      d.targetX = target.x;
+      d.targetY = target.y;
+      d.fx = target.x;
+      d.fy = target.y;
       if (vs && !(saved && !saved.auto)) {
         vs.setNodePosition(layout + '::' + persistKey(d), target.x, target.y, { silent: true });
       }
     });
 
-    g.nodes.transition().duration(760).ease(d3.easeCubicInOut)
-      .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-    if (g.articleNodes) {
-      g.articleNodes.transition().duration(760).ease(d3.easeCubicInOut)
-        .style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
-    }
-    g.links.transition().duration(760).ease(d3.easeCubicInOut)
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    const transitionDuration = 760;
+    const transitionEase = d3.easeCubicInOut;
+
+    // Transition a dummy element to drive applyPositions on every frame.
+    // D3 transitions on g.nodes and g.articleNodes animate the visual elements,
+    // while the tween interpolates the underlying node data (d.x, d.y) and calls
+    // g.applyPositions() so edges, rails, pulses, and container hulls follow smoothly.
+    d3.transition()
+      .duration(transitionDuration)
+      .ease(transitionEase)
+      .tween('layout-transition', () => {
+        const interpolators = g.data.nodes.map(d => {
+          const start = startPositions.get(d.id) || { x: d.x, y: d.y };
+          const endX = typeof d.targetX === 'number' ? d.targetX : d.x;
+          const endY = typeof d.targetY === 'number' ? d.targetY : d.y;
+          const ix = d3.interpolateNumber(start.x, endX);
+          const iy = d3.interpolateNumber(start.y, endY);
+          return (t) => {
+            d.x = ix(t);
+            d.y = iy(t);
+          };
+        });
+
+        return (t) => {
+          for (let i = 0; i < interpolators.length; i++) {
+            interpolators[i](t);
+          }
+          g.applyPositions();
+          if (connectorUpdateRef.current) connectorUpdateRef.current();
+        };
+      })
+      .on('end', () => {
+        g.data.nodes.forEach(d => {
+          if (typeof d.targetX === 'number') d.x = d.targetX;
+          if (typeof d.targetY === 'number') d.y = d.targetY;
+          delete d.targetX;
+          delete d.targetY;
+        });
+        g.applyPositions();
+        if (connectorUpdateRef.current) connectorUpdateRef.current();
+      });
 
     const t = setTimeout(() => {
       if (redrawAxisRef.current) redrawAxisRef.current();
       if (g.fitToViewport) g.fitToViewport();
-      if (g.updateContainers) g.updateContainers();
     }, 800);
     return () => clearTimeout(t);
   }, [layout]);
