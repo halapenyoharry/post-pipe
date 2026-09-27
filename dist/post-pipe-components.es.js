@@ -10795,26 +10795,26 @@ function oo() {
 	}, _;
 }
 var so = { graphContainer: "_graphContainer_1bao4_1" }, F = {
-	card: "_card_fv8xv_5",
-	draft: "_draft_fv8xv_24",
-	published: "_published_fv8xv_28",
-	pinned: "_pinned_fv8xv_32",
-	marker: "_marker_fv8xv_37",
-	title: "_title_fv8xv_46",
-	titleCentered: "_titleCentered_fv8xv_57",
-	titleInline: "_titleInline_fv8xv_73",
-	preview: "_preview_fv8xv_83",
-	scroll: "_scroll_fv8xv_93",
-	full: "_full_fv8xv_109",
-	popout: "_popout_fv8xv_126",
-	imageCard: "_imageCard_fv8xv_145",
-	imageFrame: "_imageFrame_fv8xv_156",
-	imageCaption: "_imageCaption_fv8xv_173",
-	scrollFull: "_scrollFull_fv8xv_184",
-	titleScrolling: "_titleScrolling_fv8xv_188",
-	imageMark: "_imageMark_fv8xv_200",
-	glow: "_glow_fv8xv_218",
-	resizeGrip: "_resizeGrip_fv8xv_228"
+	card: "_card_iiy3f_5",
+	draft: "_draft_iiy3f_24",
+	published: "_published_iiy3f_28",
+	pinned: "_pinned_iiy3f_32",
+	marker: "_marker_iiy3f_37",
+	title: "_title_iiy3f_46",
+	titleCentered: "_titleCentered_iiy3f_57",
+	titleInline: "_titleInline_iiy3f_73",
+	preview: "_preview_iiy3f_83",
+	scroll: "_scroll_iiy3f_93",
+	full: "_full_iiy3f_109",
+	popout: "_popout_iiy3f_126",
+	imageCard: "_imageCard_iiy3f_145",
+	imageFrame: "_imageFrame_iiy3f_156",
+	imageCaption: "_imageCaption_iiy3f_173",
+	scrollFull: "_scrollFull_iiy3f_184",
+	titleScrolling: "_titleScrolling_iiy3f_188",
+	imageMark: "_imageMark_iiy3f_200",
+	glow: "_glow_iiy3f_218",
+	resizeGrip: "_resizeGrip_iiy3f_228"
 }, I = {
 	handle: "_handle_11op8_1",
 	resizing: "_resizing_11op8_11",
@@ -11746,7 +11746,7 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 	}, [i]);
 	let y = Oo(u);
 	u.glowPadding;
-	let b = (0, M.useRef)(null), x = (0, M.useRef)(a), S = (0, M.useRef)(!1), C = (0, M.useRef)(null), w = (0, M.useRef)(null), T = (e) => e.originalItem && e.originalItem.id || e.id, ee = (e) => x.current + "::" + T(e), E = (0, M.useRef)(null), D = (0, M.useRef)(null), te = (0, M.useRef)(1), ne = (0, M.useRef)("full"), re = (0, M.useRef)(/* @__PURE__ */ new Set());
+	let b = (0, M.useRef)(null), x = (0, M.useRef)(a), S = (0, M.useRef)(!1), C = (0, M.useRef)(null), w = (0, M.useRef)(null), T = (e) => e.originalItem && e.originalItem.id || e.id, ee = (e) => x.current + "::" + T(e), E = (0, M.useRef)(/* @__PURE__ */ new Set()), D = (0, M.useRef)(null), te = (0, M.useRef)(1), ne = (0, M.useRef)("full"), re = (0, M.useRef)(/* @__PURE__ */ new Set());
 	(0, M.useEffect)(() => {
 		re.current = n instanceof Set ? n : new Set(n || []), !(!h.current || !g.current) && Co(h.current, Ut(g.current), re.current);
 	}, [n]), (0, M.useEffect)(() => {
@@ -11810,7 +11810,7 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 			if (t._resizing = !!(n && n.closest && n.closest("[data-resize=\"1\"]")), t._resizing) {
 				let n = t._size || y({
 					hovered: D.current === t.id,
-					pinned: E.current === t.id
+					pinned: E.current.has(t.id)
 				});
 				t._resizeFrom = {
 					w: n.width,
@@ -11925,7 +11925,7 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 			if (e.type !== "article") return;
 			let t = A.get(e.id);
 			if (!t) return;
-			let n = D.current === e.id, r = E.current === e.id, i = Do(te.current), a = y({
+			let n = D.current === e.id, r = E.current.has(e.id), i = Do(te.current), a = y({
 				hovered: n,
 				pinned: r,
 				lod: i
@@ -11992,25 +11992,16 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 			let n = e.relatedTarget;
 			n && e.currentTarget.contains(n) || D.current === t.id && (D.current = null, me(t), e.currentTarget.style.zIndex = "");
 		}).on("dblclick", (e, t) => {
-			e.stopPropagation(), e.preventDefault(), _.current && _.current(t.originalItem || t), E.current = null, D.current = null, me(t);
+			e.stopPropagation(), e.preventDefault(), _.current && _.current(t.originalItem || t), E.current.delete(t.id), D.current = null, me(t);
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {
-				e.stopPropagation(), _.current && _.current(t.originalItem || t), E.current === t.id && (E.current = null, D.current = null, me(t), e.currentTarget.style.zIndex = "");
+				e.stopPropagation(), _.current && _.current(t.originalItem || t), E.current.has(t.id) && (E.current.delete(t.id), D.current = null, me(t), e.currentTarget.style.zIndex = "");
 				return;
 			}
-			e.stopPropagation();
-			let r = E.current;
-			if (r === t.id) E.current = null, me(t), e.currentTarget.style.zIndex = "";
-			else {
-				if (E.current = t.id, me(t), O.filter((e) => e.id === t.id).raise(), j.filter((e) => e.id === t.id).raise(), e.currentTarget.style.zIndex = 10, r) {
-					let e = a.nodes.find((e) => e.id === r);
-					e && (me(e), j.filter((t) => t.id === e.id).style("z-index", ""));
-				}
-				_e(t).then(() => {
-					E.current === t.id && me(t);
-				});
-			}
+			e.stopPropagation(), E.current.has(t.id) ? (E.current.delete(t.id), me(t), e.currentTarget.style.zIndex = "") : (E.current.add(t.id), me(t), O.filter((e) => e.id === t.id).raise(), j.filter((e) => e.id === t.id).raise(), e.currentTarget.style.zIndex = 10, _e(t).then(() => {
+				E.current.has(t.id) && me(t);
+			}));
 		});
 		let ve = null;
 		O.filter((e) => e.type !== "article").on("click", (e, t) => {
@@ -12030,10 +12021,7 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 				});
 			}
 		}), o.on("click", () => {
-			if (ve && (ve = null, O.classed("dimmed", !1).classed("tag-active", !1), j.classed("dimmed", !1), se.classed("highlighted", !1)), E.current) {
-				let e = a.nodes.find((e) => e.id === E.current);
-				E.current = null, e && (me(e), j.filter((t) => t.id === e.id).style("z-index", ""));
-			}
+			ve && (ve = null, O.classed("dimmed", !1).classed("tag-active", !1), j.classed("dimmed", !1), se.classed("highlighted", !1));
 		});
 		function ye() {
 			se.attr("x1", (e) => e.source.x).attr("y1", (e) => e.source.y).attr("x2", (e) => e.target.x).attr("y2", (e) => e.target.y), O.attr("transform", (e) => "translate(" + e.x + "," + e.y + ")"), j && j.style("transform", (e) => `translate3d(${e.x}px, ${e.y}px, 0px)`);
@@ -12255,35 +12243,35 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 	});
 }
 var B = {
-	overlay: "_overlay_t9314_4",
-	open: "_open_t9314_16",
-	panel: "_panel_t9314_20",
-	wide: "_wide_t9314_51",
-	toolbar: "_toolbar_t9314_70",
-	toolbarGroup: "_toolbarGroup_t9314_81",
-	toolbarSeparator: "_toolbarSeparator_t9314_87",
-	toolbarSpacer: "_toolbarSpacer_t9314_94",
-	tb: "_tb_t9314_98",
-	active: "_active_t9314_120",
-	closeBtn: "_closeBtn_t9314_125",
-	tbTooltip: "_tbTooltip_t9314_140",
-	syndLink: "_syndLink_t9314_160",
-	canonical: "_canonical_t9314_178",
-	progress: "_progress_t9314_194",
-	progressFill: "_progressFill_t9314_200",
-	frontmatterPanel: "_frontmatterPanel_t9314_207",
-	fmRow: "_fmRow_t9314_221",
-	fmLabel: "_fmLabel_t9314_228",
-	fmValue: "_fmValue_t9314_237",
-	fmTag: "_fmTag_t9314_241",
-	fmSyndLink: "_fmSyndLink_t9314_251",
-	body: "_body_t9314_261",
-	articleHeader: "_articleHeader_t9314_308",
-	articleTitle: "_articleTitle_t9314_312",
-	articleByline: "_articleByline_t9314_320",
-	articleMeta: "_articleMeta_t9314_335",
-	copyToast: "_copyToast_t9314_340",
-	show: "_show_t9314_356"
+	overlay: "_overlay_vgb04_4",
+	open: "_open_vgb04_16",
+	panel: "_panel_vgb04_20",
+	wide: "_wide_vgb04_51",
+	toolbar: "_toolbar_vgb04_70",
+	toolbarGroup: "_toolbarGroup_vgb04_81",
+	toolbarSeparator: "_toolbarSeparator_vgb04_87",
+	toolbarSpacer: "_toolbarSpacer_vgb04_94",
+	tb: "_tb_vgb04_98",
+	active: "_active_vgb04_120",
+	closeBtn: "_closeBtn_vgb04_125",
+	tbTooltip: "_tbTooltip_vgb04_140",
+	syndLink: "_syndLink_vgb04_160",
+	canonical: "_canonical_vgb04_178",
+	progress: "_progress_vgb04_194",
+	progressFill: "_progressFill_vgb04_200",
+	frontmatterPanel: "_frontmatterPanel_vgb04_207",
+	fmRow: "_fmRow_vgb04_221",
+	fmLabel: "_fmLabel_vgb04_228",
+	fmValue: "_fmValue_vgb04_237",
+	fmTag: "_fmTag_vgb04_241",
+	fmSyndLink: "_fmSyndLink_vgb04_251",
+	body: "_body_vgb04_261",
+	articleHeader: "_articleHeader_vgb04_308",
+	articleTitle: "_articleTitle_vgb04_312",
+	articleByline: "_articleByline_vgb04_320",
+	articleMeta: "_articleMeta_vgb04_335",
+	copyToast: "_copyToast_vgb04_340",
+	show: "_show_vgb04_356"
 }, Ao = {
 	play: "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><polygon points=\"5,3 19,12 5,21\"/></svg>",
 	pause: "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><rect x=\"5\" y=\"3\" width=\"4\" height=\"18\"/><rect x=\"15\" y=\"3\" width=\"4\" height=\"18\"/></svg>",
@@ -13134,6 +13122,8 @@ function Qo({ viewState: e }) {
 	if ((0, M.useEffect)(() => {
 		if (e) return e.subscribe(() => r((e) => e + 1));
 	}, [e]), (0, M.useEffect)(() => {
+		typeof document < "u" && e.paragraphStyle && (document.documentElement.dataset.ppParagraph = e.paragraphStyle());
+	}), (0, M.useEffect)(() => {
 		if (!t) return;
 		let e = (e) => {
 			e.key === "Escape" && n(!1);
@@ -13213,6 +13203,27 @@ function Qo({ viewState: e }) {
 						})
 					]
 				}, t.key))
+			}),
+			/* @__PURE__ */ (0, L.jsx)("div", {
+				className: Jo.hint,
+				style: { marginTop: "14px" },
+				children: "Paragraphs"
+			}),
+			/* @__PURE__ */ (0, L.jsx)("div", {
+				style: {
+					display: "flex",
+					gap: "8px"
+				},
+				children: [["space", "Space between"], ["indent", "Indent first line"]].map(([t, n]) => /* @__PURE__ */ (0, L.jsx)("button", {
+					className: Jo.resetBtn,
+					"aria-pressed": e.paragraphStyle() === t,
+					style: e.paragraphStyle() === t ? {
+						color: "#fff",
+						borderColor: "rgba(255,255,255,0.6)"
+					} : void 0,
+					onClick: () => e.setParagraphStyle(t),
+					children: n
+				}, t))
 			}),
 			/* @__PURE__ */ (0, L.jsxs)("div", {
 				style: {

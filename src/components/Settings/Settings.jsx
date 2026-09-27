@@ -48,6 +48,14 @@ export function Settings({ viewState }) {
     return viewState.subscribe(() => bump((n) => n + 1));
   }, [viewState]);
 
+  // The paragraph style is applied as an attribute on <html>, so the reader
+  // pane and every open node read the same choice from one place.
+  useEffect(() => {
+    if (typeof document !== 'undefined' && viewState.paragraphStyle) {
+      document.documentElement.dataset.ppParagraph = viewState.paragraphStyle();
+    }
+  });
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
@@ -114,6 +122,21 @@ export function Settings({ viewState }) {
                   />
                   <span className={styles.hexLabel}>{current[f.key]}</span>
                 </label>
+              ))}
+            </div>
+
+            <div className={styles.hint} style={{ marginTop: '14px' }}>Paragraphs</div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[['space', 'Space between'], ['indent', 'Indent first line']].map(([v, label]) => (
+                <button
+                  key={v}
+                  className={styles.resetBtn}
+                  aria-pressed={viewState.paragraphStyle() === v}
+                  style={viewState.paragraphStyle() === v ? { color: '#fff', borderColor: 'rgba(255,255,255,0.6)' } : undefined}
+                  onClick={() => viewState.setParagraphStyle(v)}
+                >
+                  {label}
+                </button>
               ))}
             </div>
 

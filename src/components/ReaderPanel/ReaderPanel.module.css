@@ -376,3 +376,20 @@
   .articleTitle { color: #000 !important; }
   .articleByline { color: #555 !important; }
 }
+
+/* Paragraph style (Settings → Paragraphs). 'indent' is book style: first
+   line indented, no gap; the first paragraph and any paragraph after a
+   heading, rule, or quote starts flush. 'space' keeps the default gap. */
+:global(html[data-pp-paragraph="indent"]) .body :global(p) {
+  margin-top: 0;
+  margin-bottom: 0;
+  text-indent: 1.5em;
+}
+:global(html[data-pp-paragraph="indent"]) .body :global(p:first-child),
+:global(html[data-pp-paragraph="indent"]) .body :global(h1 + p),
+:global(html[data-pp-paragraph="indent"]) .body :global(h2 + p),
+:global(html[data-pp-paragraph="indent"]) .body :global(h3 + p),
+:global(html[data-pp-paragraph="indent"]) .body :global(hr + p),
+:global(html[data-pp-paragraph="indent"]) .body :global(blockquote + p) {
+  text-indent: 0;
+}

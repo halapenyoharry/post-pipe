@@ -373,6 +373,14 @@ function createViewState(opts = {}) {
       update((s) => { s.graphColors = { ...colors }; s.colorProfileId = id; });
     },
 
+    // Paragraph style for every place text is read: the reader pane and an
+    // open node's scrolling text. 'space' = a gap between paragraphs;
+    // 'indent' = book style, first line indented, no gap.
+    paragraphStyle() { return state.paragraphStyle === 'indent' ? 'indent' : 'space'; },
+    setParagraphStyle(v) {
+      update((s) => { s.paragraphStyle = v === 'indent' ? 'indent' : 'space'; });
+    },
+
     // Reading position. Scrolling is continuous and not an undoable act, so it
     // never enters history — taking back a scroll is not a thing readers want.
     setReadingPosition(id, scroll) {

@@ -224,7 +224,7 @@ export function GraphViewer({
 
   // View state lives in refs because it must not trigger React re-renders or
   // re-run the useEffect that owns the simulation.
-  const pinnedIdRef = useRef(null);
+  const pinnedIdsRef = useRef(new Set());
   const hoveredIdRef = useRef(null);
   const zoomScaleRef = useRef(1);
   const currentLodRef = useRef('full');
@@ -480,7 +480,7 @@ export function GraphViewer({
           if (d._resizing) {
             const start = d._size || cardSizeFor({
               hovered: hoveredIdRef.current === d.id,
-              pinned: pinnedIdRef.current === d.id,
+              pinned: pinnedIdsRef.current.has(d.id),
             });
             d._resizeFrom = { w: start.width, h: start.height, x: event.x, y: event.y };
           }
@@ -717,7 +717,7 @@ export function GraphViewer({
       const entry = reactRoots.get(d.id);
       if (!entry) return;
       const hovered = hoveredIdRef.current === d.id;
-      const pinned = pinnedIdRef.current === d.id;
+      const pinned = pinnedIdsRef.current.has(d.id);
       const lod = getLOD(zoomScaleRef.current);
       const defaultSize = cardSizeFor({ hovered, pinned, lod });
       let w, h;
@@ -850,7 +850,7 @@ export function GraphViewer({
         if (onNodeSelectRef.current) {
           onNodeSelectRef.current(d.originalItem || d);
         }
-        pinnedIdRef.current = null;
+        pinnedIdsRef.current.delete(d.id);
         hoveredIdRef.current = null;
         renderArticleBody(d);
       })
@@ -863,8 +863,8 @@ export function GraphViewer({
           if (onNodeSelectRef.current) {
             onNodeSelectRef.current(d.originalItem || d);
           }
-          if (pinnedIdRef.current === d.id) {
-            pinnedIdRef.current = null;
+          if (pinnedIdsRef.current.has(d.id)) {
+            pinnedIdsRef.current.delete(d.id);
             hoveredIdRef.current = null;
             renderArticleBody(d);
             event.currentTarget.style.zIndex = '';
@@ -872,29 +872,23 @@ export function GraphViewer({
           return;
         }
         event.stopPropagation();
-        const prevPinned = pinnedIdRef.current;
-        if (prevPinned === d.id) {
-          pinnedIdRef.current = null;
+        // Any number of nodes can be open at once. Opening one never closes
+        // another: text you have open stays open until you close that node.
+        if (pinnedIdsRef.current.has(d.id)) {
+          pinnedIdsRef.current.delete(d.id);
           renderArticleBody(d);
           event.currentTarget.style.zIndex = '';
         } else {
-          pinnedIdRef.current = d.id;
+          pinnedIdsRef.current.add(d.id);
           renderArticleBody(d);
           nodes.filter(nd => nd.id === d.id).raise();
           articleNodes.filter(nd => nd.id === d.id).raise();
           event.currentTarget.style.zIndex = 10;
-          if (prevPinned) {
-            const prev = data.nodes.find(nd => nd.id === prevPinned);
-            if (prev) {
-               renderArticleBody(prev);
-               articleNodes.filter(nd => nd.id === prev.id).style('z-index', '');
-            }
-          }
           // Fetch full article body so the pinned node becomes a mini-reader.
           // Re-render when content arrives, but only if this node is still
-          // the pinned one (user might have unpinned in the meantime).
+          // open (user might have closed it in the meantime).
           loadFullContent(d).then(() => {
-            if (pinnedIdRef.current === d.id) renderArticleBody(d);
+            if (pinnedIdsRef.current.has(d.id)) renderArticleBody(d);
           });
         }
       });
@@ -942,14 +936,7 @@ export function GraphViewer({
         articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
       }
-      if (pinnedIdRef.current) {
-        const prev = data.nodes.find(nd => nd.id === pinnedIdRef.current);
-        pinnedIdRef.current = null;
-        if (prev) {
-          renderArticleBody(prev);
-          articleNodes.filter(nd => nd.id === prev.id).style('z-index', '');
-        }
-      }
+      // Open nodes stay open on a background click; each closes by clicking it.
     });
 
     // Simulation tick → position nodes. When alpha falls below alphaMin,
