@@ -318,6 +318,16 @@ function createViewState(opts = {}) {
       });
     },
 
+    // Which nodes the reader has open. Kept with the node's other state so an
+    // open chapter is still open on the next visit. Not an undoable act.
+    setNodePinned(id, pinned) {
+      updateTransient((s) => {
+        const prev = s.nodes[id] || {};
+        s.nodes[id] = { ...prev, pinned: !!pinned, t: now() };
+        if (!pinned) delete s.nodes[id].pinned;
+      });
+    },
+
     setLayout(layout) { update((s) => { s.layout = layout; }); },
 
     resetLayout() {

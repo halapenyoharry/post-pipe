@@ -378,7 +378,16 @@ export function GraphViewer({
           d._size = { width: savedSize.w, height: savedSize.h };
         }
       }
-    } else if (viewStateRef.current) {
+    }
+    // Nodes the reader left open stay open across visits.
+    pinnedIdsRef.current = new Set();
+    if (viewStateRef.current) {
+      for (const d of data.nodes) {
+        const saved = viewStateRef.current.nodeState(persistKey(d));
+        if (d.type === 'article' && saved && saved.pinned) pinnedIdsRef.current.add(d.id);
+      }
+    }
+    if (viewStateRef.current && positionsWereDegenerate) {
       // Positions rejected, but a card the reader resized is still their work.
       for (const d of data.nodes) {
         const savedSize = viewStateRef.current.nodeState(persistKey(d));
@@ -816,6 +825,13 @@ export function GraphViewer({
     }
 
     renderAllArticleBodies();
+    // Restored open nodes: fetch their text and bring them to the front.
+    pinnedIdsRef.current.forEach((id) => {
+      const d = data.nodes.find(nd => nd.id === id);
+      if (!d) return;
+      articleNodes.filter(nd => nd.id === id).raise().style('z-index', 10);
+      loadFullContent(d).then(() => { if (pinnedIdsRef.current.has(id)) renderArticleBody(d); });
+    });
     applyVisibility(svg, cardsLayer, hiddenSourcesRef.current);
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
@@ -851,6 +867,7 @@ export function GraphViewer({
           onNodeSelectRef.current(d.originalItem || d);
         }
         pinnedIdsRef.current.delete(d.id);
+        if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
         hoveredIdRef.current = null;
         renderArticleBody(d);
       })
@@ -865,6 +882,7 @@ export function GraphViewer({
           }
           if (pinnedIdsRef.current.has(d.id)) {
             pinnedIdsRef.current.delete(d.id);
+            if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
             hoveredIdRef.current = null;
             renderArticleBody(d);
             event.currentTarget.style.zIndex = '';
@@ -876,10 +894,12 @@ export function GraphViewer({
         // another: text you have open stays open until you close that node.
         if (pinnedIdsRef.current.has(d.id)) {
           pinnedIdsRef.current.delete(d.id);
+          if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
           renderArticleBody(d);
           event.currentTarget.style.zIndex = '';
         } else {
           pinnedIdsRef.current.add(d.id);
+          if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), true);
           renderArticleBody(d);
           nodes.filter(nd => nd.id === d.id).raise();
           articleNodes.filter(nd => nd.id === d.id).raise();

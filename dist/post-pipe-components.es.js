@@ -11786,7 +11786,11 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 				height: n.h
 			});
 		}
-		else if (v.current) for (let e of a.nodes) {
+		if (E.current = /* @__PURE__ */ new Set(), v.current) for (let e of a.nodes) {
+			let t = v.current.nodeState(T(e));
+			e.type === "article" && t && t.pinned && E.current.add(e.id);
+		}
+		if (v.current && S) for (let e of a.nodes) {
 			let t = v.current.nodeState(T(e));
 			t && typeof t.w == "number" && typeof t.h == "number" && (e._size = {
 				width: t.w,
@@ -11986,20 +11990,25 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 				ge.set(e.id, null), e._fullContent = null;
 			}) : (ge.set(e.id, null), e._fullContent = null, Promise.resolve());
 		}
-		he(), Co(o, s, re.current), j.on("mouseover", (e, t) => {
+		he(), E.current.forEach((e) => {
+			let t = a.nodes.find((t) => t.id === e);
+			t && (j.filter((t) => t.id === e).raise().style("z-index", 10), _e(t).then(() => {
+				E.current.has(e) && me(t);
+			}));
+		}), Co(o, s, re.current), j.on("mouseover", (e, t) => {
 			D.current !== t.id && (D.current = t.id, me(t), e.currentTarget.style.zIndex = 10);
 		}).on("mouseout", (e, t) => {
 			let n = e.relatedTarget;
 			n && e.currentTarget.contains(n) || D.current === t.id && (D.current = null, me(t), e.currentTarget.style.zIndex = "");
 		}).on("dblclick", (e, t) => {
-			e.stopPropagation(), e.preventDefault(), _.current && _.current(t.originalItem || t), E.current.delete(t.id), D.current = null, me(t);
+			e.stopPropagation(), e.preventDefault(), _.current && _.current(t.originalItem || t), E.current.delete(t.id), v.current && v.current.setNodePinned(T(t), !1), D.current = null, me(t);
 		}).on("click", (e, t) => {
 			let n = e.target;
 			if (n && (n.dataset?.popout === "1" || n.closest?.("[data-popout=\"1\"]"))) {
-				e.stopPropagation(), _.current && _.current(t.originalItem || t), E.current.has(t.id) && (E.current.delete(t.id), D.current = null, me(t), e.currentTarget.style.zIndex = "");
+				e.stopPropagation(), _.current && _.current(t.originalItem || t), E.current.has(t.id) && (E.current.delete(t.id), v.current && v.current.setNodePinned(T(t), !1), D.current = null, me(t), e.currentTarget.style.zIndex = "");
 				return;
 			}
-			e.stopPropagation(), E.current.has(t.id) ? (E.current.delete(t.id), me(t), e.currentTarget.style.zIndex = "") : (E.current.add(t.id), me(t), O.filter((e) => e.id === t.id).raise(), j.filter((e) => e.id === t.id).raise(), e.currentTarget.style.zIndex = 10, _e(t).then(() => {
+			e.stopPropagation(), E.current.has(t.id) ? (E.current.delete(t.id), v.current && v.current.setNodePinned(T(t), !1), me(t), e.currentTarget.style.zIndex = "") : (E.current.add(t.id), v.current && v.current.setNodePinned(T(t), !0), me(t), O.filter((e) => e.id === t.id).raise(), j.filter((e) => e.id === t.id).raise(), e.currentTarget.style.zIndex = 10, _e(t).then(() => {
 				E.current.has(t.id) && me(t);
 			}));
 		});
