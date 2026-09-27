@@ -416,6 +416,411 @@ function timeAxisGeometry(nodes, axis = {}) {
   };
 }
 
+/**
+ * parseLooseDate(str, side) where side is 'start' or 'end':
+ * strip a trailing ?; split an optional THH:MM.
+ * Year all X -> return null.
+ * Month XX -> January (start) / December (end).
+ * Day XX -> 1st (start) / last day of that month (end).
+ * Without a time: 00:00 (start) / 23:59 (end).
+ * Return UTC milliseconds.
+ */
+function parseLooseDate(str, side = 'start') {
+  if (!str || typeof str !== 'string') return null;
+  let s = str.trim();
+  if (s.endsWith('?')) s = s.slice(0, -1).trim();
+  if (!s) return null;
+
+  const [datePart, timePart] = s.split('T');
+  const dParts = datePart.split('-');
+  const rawYear = dParts[0];
+  const rawMonth = dParts[1];
+  const rawDay = dParts[2];
+
+  if (!rawYear || /^X+$/i.test(rawYear)) return null;
+  const year = parseInt(rawYear, 10);
+  if (!Number.isFinite(year)) return null;
+
+  let month; // 1-12
+  if (!rawMonth || /^X+$/i.test(rawMonth)) {
+    month = side === 'start' ? 1 : 12;
+  } else {
+    month = parseInt(rawMonth, 10);
+    if (!Number.isFinite(month)) return null;
+  }
+
+  const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+  let day;
+  if (!rawDay || /^X+$/i.test(rawDay)) {
+    day = side === 'start' ? 1 : daysInMonth(year, month);
+  } else {
+    day = parseInt(rawDay, 10);
+    if (!Number.isFinite(day)) return null;
+  }
+
+  let hours = 0;
+  let minutes = 0;
+  if (timePart) {
+    const tParts = timePart.split(':');
+    hours = parseInt(tParts[0], 10) || 0;
+    minutes = parseInt(tParts[1], 10) || 0;
+  } else {
+    if (side === 'start') {
+      hours = 0;
+      minutes = 0;
+    } else {
+      hours = 23;
+      minutes = 59;
+    }
+  }
+
+  return Date.UTC(year, month - 1, day, hours, minutes, 0, 0);
+}
+
+/**
+ * dimensionIntervals(nodes, dimension)
+ * returning a Map from node id -> array of { start, end } (numbers; end may equal start).
+ * Only nodes with type === 'article' and at least one interval appear.
+ */
+function dimensionIntervals(nodes, dimension = 'time') {
+  const map = new Map();
+  const articles = (nodes || []).filter((n) => n && n.type === 'article');
+
+  if (dimension === 'time') {
+    for (const n of articles) {
+      if (n.date) {
+        const t = Date.parse(n.date);
+        if (Number.isFinite(t)) {
+          map.set(n.id, [{ start: t, end: t }]);
+        }
+      }
+    }
+  } else if (dimension === 'commits') {
+    for (const n of articles) {
+      if (Array.isArray(n.commit_times)) {
+        const intervals = [];
+        for (const c of n.commit_times) {
+          const t = Date.parse(c);
+          if (Number.isFinite(t)) {
+            intervals.push({ start: t, end: t });
+          }
+        }
+        if (intervals.length > 0) {
+          map.set(n.id, intervals);
+        }
+      }
+    }
+  } else if (dimension === 'chronology') {
+    for (const n of articles) {
+      const cal = n.timeline && n.timeline.calendar_time;
+      if (!cal) continue;
+
+      if (cal.span) {
+        const startStr = cal.span.start;
+        const endStr = cal.span.end;
+        if (!startStr) continue;
+        const start = parseLooseDate(startStr, 'start');
+        if (start === null) continue;
+        let end;
+        if (endStr) {
+          end = parseLooseDate(endStr, 'end');
+          if (end === null) end = parseLooseDate(startStr, 'end');
+        } else {
+          end = parseLooseDate(startStr, 'end');
+        }
+        if (end === null) end = start;
+        map.set(n.id, [{ start, end }]);
+      } else if (cal.date) {
+        const start = parseLooseDate(cal.date, 'start');
+        if (start === null) continue;
+        const end = parseLooseDate(cal.date, 'end') ?? start;
+        map.set(n.id, [{ start, end }]);
+      }
+    }
+  } else if (dimension === 'narrative') {
+    // Determine maxPart per series for numeric series_part
+    const seriesMaxPart = new Map();
+    for (const n of articles) {
+      if (n.series && typeof n.series_part === 'number') {
+        const cur = seriesMaxPart.get(n.series) || 0;
+        if (n.series_part > cur) seriesMaxPart.set(n.series, n.series_part);
+      }
+    }
+
+    for (const n of articles) {
+      let value = null;
+      let isSeries = false;
+      const narrPos = n.timeline && n.timeline.narrative_position;
+      const narrStr = narrPos !== undefined && narrPos !== null ? String(narrPos).trim() : '';
+      const match = narrStr.match(/^(\d+)/);
+
+      if (match) {
+        const digits = match[1];
+        const digitCount = digits.length;
+        const denom = Math.pow(10, digitCount) - 1;
+        value = denom === 0 ? 0 : parseInt(digits, 10) / denom;
+      } else if (typeof n.series_part === 'number') {
+        isSeries = true;
+        const maxPart = seriesMaxPart.get(n.series) || 1;
+        value = maxPart === 1 ? 0 : (n.series_part - 1) / (maxPart - 1);
+      }
+
+      if (value !== null && Number.isFinite(value)) {
+        const item = { start: value, end: value };
+        if (isSeries) item._series_part = n.series_part;
+        map.set(n.id, [item]);
+      }
+    }
+  }
+
+  return map;
+}
+
+// Helpers for date bucketing in UTC
+function getBucketKey(timeMs, unit) {
+  const d = new Date(timeMs);
+  if (unit === 'day') {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  if (unit === 'week') {
+    // ISO week starting Monday
+    const day = d.getUTCDay(); // 0 is Sunday, 1 is Monday, ...
+    const diff = (day + 6) % 7; // days since Monday
+    const mon = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - diff));
+    return Date.UTC(mon.getUTCFullYear(), mon.getUTCMonth(), mon.getUTCDate());
+  }
+  if (unit === 'month') {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  }
+  if (unit === 'year') {
+    return Date.UTC(d.getUTCFullYear(), 0, 1);
+  }
+  return timeMs;
+}
+
+function nextBucketKey(bucketKey, unit) {
+  const d = new Date(bucketKey);
+  if (unit === 'day') {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  }
+  if (unit === 'week') {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 7);
+  }
+  if (unit === 'month') {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+  }
+  if (unit === 'year') {
+    return Date.UTC(d.getUTCFullYear() + 1, 0, 1);
+  }
+  return bucketKey + 1;
+}
+
+function getBucketsForInterval(startMs, endMs, unit) {
+  const s = Math.min(startMs, endMs);
+  const e = Math.max(startMs, endMs);
+  const startBucket = getBucketKey(s, unit);
+  const endBucket = getBucketKey(e, unit);
+  const buckets = [];
+  let cur = startBucket;
+  while (cur <= endBucket) {
+    buckets.push(cur);
+    cur = nextBucketKey(cur, unit);
+  }
+  return buckets;
+}
+
+function formatBucketTick(timeMs, unit) {
+  const d = new Date(timeMs);
+  if (unit === 'day') {
+    // day -> Jun 3
+    const m = d.toLocaleDateString('en', { month: 'short', timeZone: 'UTC' });
+    const day = d.getUTCDate();
+    return `${m} ${day}`;
+  }
+  if (unit === 'week') {
+    // week -> wk Jun 1
+    const m = d.toLocaleDateString('en', { month: 'short', timeZone: 'UTC' });
+    const day = d.getUTCDate();
+    return `wk ${m} ${day}`;
+  }
+  if (unit === 'month') {
+    // month -> Jun '30
+    const m = d.toLocaleDateString('en', { month: 'short', timeZone: 'UTC' });
+    const yr = String(d.getUTCFullYear()).slice(-2);
+    return `${m} '${yr}`;
+  }
+  if (unit === 'year') {
+    // year -> 2030
+    return String(d.getUTCFullYear());
+  }
+  return String(d.getUTCFullYear());
+}
+
+/**
+ * dimensionAxisGeometry(nodes, axis)
+ */
+function dimensionAxisGeometry(nodes, axis = {}) {
+  const dimension = axis.dimension || 'time';
+  const {
+    orientation = 'ltr',
+    origin = { x: 0, y: 0 },
+    length = 4200,
+    granularity = 'auto',
+  } = axis;
+
+  const dir = {
+    ltr: { x: 1, y: 0 },
+    rtl: { x: -1, y: 0 },
+    ttb: { x: 0, y: 1 },
+    btt: { x: 0, y: -1 },
+  }[orientation] || { x: 1, y: 0 };
+
+  const along = (d) => ({ x: origin.x + dir.x * d, y: origin.y + dir.y * d });
+
+  if (dimension === 'time') {
+    const singleGeo = timeAxisGeometry(nodes, axis);
+    if (!singleGeo) return null;
+    const wrappedAnchors = {};
+    for (const [id, pt] of Object.entries(singleGeo.anchors)) {
+      wrappedAnchors[id] = [pt];
+    }
+    return {
+      orientation: singleGeo.orientation,
+      vertical: singleGeo.vertical,
+      from: singleGeo.from,
+      to: singleGeo.to,
+      ticks: singleGeo.ticks,
+      anchors: wrappedAnchors,
+    };
+  }
+
+  const intervalsMap = dimensionIntervals(nodes, dimension);
+  if (intervalsMap.size < 2) return null;
+
+  if (dimension === 'narrative') {
+    // Linear positions, position = value * length.
+    // Ticks at every distinct value, labelled with the node's series_part when it came from series_part,
+    // otherwise the value as a percentage (42%).
+    const anchors = {};
+    const ticksMap = new Map(); // value -> label
+
+    for (const [id, intervals] of intervalsMap.entries()) {
+      const nodeAnchors = [];
+      for (const inv of intervals) {
+        const val = inv.start;
+        const pos = val * length;
+        nodeAnchors.push(along(pos));
+
+        if (!ticksMap.has(val)) {
+          if (inv._series_part !== undefined) {
+            ticksMap.set(val, String(inv._series_part));
+          } else {
+            const pct = Math.round(val * 100);
+            ticksMap.set(val, `${pct}%`);
+          }
+        }
+      }
+      if (nodeAnchors.length > 0) {
+        anchors[id] = nodeAnchors;
+      }
+    }
+
+    if (Object.keys(anchors).length < 2) return null;
+
+    const ticks = [...ticksMap.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([val, label]) => ({
+        t: val,
+        label,
+        ...along(val * length),
+      }));
+
+    return {
+      orientation,
+      vertical: dir.x === 0,
+      from: along(0),
+      to: along(length),
+      ticks,
+      anchors,
+    };
+  }
+
+  // Date dimensions: 'commits' and 'chronology'
+  const units = ['day', 'week', 'month', 'year'];
+
+  function evaluateUnit(unit) {
+    const nodeBucketsMap = new Map();
+    const allBuckets = new Set();
+
+    for (const [id, intervals] of intervalsMap.entries()) {
+      const bucketsForNode = new Set();
+      for (const inv of intervals) {
+        const bList = getBucketsForInterval(inv.start, inv.end, unit);
+        for (const b of bList) {
+          bucketsForNode.add(b);
+        }
+      }
+      const sorted = [...bucketsForNode].sort((a, b) => a - b);
+      const finalBuckets = sorted.length > 12 ? [sorted[0], sorted[sorted.length - 1]] : sorted;
+      nodeBucketsMap.set(id, finalBuckets);
+      for (const b of finalBuckets) allBuckets.add(b);
+    }
+
+    return { unit, nodeBucketsMap, allBuckets };
+  }
+
+  let chosenUnit = granularity;
+  let evaluation;
+
+  if (granularity === 'auto') {
+    for (const u of units) {
+      const ev = evaluateUnit(u);
+      if (ev.allBuckets.size <= 60) {
+        chosenUnit = u;
+        evaluation = ev;
+        break;
+      }
+    }
+    if (!evaluation) {
+      chosenUnit = 'year';
+      evaluation = evaluateUnit('year');
+    }
+  } else {
+    evaluation = evaluateUnit(granularity);
+  }
+
+  const { nodeBucketsMap, allBuckets } = evaluation;
+  const sortedBucketKeys = [...allBuckets].sort((a, b) => a - b);
+  if (sortedBucketKeys.length === 0) return null;
+
+  const scale = compressedTimeScale(sortedBucketKeys, { span: length });
+
+  const anchors = {};
+  for (const [id, buckets] of nodeBucketsMap.entries()) {
+    if (buckets.length > 0) {
+      anchors[id] = buckets.map((b) => along(scale.position(b)));
+    }
+  }
+
+  if (Object.keys(anchors).length < 2) return null;
+
+  const ticks = sortedBucketKeys.map((b) => ({
+    t: b,
+    label: formatBucketTick(b, chosenUnit),
+    ...along(scale.position(b)),
+  }));
+
+  return {
+    orientation,
+    vertical: dir.x === 0,
+    from: along(0),
+    to: along(length),
+    ticks,
+    anchors,
+  };
+}
+
 const LAYOUTS = {
   force: null,        // the simulation owns this one; see GraphViewer
   radial: radialLayout,
@@ -433,5 +838,6 @@ function computeLayout(name, nodes, opts) {
 
 module.exports = {
   radialLayout, timelineLayout, computeLayout, layoutNames,
-  layoutIsDegenerate, timeAxisGeometry, compressedTimeScale, LAYOUTS,
+  layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry,
+  dimensionIntervals, parseLooseDate, compressedTimeScale, LAYOUTS,
 };

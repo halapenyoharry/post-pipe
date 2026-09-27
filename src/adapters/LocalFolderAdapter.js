@@ -75,6 +75,20 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     tags,
     series: c.series || '',
     series_part: c.series_part || null,
+    timeline: c.timeline || undefined,
+    commit_times: (() => {
+      try {
+        const itemFolder = path.join(resolveHome(rootPath), c.id);
+        const out = require('child_process').execFileSync('git', ['log', '--format=%cI', '--reverse', '--', '.'], {
+          cwd: itemFolder,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        return out.split('\n').filter(Boolean);
+      } catch {
+        return [];
+      }
+    })(),
     license: c.license || '',
     canonical_url: c.syndication?.canonical || pagesUrl,
     syndication: c.syndication || {},

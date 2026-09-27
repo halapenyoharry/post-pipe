@@ -11304,27 +11304,282 @@ var xo = (/* @__PURE__ */ o(((e, t) => {
 			anchors: d
 		};
 	}
-	var l = {
+	function l(e, t = "start") {
+		if (!e || typeof e != "string") return null;
+		let n = e.trim();
+		if (n.endsWith("?") && (n = n.slice(0, -1).trim()), !n) return null;
+		let [r, i] = n.split("T"), a = r.split("-"), o = a[0], s = a[1], c = a[2];
+		if (!o || /^X+$/i.test(o)) return null;
+		let l = parseInt(o, 10);
+		if (!Number.isFinite(l)) return null;
+		let u;
+		if (!s || /^X+$/i.test(s)) u = t === "start" ? 1 : 12;
+		else if (u = parseInt(s, 10), !Number.isFinite(u)) return null;
+		let d = (e, t) => new Date(Date.UTC(e, t, 0)).getUTCDate(), f;
+		if (!c || /^X+$/i.test(c)) f = t === "start" ? 1 : d(l, u);
+		else if (f = parseInt(c, 10), !Number.isFinite(f)) return null;
+		let p = 0, m = 0;
+		if (i) {
+			let e = i.split(":");
+			p = parseInt(e[0], 10) || 0, m = parseInt(e[1], 10) || 0;
+		} else t === "start" ? (p = 0, m = 0) : (p = 23, m = 59);
+		return Date.UTC(l, u - 1, f, p, m, 0, 0);
+	}
+	function u(e, t = "time") {
+		let n = /* @__PURE__ */ new Map(), r = (e || []).filter((e) => e && e.type === "article");
+		if (t === "time") {
+			for (let e of r) if (e.date) {
+				let t = Date.parse(e.date);
+				Number.isFinite(t) && n.set(e.id, [{
+					start: t,
+					end: t
+				}]);
+			}
+		} else if (t === "commits") {
+			for (let e of r) if (Array.isArray(e.commit_times)) {
+				let t = [];
+				for (let n of e.commit_times) {
+					let e = Date.parse(n);
+					Number.isFinite(e) && t.push({
+						start: e,
+						end: e
+					});
+				}
+				t.length > 0 && n.set(e.id, t);
+			}
+		} else if (t === "chronology") for (let e of r) {
+			let t = e.timeline && e.timeline.calendar_time;
+			if (t) {
+				if (t.span) {
+					let r = t.span.start, i = t.span.end;
+					if (!r) continue;
+					let a = l(r, "start");
+					if (a === null) continue;
+					let o;
+					i ? (o = l(i, "end"), o === null && (o = l(r, "end"))) : o = l(r, "end"), o === null && (o = a), n.set(e.id, [{
+						start: a,
+						end: o
+					}]);
+				} else if (t.date) {
+					let r = l(t.date, "start");
+					if (r === null) continue;
+					let i = l(t.date, "end") ?? r;
+					n.set(e.id, [{
+						start: r,
+						end: i
+					}]);
+				}
+			}
+		}
+		else if (t === "narrative") {
+			let e = /* @__PURE__ */ new Map();
+			for (let t of r) if (t.series && typeof t.series_part == "number") {
+				let n = e.get(t.series) || 0;
+				t.series_part > n && e.set(t.series, t.series_part);
+			}
+			for (let t of r) {
+				let r = null, i = !1, a = t.timeline && t.timeline.narrative_position, o = (a == null ? "" : String(a).trim()).match(/^(\d+)/);
+				if (o) {
+					let e = o[1], t = 10 ** e.length - 1;
+					r = t === 0 ? 0 : parseInt(e, 10) / t;
+				} else if (typeof t.series_part == "number") {
+					i = !0;
+					let n = e.get(t.series) || 1;
+					r = n === 1 ? 0 : (t.series_part - 1) / (n - 1);
+				}
+				if (r !== null && Number.isFinite(r)) {
+					let e = {
+						start: r,
+						end: r
+					};
+					i && (e._series_part = t.series_part), n.set(t.id, [e]);
+				}
+			}
+		}
+		return n;
+	}
+	function d(e, t) {
+		let n = new Date(e);
+		if (t === "day") return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+		if (t === "week") {
+			let e = (n.getUTCDay() + 6) % 7, t = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() - e));
+			return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+		}
+		return t === "month" ? Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 1) : t === "year" ? Date.UTC(n.getUTCFullYear(), 0, 1) : e;
+	}
+	function f(e, t) {
+		let n = new Date(e);
+		return t === "day" ? Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1) : t === "week" ? Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 7) : t === "month" ? Date.UTC(n.getUTCFullYear(), n.getUTCMonth() + 1, 1) : t === "year" ? Date.UTC(n.getUTCFullYear() + 1, 0, 1) : e + 1;
+	}
+	function p(e, t, n) {
+		let r = Math.min(e, t), i = Math.max(e, t), a = d(r, n), o = d(i, n), s = [], c = a;
+		for (; c <= o;) s.push(c), c = f(c, n);
+		return s;
+	}
+	function m(e, t) {
+		let n = new Date(e);
+		return t === "day" ? `${n.toLocaleDateString("en", {
+			month: "short",
+			timeZone: "UTC"
+		})} ${n.getUTCDate()}` : t === "week" ? `wk ${n.toLocaleDateString("en", {
+			month: "short",
+			timeZone: "UTC"
+		})} ${n.getUTCDate()}` : t === "month" ? `${n.toLocaleDateString("en", {
+			month: "short",
+			timeZone: "UTC"
+		})} '${String(n.getUTCFullYear()).slice(-2)}` : String(n.getUTCFullYear());
+	}
+	function h(e, t = {}) {
+		let n = t.dimension || "time", { orientation: r = "ltr", origin: i = {
+			x: 0,
+			y: 0
+		}, length: o = 4200, granularity: s = "auto" } = t, l = {
+			ltr: {
+				x: 1,
+				y: 0
+			},
+			rtl: {
+				x: -1,
+				y: 0
+			},
+			ttb: {
+				x: 0,
+				y: 1
+			},
+			btt: {
+				x: 0,
+				y: -1
+			}
+		}[r] || {
+			x: 1,
+			y: 0
+		}, d = (e) => ({
+			x: i.x + l.x * e,
+			y: i.y + l.y * e
+		});
+		if (n === "time") {
+			let n = c(e, t);
+			if (!n) return null;
+			let r = {};
+			for (let [e, t] of Object.entries(n.anchors)) r[e] = [t];
+			return {
+				orientation: n.orientation,
+				vertical: n.vertical,
+				from: n.from,
+				to: n.to,
+				ticks: n.ticks,
+				anchors: r
+			};
+		}
+		let f = u(e, n);
+		if (f.size < 2) return null;
+		if (n === "narrative") {
+			let e = {}, t = /* @__PURE__ */ new Map();
+			for (let [n, r] of f.entries()) {
+				let i = [];
+				for (let e of r) {
+					let n = e.start, r = n * o;
+					if (i.push(d(r)), !t.has(n)) if (e._series_part !== void 0) t.set(n, String(e._series_part));
+					else {
+						let e = Math.round(n * 100);
+						t.set(n, `${e}%`);
+					}
+				}
+				i.length > 0 && (e[n] = i);
+			}
+			if (Object.keys(e).length < 2) return null;
+			let n = [...t.entries()].sort((e, t) => e[0] - t[0]).map(([e, t]) => ({
+				t: e,
+				label: t,
+				...d(e * o)
+			}));
+			return {
+				orientation: r,
+				vertical: l.x === 0,
+				from: d(0),
+				to: d(o),
+				ticks: n,
+				anchors: e
+			};
+		}
+		let h = [
+			"day",
+			"week",
+			"month",
+			"year"
+		];
+		function g(e) {
+			let t = /* @__PURE__ */ new Map(), n = /* @__PURE__ */ new Set();
+			for (let [r, i] of f.entries()) {
+				let a = /* @__PURE__ */ new Set();
+				for (let t of i) {
+					let n = p(t.start, t.end, e);
+					for (let e of n) a.add(e);
+				}
+				let o = [...a].sort((e, t) => e - t), s = o.length > 12 ? [o[0], o[o.length - 1]] : o;
+				t.set(r, s);
+				for (let e of s) n.add(e);
+			}
+			return {
+				unit: e,
+				nodeBucketsMap: t,
+				allBuckets: n
+			};
+		}
+		let _ = s, v;
+		if (s === "auto") {
+			for (let e of h) {
+				let t = g(e);
+				if (t.allBuckets.size <= 60) {
+					_ = e, v = t;
+					break;
+				}
+			}
+			v ||= (_ = "year", g("year"));
+		} else v = g(s);
+		let { nodeBucketsMap: y, allBuckets: b } = v, x = [...b].sort((e, t) => e - t);
+		if (x.length === 0) return null;
+		let S = a(x, { span: o }), C = {};
+		for (let [e, t] of y.entries()) t.length > 0 && (C[e] = t.map((e) => d(S.position(e))));
+		if (Object.keys(C).length < 2) return null;
+		let w = x.map((e) => ({
+			t: e,
+			label: m(e, _),
+			...d(S.position(e))
+		}));
+		return {
+			orientation: r,
+			vertical: l.x === 0,
+			from: d(0),
+			to: d(o),
+			ticks: w,
+			anchors: C
+		};
+	}
+	var g = {
 		force: null,
 		radial: i,
 		timeline: o
 	};
-	function u() {
-		return Object.keys(l);
+	function _() {
+		return Object.keys(g);
 	}
-	function d(e, t, n) {
-		let r = l[e];
+	function v(e, t, n) {
+		let r = g[e];
 		return r ? r(t, n) : null;
 	}
 	t.exports = {
 		radialLayout: i,
 		timelineLayout: o,
-		computeLayout: d,
-		layoutNames: u,
+		computeLayout: v,
+		layoutNames: _,
 		layoutIsDegenerate: s,
 		timeAxisGeometry: c,
+		dimensionAxisGeometry: h,
+		dimensionIntervals: u,
+		parseLooseDate: l,
 		compressedTimeScale: a,
-		LAYOUTS: l
+		LAYOUTS: g
 	};
 })))();
 function So(e, t = {}) {
@@ -11347,6 +11602,9 @@ function So(e, t = {}) {
 			reading_time: t.reading_time || "",
 			tags: t.tags || [],
 			series: t.series || "",
+			series_part: t.series_part ?? null,
+			timeline: t.timeline || null,
+			commit_times: t.commit_times || [],
 			license: t.license || "",
 			canonical_url: t.canonical_url || t.url,
 			syndication: t.syndication || {},
@@ -11900,21 +12158,24 @@ function ko({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 		} : {
 			x: s,
 			y: l
-		}, p = (0, xo.timeAxisGeometry)(e.data.nodes, {
+		}, p = (0, xo.dimensionAxisGeometry)(e.data.nodes, {
 			orientation: o ? "ttb" : "ltr",
 			origin: d,
-			length: u
+			length: u,
+			dimension: t.dimension || "time",
+			granularity: t.granularity || "auto"
 		});
 		if (!p) return;
 		let h = e.axisLayer.append("g").attr("class", "time-axis"), g = h.append("g").attr("class", "time-connectors"), _ = [];
 		e.data.nodes.forEach((e) => {
 			let t = p.anchors[e.id];
-			if (!t) return;
-			let n = g.append("line").attr("class", "time-connector").attr("data-node", e.id).attr("x1", t.x).attr("y1", t.y).attr("stroke", e._source && e._source.color || "#7f8ea3").attr("stroke-width", f.connectorWidth).attr("stroke-opacity", f.connectorOpacity);
-			_.push({
-				node: e,
-				anchor: t,
-				line: n
+			!t || !t.length || t.forEach((t) => {
+				let n = g.append("line").attr("class", "time-connector").attr("data-node", e.id).attr("x1", t.x).attr("y1", t.y).attr("stroke", e._source && e._source.color || "#7f8ea3").attr("stroke-width", f.connectorWidth).attr("stroke-opacity", f.connectorOpacity);
+				_.push({
+					node: e,
+					anchor: t,
+					line: n
+				});
 			});
 		});
 		function y() {

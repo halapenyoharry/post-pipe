@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
-import { computeLayout, layoutIsDegenerate, timeAxisGeometry } from './layouts';
+import { computeLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -47,6 +47,9 @@ function feedToGraph(feed, config = {}) {
       reading_time: item.reading_time || '',
       tags: item.tags || [],
       series: item.series || '',
+      series_part: item.series_part ?? null,
+      timeline: item.timeline || null,
+      commit_times: item.commit_times || [],
       license: item.license || '',
       canonical_url: item.canonical_url || item.url,
       syndication: item.syndication || {},
@@ -1250,10 +1253,12 @@ export function GraphViewer({
 
     // A side rail runs earliest at the top; a top or bottom rail earliest at
     // the left. Both are the western reading order for the direction they run.
-    const geo = timeAxisGeometry(g.data.nodes, {
+    const geo = dimensionAxisGeometry(g.data.nodes, {
       orientation: vertical ? 'ttb' : 'ltr',
       origin,
       length,
+      dimension: axis.dimension || 'time',
+      granularity: axis.granularity || 'auto',
     });
     if (!geo) return;
 
@@ -1263,16 +1268,18 @@ export function GraphViewer({
     const conn = root.append('g').attr('class', 'time-connectors');
     const connected = [];
     g.data.nodes.forEach((d) => {
-      const a2 = geo.anchors[d.id];
-      if (!a2) return;
-      const line = conn.append('line')
-        .attr('class', 'time-connector')
-        .attr('data-node', d.id)
-        .attr('x1', a2.x).attr('y1', a2.y)
-        .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
-        .attr('stroke-width', AX.connectorWidth)
-        .attr('stroke-opacity', AX.connectorOpacity);
-      connected.push({ node: d, anchor: a2, line });
+      const anchors = geo.anchors[d.id];
+      if (!anchors || !anchors.length) return;
+      anchors.forEach((a2) => {
+        const line = conn.append('line')
+          .attr('class', 'time-connector')
+          .attr('data-node', d.id)
+          .attr('x1', a2.x).attr('y1', a2.y)
+          .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
+          .attr('stroke-width', AX.connectorWidth)
+          .attr('stroke-opacity', AX.connectorOpacity);
+        connected.push({ node: d, anchor: a2, line });
+      });
     });
 
     // The rail is in screen space and the nodes are in graph space, so the
