@@ -777,21 +777,13 @@ export function GraphViewer({
         const hullAvgX = d3.mean(hull, (p) => p[0]);
 
         const badge = group.select('.container-badge');
-        const badgeLabel = c.parent ? `⊟ ${c.label} (${memberNodes.length})` : c.label;
-        badge.select('text').text(badgeLabel);
-        const textNode = badge.select('text').node();
-        const bbox = textNode ? textNode.getBBox() : { width: 80, height: 18 };
-        const badgeW = bbox.width + 24;
-        const badgeH = Math.max(bbox.height + 8, 22);
-
-        badge.select('rect')
-          .attr('x', -badgeW / 2)
-          .attr('y', -badgeH / 2)
-          .attr('width', badgeW)
-          .attr('height', badgeH);
-
-        const badgeY = isRoot ? minY + 14 : minY + 8;
-        badge.attr('transform', `translate(${hullAvgX}, ${badgeY})`);
+        // Label sits at the center of the hull: name, then a smaller count.
+        // No box; text size and color are set when the label is created.
+        badge.select('.container-badge-count').text(` ${memberNodes.length}`);
+        const center = d3.polygonCentroid(hull);
+        const cx = Number.isFinite(center[0]) ? center[0] : hullAvgX;
+        const cy = Number.isFinite(center[1]) ? center[1] : d3.mean(hull, (p) => p[1]);
+        badge.attr('transform', `translate(${cx}, ${cy})`);
       });
     }
 
