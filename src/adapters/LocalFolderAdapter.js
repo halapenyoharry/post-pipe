@@ -78,7 +78,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     series: c.series || '',
     series_part: c.series_part || null,
     timeline: c.timeline || undefined,
-    commit_times: (() => {
+    commit_times: Array.isArray(c.commit_times) ? c.commit_times : (() => {
       try {
         const itemFolder = path.join(resolveHome(rootPath), c.id);
         const out = require('child_process').execFileSync('git', ['log', '--format=%cI', '--reverse', '--', '.'], {

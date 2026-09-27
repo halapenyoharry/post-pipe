@@ -158,6 +158,7 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
     body:           findBody(dir, files, fm.body?.file),
     media:          findMedia(dir, files),
     todos:          files.filter(isTodo),
+    commit_times:   Array.isArray(fm.commit_times) ? fm.commit_times : null,
     source:         'local',
     schema:         'gen2',
   };
