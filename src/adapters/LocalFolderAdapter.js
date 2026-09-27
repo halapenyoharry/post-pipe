@@ -11,6 +11,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { marked } = require('marked');
 
 const { ingestFolder } = require('../../ingest');
 
@@ -22,19 +23,23 @@ const ID = 'local';
  *   title: string,         // display name for the feed
  *   path: string,          // filesystem path or ~/-prefixed
  *   pagesBase: string,     // canonical site URL (for generating per-item URLs)
- *   coversDir: string      // where to copy cover images for the static site
+ *   coversDir: string,     // where to copy cover images for the static site
+ *   pagesDir?: string      // where to write per-item HTML pages
  * }} config
  * @returns {Promise<{items, feedMeta}>}
  */
 async function load(config) {
-  const { id, title, path: rootPath, pagesBase, coversDir } = config;
+  const { id, title, path: rootPath, pagesBase, coversDir, pagesDir } = config;
 
   if (!fs.existsSync(coversDir)) {
     fs.mkdirSync(coversDir, { recursive: true });
   }
 
   const { contents } = ingestFolder(rootPath);
-  const items = contents.map(c => contentToItem(c, rootPath, pagesBase, coversDir));
+  const items = contents.map(c => {
+    generateItemPage(c, rootPath, pagesDir);
+    return contentToItem(c, rootPath, pagesBase, coversDir);
+  });
 
   return {
     items,
@@ -168,6 +173,44 @@ function resolveHome(p) {
   if (!p) return p;
   if (p.startsWith('~')) return path.join(process.env.HOME, p.slice(1));
   return path.resolve(p);
+}
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function generateItemPage(c, rootPath, pagesDir) {
+  if (!pagesDir || !c.body) return;
+  try {
+    const { file, format } = c.body;
+    if (format !== 'md' && format !== 'html') return;
+
+    const resolvedRoot = resolveHome(rootPath);
+    const srcPath = path.join(resolvedRoot, c.id, file);
+    if (!fs.existsSync(srcPath)) return;
+
+    if (!fs.existsSync(pagesDir)) {
+      fs.mkdirSync(pagesDir, { recursive: true });
+    }
+
+    const outPath = path.join(pagesDir, `${c.id}.html`);
+
+    if (format === 'html') {
+      fs.copyFileSync(srcPath, outPath);
+    } else if (format === 'md') {
+      const rawMd = fs.readFileSync(srcPath, 'utf8');
+      const rendered = marked(rawMd);
+      const escapedTitle = escapeHtml(c.title);
+      const doc = `<!doctype html>\n<html><head><meta charset="utf-8"><title>${escapedTitle}</title></head><body><h1>${escapedTitle}</h1>\n${rendered}</body></html>\n`;
+      fs.writeFileSync(outPath, doc, 'utf8');
+    }
+  } catch (err) {
+    console.warn(`[LocalFolderAdapter] failed to generate page for item "${c.id}": ${err.message}`);
+  }
 }
 
 module.exports = { id: ID, load };

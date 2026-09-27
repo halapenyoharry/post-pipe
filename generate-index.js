@@ -15,12 +15,21 @@ const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
 const { loadCorpus }     = require('./src/aggregator');
 const { parseOpml }      = require('./src/lib/opml');
 
-const SETTINGS     = JSON.parse(fs.readFileSync(path.join(__dirname, 'settings.json'), 'utf8'));
-const SITE_DIR     = path.join(__dirname, '_site');
+function expandHome(p) {
+  if (!p) return p;
+  if (p.startsWith('~')) {
+    return path.resolve(path.join(process.env.HOME || '', p.slice(1)));
+  }
+  return path.resolve(p);
+}
+
+const SITE_ROOT    = process.env.POSTPIPE_SITE ? expandHome(process.env.POSTPIPE_SITE) : __dirname;
+const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
+const SITE_DIR     = path.join(SITE_ROOT, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
 const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
-const OPML_PATH    = path.join(__dirname, SETTINGS.feeds_opml_path || 'feeds.opml');
+const OPML_PATH    = path.resolve(SITE_ROOT, SETTINGS.feeds_opml_path || 'feeds.opml');
 const PAGES_BASE   = SETTINGS.site.base_url;
 
 // Registry of adapter modules keyed by OPML type attribute.
@@ -61,11 +70,16 @@ function configFor(entry) {
     prominence: entry.prominence,
   };
   if (entry.type === 'local') {
+    let localPath = entry.xmlUrl.replace(/^local:\/\//, '');
+    if (!localPath.startsWith('/') && !localPath.startsWith('~')) {
+      localPath = path.resolve(SITE_ROOT, localPath);
+    }
     return {
       ...base,
-      path: entry.xmlUrl.replace(/^local:\/\//, ''),
+      path: localPath,
       pagesBase: PAGES_BASE,
       coversDir: COVERS_DIR,
+      pagesDir: SITE_DIR,
     };
   }
   return { ...base, xmlUrl: entry.xmlUrl };
@@ -638,6 +652,7 @@ ${reactJs}
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
+  console.log(`Site root: ${SITE_ROOT}`);
   const entries = buildAdapterEntries();
   const { items, sources } = await loadCorpus(entries);
 
