@@ -159,6 +159,8 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
     media:          findMedia(dir, files),
     todos:          files.filter(isTodo),
     commit_times:   Array.isArray(fm.commit_times) ? fm.commit_times : null,
+    version:        fm.version || null,
+    version_maps:   fm.version_maps || null,
     source:         'local',
     schema:         'gen2',
   };

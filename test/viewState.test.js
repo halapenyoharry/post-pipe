@@ -427,3 +427,11 @@ test('bookmarks persist across reload and do not enter undo history', async () =
   assert.strictEqual(loaded[0].note, 'Saved note');
 });
 
+
+test('bookmarks accept and store optional version', async () => {
+  const { createViewState } = require('../src/lib/viewState');
+  const s = createViewState(); await s.ready();
+  s.addBookmark({ item: 'ch1', para: 1, quote: 'First words', version: 'abc123def456' });
+  const marks = s.bookmarks('ch1');
+  assert.strictEqual(marks[0].version, 'abc123def456');
+});

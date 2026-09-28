@@ -462,7 +462,7 @@ function createViewState(opts = {}) {
         .sort((a, b) => (a.para ?? 0) - (b.para ?? 0) || (a.t ?? 0) - (b.t ?? 0));
     },
 
-    addBookmark({ item, para, quote, note } = {}) {
+    addBookmark({ item, para, quote, note, version } = {}) {
       const id = 'bm-' + now() + '-' + Math.random().toString(36).slice(2, 8);
       const entry = {
         id,
@@ -472,6 +472,7 @@ function createViewState(opts = {}) {
         note: note ? String(note) : '',
         t: now(),
       };
+      if (version) entry.version = version;
       updateTransient((s) => {
         if (!Array.isArray(s.bookmarks)) s.bookmarks = [];
         s.bookmarks.push(entry);

@@ -123,6 +123,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     note: c.note,
     todos: c.todos || [],
     schema: c.schema,
+    version: c.version || undefined,
+    version_maps: c.version_maps || undefined,
   };
 }
 

@@ -153,7 +153,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       viewState.removeBookmark(pId);
     } else {
       const topP = findTopVisibleParagraph();
-      viewState.addBookmark(pId, topP !== null ? topP : undefined);
+      viewState.addBookmark({ item: pId, para: topP !== null ? topP : undefined, version: article.version });
     }
   };
 
@@ -265,14 +265,38 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     const marks = viewState.bookmarks();
     
     // Clear old ribbons
+    const getPlacedBookmarkParagraph = (b, article, ps) => {
+    let para = b.para !== undefined ? b.para : b.paragraph;
+    if (para === undefined || para === null) return null;
+    
+    if (b.version && article.version && b.version !== article.version) {
+      if (article.version_maps && article.version_maps[b.version]) {
+        const mapped = article.version_maps[b.version][para];
+        if (mapped !== undefined && mapped !== -1) {
+          return mapped;
+        }
+      }
+      
+      // Fallback
+      if (b.quote) {
+        const paragraphTexts = Array.from(ps).map(p => p.innerText);
+        const resolved = resolveParagraph(para, b.quote, paragraphTexts);
+        return resolved;
+      }
+    }
+    
+    return para;
+  };
+
     const oldRibbons = bodyRef.current.querySelectorAll('.bookmarkRibbon');
     oldRibbons.forEach(el => el.remove());
 
     if (pId) {
       const b = marks.find(m => m.id === pId);
-      if (b && b.paragraph !== undefined && b.paragraph !== null) {
+      if (b) {
         const ps = bodyRef.current.querySelectorAll('p');
-        if (ps[b.paragraph]) {
+        const placedPara = getPlacedBookmarkParagraph(b, article, ps);
+        if (placedPara !== null && ps[placedPara]) {
           const ribbon = document.createElement('div');
           ribbon.className = 'bookmarkRibbon';
           ribbon.setAttribute('aria-hidden', 'true');
@@ -284,8 +308,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           ribbon.style.width = '20px';
           ribbon.style.height = '20px';
           
-          ps[b.paragraph].style.position = 'relative';
-          ps[b.paragraph].appendChild(ribbon);
+          ps[placedPara].style.position = 'relative';
+          ps[placedPara].appendChild(ribbon);
         }
       }
     }
@@ -476,9 +500,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
                   </div>
                   <div className={styles.markActions}>
                     {b.id === pId && b.paragraph !== undefined && (
-                      <button onClick={() => jumpToParagraph(b.paragraph)} title="Jump to paragraph">Jump</button>
+                      <button onClick={() => { const ps = bodyRef.current?.querySelectorAll('p'); const p = ps ? getPlacedBookmarkParagraph(b, article, ps) : b.para !== undefined ? b.para : b.paragraph; jumpToParagraph(p); }} title="Jump to paragraph">Jump</button>
                     )}
-                    <button onClick={() => handleCopyBookmarkLink(b.id, b.paragraph)} title="Copy link" dangerouslySetInnerHTML={{ __html: ICONS.copy }} />
+                    <button onClick={() => { const ps = bodyRef.current?.querySelectorAll('p'); const p = ps ? getPlacedBookmarkParagraph(b, article, ps) : b.para !== undefined ? b.para : b.paragraph; handleCopyBookmarkLink(b.id, p); }} title="Copy link" dangerouslySetInnerHTML={{ __html: ICONS.copy }} />
                     <button onClick={() => viewState.removeBookmark(b.id)} title="Remove bookmark" dangerouslySetInnerHTML={{ __html: ICONS.trash }} />
                   </div>
                 </div>
