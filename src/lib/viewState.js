@@ -28,6 +28,8 @@ function emptyState(corpusId, layoutVersion) {
     sourceColors: {},  // sourceId -> hex override, chosen from the pill's ring picker
     graphColors: {},   // e.g. draft/published/tag/topology/placeholder -> hex override
     colorProfileId: null, // which preset (if any) graphColors currently matches
+    paragraphIndent: false,
+    paragraphSpace: true,
     nodes: {},      // id -> { x, y, w, h, pinned, t }
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
@@ -244,6 +246,17 @@ function createViewState(opts = {}) {
     async ready() {
       const loaded = await backend.load();
       if (loaded && loaded.version === VERSION) {
+        // If saved state has the old paragraphStyle, map 'indent' to indent on + space off,
+        // and 'space' to indent off + space on.
+        if (loaded.paragraphStyle !== undefined) {
+          if (loaded.paragraphIndent === undefined) {
+            loaded.paragraphIndent = loaded.paragraphStyle === 'indent';
+          }
+          if (loaded.paragraphSpace === undefined) {
+            loaded.paragraphSpace = loaded.paragraphStyle === 'space';
+          }
+          delete loaded.paragraphStyle;
+        }
         // A stored arrangement for a different corpus is not ours to apply.
         if (!opts.corpusId || !loaded.corpusId || loaded.corpusId === opts.corpusId) {
           state = {
@@ -384,11 +397,25 @@ function createViewState(opts = {}) {
     },
 
     // Paragraph style for every place text is read: the reader pane and an
-    // open node's scrolling text. 'space' = a gap between paragraphs;
-    // 'indent' = book style, first line indented, no gap.
-    paragraphStyle() { return state.paragraphStyle === 'indent' ? 'indent' : 'space'; },
+    // open node's scrolling text. Two independent switches:
+    // indent = book style first-line indent; space = gap between paragraphs.
+    paragraphIndent() { return state.paragraphIndent === true; },
+    setParagraphIndent(v) {
+      update((s) => { s.paragraphIndent = Boolean(v); });
+    },
+    paragraphSpace() { return state.paragraphSpace !== false; },
+    setParagraphSpace(v) {
+      update((s) => { s.paragraphSpace = Boolean(v); });
+    },
+    paragraphStyle() {
+      if (state.paragraphIndent && !state.paragraphSpace) return 'indent';
+      return 'space';
+    },
     setParagraphStyle(v) {
-      update((s) => { s.paragraphStyle = v === 'indent' ? 'indent' : 'space'; });
+      update((s) => {
+        s.paragraphIndent = v === 'indent';
+        s.paragraphSpace = v === 'space';
+      });
     },
 
     // Reading position. Scrolling is continuous and not an undoable act, so it

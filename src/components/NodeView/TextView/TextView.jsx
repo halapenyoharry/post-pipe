@@ -23,7 +23,7 @@ import { ResizeHandles } from '../ResizeHandles';
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
-export function TextView({ article, width, height, viewState, fullContent, onResize }) {
+export function TextView({ article, width, height, viewState, fullContent, onResize, cardSettings }) {
   const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
@@ -125,6 +125,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         expanded={expanded}
         useFullArticle={useFullArticle}
         fullContent={fullContent}
+        cardSettings={cardSettings}
       />
       {pinned && <PopoutButton />}
       {showHandles && (
@@ -181,7 +182,25 @@ function fitFontSize(text, width, height, opts = {}) {
 // it takes a third of the card and leaves a slot too short to read in.
 const COMPACT_HEIGHT = 260;
 
-function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent }) {
+// English number words from 0 to 99
+const ONES = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen'
+];
+const TENS = [
+  '', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'
+];
+
+function numberToLowercaseWords(num) {
+  const n = parseInt(num, 10);
+  if (isNaN(n) || n < 0 || n > 99) return String(num);
+  if (n < 20) return ONES[n];
+  const rem = n % 10;
+  return TENS[Math.floor(n / 10)] + (rem ? `-${ONES[rem]}` : '');
+}
+
+function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent, cardSettings }) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
@@ -220,49 +239,49 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     return null;
   }
 
-  // Slug-LOD: the shortest rung of the ladder, filling the card.
-  if (viewState.lod === 'slug') {
-    const slugLabel =
-      article.label || article.labelMedium || article.short_title || article.title || '';
-    return (
-      <div
-        className={styles.titleCentered}
-        style={{ fontSize: fitFontSize(slugLabel, width, height) + 'px' }}
-      >
-        {slugLabel}
-      </div>
-    );
+  // In the unselected (not open) card: do not show the summary (the idea.tldr /
+  // description text). Show the title large and bold, and under it a subtitle
+  // in a smaller, lighter weight, with tight spacing between them (line-height
+  // about 1.05, 2–4px gap), centered in the card.
+  const subtitleTemplate = cardSettings?.subtitle || (typeof window !== 'undefined' && window.SETTINGS?.graph?.card?.subtitle);
+  let subtitle = null;
+  if (subtitleTemplate && article.series_part != null && article.series_part !== '') {
+    const n = article.series_part;
+    const n_words = numberToLowercaseWords(n);
+    subtitle = subtitleTemplate
+      .replace(/\{n\}/g, String(n))
+      .replace(/\{n_words\}/g, n_words);
   }
 
-  // Title-only LOD: centered title, larger font, no description.
-  if (viewState.lod === 'title') {
-    // labelMedium already prefers an authored short_title and falls back to a
-    // four-word reduction, so a long news headline stops being a wall of text
-    // in a card with room for a phrase.
-    const centredLabel =
-      article.labelMedium || article.short_title || article.title || article.label;
-    return (
-      <div
-        className={styles.titleCentered}
-        style={{ fontSize: fitFontSize(centredLabel, width, height) + 'px' }}
-      >
-        {centredLabel}
-      </div>
-    );
-  }
+  const title = (viewState.lod === 'slug')
+    ? (article.label || article.labelMedium || article.title || '')
+    : (article.title || article.label);
 
-  // Full LOD (default): title + truncated description preview.
-  const desc = article.description || '';
-  const preview = desc.length > 120 ? desc.slice(0, 117) + '...' : desc;
+  const titleFontSize = fitFontSize(title, width, subtitle ? (height - 30) : height, {
+    min: 14,
+    max: 26,
+    lineHeight: 1.05,
+    pad: 8,
+  });
+  const subtitleFontSize = Math.max(11, Math.round(titleFontSize * 0.62));
+
   return (
-    <>
-      <div className={styles.titleInline}>
-        {article.title || article.label}
+    <div className={styles.cardCenter}>
+      <div
+        className={styles.cardTitle}
+        style={{ fontSize: `${titleFontSize}px` }}
+      >
+        {title}
       </div>
-      {preview && (
-        <div className={styles.preview}>{preview}</div>
+      {subtitle && (
+        <div
+          className={styles.cardSubtitle}
+          style={{ fontSize: `${subtitleFontSize}px` }}
+        >
+          {subtitle}
+        </div>
       )}
-    </>
+    </div>
   );
 }
 

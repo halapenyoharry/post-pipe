@@ -484,19 +484,30 @@
   .articleByline { color: #555 !important; }
 }
 
-/* Paragraph style (Settings → Paragraphs). 'indent' is book style: first
-   line indented, no gap; the first paragraph and any paragraph after a
-   heading, rule, or quote starts flush. 'space' keeps the default gap. */
-:global(html[data-pp-paragraph="indent"]) .body :global(p) {
-  margin-top: 0;
-  margin-bottom: 0;
+/* Paragraph style (Settings → Paragraphs).
+   Indent on: p { text-indent: 1.5em }, with first paragraph and any paragraph
+   right after a heading, hr, or blockquote at text-indent: 0.
+   Space on: p { margin: 0 0 1em }. Space off: p { margin: 0 }. */
+:global(html[data-pp-indent="on"]) .body :global(p) {
   text-indent: 1.5em;
 }
-:global(html[data-pp-paragraph="indent"]) .body :global(p:first-child),
-:global(html[data-pp-paragraph="indent"]) .body :global(h1 + p),
-:global(html[data-pp-paragraph="indent"]) .body :global(h2 + p),
-:global(html[data-pp-paragraph="indent"]) .body :global(h3 + p),
-:global(html[data-pp-paragraph="indent"]) .body :global(hr + p),
-:global(html[data-pp-paragraph="indent"]) .body :global(blockquote + p) {
+:global(html[data-pp-indent="on"]) .body :global(p:first-child),
+:global(html[data-pp-indent="on"]) .body :global(h1 + p),
+:global(html[data-pp-indent="on"]) .body :global(h2 + p),
+:global(html[data-pp-indent="on"]) .body :global(h3 + p),
+:global(html[data-pp-indent="on"]) .body :global(h4 + p),
+:global(html[data-pp-indent="on"]) .body :global(h5 + p),
+:global(html[data-pp-indent="on"]) .body :global(h6 + p),
+:global(html[data-pp-indent="on"]) .body :global(hr + p),
+:global(html[data-pp-indent="on"]) .body :global(blockquote + p) {
   text-indent: 0;
+}
+:global(html[data-pp-indent="off"]) .body :global(p) {
+  text-indent: 0;
+}
+:global(html[data-pp-space="on"]) .body :global(p) {
+  margin: 0 0 1em;
+}
+:global(html[data-pp-space="off"]) .body :global(p) {
+  margin: 0;
 }

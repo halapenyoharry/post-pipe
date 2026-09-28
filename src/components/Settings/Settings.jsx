@@ -48,11 +48,15 @@ export function Settings({ viewState }) {
     return viewState.subscribe(() => bump((n) => n + 1));
   }, [viewState]);
 
-  // The paragraph style is applied as an attribute on <html>, so the reader
-  // pane and every open node read the same choice from one place.
+  // The paragraph style is applied as two attributes on <html>, so the reader
+  // pane and every open node read the same choices from one place.
   useEffect(() => {
-    if (typeof document !== 'undefined' && viewState.paragraphStyle) {
-      document.documentElement.dataset.ppParagraph = viewState.paragraphStyle();
+    if (typeof document !== 'undefined') {
+      const indent = viewState.paragraphIndent ? viewState.paragraphIndent() : false;
+      const space = viewState.paragraphSpace ? viewState.paragraphSpace() : true;
+      document.documentElement.setAttribute('data-pp-indent', indent ? 'on' : 'off');
+      document.documentElement.setAttribute('data-pp-space', space ? 'on' : 'off');
+      document.documentElement.removeAttribute('data-pp-paragraph');
     }
   });
 
@@ -127,17 +131,22 @@ export function Settings({ viewState }) {
 
             <div className={styles.hint} style={{ marginTop: '14px' }}>Paragraphs</div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {[['space', 'Space between'], ['indent', 'Indent first line']].map(([v, label]) => (
-                <button
-                  key={v}
-                  className={styles.resetBtn}
-                  aria-pressed={viewState.paragraphStyle() === v}
-                  style={viewState.paragraphStyle() === v ? { color: '#fff', borderColor: 'rgba(255,255,255,0.6)' } : undefined}
-                  onClick={() => viewState.setParagraphStyle(v)}
-                >
-                  {label}
-                </button>
-              ))}
+              <button
+                className={styles.resetBtn}
+                aria-pressed={viewState.paragraphIndent ? viewState.paragraphIndent() : false}
+                style={viewState.paragraphIndent && viewState.paragraphIndent() ? { color: '#fff', borderColor: 'rgba(255,255,255,0.6)' } : undefined}
+                onClick={() => viewState.setParagraphIndent && viewState.setParagraphIndent(!viewState.paragraphIndent())}
+              >
+                Indent first line
+              </button>
+              <button
+                className={styles.resetBtn}
+                aria-pressed={viewState.paragraphSpace ? viewState.paragraphSpace() : true}
+                style={viewState.paragraphSpace && viewState.paragraphSpace() ? { color: '#fff', borderColor: 'rgba(255,255,255,0.6)' } : undefined}
+                onClick={() => viewState.setParagraphSpace && viewState.setParagraphSpace(!viewState.paragraphSpace())}
+              >
+                Space between
+              </button>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>

@@ -224,7 +224,8 @@
 }
 
 .glow .titleCentered,
-.glow .titleInline {
+.glow .titleInline,
+.glow .cardTitle {
   text-shadow: 0 0 10px color-mix(in srgb, var(--nv-src) 60%, transparent);
 }
 
@@ -273,19 +274,60 @@
   }
 }
 
-/* Paragraph style (Settings → Paragraphs). 'indent' is book style: first
-   line indented, no gap; the first paragraph and any paragraph after a
-   heading, rule, or quote starts flush. 'space' keeps the default gap. */
-:global(html[data-pp-paragraph="indent"]) .scroll :global(p) {
-  margin-top: 0;
-  margin-bottom: 0;
+/* Centered title + subtitle for unselected card */
+.cardCenter {
+  box-sizing: border-box;
+  padding: 6px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 3px;
+}
+
+.cardTitle {
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.cardSubtitle {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.05;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  letter-spacing: 0.02em;
+}
+
+/* Paragraph style (Settings → Paragraphs).
+   Indent on: p { text-indent: 1.5em }, with first paragraph and any paragraph
+   right after a heading, hr, or blockquote at text-indent: 0.
+   Space on: p { margin: 0 0 1em }. Space off: p { margin: 0 }. */
+:global(html[data-pp-indent="on"]) .scroll :global(p) {
   text-indent: 1.5em;
 }
-:global(html[data-pp-paragraph="indent"]) .scroll :global(p:first-child),
-:global(html[data-pp-paragraph="indent"]) .scroll :global(h1 + p),
-:global(html[data-pp-paragraph="indent"]) .scroll :global(h2 + p),
-:global(html[data-pp-paragraph="indent"]) .scroll :global(h3 + p),
-:global(html[data-pp-paragraph="indent"]) .scroll :global(hr + p),
-:global(html[data-pp-paragraph="indent"]) .scroll :global(blockquote + p) {
+:global(html[data-pp-indent="on"]) .scroll :global(p:first-child),
+:global(html[data-pp-indent="on"]) .scroll :global(h1 + p),
+:global(html[data-pp-indent="on"]) .scroll :global(h2 + p),
+:global(html[data-pp-indent="on"]) .scroll :global(h3 + p),
+:global(html[data-pp-indent="on"]) .scroll :global(h4 + p),
+:global(html[data-pp-indent="on"]) .scroll :global(h5 + p),
+:global(html[data-pp-indent="on"]) .scroll :global(h6 + p),
+:global(html[data-pp-indent="on"]) .scroll :global(hr + p),
+:global(html[data-pp-indent="on"]) .scroll :global(blockquote + p) {
   text-indent: 0;
+}
+:global(html[data-pp-indent="off"]) .scroll :global(p) {
+  text-indent: 0;
+}
+:global(html[data-pp-space="on"]) .scroll :global(p) {
+  margin: 0 0 1em;
+}
+:global(html[data-pp-space="off"]) .scroll :global(p) {
+  margin: 0;
 }

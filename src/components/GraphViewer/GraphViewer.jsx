@@ -555,7 +555,7 @@ export function GraphViewer({
       .style('user-select', 'none')
       .attr('fill', (d) => getContainerColor(d))
       .attr('opacity', 0.55)
-      .attr('font-size', (d) => (!d.parent ? '28px' : '22px'));
+      .attr('font-size', (d) => (!d.parent ? '64px' : '52px'));
 
     containerBadgeTexts.append('tspan')
       .attr('class', 'container-badge-name')
@@ -563,8 +563,8 @@ export function GraphViewer({
 
     containerBadgeTexts.append('tspan')
       .attr('class', 'container-badge-count')
-      .attr('font-size', (d) => (!d.parent ? '18px' : '15px'))
-      .attr('dx', '8px');
+      .attr('font-size', (d) => (!d.parent ? '29px' : '23px'))
+      .attr('dx', '12px');
 
     // Collapsed container macro node (when container is closed, represented like a single node)
     const containerMacroNodes = containerGroups.append('g')
@@ -585,7 +585,7 @@ export function GraphViewer({
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('fill', (d) => getContainerColor(d))
-      .attr('font-size', (d) => (!d.parent ? '28px' : '22px'))
+      .attr('font-size', (d) => (!d.parent ? '64px' : '52px'))
       .attr('font-family', "'Atkinson', sans-serif")
       .attr('font-weight', '700')
       .attr('letter-spacing', '0.05em');
@@ -596,9 +596,37 @@ export function GraphViewer({
 
     containerMacroTexts.append('tspan')
       .attr('class', 'container-macro-count')
-      .attr('font-size', (d) => (!d.parent ? '18px' : '15px'))
+      .attr('font-size', (d) => (!d.parent ? '29px' : '23px'))
       .attr('font-weight', '500')
-      .attr('dx', '8px');
+      .attr('dx', '12px');
+
+    function updateMacroBounds() {
+      containerMacroNodes.each(function (d) {
+        const g = d3.select(this);
+        const textNode = g.select('.container-macro-text').node();
+        let bw = !d.parent ? 380 : 260;
+        let bh = !d.parent ? 110 : 90;
+        if (textNode) {
+          try {
+            const bbox = textNode.getBBox();
+            if (bbox && bbox.width > 0) {
+              const padX = !d.parent ? 36 : 28;
+              const padY = !d.parent ? 22 : 18;
+              bw = bbox.width + padX * 2;
+              bh = bbox.height + padY * 2;
+            }
+          } catch (_) {}
+        }
+        g.select('.container-macro-bg')
+          .attr('width', bw)
+          .attr('height', bh)
+          .attr('x', -bw / 2)
+          .attr('y', -bh / 2);
+        d._macroHalfW = bw / 2;
+        d._macroHalfH = bh / 2;
+      });
+    }
+    updateMacroBounds();
 
     function createContainerDragHandler({ isCollapsed }) {
       return d3.drag()
@@ -686,6 +714,214 @@ export function GraphViewer({
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
 
+    function createContainerSeparationForce() {
+      let simNodes = [];
+
+      function force(alpha) {
+        if (!data.containers || data.containers.length === 0) return;
+
+        const containerCircles = new Map();
+
+        const getHalfSize = (n) => {
+          if (n.type === 'article') {
+            const w = n._size?.width || CARD.width;
+            const h = n._size?.height || CARD.height;
+            return Math.hypot(w, h) / 2;
+          }
+          return (n.size || 60) / 2;
+        };
+
+        const macroHalfSize = Math.hypot(130, 45);
+
+        for (const c of data.containers) {
+          const memberSlugs = getAllMemberSlugs(c.id);
+          const memberNodes = memberSlugs
+            .map((slug) => nodeBySlug.get(slug))
+            .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
+
+          if (memberNodes.length === 0) continue;
+
+          const isClosed = closedContainers.has(c.id);
+          if (isClosed) {
+            // Collapsed container: position is the centroid of its members
+            const avgX = d3.mean(memberNodes, (n) => n.x);
+            const avgY = d3.mean(memberNodes, (n) => n.y);
+            const pad = c.padding != null ? c.padding : 40;
+            const hw = c._macroHalfW || 130;
+            const hh = c._macroHalfH || 45;
+            const r = Math.hypot(hw, hh) + pad;
+            containerCircles.set(c.id, {
+              x: avgX,
+              y: avgY,
+              r,
+              isClosed: true,
+              members: memberNodes,
+            });
+            continue;
+          }
+
+          // Open container: visible member nodes (including nested members)
+          // Skip collapsed containers' hidden members (use the collapsed node's position instead).
+          const visibleItems = [];
+
+          // Include collapsed child macro nodes
+          for (const chId of (containerChildren.get(c.id) || [])) {
+            if (closedContainers.has(chId)) {
+              const chSlugs = getAllMemberSlugs(chId);
+              const chNodes = chSlugs
+                .map((s) => nodeBySlug.get(s))
+                .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
+              if (chNodes.length > 0) {
+                const childDef = data.containers.find((x) => x.id === chId);
+                const hw = childDef?._macroHalfW || 130;
+                const hh = childDef?._macroHalfH || 45;
+                visibleItems.push({
+                  x: d3.mean(chNodes, (n) => n.x),
+                  y: d3.mean(chNodes, (n) => n.y),
+                  halfSize: Math.hypot(hw, hh),
+                });
+              }
+            }
+          }
+
+          // Include visible member nodes (not hidden by any closed container)
+          for (const n of memberNodes) {
+            let hidden = false;
+            for (const clId of closedContainers) {
+              if (getAllMemberSlugs(clId).includes(n.id)) {
+                hidden = true;
+                break;
+              }
+            }
+            if (!hidden) {
+              visibleItems.push({
+                x: n.x,
+                y: n.y,
+                halfSize: getHalfSize(n),
+              });
+            }
+          }
+
+          if (visibleItems.length === 0) continue;
+
+          const cx = d3.mean(visibleItems, (item) => item.x);
+          const cy = d3.mean(visibleItems, (item) => item.y);
+
+          const pad = c.padding != null ? c.padding : 40;
+          let maxDist = 0;
+          for (const item of visibleItems) {
+            const d = Math.hypot(item.x - cx, item.y - cy) + item.halfSize;
+            if (d > maxDist) maxDist = d;
+          }
+          const radius = maxDist + pad;
+
+          containerCircles.set(c.id, {
+            x: cx,
+            y: cy,
+            r: radius,
+            isClosed: false,
+            members: memberNodes,
+          });
+        }
+
+        // Sibling containers separation
+        for (let i = 0; i < data.containers.length; i++) {
+          for (let j = i + 1; j < data.containers.length; j++) {
+            const c1 = data.containers[i];
+            const c2 = data.containers[j];
+            if ((c1.parent || null) !== (c2.parent || null)) continue;
+
+            const circle1 = containerCircles.get(c1.id);
+            const circle2 = containerCircles.get(c2.id);
+            if (!circle1 || !circle2) continue;
+
+            const dx = circle2.x - circle1.x;
+            const dy = circle2.y - circle1.y;
+            const dist = Math.hypot(dx, dy);
+            const minDist = circle1.r + circle2.r;
+
+            if (dist < minDist) {
+              const overlap = minDist - dist;
+              let nx = dist > 1e-4 ? dx / dist : (Math.random() - 0.5) || 1;
+              let ny = dist > 1e-4 ? dy / dist : (Math.random() - 0.5) || 0;
+              const nLen = Math.hypot(nx, ny);
+              nx /= nLen;
+              ny /= nLen;
+
+              const shift = overlap * alpha * 0.5;
+              const shiftX = nx * shift;
+              const shiftY = ny * shift;
+
+              for (const n of circle1.members) {
+                n.vx -= shiftX;
+                n.vy -= shiftY;
+              }
+              for (const n of circle2.members) {
+                n.vx += shiftX;
+                n.vy += shiftY;
+              }
+            }
+          }
+        }
+
+        // Nodes belonging to no container pushed out of any top-level container's circle
+        const allContainedSlugs = new Set();
+        for (const c of data.containers) {
+          for (const s of getAllMemberSlugs(c.id)) {
+            allContainedSlugs.add(s);
+          }
+        }
+
+        const uncontainedNodes = (simNodes.length ? simNodes : data.nodes).filter(
+          (n) => !allContainedSlugs.has(n.id) && Number.isFinite(n.x) && Number.isFinite(n.y)
+        );
+
+        const topContainers = data.containers.filter((c) => !c.parent);
+        for (const tc of topContainers) {
+          const circle = containerCircles.get(tc.id);
+          if (!circle) continue;
+
+          for (const n of uncontainedNodes) {
+            const nHalfSize = getHalfSize(n);
+            const dx = n.x - circle.x;
+            const dy = n.y - circle.y;
+            const dist = Math.hypot(dx, dy);
+            const minDist = circle.r + nHalfSize;
+
+            if (dist < minDist) {
+              const overlap = minDist - dist;
+              let nx = dist > 1e-4 ? dx / dist : (Math.random() - 0.5) || 1;
+              let ny = dist > 1e-4 ? dy / dist : (Math.random() - 0.5) || 0;
+              const nLen = Math.hypot(nx, ny);
+              nx /= nLen;
+              ny /= nLen;
+
+              const shift = overlap * alpha * 0.5;
+              const shiftX = nx * shift;
+              const shiftY = ny * shift;
+
+              n.vx += shiftX;
+              n.vy += shiftY;
+              for (const m of circle.members) {
+                m.vx -= shiftX;
+                m.vy -= shiftY;
+              }
+            }
+          }
+        }
+      }
+
+      force.initialize = (_nodes) => {
+        simNodes = _nodes;
+      };
+
+      return force;
+    }
+
+    if (data.containers && data.containers.length > 0) {
+      simulation.force('containerSeparation', createContainerSeparationForce());
+    }
+
     function updateContainers() {
       if (sortedContainers.length === 0) return;
 
@@ -730,11 +966,14 @@ export function GraphViewer({
           if (closedContainers.has(childId)) {
             const cp = containerCentroids.get(childId);
             if (cp) {
+              const childObj = sortedContainers.find(x => x.id === childId);
+              const hw = childObj?._macroHalfW || 130;
+              const hh = childObj?._macroHalfH || 45;
               points.push(
-                [cp.x - 90, cp.y - 45],
-                [cp.x + 90, cp.y - 45],
-                [cp.x + 90, cp.y + 45],
-                [cp.x - 90, cp.y + 45]
+                [cp.x - hw, cp.y - hh],
+                [cp.x + hw, cp.y - hh],
+                [cp.x + hw, cp.y + hh],
+                [cp.x - hw, cp.y + hh]
               );
             }
           }
@@ -1253,6 +1492,7 @@ export function GraphViewer({
           height: h,
           viewState: { hovered, pinned, lod, zoomScale: zoomScaleRef.current },
           fullContent: d._fullContent || null,
+          cardSettings: CARD,
           onResize: ({ width: newW, height: newH }) => {
             d._customWidth = newW;
             d._customHeight = newH;

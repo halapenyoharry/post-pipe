@@ -336,3 +336,31 @@ test('dragging the axis is one undo, not one per frame', async () => {
   assert.strictEqual(s.timeAxis().x, 0, 'the whole drag came back');
   assert.strictEqual(s.timeAxis().on, true, 'and nothing before it was disturbed');
 });
+
+test('paragraphIndent and paragraphSpace are independent booleans with correct defaults', async () => {
+  const s = mk(); await s.ready();
+  assert.strictEqual(s.paragraphIndent(), false, 'indent defaults to false');
+  assert.strictEqual(s.paragraphSpace(), true, 'space defaults to true');
+
+  s.setParagraphIndent(true);
+  assert.strictEqual(s.paragraphIndent(), true);
+  assert.strictEqual(s.paragraphSpace(), true, 'space remains true');
+
+  s.setParagraphSpace(false);
+  assert.strictEqual(s.paragraphIndent(), true, 'indent remains true');
+  assert.strictEqual(s.paragraphSpace(), false);
+});
+
+test('legacy paragraphStyle maps to paragraphIndent and paragraphSpace on load', async () => {
+  const backendIndent = memoryBackend({ version: 1, paragraphStyle: 'indent' });
+  const a = mk({ backend: backendIndent });
+  await a.ready();
+  assert.strictEqual(a.paragraphIndent(), true, 'indent style maps to indent on');
+  assert.strictEqual(a.paragraphSpace(), false, 'indent style maps to space off');
+
+  const backendSpace = memoryBackend({ version: 1, paragraphStyle: 'space' });
+  const b = mk({ backend: backendSpace });
+  await b.ready();
+  assert.strictEqual(b.paragraphIndent(), false, 'space style maps to indent off');
+  assert.strictEqual(b.paragraphSpace(), true, 'space style maps to space on');
+});
