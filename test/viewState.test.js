@@ -364,3 +364,66 @@ test('legacy paragraphStyle maps to paragraphIndent and paragraphSpace on load',
   assert.strictEqual(b.paragraphIndent(), false, 'space style maps to indent off');
   assert.strictEqual(b.paragraphSpace(), true, 'space style maps to space on');
 });
+
+test('bookmarks add and list in para order', async () => {
+  const s = mk(); await s.ready();
+  const id2 = s.addBookmark({ item: 'ch1', para: 5, quote: 'Five words in the fifth para', note: 'second note' });
+  const id1 = s.addBookmark({ item: 'ch1', para: 1, quote: 'First words in the first para' });
+  const idOther = s.addBookmark({ item: 'ch2', para: 0, quote: 'Other item first para' });
+
+  assert.ok(id1.startsWith('bm-'));
+  assert.ok(id2.startsWith('bm-'));
+
+  // bookmarks('ch1') returns only ch1, sorted by para ascending
+  const ch1Marks = s.bookmarks('ch1');
+  assert.strictEqual(ch1Marks.length, 2);
+  assert.strictEqual(ch1Marks[0].id, id1);
+  assert.strictEqual(ch1Marks[0].para, 1);
+  assert.strictEqual(ch1Marks[0].quote, 'First words in the first para');
+  assert.strictEqual(ch1Marks[0].note, '');
+  assert.strictEqual(ch1Marks[1].id, id2);
+  assert.strictEqual(ch1Marks[1].para, 5);
+  assert.strictEqual(ch1Marks[1].note, 'second note');
+
+  // bookmarks() returns all
+  const allMarks = s.bookmarks();
+  assert.strictEqual(allMarks.length, 3);
+});
+
+test('bookmarks note editing and removal', async () => {
+  const s = mk(); await s.ready();
+  const id = s.addBookmark({ item: 'ch1', para: 3, quote: 'Some words here' });
+  assert.strictEqual(s.bookmarks('ch1')[0].note, '');
+
+  s.setBookmarkNote(id, 'Important revelation');
+  assert.strictEqual(s.bookmarks('ch1')[0].note, 'Important revelation');
+
+  s.removeBookmark(id);
+  assert.strictEqual(s.bookmarks('ch1').length, 0);
+});
+
+test('bookmarks persist across reload and do not enter undo history', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
+  a.setLayout('radial');
+  const id = a.addBookmark({ item: 'ch1', para: 2, quote: 'Quote text', note: 'Saved note' });
+  await a.flush();
+
+  // Bookmarking is reader state, not layout history: undoing skips bookmarks and undoes layout
+  assert.strictEqual(a.bookmarks('ch1').length, 1);
+  a.undo();
+  assert.strictEqual(a.state.layout, 'force', 'undo took back layout');
+  assert.strictEqual(a.bookmarks('ch1').length, 1, 'bookmark survived layout undo');
+
+  // Persists to a fresh instance
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  const loaded = b.bookmarks('ch1');
+  assert.strictEqual(loaded.length, 1);
+  assert.strictEqual(loaded[0].id, id);
+  assert.strictEqual(loaded[0].para, 2);
+  assert.strictEqual(loaded[0].quote, 'Quote text');
+  assert.strictEqual(loaded[0].note, 'Saved note');
+});
+

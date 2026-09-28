@@ -210,6 +210,32 @@
   pointer-events: none;
 }
 
+/* Bookmark ribbon mark in the corner of a card with bookmarks */
+.bookmarkMark {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--nv-accent, #64ffda);
+  color: #141829;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 4px 3px;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.bookmarkCount {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 
 /* Provenance glow. color-mix keeps the halo at the feed's hue without needing
    the colour pre-converted to rgba — the value arrives as whatever the OPML or

@@ -236,9 +236,39 @@ function EmbedApp({ initialConfig, feedData }) {
   }, [features.keyboardShortcuts, viewState]);
 
   const [selectedArticle, setSelectedArticle] = React.useState(null);
+      const [targetParagraph, setTargetParagraph] = React.useState(null);
 
   // Computed derived state
-  const hiddenSources = React.useMemo(() => {
+  
+      React.useEffect(function () {
+        function onHashChange() {
+          const hash = window.location.hash;
+          if (hash.startsWith('#read=')) {
+            const parts = hash.substring(6).split('&p=');
+            const id = parts[0];
+            const p = parts[1] ? parseInt(parts[1], 10) : null;
+            // The items are in feed.items (or feedData.items)
+            const items = typeof feed !== 'undefined' ? (feed.items || []) : (typeof feedData !== 'undefined' ? (feedData.items || []) : []);
+            const item = items.find(i => (i.id === decodeURIComponent(id)) || (i.url === decodeURIComponent(id)));
+            if (item) {
+              if (viewState) {
+                viewState.markSeen(item.id);
+              }
+              setSelectedArticle(item);
+              if (p !== null && !isNaN(p)) {
+                setTargetParagraph(p);
+              } else {
+                setTargetParagraph(null);
+              }
+            }
+          }
+        }
+        window.addEventListener('hashchange', onHashChange);
+        onHashChange();
+        return function () { window.removeEventListener('hashchange', onHashChange); };
+      }, [typeof feed !== 'undefined' ? feed : feedData, viewState]);
+  
+      const hiddenSources = React.useMemo(() => {
     return viewState ? new Set(viewState.state.hiddenSources) : new Set();
   }, [viewState?.state?.hiddenSources]);
 
@@ -355,6 +385,8 @@ function EmbedApp({ initialConfig, feedData }) {
           article={selectedArticle}
           onClose={() => setSelectedArticle(null)}
           settings={settings}
+          viewState={viewState}
+          targetParagraph={targetParagraph}
         />
       )}
     </>

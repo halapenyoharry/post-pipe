@@ -248,6 +248,7 @@ export function GraphViewer({
   const redrawAxisRef = useRef(null);
   // Set by the axis draw so pan and zoom can re-project the connectors.
   const connectorUpdateRef = useRef(null);
+  const renderAllArticleBodiesRef = useRef(null);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -286,6 +287,16 @@ export function GraphViewer({
       if (value) containerRef.current.style.setProperty(prop, value);
     }
   }, [colorOverrides]);
+
+  // When bookmarks or other node viewState changes, re-render article cards
+  useEffect(() => {
+    if (!viewState) return;
+    return viewState.subscribe(() => {
+      if (renderAllArticleBodiesRef.current) {
+        renderAllArticleBodiesRef.current();
+      }
+    });
+  }, [viewState]);
 
   // Apply time filter dimming
   useEffect(() => {
@@ -1485,12 +1496,21 @@ export function GraphViewer({
       entry.wrapper.style.marginTop = (-h / 2) + 'px';
 
       const Lens = lensFor(d.kind);
+      const vs = viewStateRef.current;
+      const bms = vs ? vs.bookmarks(persistKey(d)) : [];
       entry.root.render(
         React.createElement(Lens, {
           article: d,
           width: w,
           height: h,
-          viewState: { hovered, pinned, lod, zoomScale: zoomScaleRef.current },
+          viewState: {
+            hovered,
+            pinned,
+            lod,
+            zoomScale: zoomScaleRef.current,
+            bookmarks: bms,
+            bookmarkCount: bms.length,
+          },
           fullContent: d._fullContent || null,
           cardSettings: CARD,
           onResize: ({ width: newW, height: newH }) => {
@@ -1518,6 +1538,7 @@ export function GraphViewer({
     function renderAllArticleBodies() {
       data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
     }
+    renderAllArticleBodiesRef.current = renderAllArticleBodies;
 
     // Article-content fetch cache. Keyed by node id. Value is the body HTML
     // (with <h1> removed) or null on fetch failure.
@@ -1953,6 +1974,7 @@ export function GraphViewer({
     window.addEventListener('graph:reset-layout', handleResetLayout);
 
     return () => {
+      renderAllArticleBodiesRef.current = null;
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);

@@ -39,6 +39,7 @@ function emptyState(corpusId, layoutVersion) {
     // configuration rather than a patch.
     timeAxis: { on: false, x: 0, y: -1000 },
     reading: {},    // id -> { scroll, seenAt, t }
+    bookmarks: [],  // array of { id, item, para, quote, note, t }
   };
 }
 
@@ -220,7 +221,11 @@ function createViewState(opts = {}) {
   function undo() {
     if (!past.length) return false;
     future.push(clone(state));
+    const bookmarks = state.bookmarks;
+    const reading = state.reading;
     state = past.pop();
+    state.bookmarks = bookmarks;
+    state.reading = reading;
     gestureBase = null;
     notify();
     scheduleSave();
@@ -230,7 +235,11 @@ function createViewState(opts = {}) {
   function redo() {
     if (!future.length) return false;
     past.push(clone(state));
+    const bookmarks = state.bookmarks;
+    const reading = state.reading;
     state = future.pop();
+    state.bookmarks = bookmarks;
+    state.reading = reading;
     gestureBase = null;
     notify();
     scheduleSave();
@@ -264,6 +273,9 @@ function createViewState(opts = {}) {
             ...loaded,
             corpusId: opts.corpusId || loaded.corpusId,
           };
+          if (!Array.isArray(state.bookmarks)) {
+            state.bookmarks = [];
+          }
         }
       }
 
@@ -437,6 +449,55 @@ function createViewState(opts = {}) {
 
     isSeen(id) { return Boolean(state.reading[id] && state.reading[id].seenAt); },
     readingPosition(id) { return (state.reading[id] && state.reading[id].scroll) || 0; },
+
+    // ── bookmarks ────────────────────────────────────────────────────────────
+
+    bookmarks(item) {
+      const all = Array.isArray(state.bookmarks) ? state.bookmarks : [];
+      if (item === undefined || item === null) {
+        return all.slice();
+      }
+      return all
+        .filter((b) => b.item === item)
+        .sort((a, b) => (a.para ?? 0) - (b.para ?? 0) || (a.t ?? 0) - (b.t ?? 0));
+    },
+
+    addBookmark({ item, para, quote, note } = {}) {
+      const id = 'bm-' + now() + '-' + Math.random().toString(36).slice(2, 8);
+      const entry = {
+        id,
+        item,
+        para: typeof para === 'number' ? para : (parseInt(para, 10) || 0),
+        quote: quote ? String(quote) : '',
+        note: note ? String(note) : '',
+        t: now(),
+      };
+      updateTransient((s) => {
+        if (!Array.isArray(s.bookmarks)) s.bookmarks = [];
+        s.bookmarks.push(entry);
+      });
+      gestureBase = null;
+      return id;
+    },
+
+    setBookmarkNote(id, note) {
+      updateTransient((s) => {
+        if (!Array.isArray(s.bookmarks)) s.bookmarks = [];
+        const bm = s.bookmarks.find((b) => b.id === id);
+        if (bm) {
+          bm.note = note !== undefined && note !== null ? String(note) : '';
+        }
+      });
+      gestureBase = null;
+    },
+
+    removeBookmark(id) {
+      updateTransient((s) => {
+        if (!Array.isArray(s.bookmarks)) s.bookmarks = [];
+        s.bookmarks = s.bookmarks.filter((b) => b.id !== id);
+      });
+      gestureBase = null;
+    },
 
     /**
      * Keep per-item state finite without losing anything that still exists.

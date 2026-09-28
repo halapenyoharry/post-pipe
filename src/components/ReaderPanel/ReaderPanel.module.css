@@ -464,8 +464,202 @@
   opacity: 1;
 }
 
+/* Bookmark ribbon in left margin of bookmarked paragraph */
+.bookmarkRibbon {
+  position: absolute;
+  left: -28px;
+  top: 4px;
+  color: var(--rp-accent, #64ffda);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  opacity: 0.85;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 5;
+}
+
+.bookmarkRibbon:hover,
+.bookmarkRibbon.open {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.ribbonTooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: var(--rp-surface, #141829);
+  color: var(--rp-text-bright, #fff);
+  border: 1px solid var(--rp-border, rgba(100, 255, 218, 0.25));
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  min-width: 140px;
+  max-width: 280px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.bookmarkRibbon:hover .ribbonTooltip,
+.bookmarkRibbon.open .ribbonTooltip {
+  display: block;
+}
+
+/* Inline note input when adding bookmark */
+.inlineNoteForm {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.inlineNoteInput {
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid var(--rp-accent);
+  color: var(--rp-text-bright, #fff);
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  outline: none;
+  width: 170px;
+}
+
+.inlineNoteInput::placeholder {
+  color: rgba(204, 214, 246, 0.5);
+}
+
+/* Marks list panel */
+.marksPanel {
+  padding: 14px 20px;
+  background: rgba(17, 24, 39, 0.85);
+  border-bottom: 1px solid var(--rp-border);
+  font-size: 13px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.marksHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rp-accent);
+}
+
+.marksList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.markItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(100, 255, 218, 0.1);
+  border-radius: 6px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.markItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(100, 255, 218, 0.25);
+}
+
+.markBody {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.markQuote {
+  font-weight: 500;
+  color: var(--rp-text-bright, #fff);
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+
+.markNote {
+  font-size: 12px;
+  color: var(--rp-accent);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.markNoteEmpty {
+  color: rgba(204, 214, 246, 0.4);
+  font-style: normal;
+}
+
+.markNoteInput {
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid var(--rp-accent);
+  color: var(--rp-text-bright, #fff);
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 3px;
+  outline: none;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.markActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.markBtn {
+  background: transparent;
+  border: 1px solid rgba(100, 255, 218, 0.2);
+  color: var(--rp-text);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.2s;
+}
+
+.markBtn:hover {
+  background: rgba(100, 255, 218, 0.15);
+  border-color: var(--rp-accent);
+  color: var(--rp-accent);
+}
+
+.markBtnDanger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.noMarks {
+  color: rgba(204, 214, 246, 0.5);
+  font-style: italic;
+  padding: 8px 0;
+}
+
 @media print {
-  .overlay, .toolbar, .progress, .frontmatterPanel, .copyToast {
+  .overlay, .toolbar, .progress, .frontmatterPanel, .marksPanel, .copyToast {
     display: none !important;
   }
   .panel {

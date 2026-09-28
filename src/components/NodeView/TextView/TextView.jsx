@@ -38,6 +38,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     !!(article.syndication && article.syndication.canonical)
   );
   const sourceColor = article.containerColor || article.color || (article._source && article._source.color);
+  const bookmarkCount = viewState?.bookmarkCount ?? (Array.isArray(viewState?.bookmarks) ? viewState.bookmarks.length : (Array.isArray(article?.bookmarks) ? article.bookmarks.length : 0));
 
   // Image-kind nodes are a different visual: photo card with caption.
   if (article.kind === 'image' && article.image) {
@@ -50,6 +51,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         hovered={hovered}
         isDraft={isDraft}
         zoomScale={zoomScale}
+        bookmarkCount={bookmarkCount}
         onResize={onResize}
       />
     );
@@ -109,6 +111,19 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {})
       }}
     >
+      {bookmarkCount > 0 && (
+        <div
+          className={styles.bookmarkMark}
+          title={bookmarkCount === 1 ? '1 bookmark' : `${bookmarkCount} bookmarks`}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+            <path d="M3 2v12l5-3 5 3V2z" />
+          </svg>
+          {bookmarkCount > 1 && (
+            <span className={styles.bookmarkCount}>{bookmarkCount}</span>
+          )}
+        </div>
+      )}
       {hasImage && (
         <div
           className={styles.imageMark}
@@ -285,7 +300,7 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
   );
 }
 
-function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale, onResize }) {
+function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale, bookmarkCount = 0, onResize }) {
   // Photo-on-top, caption-below. Hover/pin slightly enlarges.
   const cardClassNames = [
     styles.imageCard,
@@ -300,6 +315,19 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale
       className={cardClassNames}
       style={{ width, height }}
     >
+      {bookmarkCount > 0 && (
+        <div
+          className={styles.bookmarkMark}
+          title={bookmarkCount === 1 ? '1 bookmark' : `${bookmarkCount} bookmarks`}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+            <path d="M3 2v12l5-3 5 3V2z" />
+          </svg>
+          {bookmarkCount > 1 && (
+            <span className={styles.bookmarkCount}>{bookmarkCount}</span>
+          )}
+        </div>
+      )}
       <div
         className={styles.imageFrame}
         style={{
