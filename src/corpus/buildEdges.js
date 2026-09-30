@@ -7,7 +7,8 @@
 // speaks it — json-graph, json-cytoscape, json-graph3d, topoviewer, and
 // graph-reader — can render the corpus without a post-pipe-specific transform.
 //
-// `layer` is the toggle/color axis: 'authored' | 'tag' | 'topology' | 'sequence'.
+// `layer` is the toggle/color axis: 'authored' | 'tag' | 'topology' | 'sequence'
+// | 'containment'.
 // Authored edges are the ones Harold wrote by hand; inferred ones are derived
 // from shared vocabulary. They are deliberately separable.
 
@@ -132,7 +133,30 @@ function buildEdges(items, options = {}) {
     }
   }
 
-  return edges;
+  return mergeSequenceDuplicates(edges);
+}
+
+// An authored connected_to between two pieces that already follow one another
+// in a series says nothing the `next` edge doesn't. A site that writes prev/next
+// links as connected_to would otherwise draw three lines per pair, two of them
+// unlabeled. So such an edge, in either direction, folds into the `next` edge
+// (which records that it was also authored). Authored edges between pieces that
+// are not neighbours in a series stay as they are.
+function mergeSequenceDuplicates(edges) {
+  const pairKey = (a, b) => (a < b ? a + '\u0000' + b : b + '\u0000' + a);
+  const nextByPair = new Map();
+  for (const e of edges) {
+    if (e.layer === 'sequence') nextByPair.set(pairKey(e.source, e.target), e);
+  }
+  if (nextByPair.size === 0) return edges;
+  return edges.filter((e) => {
+    if (e.layer !== 'authored') return true;
+    const next = nextByPair.get(pairKey(e.source, e.target));
+    if (!next) return true;
+    const dir = e.source === next.source ? 'forward' : 'backward';
+    next.attrs.authored = [...new Set([...(next.attrs.authored || []), dir])];
+    return false;
+  });
 }
 
 module.exports = { buildEdges, slugOf };

@@ -124,3 +124,28 @@ test('hierarchical containment connects parent to child and eliminates radial ta
   assert.strictEqual(tagEdges.filter((e) => e.target === 'tag:philosophy').length, 1);
 });
 
+
+test('connected_to between series neighbours folds into the one next edge', () => {
+  // prev/next written as connected_to both ways: three edges per pair before.
+  const items = Array.from({ length: 11 }, (_, i) => item('ch' + (i + 1), {
+    series: 'act', series_part: i + 1,
+    connected_to: [i > 0 ? 'ch' + i : null, i < 10 ? 'ch' + (i + 2) : null].filter(Boolean),
+  }));
+  const edges = buildEdges(items);
+  assert.strictEqual(edges.length, 10, 'eleven chapters, ten next edges, nothing else');
+  assert.ok(edges.every((e) => e.layer === 'sequence' && e.role === 'next'));
+  assert.deepStrictEqual([...edges[0].attrs.authored].sort(), ['backward', 'forward']);
+});
+
+test('connected_to that is not a series neighbour stays', () => {
+  const items = [
+    item('ch1', { series: 's', series_part: 1, connected_to: ['ch3'] }),
+    item('ch2', { series: 's', series_part: 2 }),
+    item('ch3', { series: 's', series_part: 3, connected_to: ['ch2'] }),
+  ];
+  const edges = buildEdges(items);
+  const authored = edges.filter((e) => e.layer === 'authored');
+  assert.strictEqual(authored.length, 1);
+  assert.strictEqual(authored[0].target, 'https://example.test/ch3.html');
+  assert.strictEqual(edges.filter((e) => e.layer === 'sequence').length, 2);
+});

@@ -17,6 +17,10 @@ function feedToGraph(feed, config = {}) {
   const articleSlugs = new Set();
   const idToSlug = new Map(); // item.id (feed-item identity) -> renderer slug
 
+  // Which edge layers draw a line. A layer left out draws nothing and makes
+  // none of its tag/topology/placeholder nodes; containment is never a line,
+  // the hulls say it.
+  const visibleLayers = new Set(config.visibleLayers || ['sequence']);
   const tagColor = config.tagColor || '#f39c12';
   const topologyColor = config.topologyColor || '#9b59b6';
   const placeholderColor = config.placeholderColor || '#7f8c8d';
@@ -101,6 +105,7 @@ function feedToGraph(feed, config = {}) {
       continue;
     }
 
+    if (!visibleLayers.has(edge.layer)) continue;
     const source = resolveEndpoint(edge.source);
     const target = resolveEndpoint(edge.target);
 
@@ -114,7 +119,10 @@ function feedToGraph(feed, config = {}) {
       auxNodes.set(target, { id: target, label: target, type: 'placeholder', size: 40, color: placeholderColor });
     }
 
-    links.push({ source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer });
+    // What the line says when hovered or tapped: its own label if it has one
+    // (a flashback, say), otherwise its role.
+    const label = edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
+    links.push({ source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label });
   }
 
   nodes.push(...auxNodes.values());
@@ -151,7 +159,7 @@ function applyVisibility(svg, cardsLayer, hiddenSet) {
   cardsLayer.selectAll('.node-card')
     .style('display', (d) => isHiddenArticle(d) ? 'none' : null);
 
-  svg.selectAll('.link')
+  svg.selectAll('.link, .link-hit')
     .style('display', (l) => {
       const sNode = typeof l.source === 'object' ? l.source : null;
       const tNode = typeof l.target === 'object' ? l.target : null;
@@ -316,7 +324,8 @@ export function GraphViewer({
     const config = {
       tagColor: computedStyles.getPropertyValue('--gv-tag-color').trim() || '#f39c12',
       topologyColor: computedStyles.getPropertyValue('--gv-topology-color').trim() || '#9b59b6',
-      placeholderColor: computedStyles.getPropertyValue('--gv-placeholder-color').trim() || '#7f8c8d'
+      placeholderColor: computedStyles.getPropertyValue('--gv-placeholder-color').trim() || '#7f8c8d',
+      visibleLayers: Array.isArray(GS.visibleLayers) ? GS.visibleLayers : ['sequence'],
     };
 
     const data = feedToGraph(feedData, config);
@@ -387,6 +396,7 @@ export function GraphViewer({
       }
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
+      if (edgeLabelFor) placeEdgeLabel();
       // The rail is pinned to the window and the nodes are not, so every pan
       // and zoom moves one end of every connector.
       if (connectorUpdateRef.current) connectorUpdateRef.current();
@@ -1395,8 +1405,9 @@ export function GraphViewer({
       const nx = -dy / dist;
       const ny = dx / dist;
 
-      // Graceful bend: noticeable arc between 36px and 80px offset
-      const bend = Math.min(80, Math.max(36, dist * 0.22));
+      // A gentle bend, toward the right of travel: consecutive chapters on a
+      // clockwise path then bow the way the path itself turns.
+      const bend = Math.min(48, dist * 0.12);
 
       const cx = mx + nx * bend;
       const cy = my + ny * bend;
@@ -1404,7 +1415,51 @@ export function GraphViewer({
       return `M ${ep.x1} ${ep.y1} Q ${cx} ${cy} ${ep.x2} ${ep.y2}`;
     }
 
-    // Render links + nodes without arrowheads (relying solely on the moving bead)
+    // Every drawn edge shows its direction with a small arrowhead in its own
+    // color, and says what it is on hover or tap. One marker per color.
+    const arrowIds = new Map();
+    function arrowFor(color) {
+      if (!arrowIds.has(color)) {
+        const id = 'edge-arrow-' + arrowIds.size;
+        defs.append('marker')
+          .attr('id', id)
+          .attr('viewBox', '0 0 10 10')
+          .attr('refX', 9)
+          .attr('refY', 5)
+          .attr('markerUnits', 'userSpaceOnUse')
+          .attr('markerWidth', 13)
+          .attr('markerHeight', 13)
+          .attr('orient', 'auto')
+          .append('path')
+          .attr('d', 'M 0 1 L 10 5 L 0 9 z')
+          .style('fill', color)
+          .style('fill-opacity', 0.75);
+        arrowIds.set(color, id);
+      }
+      return arrowIds.get(color);
+    }
+    const linkColor = (d) => {
+      if (d.layer !== 'sequence') return '#8a8f9c';
+      const sid = typeof d.source === 'object' ? d.source.id : d.source;
+      const sn = nodeBySlug.get(sid);
+      return sn?.containerColor || 'var(--gv-accent, #d4af37)';
+    };
+
+    // The hit area sits under the containers layer, so a container's title
+    // always wins a tap over an edge passing near it; cards are above both.
+    const linkHits = g.insert('g', '.containers-layer')
+      .attr('class', 'link-hits')
+      .selectAll('.link-hit')
+      .data(data.links)
+      .enter().append('path')
+      .attr('class', 'link-hit')
+      .attr('fill', 'none')
+      .style('stroke', 'transparent')
+      .style('stroke-width', '16px')
+      .style('pointer-events', 'stroke')
+      .style('cursor', 'default');
+
+    // Render links (the moving bead on a sequence edge is drawn separately)
     const links = g.selectAll('.link')
       .data(data.links)
       .enter().append('path')
@@ -1414,12 +1469,9 @@ export function GraphViewer({
         d.role ? `link-role-${d.role}` : '',
       ].filter(Boolean).join(' '))
       .attr('fill', 'none')
-      .style('stroke', (d) => {
-        if (d.layer !== 'sequence') return null;
-        const sid = typeof d.source === 'object' ? d.source.id : d.source;
-        const sn = nodeBySlug.get(sid);
-        return sn?.containerColor || 'var(--gv-accent, #d4af37)';
-      })
+      .attr('data-label', (d) => d.label)
+      .attr('marker-end', (d) => (d.directed ? `url(#${arrowFor(linkColor(d))})` : null))
+      .style('stroke', (d) => (d.layer !== 'sequence' ? null : linkColor(d)))
       .style('stroke-opacity', (d) => (d.layer === 'sequence' ? 0.45 : null));
 
     // Traveling single bead on sequence rail (matches act color)
@@ -1439,6 +1491,63 @@ export function GraphViewer({
         const sn = nodeBySlug.get(sid);
         const col = sn?.containerColor || '#ffd700';
         return `drop-shadow(0 0 4px ${col})`;
+      });
+
+    // An edge's label: shown while the pointer is on the edge, or for a few
+    // seconds after a tap. The same size on screen at any zoom.
+    const edgeLabel = g.append('g')
+      .attr('class', 'edge-label')
+      .style('pointer-events', 'none')
+      .style('display', 'none');
+    const edgeLabelBg = edgeLabel.append('rect')
+      .attr('fill', 'rgba(15, 17, 26, 0.88)')
+      .attr('stroke-opacity', 0.6);
+    const edgeLabelText = edgeLabel.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('font-family', "'Atkinson', sans-serif")
+      .attr('font-weight', 600)
+      .attr('letter-spacing', '0.04em');
+    let edgeLabelFor = null;
+    let edgeLabelEl = null;
+    let edgeLabelTimer = null;
+    function placeEdgeLabel() {
+      if (!edgeLabelFor || !edgeLabelEl) return;
+      const len = edgeLabelEl.getTotalLength ? edgeLabelEl.getTotalLength() : 0;
+      if (!len) { edgeLabel.style('display', 'none'); return; }
+      const p = edgeLabelEl.getPointAtLength(len / 2);
+      const k = zoomScaleRef.current || 1;
+      const fs = 13 / k;
+      const color = linkColor(edgeLabelFor);
+      edgeLabelText.attr('font-size', fs).style('fill', color).text(edgeLabelFor.label);
+      const w = (edgeLabelFor.label.length * 0.62 + 1.4) * fs;
+      const h = fs * 1.7;
+      edgeLabelBg.attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h)
+        .attr('rx', h / 2).style('stroke', color).attr('stroke-width', 1 / k);
+      edgeLabel.attr('transform', `translate(${p.x}, ${p.y})`).style('display', null);
+    }
+    function showEdgeLabel(l, el) {
+      clearTimeout(edgeLabelTimer);
+      edgeLabelTimer = null;
+      edgeLabelFor = l;
+      edgeLabelEl = el;
+      placeEdgeLabel();
+    }
+    function hideEdgeLabel() {
+      clearTimeout(edgeLabelTimer);
+      edgeLabelTimer = null;
+      edgeLabelFor = null;
+      edgeLabelEl = null;
+      edgeLabel.style('display', 'none');
+    }
+    linkHits
+      .on('mouseenter', function (event, l) { showEdgeLabel(l, this); })
+      .on('mouseleave', () => { if (!edgeLabelTimer) hideEdgeLabel(); })
+      .on('click', function (event, l) {
+        // A tap names the edge; it does not count as a tap on the canvas.
+        event.stopPropagation();
+        showEdgeLabel(l, this);
+        edgeLabelTimer = setTimeout(() => { edgeLabelTimer = null; hideEdgeLabel(); }, 2500);
       });
 
 
@@ -1536,10 +1645,12 @@ export function GraphViewer({
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
             if (sid === d.id || tid === d.id) {
-              const ep = linkEndpoints(l);
-              d3.select(this).attr('d', linkPath(l, ep));
+              l._path = linkPath(l, linkEndpoints(l));
+              d3.select(this).attr('d', l._path);
             }
           });
+          linkHits.attr('d', (l) => l._path || 'M 0 0');
+          hideEdgeLabel();
           sequencePulses.each(function(l) {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
@@ -1988,6 +2099,7 @@ export function GraphViewer({
       });
 
     svg.on('click', () => {
+      hideEdgeLabel();
       if (activeTag) {
         activeTag = null;
         nodes.classed('dimmed', false).classed('tag-active', false);
@@ -2008,9 +2120,11 @@ export function GraphViewer({
     // needs no simulation — and would have got a graph stacked at the origin.
     function applyPositions() {
       links.each(function(l) {
-        const ep = linkEndpoints(l);
-        d3.select(this).attr('d', linkPath(l, ep));
+        l._path = linkPath(l, linkEndpoints(l));
+        d3.select(this).attr('d', l._path);
       });
+      linkHits.attr('d', (l) => l._path || 'M 0 0');
+      if (edgeLabelFor) placeEdgeLabel();
       sequencePulses.each(function(l) {
         const ep = linkEndpoints(l);
         d3.select(this).attr('d', linkPath(l, ep));

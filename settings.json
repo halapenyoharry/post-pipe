@@ -360,6 +360,8 @@
       "alphaDecay": 0.028
     },
     "collapseGesture": "tap",
-    "_collapseGesture_note": "tap (default) or doubletap: what opens and closes a container, on its title or its closed node. A tap is under 4px of movement; more than that drags the container."
+    "_collapseGesture_note": "tap (default) or doubletap: what opens and closes a container, on its title or its closed node. A tap is under 4px of movement; more than that drags the container.",
+    "visibleLayers": ["sequence"],
+    "_visibleLayers_note": "Which edge layers draw lines: sequence, authored, tag, topology. Default sequence only. Containment is never a line; the hulls show it. A connected_to between two pieces that follow one another in a series is folded into that next edge."
   }
 }
