@@ -36,13 +36,26 @@ async function load(config) {
   }
 
   const { contents } = ingestFolder(rootPath);
-  const items = contents.filter(c => {
+  
+  const hiddenSlugs = new Set();
+  const visibleContents = [];
+  
+  for (const c of contents) {
     let vis = c.posted;
     if (vis === undefined || vis === null) vis = config.visibilityDefault;
     const isVisible = (vis === true || vis === 'yes' || vis === 'true' || vis === 'public');
-    return isVisible;
-  }).map(c => {
-    generateItemPage(c, rootPath, pagesDir);
+    if (isVisible) {
+      visibleContents.push(c);
+    } else {
+      hiddenSlugs.add(c.id);
+    }
+  }
+
+  const items = visibleContents.map(c => {
+    if (c.connected_to && Array.isArray(c.connected_to)) {
+      c.connected_to = c.connected_to.filter(slug => !hiddenSlugs.has(slug));
+    }
+    generateItemPage(c, rootPath, pagesDir, hiddenSlugs);
     return contentToItem(c, rootPath, pagesBase, coversDir);
   });
 
@@ -206,7 +219,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function generateItemPage(c, rootPath, pagesDir) {
+function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set()) {
   if (!pagesDir || !c.body) return;
   try {
     const { file, format } = c.body;
@@ -225,7 +238,21 @@ function generateItemPage(c, rootPath, pagesDir) {
     if (format === 'html') {
       fs.copyFileSync(srcPath, outPath);
     } else if (format === 'md') {
-      const rawMd = fs.readFileSync(srcPath, 'utf8');
+      let rawMd = fs.readFileSync(srcPath, 'utf8');
+      if (hiddenSlugs.size > 0) {
+        // Find links in markdown, e.g. [some text](slug) or [some text](slug.html) or [some text](./slug.html)
+        // We replace them with just the text if the slug is hidden.
+        // A naive regex for markdown links:
+        const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+        rawMd = rawMd.replace(linkRegex, (match, text, url) => {
+          // Normalize url to slug
+          let slug = url.replace(/^\.\//, '').replace(/\.html$/, '').replace(/\/$/, '');
+          if (hiddenSlugs.has(slug)) {
+            return text; // Strip the link, leave the text
+          }
+          return match;
+        });
+      }
       const rendered = marked(rawMd);
       const escapedTitle = escapeHtml(c.title);
       const doc = `<!doctype html>\n<html><head><meta charset="utf-8"><title>${escapedTitle}</title></head><body><h1>${escapedTitle}</h1>\n${rendered}</body></html>\n`;
