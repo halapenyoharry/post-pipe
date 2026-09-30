@@ -369,6 +369,8 @@
       "startRadius": null,
       "_startRadius_note": "The spiral's radius at the first chapter. null = about two thirds of a card."
     },
+    "initialFocus": "all",
+    "_initialFocus_note": "What the first screen frames: all (default) or a container id. A container is framed so its cards are still cards (initialFocusMinScale, default 0.4); when the whole top-level container fits at that scale, it is framed instead. Zoom to Fit always frames everything.",
     "visibleLayers": ["sequence"],
     "_visibleLayers_note": "Which edge layers draw lines: sequence, authored, tag, topology. Default sequence only. Containment is never a line; the hulls show it. A connected_to between two pieces that follow one another in a series is folded into that next edge."
   }

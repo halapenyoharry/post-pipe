@@ -388,8 +388,11 @@ export function GraphViewer({
     // Whether the reader has panned or zoomed. Until they have, the view is
     // re-framed once the layout settles; after, it is theirs.
     let userMovedView = false;
+    // Whether automatic framing still goes to settings.graph.initialFocus.
+    let focusActive = !!GS.initialFocus && GS.initialFocus !== 'all';
+    const FOCUS_MIN_SCALE = GS.initialFocusMinScale != null ? GS.initialFocusMinScale : 0.4;
     const zoom = d3.zoom().on('zoom', (event) => {
-      if (event.sourceEvent) userMovedView = true;
+      if (event.sourceEvent) { userMovedView = true; focusActive = false; }
       g.attr('transform', event.transform);
       if (cardsTransform) {
         cardsTransform.style('transform', `translate3d(${event.transform.x}px, ${event.transform.y}px, 0px) scale(${event.transform.k})`);
@@ -2221,17 +2224,60 @@ export function GraphViewer({
       };
     }
 
-    function fitToViewport({ animate = false, initialZoomOut = false } = {}) {
+    // The first screen: settings.graph.initialFocus is 'all' (everything) or a
+    // container id. A container is framed at a scale where its cards are still
+    // cards (initialFocusMinScale); if the whole top-level container it sits
+    // in fits at that scale too, that is framed instead. Once the reader asks
+    // for Zoom to Fit, or pans or zooms, the automatic framing stops focusing.
+    function focusFrame() {
+      if (!focusActive || !spiralOn()) return null;
+      const id = GS.initialFocus;
+      const info = CL.containers.get(id);
+      const c = containerById.get(id);
+      if (!info || !c || closedContainers.has(id) || hasClosedAncestor(c)) return null;
+      const off = containerOffset(id);
+      if (!off) return null;
+      const box = { x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 };
+      const rootInfo = CL.containers.get(info.root);
+      const rootOff = rootInfo && rootOffset(info.root);
+      const root = rootOff
+        ? { x0: rootOff.x + rootInfo.box.x0, y0: rootOff.y + rootInfo.box.y0, x1: rootOff.x + rootInfo.box.x1, y1: rootOff.y + rootInfo.box.y1 }
+        : null;
+      return { box, root };
+    }
+
+    function fitToViewport({ animate = false, initialZoomOut = false, focus = true } = {}) {
       const ext = containerExtent();
       if (ext) {
         let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
         let h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
         if (w < 50 || h < 50) return false;
         const margin = 24;
-        let k = Math.min((w - margin * 2) / Math.max(ext.x1 - ext.x0, 1), (h - margin * 2) / Math.max(ext.y1 - ext.y0, 1), 1);
+        const fitScale = (r) => Math.min((w - margin * 2) / Math.max(r.x1 - r.x0, 1), (h - margin * 2) / Math.max(r.y1 - r.y0, 1), 1);
+        const ff = focus ? focusFrame() : null;
+        let frame = ext;
+        let k = fitScale(ext);
+        let topAligned = false;
+        if (ff) {
+          k = fitScale(ff.box);
+          frame = ff.box;
+          if (ff.root && fitScale(ff.root) >= Math.min(k, FOCUS_MIN_SCALE)) {
+            frame = ff.root;
+            k = fitScale(ff.root);
+          } else if (k < FOCUS_MIN_SCALE) {
+            // Too big to fit legibly: keep the cards legible and show the
+            // top of the container (its title and first chapters).
+            k = FOCUS_MIN_SCALE;
+            topAligned = (ff.box.y1 - ff.box.y0) * k > h - margin * 2;
+          }
+        }
         k = Math.max(k, 0.04);
+        const cx = (frame.x0 + frame.x1) / 2;
+        const ty = topAligned
+          ? margin + 32 - frame.y0 * k
+          : h / 2 - ((frame.y0 + frame.y1) / 2) * k;
         const transform = d3.zoomIdentity
-          .translate(w / 2 - ((ext.x0 + ext.x1) / 2) * k, h / 2 - ((ext.y0 + ext.y1) / 2) * k)
+          .translate(w / 2 - cx * k, ty)
           .scale(k);
         if (animate) svg.transition().duration(750).call(zoom.transform, transform);
         else svg.call(zoom.transform, transform);
@@ -2384,7 +2430,7 @@ export function GraphViewer({
     // LayoutControls dispatches these from outside the component. They reach
     // into the closure that owns the simulation, the zoom, and the data.
 
-    const handleZoomToFit = () => { fitToViewport({ animate: true }); };
+    const handleZoomToFit = () => { focusActive = false; fitToViewport({ animate: true, focus: false }); };
 
     const handleUnpinAll = () => {
       data.nodes.forEach(d => {
