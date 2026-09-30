@@ -170,6 +170,24 @@ export function Settings({ viewState, feedData }) {
             </div>
             </>)}
 
+            {feedData && Array.isArray(feedData.containers) && feedData.containers.length > 0 && (<>
+              <div className={styles.hint} style={{ marginTop: '14px' }}>Containers</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className={styles.resetBtn}
+                  onClick={() => window.dispatchEvent(new CustomEvent('graph:open-all-containers'))}
+                >
+                  Open all
+                </button>
+                <button
+                  className={styles.resetBtn}
+                  onClick={() => window.dispatchEvent(new CustomEvent('graph:close-all-containers'))}
+                >
+                  Close all
+                </button>
+              </div>
+            </>)}
+
             <div className={styles.hint} style={{ marginTop: '14px' }}>Paragraphs</div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button

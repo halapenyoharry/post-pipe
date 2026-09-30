@@ -299,6 +299,19 @@ ${reactJs}
       layoutVersion: LAYOUT_VERSION
     });
 
+    // Programs on the page can open and close containers:
+    // PostPipeGraph.openContainer(id), closeContainer(id), toggleContainer(id),
+    // openAllContainers(), closeAllContainers(), getContainerState().
+    const graphApi = { current: null };
+    window.PostPipeGraph = {
+      openContainer: function (id) { return graphApi.current ? graphApi.current.openContainer(id) : false; },
+      closeContainer: function (id) { return graphApi.current ? graphApi.current.closeContainer(id) : false; },
+      toggleContainer: function (id) { return graphApi.current ? graphApi.current.toggleContainer(id) : false; },
+      openAllContainers: function () { return graphApi.current ? graphApi.current.openAllContainers() : false; },
+      closeAllContainers: function () { return graphApi.current ? graphApi.current.closeAllContainers() : false; },
+      getContainerState: function () { return graphApi.current ? graphApi.current.getContainerState() : {}; }
+    };
+
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
       const [targetParagraph, setTargetParagraph] = React.useState(null);
@@ -407,7 +420,8 @@ ${reactJs}
           hiddenSources: hiddenSources,
           filteredArticleIds: filteredArticleIds,
           viewState: viewState,
-          colorOverrides: colorOverrides
+          colorOverrides: colorOverrides,
+          apiRef: graphApi
         }),
         React.createElement(FeedZ, {
           sources: feed._sources || [],

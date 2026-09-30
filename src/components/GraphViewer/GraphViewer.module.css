@@ -57,6 +57,9 @@
   stroke: #555;
   stroke-opacity: 0.4;
   stroke-width: 1.5;
+  /* Edges are drawn, not touched. Left hittable, one crossing a container's
+     title swallowed the tap meant for the title. */
+  pointer-events: none;
 }
 
 .graphContainer :global(.link.highlighted) {
@@ -76,6 +79,7 @@
 
 /* Narrative sequence: single flowing bead */
 .graphContainer :global(.link-sequence-pulse) {
+  pointer-events: none;
   stroke: #ffe066;
   stroke-width: 3.5px;
   stroke-linecap: round;

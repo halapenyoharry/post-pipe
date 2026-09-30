@@ -358,6 +358,8 @@
       "collidePadding": 10,
       "velocityDecay": 0.7,
       "alphaDecay": 0.028
-    }
+    },
+    "collapseGesture": "tap",
+    "_collapseGesture_note": "tap (default) or doubletap: what opens and closes a container, on its title or its closed node. A tap is under 4px of movement; more than that drags the container."
   }
 }

@@ -14,6 +14,13 @@
  *     });
  *   </script>
  *
+ * init() resolves to { unmount, openContainer(id), closeContainer(id),
+ * toggleContainer(id), openAllContainers(), closeAllContainers(),
+ * getContainerState() }. The generated page exposes the same methods as
+ * window.PostPipeGraph, and both answer the window events
+ * graph:open-container / graph:close-container / graph:toggle-container
+ * ({ detail: { id } }) and graph:open-all-containers / graph:close-all-containers.
+ *
  * With zero config beyond the feed URL, everything turns on with sensible
  * defaults. The ConfigPanel lets the user toggle features at runtime and
  * export a JSON config they can paste back into their init() call.
@@ -154,7 +161,7 @@ function deepMerge(target, source) {
 
 // ── The embed app ────────────────────────────────────────────────────────────
 
-function EmbedApp({ initialConfig, feedData }) {
+function EmbedApp({ initialConfig, feedData, graphApiRef }) {
   const [config, setConfig] = React.useState(initialConfig);
 
   const features = { ...DEFAULT_FEATURES, ...(config.features || {}) };
@@ -361,6 +368,7 @@ function EmbedApp({ initialConfig, feedData }) {
         hiddenSources={hiddenSources}
         viewState={viewState}
         colorOverrides={colorOverrides}
+        apiRef={graphApiRef}
       />
 
       {/* Feed sources bar */}
@@ -690,18 +698,28 @@ const PostPipe = {
     const feedData = await res.json();
 
     // Mount
+    const graphApiRef = { current: null };
     const root = ReactDOM.createRoot(container);
     root.render(
       React.createElement(EmbedApp, {
         initialConfig: { ...config, feed: feedUrl },
         feedData,
+        graphApiRef,
       })
     );
 
+    const call = (name) => (...args) => (graphApiRef.current ? graphApiRef.current[name](...args) : undefined);
     return {
       unmount() {
         root.unmount();
       },
+      // Containers: open, close, toggle one by id, or all; and read the state.
+      openContainer: call('openContainer'),
+      closeContainer: call('closeContainer'),
+      toggleContainer: call('toggleContainer'),
+      openAllContainers: call('openAllContainers'),
+      closeAllContainers: call('closeAllContainers'),
+      getContainerState: () => (graphApiRef.current ? graphApiRef.current.getContainerState() : {}),
     };
   },
 

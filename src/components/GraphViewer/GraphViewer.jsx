@@ -208,7 +208,7 @@ function makeCardSizeFor(CARD) {
 
 export function GraphViewer({
   feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout = 'force', timeAxis, graphSettings,
-  colorOverrides,
+  colorOverrides, apiRef,
 }) {
   // Visual parameters come from settings.json so they can be tuned without a
   // rebuild. The defaults here are the values they replaced, so a missing or
@@ -523,13 +523,19 @@ export function GraphViewer({
       }
     }
 
-    function getAllMemberSlugs(cId, visited = new Set()) {
-      if (visited.has(cId)) return [];
-      visited.add(cId);
+    // Membership never changes after mount, and this is asked every tick.
+    const memberSlugCache = new Map();
+    function getAllMemberSlugs(cId, visited) {
+      if (!visited && memberSlugCache.has(cId)) return memberSlugCache.get(cId);
+      const seen = visited || new Set();
+      if (seen.has(cId)) return [];
+      seen.add(cId);
       const direct = Array.from(containerMembers.get(cId) || []);
       const children = Array.from(containerChildren.get(cId) || []);
-      const fromChildren = children.flatMap((chId) => getAllMemberSlugs(chId, visited));
-      return Array.from(new Set([...direct, ...fromChildren]));
+      const fromChildren = children.flatMap((chId) => getAllMemberSlugs(chId, seen));
+      const out = Array.from(new Set([...direct, ...fromChildren]));
+      if (!visited) memberSlugCache.set(cId, out);
+      return out;
     }
 
     // Sort so parent containers render first (bottom-most in SVG z-index)
@@ -652,6 +658,12 @@ export function GraphViewer({
       .attr('class', 'container-badge')
       .style('touch-action', 'manipulation');
 
+    // The title's text ignores the pointer, so this is what a tap lands on.
+    containerBadges.append('rect')
+      .attr('class', 'container-badge-hit')
+      .attr('fill', 'transparent')
+      .attr('pointer-events', 'all');
+
     const containerBadgeTexts = containerBadges.append('text')
       .attr('class', 'container-badge-text')
       .attr('text-anchor', 'middle')
@@ -671,24 +683,45 @@ export function GraphViewer({
       .style('display', 'none')
       .style('touch-action', 'manipulation');
 
-    containerMacroNodes.append('rect')
+    // A closed container is a node, but a bigger, softer one: a blob in the
+    // container's color rather than a card, with larger text than a chapter's.
+    containerMacroNodes.append('path')
       .attr('class', 'container-macro-bg')
-      .attr('rx', 40)
-      .attr('ry', 40)
-      .attr('fill', (d) => d.fill || 'rgba(212, 175, 55, 0.08)')
+      .style('fill', (d) => `color-mix(in srgb, ${getContainerColor(d)} 16%, #151826)`)
       .attr('stroke', (d) => getContainerColor(d))
-      .attr('stroke-width', 1.8)
-      .style('filter', 'drop-shadow(0 10px 25px rgba(0, 0, 0, 0.6))');
+      .attr('stroke-width', 2.2)
+      .style('filter', (d) => `drop-shadow(0 0 18px color-mix(in srgb, ${getContainerColor(d)} 45%, transparent))`);
 
+    const CLOSED_FONT = Math.round((CARD.labelMaxFontSize || 26) * 1.6);
     const containerMacroTexts = containerMacroNodes.append('text')
       .attr('class', 'container-macro-text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('fill', (d) => getContainerColor(d))
-      .attr('font-size', (d) => (!d.parent ? '64px' : '52px'))
+      .attr('font-size', (d) => `${!d.parent ? Math.round(CLOSED_FONT * 1.25) : CLOSED_FONT}px`)
       .attr('font-family', "'Atkinson', sans-serif")
       .attr('font-weight', '700')
       .attr('letter-spacing', '-0.02em');
+
+    // A soft closed outline through points on a rounded rectangle, nudged in
+    // and out a little (the same way every time for the same container).
+    const blobLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+    function blobPath(id, hw, hh) {
+      let seed = 0;
+      for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) >>> 0;
+      const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      const pts = [];
+      const N = 14;
+      for (let k = 0; k < N; k++) {
+        const t = (k / N) * Math.PI * 2;
+        const c = Math.cos(t), sn = Math.sin(t);
+        // superellipse, exponent 2.8: squarer than an ellipse, rounder than a card
+        const e = 2 / 2.8;
+        const wobble = 1 + (rand() - 0.5) * 0.08;
+        pts.push([Math.sign(c) * Math.pow(Math.abs(c), e) * hw * wobble, Math.sign(sn) * Math.pow(Math.abs(sn), e) * hh * wobble]);
+      }
+      return blobLine(pts);
+    }
 
     containerMacroTexts.each(function(d) {
       buildWrappedLabel(d3.select(this), d);
@@ -697,25 +730,12 @@ export function GraphViewer({
     function updateMacroBounds() {
       containerMacroNodes.each(function (d) {
         const g = d3.select(this);
-        const textNode = g.select('.container-macro-text').node();
-        let bw = !d.parent ? 380 : 260;
-        let bh = !d.parent ? 110 : 90;
-        if (textNode) {
-          try {
-            const bbox = textNode.getBBox();
-            if (bbox && bbox.width > 0) {
-              const padX = !d.parent ? 36 : 28;
-              const padY = !d.parent ? 22 : 18;
-              bw = bbox.width + padX * 2;
-              bh = bbox.height + padY * 2;
-            }
-          } catch (_) {}
-        }
-        g.select('.container-macro-bg')
-          .attr('width', bw)
-          .attr('height', bh)
-          .attr('x', -bw / 2)
-          .attr('y', -bh / 2);
+        const fs = parseFloat(g.select('.container-macro-text').attr('font-size')) || CLOSED_FONT;
+        const block = labelBlockSize(d, fs);
+        // At least half again a chapter card, and room for the text.
+        const bw = Math.max(CARD.width * 1.5, block.w + fs * 1.4);
+        const bh = Math.max(CARD.height * 1.5, block.h + fs * 1.4);
+        g.select('.container-macro-bg').attr('d', blobPath(d.id, bw / 2, bh / 2));
         d._macroHalfW = bw / 2;
         d._macroHalfH = bh / 2;
       });
@@ -787,37 +807,28 @@ export function GraphViewer({
             if (vs) vs.commit();
             applyPositions();
           } else {
-            // Click with < 4px movement: toggle collapse
+            // A tap (under 4px of movement) on the title or the closed node
+            // toggles it. collapseGesture 'tap' (default) or 'doubletap'.
             const now = Date.now();
             const lastTap = c._lastTap || 0;
             const gesture = graphSettings.collapseGesture || 'tap';
-
-            if (gesture === 'doubletap') {
-              if (now - lastTap < 400) {
-                if (isCollapsed) closedContainers.delete(c.id);
-                else {
-                  if (closedContainers.has(c.id)) closedContainers.delete(c.id);
-                  else closedContainers.add(c.id);
-                }
-                applyContainerVisibility();
-                c._lastTap = 0;
-              } else {
-                c._lastTap = now;
-              }
-            } else {
-              if (isCollapsed) closedContainers.delete(c.id);
-              else {
-                if (closedContainers.has(c.id)) closedContainers.delete(c.id);
-                else closedContainers.add(c.id);
-              }
-              applyContainerVisibility();
+            if (gesture === 'doubletap' && now - lastTap >= 400) {
+              c._lastTap = now;
+              return;
             }
+            c._lastTap = 0;
+            if (isCollapsed) setContainersOpen([c.id], true);
+            else setContainersOpen([c.id], closedContainers.has(c.id));
           }
         });
     }
 
     containerBadges.call(createContainerDragHandler({ isCollapsed: false }));
     containerMacroNodes.call(createContainerDragHandler({ isCollapsed: true }));
+    // The tap is handled above; it must not also reach the canvas, which
+    // would read it as a tap on empty space and close the reader.
+    containerBadges.on('click', (event) => event.stopPropagation());
+    containerMacroNodes.on('click', (event) => event.stopPropagation());
 
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
@@ -893,6 +904,17 @@ export function GraphViewer({
         if (p.root !== rootId) continue;
         const node = nodeBySlug.get(id);
         if (!node || !Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
+        sx += node.x - p.x; sy += node.y - p.y; n++;
+      }
+      return n ? { x: sx / n, y: sy / n } : null;
+    }
+
+    function containerOffset(cId) {
+      let sx = 0, sy = 0, n = 0;
+      for (const id of getAllMemberSlugs(cId)) {
+        const p = CL.nodes.get(id);
+        const node = nodeBySlug.get(id);
+        if (!p || !node || !Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
         sx += node.x - p.x; sy += node.y - p.y; n++;
       }
       return n ? { x: sx / n, y: sy / n } : null;
@@ -1060,11 +1082,11 @@ export function GraphViewer({
     function updateContainers() {
       if (sortedContainers.length === 0) return;
       const useLayout = spiralOn() && CL.containers.size > 0;
-      const offsets = new Map();
-      if (useLayout) for (const rootId of CL.roots) offsets.set(rootId, rootOffset(rootId));
+      // Each container's frame is measured from its own members, so a label
+      // follows its container when the reader drags just that container.
       const framed = (c) => {
         const info = useLayout ? CL.containers.get(c.id) : null;
-        const off = info ? offsets.get(info.root) : null;
+        const off = info ? containerOffset(c.id) : null;
         return info && off ? { info, off } : null;
       };
       // Where a closed container's node sits.
@@ -1099,7 +1121,8 @@ export function GraphViewer({
           group.select('.container-badge').style('display', 'none');
           group.select('.container-macro-node')
             .style('display', null)
-            .attr('transform', `translate(${pos.x}, ${pos.y})`);
+            .attr('transform', `translate(${pos.x}, ${pos.y})`)
+            .select('.label-count').text(` ${memberNodes.length}`);
           return;
         }
 
@@ -1172,8 +1195,15 @@ export function GraphViewer({
         const badge = group.select('.container-badge');
         badge.select('.label-count').text(` ${memberNodes.length}`);
 
+        const sizeHit = (size) => {
+          const blk = labelBlockSize(c, size);
+          badge.select('.container-badge-hit')
+            .attr('x', -blk.w / 2).attr('y', -blk.h / 2).attr('width', blk.w).attr('height', blk.h);
+        };
+
         if (labelAt) {
           badge.select('.container-badge-text').attr('font-size', `${fs}px`);
+          sizeHit(fs);
           badge.attr('transform', `translate(${labelAt.x}, ${labelAt.y})`);
           return;
         }
@@ -1186,31 +1216,66 @@ export function GraphViewer({
         const maxX = Math.max(...hull.map((p) => p[0]));
         const fs2 = Math.max(LABEL_MIN, Math.min(LABEL_MAX, (maxX - minX) / 8));
         badge.select('.container-badge-text').attr('font-size', `${fs2}px`);
+        sizeHit(fs2);
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : d3.mean(hull, (p) => p[0]);
         badge.attr('transform', `translate(${cx}, ${minY + (maxY - minY) / 3})`);
       });
     }
 
-    function applyContainerVisibility() {
+    // Members of a closed container are not drawn; the container's node is.
+    function applyClosedDisplay() {
       const hiddenSlugs = new Set();
       for (const cId of closedContainers) {
         for (const s of getAllMemberSlugs(cId)) hiddenSlugs.add(s);
       }
-
       if (articleNodes) {
         articleNodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
       }
       nodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
+    }
+
+    function applyContainerVisibility() {
+      applyClosedDisplay();
       relayoutContainers();
       updateContainers();
       applyPositions();
     }
 
+    // ── Open and close ─────────────────────────────────────────────────────
+    // The one way containers change state: a tap, the panel, or a program
+    // calling the API all come through here.
+    function containerState() {
+      return Object.fromEntries((data.containers || []).map((c) => [c.id, closedContainers.has(c.id) ? 'closed' : 'open']));
+    }
+    function setContainersOpen(ids, open) {
+      let changed = false;
+      for (const id of ids) {
+        if (!containerById.has(id)) continue;
+        if (open && closedContainers.has(id)) { closedContainers.delete(id); changed = true; }
+        if (!open && !closedContainers.has(id)) { closedContainers.add(id); changed = true; }
+      }
+      if (!changed) return false;
+      applyContainerVisibility();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('graph:containers-changed', { detail: containerState() }));
+      }
+      return true;
+    }
+    const allContainerIds = () => (data.containers || []).map((c) => c.id);
+    const containerApi = {
+      openContainer: (id) => setContainersOpen([id], true),
+      closeContainer: (id) => setContainersOpen([id], false),
+      toggleContainer: (id) => setContainersOpen([id], closedContainers.has(id)),
+      openAllContainers: () => setContainersOpen(allContainerIds(), true),
+      closeAllContainers: () => setContainersOpen(allContainerIds(), false),
+      getContainerState: containerState,
+    };
+    if (apiRef) apiRef.current = containerApi;
+
     // Opening or closing a container changes the size of everything around
     // it. Re-run the layout, keep each top-level container's label where it
     // is, and move members to their new places.
-    let relayoutTransition = null;
     function relayoutContainers() {
       if (!data.containers || data.containers.length === 0) return;
       const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
@@ -1226,8 +1291,9 @@ export function GraphViewer({
         if (!n || !off || !Number.isFinite(n.x)) continue;
         moves.push({ n, x0: n.x, y0: n.y, x1: off.x + p.x, y1: off.y + p.y });
       }
-      if (relayoutTransition) relayoutTransition.interrupt();
-      relayoutTransition = d3.transition().duration(600).ease(d3.easeCubicInOut)
+      // Named, so a newer relayout replaces one still running, and neither
+      // interrupts the layout-switch transition.
+      d3.transition('container-relayout').duration(600).ease(d3.easeCubicInOut)
         .tween('container-relayout', () => (t) => {
           for (const m of moves) {
             m.n.x = m.x0 + (m.x1 - m.x0) * t;
@@ -1236,7 +1302,8 @@ export function GraphViewer({
           }
           applyPositions();
           if (connectorUpdateRef.current) connectorUpdateRef.current();
-        });
+        })
+        .on('end', () => { if (!userMovedView) fitToViewport({ animate: true }); });
     }
 
     function linkEndpoints(l) {
@@ -2089,6 +2156,8 @@ export function GraphViewer({
     }
 
     let hasSettled = false;
+    // Containers closed from the start (settings.graph.initialCollapsed).
+    if (closedContainers.size) { applyClosedDisplay(); updateContainers(); }
     simulation.on('end', () => {
       hasSettled = true;
       // This simulation runs for the whole mount's lifetime regardless of
@@ -2199,6 +2268,16 @@ export function GraphViewer({
     window.addEventListener('graph:unpin-all', handleUnpinAll);
     window.addEventListener('graph:reset-sizes', handleResetSizes);
     window.addEventListener('graph:reset-layout', handleResetLayout);
+    // The same open/close API, reachable from outside React: the panel and
+    // any page script dispatch these. detail.id names one container.
+    const containerEvents = {
+      'graph:open-container': (e) => containerApi.openContainer(e.detail && e.detail.id),
+      'graph:close-container': (e) => containerApi.closeContainer(e.detail && e.detail.id),
+      'graph:toggle-container': (e) => containerApi.toggleContainer(e.detail && e.detail.id),
+      'graph:open-all-containers': () => containerApi.openAllContainers(),
+      'graph:close-all-containers': () => containerApi.closeAllContainers(),
+    };
+    for (const [name, fn] of Object.entries(containerEvents)) window.addEventListener(name, fn);
 
     return () => {
       renderAllArticleBodiesRef.current = null;
@@ -2209,6 +2288,8 @@ export function GraphViewer({
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
       window.removeEventListener('graph:reset-sizes', handleResetSizes);
       window.removeEventListener('graph:reset-layout', handleResetLayout);
+      for (const [name, fn] of Object.entries(containerEvents)) window.removeEventListener(name, fn);
+      if (apiRef && apiRef.current === containerApi) apiRef.current = null;
       // Unmount React roots BEFORE D3 tears down the SVG — otherwise React
       // would try to reconcile against a detached DOM tree on the next
       // effect run. Defer the unmount so it doesn't fire inside a render.
