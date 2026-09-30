@@ -331,6 +331,12 @@ function EmbedApp({ initialConfig, feedData }) {
             if (article && article.originalItem && viewState) {
               viewState.markSeen(article.originalItem.id);
             }
+            if (article && article.originalItem) {
+              const id = encodeURIComponent(article.originalItem.id);
+              history.pushState(null, '', '#read=' + id);
+              // Manually trigger so listener fires
+              window.dispatchEvent(new Event('hashchange'));
+            }
             setSelectedArticle(article);
           }
         }}
@@ -383,7 +389,13 @@ function EmbedApp({ initialConfig, feedData }) {
       {features.readerPanel && (
         <ReaderPanel
           article={selectedArticle}
-          onClose={() => setSelectedArticle(null)}
+          onClose={() => {
+            if (window.location.hash.startsWith('#read=')) {
+              history.pushState(null, '', window.location.pathname + window.location.search);
+              window.dispatchEvent(new Event('hashchange'));
+            }
+            setSelectedArticle(null);
+          }}
           settings={settings}
           viewState={viewState}
           targetParagraph={targetParagraph}

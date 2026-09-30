@@ -47,13 +47,15 @@
   overflow: hidden;
   font-family: 'Atkinson', sans-serif;
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, width 0.3s ease;
-  transform: translateX(calc(100% + 40px)) scale(0.96);
+  transform: translate3d(calc(100vw + 40px), 0, 0);
+  -webkit-transform: translate3d(calc(100vw + 40px), 0, 0);
   opacity: 0;
   pointer-events: none;
 }
 
 .panel.open {
-  transform: translateX(0) scale(1);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
   opacity: 1;
   pointer-events: auto;
 }
