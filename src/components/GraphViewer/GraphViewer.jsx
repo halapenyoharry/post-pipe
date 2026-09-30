@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
+import { containerLayout } from './containerLayout';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -377,7 +378,11 @@ export function GraphViewer({
     // never touches the simulation. Re-renders card contents at the new
     // font-size on every zoom event so the on-screen label size stays
     // constant as the user zooms in/out.
+    // Whether the reader has panned or zoomed. Until they have, the view is
+    // re-framed once the layout settles; after, it is theirs.
+    let userMovedView = false;
     const zoom = d3.zoom().on('zoom', (event) => {
+      if (event.sourceEvent) userMovedView = true;
       g.attr('transform', event.transform);
       if (cardsTransform) {
         cardsTransform.style('transform', `translate3d(${event.transform.x}px, ${event.transform.y}px, 0px) scale(${event.transform.k})`);
@@ -558,34 +563,34 @@ export function GraphViewer({
     const containerCentroids = new Map();
 
 
-    function buildWrappedLabel(textSel, d, maxLineChars) {
-      const label = d.label || d.id;
-      // We'll update the count text in updateContainers
-      const words = label.split(/\s+/);
+    // A container's label: its title wrapped to a few lines, the member count
+    // after the last line. Lines are placed explicitly around the origin so the
+    // rendered block matches the rectangle the layout reserved for it.
+    const LABEL_LINE_H = 1.05;
+    const LABEL_WRAP = 15;
+    function labelLines(d) {
+      const words = (d.label || d.id).split(/\s+/);
       const lines = [];
       let currentLine = '';
       for (const w of words) {
-        if (!currentLine) {
-          currentLine = w;
-        } else if (currentLine.length + 1 + w.length > maxLineChars) {
-          lines.push(currentLine);
-          currentLine = w;
-        } else {
-          currentLine += ' ' + w;
-        }
+        if (!currentLine) currentLine = w;
+        else if (currentLine.length + 1 + w.length > LABEL_WRAP) { lines.push(currentLine); currentLine = w; }
+        else currentLine += ' ' + w;
       }
       if (currentLine) lines.push(currentLine);
-
+      return lines;
+    }
+    function buildWrappedLabel(textSel, d) {
+      const lines = labelLines(d);
       textSel.selectAll('*').remove();
       const nLines = lines.length;
       lines.forEach((line, i) => {
-        const isLast = (i === nLines - 1);
         textSel.append('tspan')
           .attr('class', 'label-line')
           .attr('x', 0)
-          .attr('dy', i === 0 ? `-${(nLines - 1) * 0.5}em` : '1em')
+          .attr('y', `${(i - (nLines - 1) / 2) * LABEL_LINE_H}em`)
           .text(line);
-        if (isLast) {
+        if (i === nLines - 1) {
           textSel.append('tspan')
             .attr('class', 'label-count')
             .attr('font-weight', '500')
@@ -594,6 +599,25 @@ export function GraphViewer({
             .text('');
         }
       });
+    }
+    const labelMeasureCtx = typeof document !== 'undefined'
+      ? document.createElement('canvas').getContext('2d')
+      : null;
+    function labelInkWidth(text, fs, weight) {
+      // Letter-spacing is 0.05em in the stylesheet; canvas does not apply it.
+      const spacing = text.length * fs * 0.05;
+      if (!labelMeasureCtx) return text.length * fs * 0.6 + spacing;
+      labelMeasureCtx.font = `${weight} ${fs}px 'Atkinson', sans-serif`;
+      return labelMeasureCtx.measureText(text).width * 1.06 + spacing;
+    }
+    // The rectangle a container's label occupies at font size fs.
+    function labelBlockSize(c, fs) {
+      const lines = labelLines(c);
+      const countW = labelInkWidth(' 000', fs * 0.5, 500) + 12;
+      const w = Math.max(...lines.map((l, i) => labelInkWidth(l, fs, 700) + (i === lines.length - 1 ? countW : 0)));
+      // A text box is taller than its lines: ascenders and descenders.
+      const h = lines.length * LABEL_LINE_H * fs + 0.3 * fs;
+      return { w: w + 24, h: h + 12 };
     }
     function getContainerColor(c) {
       return c.badgeColor || c.color || c.stroke || '#d4af37';
@@ -613,7 +637,7 @@ export function GraphViewer({
       .attr('font-size', (d) => (!d.parent ? '64px' : '52px'));
       
     containerBadgeTexts.each(function(d) {
-      buildWrappedLabel(d3.select(this), d, 15);
+      buildWrappedLabel(d3.select(this), d);
     });
 
     // Collapsed container macro node (when container is closed, represented like a single node)
@@ -642,7 +666,7 @@ export function GraphViewer({
       .attr('letter-spacing', '-0.02em');
 
     containerMacroTexts.each(function(d) {
-      buildWrappedLabel(d3.select(this), d, 15);
+      buildWrappedLabel(d3.select(this), d);
     });
 
     function updateMacroBounds() {
@@ -773,354 +797,258 @@ export function GraphViewer({
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
 
-    function getDirectSpiralUnits(c) {
-      // For a container whose direct children are containers, return those
-      // child containers as placement units (by centroid). For a leaf container
-      // whose direct members are article nodes, return those nodes.
-      const childContainerIds = Array.from(containerChildren.get(c.id) || []);
-      if (childContainerIds.length > 0) {
-        return childContainerIds
-          .map(chId => {
-            const chSlugs = getAllMemberSlugs(chId);
-            const chNodes = chSlugs
-              .map(s => nodeBySlug.get(s))
-              .filter(n => n && Number.isFinite(n.x) && Number.isFinite(n.y));
-            if (chNodes.length === 0) return null;
-            const chDef = (data.containers || []).find(x => x.id === chId);
-            return {
-              isContainer: true,
-              id: chId,
-              x: d3.mean(chNodes, n => n.x),
-              y: d3.mean(chNodes, n => n.y),
-              def: chDef,
-              nodes: chNodes,
-              series_part: null,
-              date: '',
-            };
-          })
-          .filter(Boolean);
+    // ── Nested container layout (cluster layout only) ──────────────────────
+    // Every container is laid out in its own frame by containerLayout: label
+    // reserved at the origin, first unit directly below it, the rest on a
+    // golden-angle spiral, child containers placed as whole boxes. The result
+    // is a set of target positions relative to each top-level container; the
+    // top-level container itself is free to drift wherever the simulation puts
+    // it, so the offset is re-measured from the members every time.
+    const containerById = new Map((data.containers || []).map((c) => [c.id, c]));
+    const depthOf = (c) => {
+      let depth = 0;
+      let p = c.parent;
+      while (p && containerById.has(p) && depth < 20) { depth++; p = containerById.get(p).parent; }
+      return depth;
+    };
+    const LABEL_MIN = (graphSettings.labelSize && graphSettings.labelSize.min) || 32;
+    const LABEL_MAX = (graphSettings.labelSize && graphSettings.labelSize.max) || 96;
+    const LABEL_NESTED = (graphSettings.labelSize && graphSettings.labelSize.nestedScale) || 0.75;
+    const layoutMembers = () => {
+      const m = new Map();
+      for (const c of (data.containers || [])) {
+        m.set(c.id, Array.from(containerMembers.get(c.id) || [])
+          .map((slug) => nodeBySlug.get(slug))
+          .filter(Boolean)
+          .map((n) => ({
+            id: n.id,
+            w: (n._size && n._size.width) || (n.type === 'article' ? CARD.width : n.size),
+            h: (n._size && n._size.height) || (n.type === 'article' ? CARD.height : n.size),
+            order: Number.isFinite(n.series_part) ? n.series_part : null,
+            date: n.date || '',
+          })));
       }
-      const directSlugs = Array.from(containerMembers.get(c.id) || []);
-      return directSlugs
-        .map(slug => nodeBySlug.get(slug))
-        .filter(n => n && Number.isFinite(n.x) && Number.isFinite(n.y))
-        .map(n => ({
-          isContainer: false, id: n.id,
-          x: n.x, y: n.y, node: n,
-          series_part: n.series_part, date: n.date || '',
-        }));
+      return m;
+    };
+    let CL = { roots: [], nodes: new Map(), containers: new Map() };
+    function computeContainerLayout() {
+      if (!data.containers || data.containers.length === 0) return;
+      const members = layoutMembers();
+      const run = () => containerLayout({
+        containers: data.containers,
+        members,
+        closed: closedContainers,
+        labelSize: (c) => labelBlockSize(c, c._fs || LABEL_MIN),
+        macroSize: (c) => ({ w: (c._macroHalfW || 130) * 2, h: (c._macroHalfH || 45) * 2 }),
+        options: {
+          spacing: graphSettings.spiral?.spacing ?? 20,
+          gap: 28,
+          padding: (c) => (c.padding != null ? c.padding : (c.parent ? 42 : 75)),
+        },
+      });
+      // Two passes: the label's size depends on how wide its container ends
+      // up, and the container's width depends on the label.
+      for (const c of data.containers) c._fs = LABEL_MIN;
+      let res = run();
+      for (const c of data.containers) {
+        const info = res.containers.get(c.id);
+        const w = info ? info.box.x1 - info.box.x0 : 0;
+        const max = LABEL_MAX * Math.pow(LABEL_NESTED, depthOf(c));
+        c._fs = Math.max(LABEL_MIN, Math.min(Math.max(LABEL_MIN, max), w / 8));
+      }
+      res = run();
+      CL = res;
     }
 
-    function createContainerSpiralForce() {
-      let simNodes = [];
-      function force(alpha) {
-        if (graphSettings.spiral?.enabled === false) return;
-        const spacing = graphSettings.spiral?.spacing || 20;
-
-        containerGroups.each(function (c) {
-          if (closedContainers.has(c.id)) return;
-
-          const units = getDirectSpiralUnits(c);
-          if (units.length < 2) return;
-
-          // Order by series_part then by date, then stable
-          units.sort((a, b) => {
-            if (a.series_part != null && b.series_part != null) return a.series_part - b.series_part;
-            if (a.series_part != null) return -1;
-            if (b.series_part != null) return 1;
-            return (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0);
-          });
-
-          const cp = containerCentroids.get(c.id) || { x: 0, y: 0 };
-          const first = units[0];
-
-          // Pull first unit just below the label
-          const fs = c._fs || 52;
-          const labelClearance = fs * 1.4 + 20;
-          const targetY = cp.y + labelClearance;
-
-          const moveTo = (unit, tx, ty, str) => {
-            if (unit.isContainer) {
-              const dx = (tx - unit.x) * str * alpha;
-              const dy = (ty - unit.y) * str * alpha;
-              for (const n of unit.nodes) { n.vx += dx; n.vy += dy; }
-            } else {
-              unit.node.vx += (tx - unit.node.x) * str * alpha;
-              unit.node.vy += (ty - unit.node.y) * str * alpha;
-            }
-          };
-          moveTo(first, cp.x, targetY, 0.08);
-
-          const refW = CARD.width;
-          const refH = CARD.height;
-          const golden = 137.508 * (Math.PI / 180);
-          const anchorX = first.isContainer ? first.x : first.node.x;
-          const anchorY = first.isContainer ? first.y : first.node.y;
-          for (let i = 1; i < units.length; i++) {
-            const unit = units[i];
-            const radius = (Math.hypot(refW, refH) / 2 + spacing) * Math.sqrt(i);
-            const angle = i * golden;
-            moveTo(unit, anchorX + radius * Math.cos(angle), anchorY + radius * Math.sin(angle), 0.04);
-          }
-        });
+    // Where each top-level container's frame currently sits: the mean offset
+    // between its members' positions and their targets.
+    function rootOffset(rootId) {
+      let sx = 0, sy = 0, n = 0;
+      for (const [id, p] of CL.nodes) {
+        if (p.root !== rootId) continue;
+        const node = nodeBySlug.get(id);
+        if (!node || !Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
+        sx += node.x - p.x; sy += node.y - p.y; n++;
       }
-      force.initialize = function (_nodes) { simNodes = _nodes; };
+      return n ? { x: sx / n, y: sy / n } : null;
+    }
+
+    const spiralOn = () => graphSettings.spiral?.enabled !== false && layoutRef.current === 'force';
+
+    function createContainerLayoutForce() {
+      function force(alpha) {
+        if (!spiralOn()) return;
+        const strength = graphSettings.spiral?.strength ?? 0.35;
+        for (const rootId of CL.roots) {
+          const off = rootOffset(rootId);
+          if (!off) continue;
+          for (const [id, p] of CL.nodes) {
+            if (p.root !== rootId) continue;
+            const n = nodeBySlug.get(id);
+            if (!n || !Number.isFinite(n.x)) continue;
+            n.vx += (off.x + p.x - n.x) * strength * alpha;
+            n.vy += (off.y + p.y - n.y) * strength * alpha;
+          }
+        }
+      }
+      force.initialize = function () {};
       return force;
     }
 
-    // Badge-rect repel: push member nodes below each container's label rect.
-    function createLabelRepelForce() {
-      let simNodes = [];
-      function force(alpha) {
-        containerGroups.each(function (c) {
-          if (closedContainers.has(c.id)) return;
-          const cp = containerCentroids.get(c.id);
-          if (!cp) return;
-
-          const fs = c._fs || 52;
-          const badgeH = fs * 1.4 + 16;
-          const badgeW = Math.max(160, ((c.label || '').length * fs * 0.55) + 60);
-          // Use the actual badge cy from updateContainers if known, else estimate
-          const badgeCy = (c._badgeCy != null) ? c._badgeCy : cp.y;
-          const bTop    = badgeCy - badgeH * 0.4;
-          const bBottom = badgeCy + badgeH * 0.6;
-          const bLeft   = cp.x - badgeW / 2;
-          const bRight  = cp.x + badgeW / 2;
-
-          for (const slug of getAllMemberSlugs(c.id)) {
-            const n = nodeBySlug.get(slug);
-            if (!n || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
-            const nW = (n._size?.width  || CARD.width)  / 2;
-            const nH = (n._size?.height || CARD.height) / 2;
-            const overlapX = Math.min(n.x + nW, bRight)  - Math.max(n.x - nW, bLeft);
-            const overlapY = Math.min(n.y + nH, bBottom) - Math.max(n.y - nH, bTop);
-            if (overlapX > 0 && overlapY > 0) {
-              n.vy += overlapY * alpha * 0.5;
-            }
-          }
-        });
-      }
-      force.initialize = function (_nodes) { simNodes = _nodes; };
-      return force;
-    }
-
+    // Top-level containers keep apart from each other, and nodes that belong
+    // to no container stay outside them. Inside a container the layout above
+    // decides everything, so nested containers are not separated here.
     function createContainerSeparationForce() {
       let simNodes = [];
+      const getHalfSize = (n) => {
+        if (n.type === 'article') {
+          return Math.hypot(n._size?.width || CARD.width, n._size?.height || CARD.height) / 2;
+        }
+        return (n._r || (n.size || 60) / 2);
+      };
 
       function force(alpha) {
         if (!data.containers || data.containers.length === 0) return;
-
-        const containerCircles = new Map();
-
-        const getHalfSize = (n) => {
-          if (n.type === 'article') {
-            const w = n._size?.width || CARD.width;
-            const h = n._size?.height || CARD.height;
-            return Math.hypot(w, h) / 2;
-          }
-          return (n.size || 60) / 2;
-        };
-
-        const macroHalfSize = Math.hypot(130, 45);
-
-        for (const c of data.containers) {
-          const memberSlugs = getAllMemberSlugs(c.id);
-          const memberNodes = memberSlugs
-            .map((slug) => nodeBySlug.get(slug))
-            .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
-
-          if (memberNodes.length === 0) continue;
-
-          const isClosed = closedContainers.has(c.id);
-          if (isClosed) {
-            // Collapsed container: position is the centroid of its members
-            const avgX = d3.mean(memberNodes, (n) => n.x);
-            const avgY = d3.mean(memberNodes, (n) => n.y);
-            const pad = c.padding != null ? c.padding : 40;
-            const hw = c._macroHalfW || 130;
-            const hh = c._macroHalfH || 45;
-            const r = Math.hypot(hw, hh) + pad;
-            containerCircles.set(c.id, {
-              x: avgX,
-              y: avgY,
-              r,
-              isClosed: true,
-              members: memberNodes,
-            });
-            continue;
-          }
-
-          // Open container: visible member nodes (including nested members)
-          // Skip collapsed containers' hidden members (use the collapsed node's position instead).
-          const visibleItems = [];
-
-          // Include collapsed child macro nodes
-          for (const chId of (containerChildren.get(c.id) || [])) {
-            if (closedContainers.has(chId)) {
-              const chSlugs = getAllMemberSlugs(chId);
-              const chNodes = chSlugs
-                .map((s) => nodeBySlug.get(s))
-                .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
-              if (chNodes.length > 0) {
-                const childDef = data.containers.find((x) => x.id === chId);
-                const hw = childDef?._macroHalfW || 130;
-                const hh = childDef?._macroHalfH || 45;
-                visibleItems.push({
-                  x: d3.mean(chNodes, (n) => n.x),
-                  y: d3.mean(chNodes, (n) => n.y),
-                  halfSize: Math.hypot(hw, hh),
-                });
-              }
-            }
-          }
-
-          // Include visible member nodes (not hidden by any closed container)
-          for (const n of memberNodes) {
-            let hidden = false;
-            for (const clId of closedContainers) {
-              if (getAllMemberSlugs(clId).includes(n.id)) {
-                hidden = true;
-                break;
-              }
-            }
-            if (!hidden) {
-              visibleItems.push({
-                x: n.x,
-                y: n.y,
-                halfSize: getHalfSize(n),
-              });
-            }
-          }
-
-          if (visibleItems.length === 0) continue;
-
-          const cx = d3.mean(visibleItems, (item) => item.x);
-          const cy = d3.mean(visibleItems, (item) => item.y);
-
-          const pad = c.padding != null ? c.padding : 40;
-          let maxDist = 0;
-          for (const item of visibleItems) {
-            const d = Math.hypot(item.x - cx, item.y - cy) + item.halfSize;
-            if (d > maxDist) maxDist = d;
-          }
-          const radius = maxDist + pad;
-          
-          const minFs = graphSettings.labelSize?.min || 32;
-          const maxFs = graphSettings.labelSize?.max || 96;
-          c._fs = Math.max(minFs, Math.min(maxFs, (radius * 2) / 8));
-
-          containerCircles.set(c.id, {
-            x: cx,
-            y: cy,
-            r: radius,
-            isClosed: false,
-            members: memberNodes,
+        const circles = [];
+        for (const rootId of CL.roots) {
+          const info = CL.containers.get(rootId);
+          const off = rootOffset(rootId);
+          if (!info || !off) continue;
+          const members = getAllMemberSlugs(rootId).map((s) => nodeBySlug.get(s)).filter((n) => n && Number.isFinite(n.x));
+          circles.push({
+            x: off.x + (info.box.x0 + info.box.x1) / 2,
+            y: off.y + (info.box.y0 + info.box.y1) / 2,
+            r: Math.hypot(info.box.x1 - info.box.x0, info.box.y1 - info.box.y0) / 2,
+            members,
           });
         }
-
-        // Sibling containers separation
-        for (let i = 0; i < data.containers.length; i++) {
-          for (let j = i + 1; j < data.containers.length; j++) {
-            const c1 = data.containers[i];
-            const c2 = data.containers[j];
-            if ((c1.parent || null) !== (c2.parent || null)) continue;
-
-            const circle1 = containerCircles.get(c1.id);
-            const circle2 = containerCircles.get(c2.id);
-            if (!circle1 || !circle2) continue;
-
-            const dx = circle2.x - circle1.x;
-            const dy = circle2.y - circle1.y;
-            const dist = Math.hypot(dx, dy);
-            const spacing = graphSettings.containerSpacing !== undefined ? graphSettings.containerSpacing : -20;
-            const minDist = circle1.r + circle2.r + spacing;
-
-            if (dist < minDist) {
-              const overlap = minDist - dist;
-              let nx = dist > 1e-4 ? dx / dist : (Math.random() - 0.5) || 1;
-              let ny = dist > 1e-4 ? dy / dist : (Math.random() - 0.5) || 0;
-              const nLen = Math.hypot(nx, ny);
-              nx /= nLen;
-              ny /= nLen;
-
-              const shift = overlap * alpha * 0.5;
-              const shiftX = nx * shift;
-              const shiftY = ny * shift;
-
-              for (const n of circle1.members) {
-                n.vx -= shiftX;
-                n.vy -= shiftY;
-              }
-              for (const n of circle2.members) {
-                n.vx += shiftX;
-                n.vy += shiftY;
-              }
-            }
+        const push = (dx, dy, dist, minDist, apply) => {
+          if (dist >= minDist) return;
+          const overlap = minDist - dist;
+          let nx = dist > 1e-4 ? dx / dist : 1;
+          let ny = dist > 1e-4 ? dy / dist : 0;
+          apply(nx * overlap * alpha * 0.5, ny * overlap * alpha * 0.5);
+        };
+        const spacing = graphSettings.containerSpacing !== undefined ? graphSettings.containerSpacing : -20;
+        for (let i = 0; i < circles.length; i++) {
+          for (let j = i + 1; j < circles.length; j++) {
+            const a = circles[i], b = circles[j];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            push(dx, dy, Math.hypot(dx, dy), a.r + b.r + spacing, (sx, sy) => {
+              for (const n of a.members) { n.vx -= sx; n.vy -= sy; }
+              for (const n of b.members) { n.vx += sx; n.vy += sy; }
+            });
           }
         }
-
-        // Nodes belonging to no container pushed out of any top-level container's circle
-        const allContainedSlugs = new Set();
-        for (const c of data.containers) {
-          for (const s of getAllMemberSlugs(c.id)) {
-            allContainedSlugs.add(s);
-          }
-        }
-
-        const uncontainedNodes = (simNodes.length ? simNodes : data.nodes).filter(
-          (n) => !allContainedSlugs.has(n.id) && Number.isFinite(n.x) && Number.isFinite(n.y)
-        );
-
-        const topContainers = data.containers.filter((c) => !c.parent);
-        for (const tc of topContainers) {
-          const circle = containerCircles.get(tc.id);
-          if (!circle) continue;
-
-          for (const n of uncontainedNodes) {
-            const nHalfSize = getHalfSize(n);
-            const dx = n.x - circle.x;
-            const dy = n.y - circle.y;
-            const dist = Math.hypot(dx, dy);
-            const minDist = circle.r + nHalfSize;
-
-            if (dist < minDist) {
-              const overlap = minDist - dist;
-              let nx = dist > 1e-4 ? dx / dist : (Math.random() - 0.5) || 1;
-              let ny = dist > 1e-4 ? dy / dist : (Math.random() - 0.5) || 0;
-              const nLen = Math.hypot(nx, ny);
-              nx /= nLen;
-              ny /= nLen;
-
-              const shift = overlap * alpha * 0.5;
-              const shiftX = nx * shift;
-              const shiftY = ny * shift;
-
-              n.vx += shiftX;
-              n.vy += shiftY;
-              for (const m of circle.members) {
-                m.vx -= shiftX;
-                m.vy -= shiftY;
-              }
-            }
+        const contained = new Set(CL.nodes.keys());
+        const loose = (simNodes.length ? simNodes : data.nodes)
+          .filter((n) => !contained.has(n.id) && Number.isFinite(n.x));
+        for (const c of circles) {
+          for (const n of loose) {
+            const dx = n.x - c.x, dy = n.y - c.y;
+            push(dx, dy, Math.hypot(dx, dy), c.r + getHalfSize(n), (sx, sy) => {
+              n.vx += sx; n.vy += sy;
+              for (const m of c.members) { m.vx -= sx * 0.2; m.vy -= sy * 0.2; }
+            });
           }
         }
       }
-
-      force.initialize = (_nodes) => {
-        simNodes = _nodes;
-      };
-
+      force.initialize = (_nodes) => { simNodes = _nodes; };
       return force;
     }
 
     if (data.containers && data.containers.length > 0) {
+      computeContainerLayout();
       simulation.force('containerSeparation', createContainerSeparationForce());
-      simulation.force('containerSpiral', createContainerSpiralForce());
-      simulation.force('labelRepel', createLabelRepelForce());
+      simulation.force('containerLayout', createContainerLayoutForce());
+    }
+
+    // Members of a closed container are hidden: they take no room and push
+    // nothing. Inside a laid-out container the layout places members, so
+    // their mutual repulsion and link springs are turned right down rather
+    // than left to argue with it.
+    let hiddenByClosed = new Set();
+    const rootOfNode = (id) => (CL.nodes.get(id) || {}).root || null;
+    const endId = (e) => (typeof e === 'object' ? e.id : e);
+    function refreshContainerForces() {
+      hiddenByClosed = new Set();
+      for (const cId of closedContainers) for (const s of getAllMemberSlugs(cId)) hiddenByClosed.add(s);
+      // A laid-out member already has a rectangle nobody else overlaps, so its
+      // collision circle is the one inscribed in its card, not the one around it.
+      simulation.force('collide').radius((d) => {
+        if (hiddenByClosed.has(d.id)) return 0;
+        if (CL.nodes.has(d.id) && d.type === 'article') {
+          return Math.min(d._size?.width || CARD.width, d._size?.height || CARD.height) / 2;
+        }
+        return (d._r || (d.type === 'article' ? Math.hypot(CARD.width, CARD.height) / 2 : d.size / 2)) + SIM.collidePadding;
+      });
+      simulation.force('charge').strength((d) => {
+        if (hiddenByClosed.has(d.id)) return 0;
+        return CL.nodes.has(d.id) ? SIM.chargeStrength * 0.05 : SIM.chargeStrength;
+      });
+    }
+    if (CL.nodes.size > 0) {
+      refreshContainerForces();
+      const linkForce = simulation.force('link');
+      const defaultLinkStrength = linkForce.strength();
+      linkForce.strength((l) => {
+        const rs = rootOfNode(endId(l.source));
+        return rs && rs === rootOfNode(endId(l.target)) ? 0 : defaultLinkStrength(l);
+      });
+    }
+
+    // Never-placed members start at their targets, so the first frame is
+    // already the arrangement rather than a heap that has to unfold. Top-level
+    // containers start side by side.
+    function seedFromLayout(all) {
+      let cursor = width / 2;
+      for (const rootId of CL.roots) {
+        const info = CL.containers.get(rootId);
+        if (!info) continue;
+        const w = info.box.x1 - info.box.x0;
+        const ox = cursor - (info.box.x0 + info.box.x1) / 2 + (cursor === width / 2 ? 0 : w / 2);
+        const oy = height / 2 - (info.box.y0 + info.box.y1) / 2;
+        for (const [id, p] of CL.nodes) {
+          if (p.root !== rootId) continue;
+          const n = nodeBySlug.get(id);
+          if (!n) continue;
+          if (all || !Number.isFinite(n.x) || !Number.isFinite(n.y)) {
+            n.x = ox + p.x; n.y = oy + p.y;
+            n.vx = 0; n.vy = 0;
+          }
+        }
+        cursor += (cursor === width / 2 ? w / 2 : w) + 200;
+      }
+    }
+    if (CL.nodes.size > 0) seedFromLayout(positionsWereDegenerate);
+
+    function hasClosedAncestor(c) {
+      let p = c.parent;
+      let guard = 0;
+      while (p && guard++ < 20) {
+        if (closedContainers.has(p)) return true;
+        p = containerById.get(p)?.parent;
+      }
+      return false;
     }
 
     function updateContainers() {
       if (sortedContainers.length === 0) return;
+      const useLayout = spiralOn() && CL.containers.size > 0;
+      const offsets = new Map();
+      if (useLayout) for (const rootId of CL.roots) offsets.set(rootId, rootOffset(rootId));
+      const framed = (c) => {
+        const info = useLayout ? CL.containers.get(c.id) : null;
+        const off = info ? offsets.get(info.root) : null;
+        return info && off ? { info, off } : null;
+      };
+      // Where a closed container's node sits.
+      const macroPos = (c) => {
+        const f = framed(c);
+        if (f) return { x: f.off.x + f.info.center.x, y: f.off.y + f.info.center.y };
+        const ns = getAllMemberSlugs(c.id).map((s) => nodeBySlug.get(s)).filter((n) => n && Number.isFinite(n.x));
+        return ns.length ? { x: d3.mean(ns, (n) => n.x), y: d3.mean(ns, (n) => n.y) } : null;
+      };
 
       containerGroups.each(function (c) {
         const group = d3.select(this);
@@ -1129,8 +1057,24 @@ export function GraphViewer({
           .map((slug) => nodeBySlug.get(slug))
           .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
 
-        if (memberNodes.length === 0) {
+        if (memberNodes.length === 0 || hasClosedAncestor(c)) {
           group.style('display', 'none');
+          return;
+        }
+
+        const isClosed = closedContainers.has(c.id);
+        const fs = c._fs || 52;
+        const f = framed(c);
+
+        if (isClosed) {
+          const pos = macroPos(c);
+          containerCentroids.set(c.id, pos);
+          group.style('display', null);
+          group.select('.container-hull').style('display', 'none');
+          group.select('.container-badge').style('display', 'none');
+          group.select('.container-macro-node')
+            .style('display', null)
+            .attr('transform', `translate(${pos.x}, ${pos.y})`);
           return;
         }
 
@@ -1138,60 +1082,32 @@ export function GraphViewer({
         const avgY = d3.mean(memberNodes, (n) => n.y);
         containerCentroids.set(c.id, { x: avgX, y: avgY });
 
-        const isClosed = closedContainers.has(c.id);
-        const fs = c._fs || 52;
-
-        if (isClosed) {
-          group.style('display', null);
-          group.select('.container-hull').style('display', 'none');
-          group.select('.container-badge').style('display', 'none');
-          group.select('.container-macro-text').attr('font-size', `${fs}px`);
-          group.select('.container-macro-node')
-            .style('display', null)
-            .attr('transform', `translate(${avgX}, ${avgY})`);
-          return;
-        }
-
         group.style('display', null);
         group.select('.container-macro-node').style('display', 'none');
         group.select('.container-hull').style('display', null);
         group.select('.container-badge').style('display', null);
 
         const points = [];
-        const isRoot = !c.parent;
-        const pad = c.padding || (isRoot ? 75 : 42);
+        const pad = c.padding || (c.parent ? 42 : 75);
 
-        // If child containers are closed, include their macro node bounds
+        // Closed children are drawn as nodes; the hull wraps those.
         for (const childId of (containerChildren.get(c.id) || [])) {
-          if (closedContainers.has(childId)) {
-            const cp = containerCentroids.get(childId);
-            if (cp) {
-              const childObj = sortedContainers.find(x => x.id === childId);
-              const hw = childObj?._macroHalfW || 130;
-              const hh = childObj?._macroHalfH || 45;
-              points.push(
-                [cp.x - hw, cp.y - hh],
-                [cp.x + hw, cp.y - hh],
-                [cp.x + hw, cp.y + hh],
-                [cp.x - hw, cp.y + hh]
-              );
-            }
-          }
+          if (!closedContainers.has(childId)) continue;
+          const childObj = containerById.get(childId);
+          const cp = childObj && macroPos(childObj);
+          if (!cp) continue;
+          const hw = (childObj._macroHalfW || 130) + pad / 2;
+          const hh = (childObj._macroHalfH || 45) + pad / 2;
+          points.push([cp.x - hw, cp.y - hh], [cp.x + hw, cp.y - hh], [cp.x + hw, cp.y + hh], [cp.x - hw, cp.y + hh]);
         }
 
-        // Only include open nodes in hull calculations
+        // Only open nodes count toward the hull.
         const openMemberNodes = memberNodes.filter((n) => {
           for (const cId of closedContainers) {
             if (getAllMemberSlugs(cId).includes(n.id)) return false;
           }
           return true;
         });
-
-        if (openMemberNodes.length === 0 && points.length === 0) {
-          group.select('.container-hull').style('display', 'none');
-          group.select('.container-badge').style('display', 'none');
-          return;
-        }
 
         for (const n of openMemberNodes) {
           const w = n._size?.width || (n.type === 'article' ? CARD.width : n.size);
@@ -1206,38 +1122,48 @@ export function GraphViewer({
           );
         }
 
+        // The label is part of the container: the hull wraps it too.
+        let labelAt = null;
+        if (f) {
+          const L = f.info.label;
+          labelAt = { x: f.off.x + (L.x0 + L.x1) / 2, y: f.off.y + (L.y0 + L.y1) / 2 };
+          const lp = pad / 2;
+          points.push(
+            [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp], [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
+            [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp], [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp]
+          );
+        }
+
+        if (points.length === 0) {
+          group.select('.container-hull').style('display', 'none');
+          group.select('.container-badge').style('display', 'none');
+          return;
+        }
+
         const hull = d3.polygonHull(points);
         if (!hull || hull.length < 3) return;
-
-        const pathD = hullLine(hull);
-        group.select('.container-hull').attr('d', pathD);
-
-        const minY = Math.min(...hull.map((p) => p[1]));
-        const maxY = Math.max(...hull.map((p) => p[1]));
-        const hullAvgX = d3.mean(hull, (p) => p[0]);
-
-        const minX = Math.min(...hull.map((p) => p[0]));
-        const maxX = Math.max(...hull.map((p) => p[0]));
-        const hullW = maxX - minX;
-        const minFs = graphSettings.labelSize?.min || 32;
-        const maxFs = graphSettings.labelSize?.max || 96;
-        const fs2 = Math.max(minFs, Math.min(maxFs, hullW / 8));
+        group.select('.container-hull').attr('d', hullLine(hull));
 
         const badge = group.select('.container-badge');
-        badge.select('.container-badge-text').attr('font-size', `${fs2}px`);
         badge.select('.label-count').text(` ${memberNodes.length}`);
-        const center = d3.polygonCentroid(hull);
-        const cx = Number.isFinite(center[0]) ? center[0] : hullAvgX;
-        
-        // Label position: horizontally centered, vertically about one third down from the top
-        const hullH = maxY - minY;
-        const cy = minY + (hullH / 3);
 
-        // Store for label-repel force
-        c._badgeCy = cy;
-        c._fs = fs2;
-        
-        badge.attr('transform', `translate(${cx}, ${cy})`);
+        if (labelAt) {
+          badge.select('.container-badge-text').attr('font-size', `${fs}px`);
+          badge.attr('transform', `translate(${labelAt.x}, ${labelAt.y})`);
+          return;
+        }
+
+        // No layout frame (ring layout, or the spiral turned off): centred,
+        // a third of the way down the hull.
+        const minY = Math.min(...hull.map((p) => p[1]));
+        const maxY = Math.max(...hull.map((p) => p[1]));
+        const minX = Math.min(...hull.map((p) => p[0]));
+        const maxX = Math.max(...hull.map((p) => p[0]));
+        const fs2 = Math.max(LABEL_MIN, Math.min(LABEL_MAX, (maxX - minX) / 8));
+        badge.select('.container-badge-text').attr('font-size', `${fs2}px`);
+        const center = d3.polygonCentroid(hull);
+        const cx = Number.isFinite(center[0]) ? center[0] : d3.mean(hull, (p) => p[0]);
+        badge.attr('transform', `translate(${cx}, ${minY + (maxY - minY) / 3})`);
       });
     }
 
@@ -1251,8 +1177,41 @@ export function GraphViewer({
         articleNodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
       }
       nodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
+      relayoutContainers();
       updateContainers();
       applyPositions();
+    }
+
+    // Opening or closing a container changes the size of everything around
+    // it. Re-run the layout, keep each top-level container's label where it
+    // is, and move members to their new places.
+    let relayoutTransition = null;
+    function relayoutContainers() {
+      if (!data.containers || data.containers.length === 0) return;
+      const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
+      updateMacroBounds();
+      computeContainerLayout();
+      refreshContainerForces();
+      if (!spiralOn()) return;
+      if (!hasSettled) { simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
+      const moves = [];
+      for (const [id, p] of CL.nodes) {
+        const n = nodeBySlug.get(id);
+        const off = anchors.get(p.root);
+        if (!n || !off || !Number.isFinite(n.x)) continue;
+        moves.push({ n, x0: n.x, y0: n.y, x1: off.x + p.x, y1: off.y + p.y });
+      }
+      if (relayoutTransition) relayoutTransition.interrupt();
+      relayoutTransition = d3.transition().duration(600).ease(d3.easeCubicInOut)
+        .tween('container-relayout', () => (t) => {
+          for (const m of moves) {
+            m.n.x = m.x0 + (m.x1 - m.x0) * t;
+            m.n.y = m.y0 + (m.y1 - m.y0) * t;
+            m.n.fx = m.n.x; m.n.fy = m.n.y;
+          }
+          applyPositions();
+          if (connectorUpdateRef.current) connectorUpdateRef.current();
+        });
     }
 
     function linkEndpoints(l) {
@@ -1981,7 +1940,47 @@ export function GraphViewer({
     // Frame the whole graph once it has settled, but only when the reader has
     // not arranged it themselves. Giving every node its true footprint spreads
     // looking for is not an improvement on one that overlaps.
+    // With containers laid out, the frame is the containers themselves —
+    // every label and every hull — rather than a trimmed core of nodes.
+    function containerExtent() {
+      if (!spiralOn() || CL.roots.length === 0) return null;
+      const rects = [];
+      for (const rootId of CL.roots) {
+        const info = CL.containers.get(rootId);
+        const off = rootOffset(rootId);
+        if (!info || !off) continue;
+        if (getAllMemberSlugs(rootId).every((s) => hiddenSourcesRef.current.has(nodeBySlug.get(s)?._source?.id))) continue;
+        rects.push({ x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 });
+      }
+      for (const d of data.nodes) {
+        if (d.type !== 'article' || CL.nodes.has(d.id) || !Number.isFinite(d.x)) continue;
+        if (d._source && hiddenSourcesRef.current.has(d._source.id)) continue;
+        const w = (d._size?.width || CARD.width) / 2, h = (d._size?.height || CARD.height) / 2;
+        rects.push({ x0: d.x - w, y0: d.y - h, x1: d.x + w, y1: d.y + h });
+      }
+      if (!rects.length) return null;
+      return {
+        x0: Math.min(...rects.map((r) => r.x0)), y0: Math.min(...rects.map((r) => r.y0)),
+        x1: Math.max(...rects.map((r) => r.x1)), y1: Math.max(...rects.map((r) => r.y1)),
+      };
+    }
+
     function fitToViewport({ animate = false, initialZoomOut = false } = {}) {
+      const ext = containerExtent();
+      if (ext) {
+        let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
+        let h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
+        if (w < 50 || h < 50) return false;
+        const margin = 24;
+        let k = Math.min((w - margin * 2) / Math.max(ext.x1 - ext.x0, 1), (h - margin * 2) / Math.max(ext.y1 - ext.y0, 1), 1);
+        k = Math.max(k, 0.04);
+        const transform = d3.zoomIdentity
+          .translate(w / 2 - ((ext.x0 + ext.x1) / 2) * k, h / 2 - ((ext.y0 + ext.y1) / 2) * k)
+          .scale(k);
+        if (animate) svg.transition().duration(750).call(zoom.transform, transform);
+        else svg.call(zoom.transform, transform);
+        return true;
+      }
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
@@ -2086,6 +2085,8 @@ export function GraphViewer({
       // degenerate (shoved offscreen, over-compressed), saving it here
       // would just lock it in. The reader would never see the fresh fallback
       // layout it would then have to reject.
+      if (!userMovedView && containerExtent()) fitToViewport({ animate: true });
+
       if (layoutIsDegenerate(data.nodes, cardSizeFor({ hovered: false, pinned: false }))) return;
 
       const vs = viewStateRef.current;
@@ -2096,14 +2097,11 @@ export function GraphViewer({
         // we can distinguish them here. We explicitly *delete* that flag when
         // a user unpins everything, because the simulation resumes and computes
         // a fresh layout that is now worth saving.
-        let savedAny = false;
         for (const d of data.nodes) {
           if (!d.pinned && d._forcePos) {
             vs.setNodePosition('force::' + persistKey(d), d.x, d.y, { silent: true });
-            savedAny = true;
           }
         }
-        if (savedAny) vs.notify(); // Commit the batch.
       }
 
       // Redraw the axis once more now that nodes have come to rest.

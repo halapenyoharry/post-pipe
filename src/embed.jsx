@@ -95,7 +95,7 @@ const DEFAULT_SETTINGS = {
   },
 };
 
-const LAYOUT_VERSION = 'per-layout-positions-3';
+const LAYOUT_VERSION = 'per-layout-positions-4';
 
 // ── ViewState factory (inline to avoid needing the CJS module at build) ──────
 
