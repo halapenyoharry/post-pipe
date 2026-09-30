@@ -773,55 +773,134 @@ export function GraphViewer({
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
 
-        function createContainerSpiralForce() {
-      let nodes = [];
+    function getDirectSpiralUnits(c) {
+      // For a container whose direct children are containers, return those
+      // child containers as placement units (by centroid). For a leaf container
+      // whose direct members are article nodes, return those nodes.
+      const childContainerIds = Array.from(containerChildren.get(c.id) || []);
+      if (childContainerIds.length > 0) {
+        return childContainerIds
+          .map(chId => {
+            const chSlugs = getAllMemberSlugs(chId);
+            const chNodes = chSlugs
+              .map(s => nodeBySlug.get(s))
+              .filter(n => n && Number.isFinite(n.x) && Number.isFinite(n.y));
+            if (chNodes.length === 0) return null;
+            const chDef = (data.containers || []).find(x => x.id === chId);
+            return {
+              isContainer: true,
+              id: chId,
+              x: d3.mean(chNodes, n => n.x),
+              y: d3.mean(chNodes, n => n.y),
+              def: chDef,
+              nodes: chNodes,
+              series_part: null,
+              date: '',
+            };
+          })
+          .filter(Boolean);
+      }
+      const directSlugs = Array.from(containerMembers.get(c.id) || []);
+      return directSlugs
+        .map(slug => nodeBySlug.get(slug))
+        .filter(n => n && Number.isFinite(n.x) && Number.isFinite(n.y))
+        .map(n => ({
+          isContainer: false, id: n.id,
+          x: n.x, y: n.y, node: n,
+          series_part: n.series_part, date: n.date || '',
+        }));
+    }
+
+    function createContainerSpiralForce() {
+      let simNodes = [];
       function force(alpha) {
         if (graphSettings.spiral?.enabled === false) return;
         const spacing = graphSettings.spiral?.spacing || 20;
-        
+
         containerGroups.each(function (c) {
           if (closedContainers.has(c.id)) return;
-          const memberSlugs = getAllMemberSlugs(c.id);
-          const memberNodes = memberSlugs
-            .map((slug) => nodeBySlug.get(slug))
-            .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
-          
-          if (memberNodes.length < 2) return;
-          
-          const sorted = memberNodes.sort((a, b) => {
-             const tA = Date.parse(a.date || '') || 0;
-             const tB = Date.parse(b.date || '') || 0;
-             return tA - tB;
-          });
-          
-          const cp = containerCentroids.get(c.id) || {x: 0, y: 0};
-          const first = sorted[0];
-          
-          const w = first._size?.width || CARD.width;
-          const h = first._size?.height || CARD.height;
-          
-          // Pull first directly below label
-          // Label is at top 1/3, center is cp.y, top is roughly cp.y - h/2.
-          const targetY = cp.y - h/2 + 80;
-          first.vy += (cp.y - first.y) * 0.1 * alpha;
-          first.vx += (cp.x - first.x) * 0.1 * alpha;
 
+          const units = getDirectSpiralUnits(c);
+          if (units.length < 2) return;
+
+          // Order by series_part then by date, then stable
+          units.sort((a, b) => {
+            if (a.series_part != null && b.series_part != null) return a.series_part - b.series_part;
+            if (a.series_part != null) return -1;
+            if (b.series_part != null) return 1;
+            return (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0);
+          });
+
+          const cp = containerCentroids.get(c.id) || { x: 0, y: 0 };
+          const first = units[0];
+
+          // Pull first unit just below the label
+          const fs = c._fs || 52;
+          const labelClearance = fs * 1.4 + 20;
+          const targetY = cp.y + labelClearance;
+
+          const moveTo = (unit, tx, ty, str) => {
+            if (unit.isContainer) {
+              const dx = (tx - unit.x) * str * alpha;
+              const dy = (ty - unit.y) * str * alpha;
+              for (const n of unit.nodes) { n.vx += dx; n.vy += dy; }
+            } else {
+              unit.node.vx += (tx - unit.node.x) * str * alpha;
+              unit.node.vy += (ty - unit.node.y) * str * alpha;
+            }
+          };
+          moveTo(first, cp.x, targetY, 0.08);
+
+          const refW = CARD.width;
+          const refH = CARD.height;
           const golden = 137.508 * (Math.PI / 180);
-          for (let i = 1; i < sorted.length; i++) {
-             const node = sorted[i];
-             const radius = (Math.hypot(w, h)/2 + spacing) * Math.sqrt(i);
-             const angle = i * golden;
-             const tx = first.x + radius * Math.cos(angle);
-             const ty = first.y + radius * Math.sin(angle);
-             
-             node.vx += (tx - node.x) * 0.05 * alpha;
-             node.vy += (ty - node.y) * 0.05 * alpha;
+          const anchorX = first.isContainer ? first.x : first.node.x;
+          const anchorY = first.isContainer ? first.y : first.node.y;
+          for (let i = 1; i < units.length; i++) {
+            const unit = units[i];
+            const radius = (Math.hypot(refW, refH) / 2 + spacing) * Math.sqrt(i);
+            const angle = i * golden;
+            moveTo(unit, anchorX + radius * Math.cos(angle), anchorY + radius * Math.sin(angle), 0.04);
           }
         });
       }
-      force.initialize = function(_nodes) {
-        nodes = _nodes;
-      };
+      force.initialize = function (_nodes) { simNodes = _nodes; };
+      return force;
+    }
+
+    // Badge-rect repel: push member nodes below each container's label rect.
+    function createLabelRepelForce() {
+      let simNodes = [];
+      function force(alpha) {
+        containerGroups.each(function (c) {
+          if (closedContainers.has(c.id)) return;
+          const cp = containerCentroids.get(c.id);
+          if (!cp) return;
+
+          const fs = c._fs || 52;
+          const badgeH = fs * 1.4 + 16;
+          const badgeW = Math.max(160, ((c.label || '').length * fs * 0.55) + 60);
+          // Use the actual badge cy from updateContainers if known, else estimate
+          const badgeCy = (c._badgeCy != null) ? c._badgeCy : cp.y;
+          const bTop    = badgeCy - badgeH * 0.4;
+          const bBottom = badgeCy + badgeH * 0.6;
+          const bLeft   = cp.x - badgeW / 2;
+          const bRight  = cp.x + badgeW / 2;
+
+          for (const slug of getAllMemberSlugs(c.id)) {
+            const n = nodeBySlug.get(slug);
+            if (!n || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
+            const nW = (n._size?.width  || CARD.width)  / 2;
+            const nH = (n._size?.height || CARD.height) / 2;
+            const overlapX = Math.min(n.x + nW, bRight)  - Math.max(n.x - nW, bLeft);
+            const overlapY = Math.min(n.y + nH, bBottom) - Math.max(n.y - nH, bTop);
+            if (overlapX > 0 && overlapY > 0) {
+              n.vy += overlapY * alpha * 0.5;
+            }
+          }
+        });
+      }
+      force.initialize = function (_nodes) { simNodes = _nodes; };
       return force;
     }
 
@@ -1036,6 +1115,8 @@ export function GraphViewer({
 
     if (data.containers && data.containers.length > 0) {
       simulation.force('containerSeparation', createContainerSeparationForce());
+      simulation.force('containerSpiral', createContainerSpiralForce());
+      simulation.force('labelRepel', createLabelRepelForce());
     }
 
     function updateContainers() {
@@ -1151,6 +1232,10 @@ export function GraphViewer({
         // Label position: horizontally centered, vertically about one third down from the top
         const hullH = maxY - minY;
         const cy = minY + (hullH / 3);
+
+        // Store for label-repel force
+        c._badgeCy = cy;
+        c._fs = fs2;
         
         badge.attr('transform', `translate(${cx}, ${cy})`);
       });
