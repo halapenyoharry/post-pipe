@@ -557,7 +557,8 @@ export function GraphViewer({
     }
 
     const containerBadges = containerGroups.append('g')
-      .attr('class', 'container-badge');
+      .attr('class', 'container-badge')
+      .style('touch-action', 'manipulation');
 
     const containerBadgeTexts = containerBadges.append('text')
       .attr('class', 'container-badge-text')
@@ -580,7 +581,8 @@ export function GraphViewer({
     // Collapsed container macro node (when container is closed, represented like a single node)
     const containerMacroNodes = containerGroups.append('g')
       .attr('class', 'container-macro-node')
-      .style('display', 'none');
+      .style('display', 'none')
+      .style('touch-action', 'manipulation');
 
     containerMacroNodes.append('rect')
       .attr('class', 'container-macro-bg')
@@ -705,16 +707,30 @@ export function GraphViewer({
             applyPositions();
           } else {
             // Click with < 4px movement: toggle collapse
-            if (isCollapsed) {
-              closedContainers.delete(c.id);
-            } else {
-              if (closedContainers.has(c.id)) {
-                closedContainers.delete(c.id);
+            const now = Date.now();
+            const lastTap = c._lastTap || 0;
+            const gesture = graphSettings.collapseGesture || 'tap';
+
+            if (gesture === 'doubletap') {
+              if (now - lastTap < 400) {
+                if (isCollapsed) closedContainers.delete(c.id);
+                else {
+                  if (closedContainers.has(c.id)) closedContainers.delete(c.id);
+                  else closedContainers.add(c.id);
+                }
+                applyContainerVisibility();
+                c._lastTap = 0;
               } else {
-                closedContainers.add(c.id);
+                c._lastTap = now;
               }
+            } else {
+              if (isCollapsed) closedContainers.delete(c.id);
+              else {
+                if (closedContainers.has(c.id)) closedContainers.delete(c.id);
+                else closedContainers.add(c.id);
+              }
+              applyContainerVisibility();
             }
-            applyContainerVisibility();
           }
         });
     }
