@@ -163,6 +163,7 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
     version_maps:   fm.version_maps || null,
     source:         'local',
     schema:         'gen2',
+    posted:         fm.posted !== undefined ? fm.posted : null,
   };
 }
 
@@ -202,6 +203,7 @@ function buildFromQmd(id, yaml, files, dir) {
     todos:          files.filter(isTodo),
     source:         'local',
     schema:         'legacy-qmd',
+    posted:         yaml.posted !== undefined ? yaml.posted : null,
   };
 }
 
@@ -240,6 +242,7 @@ function buildFromUnstructured(id, files, dir) {
     todos:          files.filter(isTodo),
     source:         'local',
     schema:         'unstructured',
+    posted:         null,
   };
 }
 

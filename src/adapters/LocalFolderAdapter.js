@@ -36,7 +36,12 @@ async function load(config) {
   }
 
   const { contents } = ingestFolder(rootPath);
-  const items = contents.map(c => {
+  const items = contents.filter(c => {
+    let vis = c.posted;
+    if (vis === undefined || vis === null) vis = config.visibilityDefault;
+    const isVisible = (vis === true || vis === 'yes' || vis === 'true' || vis === 'public');
+    return isVisible;
+  }).map(c => {
     generateItemPage(c, rootPath, pagesDir);
     return contentToItem(c, rootPath, pagesBase, coversDir);
   });

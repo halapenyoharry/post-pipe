@@ -76,6 +76,8 @@ function configFor(entry) {
     }
     return {
       ...base,
+      visibilityDefault: SETTINGS.visibility?.default || 'public',
+
       path: localPath,
       pagesBase: PAGES_BASE,
       coversDir: COVERS_DIR,
