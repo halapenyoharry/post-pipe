@@ -18,6 +18,8 @@
 //   - mode 'scatter', or members with no order: the golden-angle spiral, each
 //     unit pushed out along its ray until it clears the label and everything
 //     already placed.
+//   - mode 'ring' (the ring layout): members on a circle round the label, in
+//     order, clockwise from the top; child containers as for 'path'.
 //
 // The renderer turns this into a gentle positional force, so the result is a
 // target the simulation settles into rather than coordinates it is nailed to.
@@ -66,7 +68,7 @@ function compareUnits(a, b) {
  * @param {Function} [input.macroSize] (container) -> { w, h } of its closed form
  * @param {Set}      [input.closed]    ids of closed containers
  * @param {Object}   [input.options]   { spacing, gap, padding(container), mode, startRadius }
- *   mode: 'path' (default) | 'scatter'; startRadius: the spiral's radius at its first member
+ *   mode: 'path' (default) | 'scatter' | 'ring'; startRadius: the spiral's radius at its first member
  * @returns {{ roots: string[], nodes: Map, containers: Map }}
  *   nodes:      nodeId -> { root, x, y }          position in its root container's frame
  *   containers: id -> { root, label: rect, box: rect, center: {x, y}, closed }  in the root frame
@@ -75,7 +77,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
   const spacing = options.spacing != null ? options.spacing : 20;
   const gap = options.gap != null ? options.gap : 16;
   const paddingOf = options.padding || (() => 40);
-  const mode = options.mode === 'scatter' ? 'scatter' : 'path';
+  const mode = options.mode === 'scatter' || options.mode === 'ring' ? options.mode : 'path';
   const closedSet = closed || new Set();
   const byId = new Map(containers.map((c) => [c.id, c]));
   const childrenOf = new Map(containers.map((c) => [c.id, []]));
@@ -132,8 +134,9 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       const clear = (rect) => !rectsOverlap(rect, labelRect, gap) && !placed.some((p) => rectsOverlap(rect, p, spacing));
       const hasChildContainers = units.some((u) => u.kind === 'container');
       const ordered = units.some((u) => Number.isFinite(u.order));
-      const arrangement = mode === 'scatter' ? 'scatter'
-        : hasChildContainers ? 'beside'
+      const arrangement = hasChildContainers ? (mode === 'scatter' ? 'scatter' : 'beside')
+        : mode === 'ring' ? 'ring'
+        : mode === 'scatter' ? 'scatter'
         : ordered ? 'path' : 'scatter';
       const positions = [];
 
@@ -167,6 +170,32 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
           positions.push(p);
           placed.push(rectAt(p.x, p.y, u.w, u.h));
         });
+      } else if (arrangement === 'ring') {
+        // One ring per container, its label in the middle. The radius gives
+        // every member a card's diagonal plus spacing of arc, and clears the
+        // label.
+        const diag = Math.max(...units.map((u) => Math.hypot(u.w, u.h)));
+        const n = units.length;
+        let R = Math.max(
+          n > 1 ? (n * (diag + spacing)) / (2 * Math.PI) : 0,
+          Math.hypot(lab.w, lab.h) / 2 + diag / 2 + gap,
+        );
+        const cy0 = 0;
+        for (let guard = 0; guard < 400; guard++) {
+          positions.length = 0;
+          placed.length = 0;
+          let ok = true;
+          units.forEach((u, k) => {
+            const t = -Math.PI / 2 + (k / n) * 2 * Math.PI;
+            const p = { x: R * Math.cos(t), y: cy0 + R * Math.sin(t) };
+            const rect = rectAt(p.x, p.y, u.w, u.h);
+            if (!clear(rect)) ok = false;
+            positions.push(p);
+            placed.push(rect);
+          });
+          if (ok) break;
+          R += 8;
+        }
       } else if (arrangement === 'beside') {
         // First unit under the label; the rest alternate right and left of
         // everything placed so far, their tops lifted so the label sits about

@@ -155,3 +155,27 @@ test('scatter mode is the golden-angle arrangement, and still keeps every rule',
   }
   for (const [, info] of L.containers) for (const p of all) assert.ok(!rectsOverlap(info.label, rectOf(p)));
 });
+
+test('ring mode: one ring per container round its label, clear of everything', () => {
+  const L = book(undefined, { mode: 'ring' });
+  for (const id of ['a1', 'a2', 'a3']) {
+    const info = L.containers.get(id);
+    const cx = (info.label.x0 + info.label.x1) / 2;
+    const cy = (info.label.y0 + info.label.y1) / 2;
+    const n = id === 'a1' ? 11 : id === 'a2' ? 9 : 8;
+    const radii = Array.from({ length: n }, (_, i) => {
+      const p = L.nodes.get(id + '-' + (i + 1));
+      return Math.hypot(p.x - cx, p.y - cy);
+    });
+    assert.ok(Math.max(...radii) - Math.min(...radii) < 1e-6, id + ' members on one circle');
+    const first = L.nodes.get(id + '-1');
+    assert.ok(Math.abs(first.x - cx) < 1e-6 && first.y < cy, 'first at the top');
+  }
+  const boxes = ['a1', 'a2', 'a3'].map((id) => L.containers.get(id).box);
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) assert.ok(!rectsOverlap(boxes[i], boxes[j]));
+  const all = [...L.nodes.values()];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) assert.ok(!rectsOverlap(rectOf(all[i]), rectOf(all[j])));
+  }
+  for (const [, info] of L.containers) for (const p of all) assert.ok(!rectsOverlap(info.label, rectOf(p)));
+});

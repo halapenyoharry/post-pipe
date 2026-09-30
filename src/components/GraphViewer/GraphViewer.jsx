@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
-import { computeLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
+import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
 import { containerLayout } from './containerLayout';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
@@ -893,7 +893,7 @@ export function GraphViewer({
         macroSize: (c) => ({ w: (c._macroHalfW || 130) * 2, h: (c._macroHalfH || 45) * 2 }),
         options: {
           spacing: graphSettings.spiral?.spacing ?? 20,
-          mode: graphSettings.spiral?.mode || 'path',
+          mode: layoutRef.current === 'radial' ? 'ring' : (graphSettings.spiral?.mode || 'path'),
           startRadius: graphSettings.spiral?.startRadius,
           gap: 28,
           padding: (c) => (c.padding != null ? c.padding : (c.parent ? 42 : 75)),
@@ -937,11 +937,15 @@ export function GraphViewer({
       return n ? { x: sx / n, y: sy / n } : null;
     }
 
-    const spiralOn = () => graphSettings.spiral?.enabled !== false && layoutRef.current === 'force';
+    // Containers are laid out in cluster (spiral paths) and in ring (one ring
+    // per container). The positional pull only matters in cluster: in ring
+    // every node is placed outright.
+    const spiralOn = () => graphSettings.spiral?.enabled !== false
+      && (layoutRef.current === 'force' || layoutRef.current === 'radial');
 
     function createContainerLayoutForce() {
       function force(alpha) {
-        if (!spiralOn()) return;
+        if (!spiralOn() || layoutRef.current !== 'force') return;
         const strength = graphSettings.spiral?.strength ?? 0.35;
         for (const rootId of CL.roots) {
           const off = rootOffset(rootId);
@@ -1085,6 +1089,42 @@ export function GraphViewer({
       }
     }
     if (CL.nodes.size > 0) seedFromLayout(positionsWereDegenerate);
+
+    // The ring layout with containers: each top-level container (its rings
+    // inside it) side by side, and anything in no container on a ring of its
+    // own to the right.
+    function ringTargets() {
+      if (!data.containers || data.containers.length === 0) return null;
+      computeContainerLayout();
+      refreshContainerForces();
+      if (CL.nodes.size === 0) return null;
+      const out = {};
+      let cursor = 0;
+      for (const rootId of CL.roots) {
+        const info = CL.containers.get(rootId);
+        if (!info) continue;
+        const ox = cursor - info.box.x0;
+        const oy = -(info.box.y0 + info.box.y1) / 2;
+        for (const [id, p] of CL.nodes) {
+          if (p.root === rootId) out[id] = { x: ox + p.x, y: oy + p.y };
+        }
+        cursor += info.box.x1 - info.box.x0 + 200;
+      }
+      const loose = data.nodes.filter((n) => !CL.nodes.has(n.id));
+      if (loose.length) {
+        const pos = radialLayout(loose, { cardW: CARD.width, cardH: CARD.height });
+        const xs = Object.values(pos).map((p) => p.x);
+        const shift = xs.length ? cursor + CARD.width - Math.min(...xs) : cursor;
+        for (const [id, p] of Object.entries(pos)) out[id] = { x: p.x + shift, y: p.y };
+      }
+      return out;
+    }
+    // Called when the layout changes: containers are laid out again for it.
+    function recomputeContainers() {
+      if (!data.containers || data.containers.length === 0) return;
+      computeContainerLayout();
+      refreshContainerForces();
+    }
 
     function hasClosedAncestor(c) {
       let p = c.parent;
@@ -2173,7 +2213,7 @@ export function GraphViewer({
       updateContainers();
     }
     let hasFitted = false;
-    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers };
+    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers };
 
     // The axis is measured against the corpus extent, which keeps changing
     // while the simulation runs — so drawing it once at the start pins it to
@@ -2682,6 +2722,7 @@ export function GraphViewer({
 
     const vs = viewStateRef.current;
     const rest = cardSizeFor({ hovered: false, pinned: false });
+    if (g.recomputeContainers) g.recomputeContainers();
 
     // Prefer what the reader arranged in this layout; fall back to computing it.
     // Cluster is not a set of coordinates, it is the simulation. Asking for it
@@ -2710,7 +2751,8 @@ export function GraphViewer({
           d.id,
           d._forcePos || (vs && vs.nodeState('force::' + persistKey(d))) || { x: d.x, y: d.y },
         ]))
-      : computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
+      : (layout === 'radial' && g.ringTargets && g.ringTargets())
+        || computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
     if (!computed) return;
 
     const startPositions = new Map(g.data.nodes.map(d => [d.id, { x: d.x, y: d.y }]));

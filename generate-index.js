@@ -291,7 +291,7 @@ ${reactJs}
     // Bump when the layout algorithm changes in a way that makes previously
     // generated positions wrong. Positions the reader placed by hand are not
     // affected — only the ones the simulation produced.
-    const LAYOUT_VERSION = 'per-layout-positions-4';
+    const LAYOUT_VERSION = 'per-layout-positions-5';
 
     const viewState = window.ViewState.createViewState({
       backend: window.ViewState.localStorageBackend('post-pipe:viewstate'),
