@@ -67,11 +67,11 @@ export function TTS({ targetRef }) {
       const newParams = {};
       for (const key of Object.keys(caps)) {
         if (key === 'voice') {
-          let chosen = tts.get('voice') || caps.voice.default;
-          // If no voice chosen yet or browser engine is active, search for Google US English 7 (Natural)
-          if (!chosen && vList.length) {
-            const match7 = vList.find(v => /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.id || v.label));
-            if (match7) chosen = match7.id;
+          // Keep the reader's choice if it is still on offer; otherwise the
+          // first of the curated voices.
+          let chosen = tts.get('voice');
+          if (!chosen || (vList.length && !vList.some(v => v.id === chosen))) {
+            chosen = caps.voice.default || (vList[0] && vList[0].id);
           }
           if (chosen) {
             tts.set('voice', chosen);
@@ -155,26 +155,9 @@ export function TTS({ targetRef }) {
 
   if (!T) return null; // Wait until global is mounted
 
-  // Group voices by language
+  // The engine already curates the list: a handful of voices, best first.
   const renderVoiceOptions = () => {
     if (!voices.length) return <option>Loading...</option>;
-
-    const hasLang = voices.some(v => v.lang);
-    if (hasLang) {
-      const groups = {};
-      voices.forEach(v => {
-        const lang = v.lang || 'other';
-        (groups[lang] = groups[lang] || []).push(v);
-      });
-      return Object.keys(groups).sort().map(lang => (
-        <optgroup label={lang} key={lang}>
-          {groups[lang].map(v => (
-            <option key={v.id} value={v.id}>{v.label}</option>
-          ))}
-        </optgroup>
-      ));
-    }
-
     return voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>);
   };
 
@@ -215,17 +198,19 @@ export function TTS({ targetRef }) {
         </span>
       )}
 
-      <select
-        className={styles.select}
-        style={{ maxWidth: 110 }}
-        value={selectedEngine}
-        onChange={handleEngineChange}
-        title="TTS Engine"
-      >
-        {engines.map(e => (
-          <option key={e.id} value={e.id}>{e.label}</option>
-        ))}
-      </select>
+      {engines.length > 1 && (
+        <select
+          className={styles.select}
+          style={{ maxWidth: 110 }}
+          value={selectedEngine}
+          onChange={handleEngineChange}
+          title="TTS Engine"
+        >
+          {engines.map(e => (
+            <option key={e.id} value={e.id}>{e.label}</option>
+          ))}
+        </select>
+      )}
 
       <select
         className={styles.select}

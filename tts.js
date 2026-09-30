@@ -408,26 +408,40 @@
     synth.addEventListener('voiceschanged', refreshVoices);
     refreshVoices();
 
-    const CURATED = new Set([
-      'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa', 'Rishi', 'Tara', 'Aman',
-      'Flo', 'Shelley', 'Sandy', 'Reed',
-      'Google US English', 'Google UK English Male', 'Google UK English Female',
-    ]);
+    // A few good English voices rather than every voice the device has.
+    // TTS_CONFIG.preferredVoices is an ordered list of names; a device voice
+    // matches a name exactly or by prefix ("Samantha (Enhanced)", "Microsoft
+    // Aria Online (Natural) - English (United States)"). At most maxVoices
+    // are offered, in the list's order; if none of them exist on this device,
+    // one English voice is offered instead.
+    const DEFAULT_PREFERRED = [
+      'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa',
+      'Google US English', 'Google UK English Female', 'Google UK English Male',
+      'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
+    ];
+    function curatedVoices(all) {
+      const cfg = window.TTS_CONFIG || {};
+      const preferred = Array.isArray(cfg.preferredVoices) && cfg.preferredVoices.length
+        ? cfg.preferredVoices : DEFAULT_PREFERRED;
+      const max = Number.isFinite(cfg.maxVoices) && cfg.maxVoices > 0 ? cfg.maxVoices : 5;
+      const english = all.filter(v => /^en([-_]|$)/i.test(v.lang || ''));
+      const picked = [];
+      for (const name of preferred) {
+        if (picked.length >= max) break;
+        const exact = english.find(v => v.name === name && picked.indexOf(v) === -1);
+        const prefix = exact || english.find(v => v.name.indexOf(name) === 0 && picked.indexOf(v) === -1);
+        if (prefix) picked.push(prefix);
+      }
+      if (!picked.length) {
+        const fallback = english.find(v => v.default) || english[0] || all.find(v => v.default) || all[0];
+        if (fallback) picked.push(fallback);
+      }
+      return picked;
+    }
 
     function findDefaultBrowserVoice(allVoices) {
-      // 1. Explicit target requested by user: Google US English 7 (Natural)
-      const target = allVoices.find(v => /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.name));
-      if (target) return target.name;
-      // 2. Any Google US English Natural
-      const naturalFallback = allVoices.find(v => /Google.*(?:US\s*)?English.*(?:Natural)/i.test(v.name));
-      if (naturalFallback) return naturalFallback.name;
-      // 3. Any Google English
-      const googleFallback = allVoices.find(v => /Google.*English/i.test(v.name));
-      if (googleFallback) return googleFallback.name;
-      // 4. Any curated voice
-      const curated = allVoices.find(v => CURATED.has(v.name.replace(/ \(English.*\)/, '')));
-      if (curated) return curated.name;
-      return allVoices[0]?.name || null;
+      const first = curatedVoices(allVoices)[0];
+      return first ? first.name : null;
     }
 
     window.TTS.register({
@@ -452,25 +466,11 @@
       },
 
       voices: function () {
-        const all = synth.getVoices();
-        // Group by language, prioritized voice first, then curated
-        return all.map(v => {
-          const clean = v.name.replace(/ \(English.*\)/, '');
-          const isTarget = /Google.*(?:US\s*)?English\s*7.*(?:Natural)?/i.test(v.name);
-          return {
-            id: v.name,
-            label: v.name, // Keep descriptive name so specific voice variants are distinct
-            lang: v.lang,
-            curated: isTarget || CURATED.has(clean),
-            isTarget: isTarget,
-          };
-        }).sort((a, b) => {
-          if (a.isTarget && !b.isTarget) return -1;
-          if (!a.isTarget && b.isTarget) return 1;
-          if (a.curated && !b.curated) return -1;
-          if (!a.curated && b.curated) return 1;
-          return a.label.localeCompare(b.label);
-        });
+        return curatedVoices(synth.getVoices()).map(v => ({
+          id: v.name,
+          label: v.name,
+          lang: v.lang,
+        }));
       },
 
       speak: function (text, p) {
@@ -496,400 +496,6 @@
       resume: function () { synth.resume(); },
       stop: function () { synth.cancel(); currentUtterance = null; if (resolveSpeak) { resolveSpeak(); resolveSpeak = null; } },
     });
-  })();
-
-  // ─── Built-in engine: Kokoro ───────────────────────────────────────────────
-  // Two transports behind one engine id, chosen by settings.json's
-  // tts.engines.kokoro.mode:
-  //
-  //  'server' — calls a self-hosted Kokoro instance's OpenAI-compatible
-  //             /v1/audio/speech endpoint (see the kokoro-tts skill and
-  //             services-registry.json's "kokoro-tts" entry — lumen runs one
-  //             on its RTX 3090 at 192.168.1.3:8880). No download, no
-  //             per-request billing, but only reachable from a device on
-  //             lothal's 10GbE/Tailscale network.
-  //
-  //  'wasm'   — would run an 82MB ONNX model in-browser via a Worker. This
-  //             path has never actually worked: kokoro-worker.js does not
-  //             exist in this repo and there is no ONNX runtime dependency
-  //             to build it from, so init() would hang forever waiting for a
-  //             'ready' message the Worker can never send (a 404 module
-  //             import throws before the worker's own message loop starts).
-  //             Left in place for whoever eventually builds that worker;
-  //             'server' is the mode actually in use.
-
-  (function registerKokoro() {
-    const cfg = window.TTS_CONFIG || {};
-    const mode = cfg.kokoroMode || 'wasm';
-    const host = (cfg.kokoroHost || '').replace(/\/+$/, '');
-    const staticVoices = cfg.kokoroVoices || [];
-
-    let worker = null;
-    let ready = false;
-    let voiceList = [];       // raw voice IDs from model (wasm mode)
-    let voiceMeta = {};       // { id: { name, language, gender, overallGrade } } (wasm mode)
-    let currentAudio = null;
-    let resolveSpeak = null;
-    let abortController = null;  // AbortController for in-flight server requests
-
-    const LANG_MAP = {
-      a: 'en-US', b: 'en-GB', e: 'es', f: 'fr', h: 'hi', i: 'it', j: 'ja', p: 'pt', z: 'zh'
-    };
-
-    function idToVoice(id, meta) {
-      const prefix = id.charAt(0);
-      const gender = id.charAt(1) === 'f' ? 'female' : 'male';
-      const lang = LANG_MAP[prefix] || 'en';
-      const m = meta || {};
-      return {
-        id: id,
-        label: m.label || m.name || id,
-        lang: m.lang || lang,
-        gender: gender,
-        grade: m.overallGrade || '',
-      };
-    }
-
-    function playBlob(blob) {
-      return new Promise((resolve, reject) => {
-        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-        const url = URL.createObjectURL(blob);
-        currentAudio = new Audio(url);
-        resolveSpeak = resolve;
-        currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-        currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
-        currentAudio.play();
-      });
-    }
-
-    window.TTS.register({
-      id: 'kokoro',
-      label: 'Kokoro (self-hosted)',
-      capabilities: {
-        speed:   { type: 'range', min: 0.5, max: 2, step: 0.1, default: 1, label: 'Speed' },
-        quality: { type: 'select', options: [
-          { value: 'fp32', label: 'High (fp32)' },
-          { value: 'q8', label: 'Balanced (q8)' },
-          { value: 'q4', label: 'Fast (q4)' },
-        ], default: 'q8', label: 'Quality' },
-        voice:   { type: 'voice', default: null, label: 'Voice' },
-      },
-
-      init: async function (p) {
-        if (ready) return;
-
-        if (mode === 'server') {
-          if (!host) throw new Error('Kokoro: mode is "server" but tts.engines.kokoro.host is not set in settings.json');
-          // The curated voice list already in settings.json is known-good, so
-          // there is nothing to fetch before this engine is usable — a live
-          // GET /v1/voices call would be nice-to-have (the full 54-voice set)
-          // but its response shape is unverified on this specific Kokoro
-          // build, and a working default beats a richer list that might fail
-          // to parse. Ship the reliable path.
-          ready = true;
-          return;
-        }
-
-        const workerUrl = cfg.kokoroWorkerUrl || './kokoro-worker.js';
-        worker = new Worker(workerUrl, { type: 'module' });
-        return new Promise((resolve, reject) => {
-          worker.addEventListener('message', function handler(e) {
-            const msg = e.data;
-            if (msg.status === 'progress') {
-              emit('loadingProgress', { engine: 'kokoro', progress: msg.progress });
-            }
-            if (msg.status === 'ready') {
-              ready = true;
-              voiceList = msg.voices || [];
-              if (msg.voiceMeta) voiceMeta = msg.voiceMeta;
-              worker.removeEventListener('message', handler);
-              resolve();
-            }
-            if (msg.status === 'error' && !ready) {
-              worker.removeEventListener('message', handler);
-              reject(new Error(msg.error));
-            }
-            if (msg.status === 'progress') {
-              let p = 0;
-              if (msg.progress && typeof msg.progress.progress === 'number') {
-                // Transformers.js progress is 0-100
-                p = msg.progress.progress / 100;
-              } else if (msg.progress && msg.progress.loaded && msg.progress.total) {
-                p = msg.progress.loaded / msg.progress.total;
-              }
-              emit('engineProgress', p);
-            }
-          });
-          
-          worker.addEventListener('error', function errHandler(e) {
-            worker.removeEventListener('error', errHandler);
-            reject(new Error(e.message || 'Worker script failed to load.'));
-          });
-          
-          // Background listener for generated audio blobs
-          worker.addEventListener('message', function bgHandler(e) {
-            const msg = e.data;
-            if (msg.status === 'complete' || (msg.status === 'error' && msg.text)) {
-              const resolver = prefetchMap.get(msg.text);
-              if (resolver) {
-                if (msg.status === 'complete') resolver.resolve(msg.audio);
-                else resolver.reject(new Error(msg.error));
-                prefetchMap.delete(msg.text);
-              }
-            }
-          });
-          // Worker auto-inits on creation — it loads the model immediately
-        });
-      },
-
-      prefetch: function (text, p) {
-        if (!worker) return Promise.reject(new Error("Worker not initialized"));
-        if (prefetchMap.has(text)) return prefetchMap.get(text).promise;
-        const voice = p.voice || 'af_heart';
-        let resolver = {};
-        const promise = new Promise((resolve, reject) => {
-          resolver.resolve = resolve;
-          resolver.reject = reject;
-        });
-        resolver.promise = promise;
-        prefetchMap.set(text, resolver);
-        worker.postMessage({ action: 'generate', text: text, voice: voice, speed: p.speed || 1 });
-        return promise;
-      },
-
-      voices: function () {
-        if (mode === 'server') {
-          return staticVoices.map(v => idToVoice(v.id, v))
-            .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
-        }
-        // In wasm mode, return the static list immediately so the UI can populate.
-        // It will update to the real list if/when the worker sends the 'ready' message.
-        if (voiceList && voiceList.length > 0) {
-          return voiceList.map(id => idToVoice(id, voiceMeta[id] || { name: id }))
-            .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
-        }
-        return staticVoices.map(v => idToVoice(v.id, v))
-          .sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label));
-      },
-
-      speak: function (text, p) {
-        const voice = p.voice || (staticVoices[0] && staticVoices[0].id) || 'af_heart';
-
-        if (mode === 'server') {
-          // Abort any previous in-flight request
-          if (abortController) { try { abortController.abort(); } catch (_) {} }
-          abortController = new AbortController();
-          const timeout = setTimeout(() => abortController.abort(), 10000);
-
-          return fetch(host + '/v1/audio/speech', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: abortController.signal,
-            body: JSON.stringify({
-              model: 'kokoro',
-              input: text,
-              voice: voice,
-              speed: p.speed || 1,
-              response_format: 'mp3',
-            }),
-          }).then(res => {
-            clearTimeout(timeout);
-            if (!res.ok) {
-              return res.text().then(t => {
-                throw new Error('Kokoro server HTTP ' + res.status + ': ' + t.slice(0, 200));
-              });
-            }
-            return res.blob();
-          }).catch(err => {
-            clearTimeout(timeout);
-            abortController = null;
-            if (err.name === 'AbortError') {
-              throw new Error('Kokoro server unreachable (timed out after 10s)');
-            }
-            throw err;
-          }).then(blob => {
-            return new Promise((resolve, reject) => {
-              if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-              const url = URL.createObjectURL(blob);
-              currentAudio = new Audio(url);
-              currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-              currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
-              const playPromise = currentAudio.play();
-              if (playPromise !== undefined) {
-                playPromise.catch(err => {
-                  URL.revokeObjectURL(url);
-                  currentAudio = null;
-                  reject(new Error('Audio play prevented: ' + (err.message || err)));
-                });
-              }
-            });
-          });
-        }
-
-        return this.prefetch(text, p).then(blob => {
-          return new Promise((resolve, reject) => {
-            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-            const url = URL.createObjectURL(blob);
-            currentAudio = new Audio(url);
-            currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-            currentAudio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e); };
-            currentAudio.play();
-          });
-        });
-      },
-
-      pause: function () { if (currentAudio) currentAudio.pause(); },
-      resume: function () { if (currentAudio) currentAudio.play(); },
-      stop: function () {
-        // Abort any in-flight server request so the fetch rejects immediately
-        if (abortController) { try { abortController.abort(); } catch (_) {} abortController = null; }
-        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
-        if (resolveSpeak) { resolveSpeak(); resolveSpeak = null; }
-      },
-    });
-  })();
-
-  // ─── Built-in engine: Supertonic ───────────────────────────────────────────
-  // 66M model, 10 voices, 5 languages. Official ONNX Runtime Web support.
-  // Lazy-loads from worker on first play.
-
-  (function registerSupertonic() {
-    // Supertonic requires a separate worker and model files.
-    // This is a registration stub — the actual worker (supertonic-worker.js)
-    // must be served alongside the page. If not present, engine stays unavailable.
-
-    let worker = null;
-    let ready = false;
-    let currentAudio = null;
-    let resolveSpeak = null;
-
-    const VOICES = [
-      { id: 'F1', label: 'Female 1', gender: 'female' },
-      { id: 'F2', label: 'Female 2', gender: 'female' },
-      { id: 'F3', label: 'Female 3', gender: 'female' },
-      { id: 'F4', label: 'Female 4', gender: 'female' },
-      { id: 'F5', label: 'Female 5', gender: 'female' },
-      { id: 'M1', label: 'Male 1', gender: 'male' },
-      { id: 'M2', label: 'Male 2', gender: 'male' },
-      { id: 'M3', label: 'Male 3', gender: 'male' },
-      { id: 'M4', label: 'Male 4', gender: 'male' },
-      { id: 'M5', label: 'Male 5', gender: 'male' },
-    ];
-
-    const LANGUAGES = [
-      { value: 'en', label: 'English' },
-      { value: 'ko', label: 'Korean' },
-      { value: 'es', label: 'Spanish' },
-      { value: 'pt', label: 'Portuguese' },
-      { value: 'fr', label: 'French' },
-    ];
-
-    window.TTS.register({
-      id: 'supertonic',
-      label: 'Supertonic (66M)',
-      capabilities: {
-        speed:    { type: 'range', min: 0.5, max: 2, step: 0.05, default: 1.05, label: 'Speed' },
-        quality:  { type: 'range', min: 1, max: 20, step: 1, default: 5, label: 'Quality (steps)' },
-        language: { type: 'select', options: LANGUAGES, default: 'en', label: 'Language' },
-        voice:    { type: 'voice', default: null, label: 'Voice' },
-      },
-
-      init: async function (p) {
-        if (ready) return;
-        const workerUrl = (window.TTS_CONFIG && window.TTS_CONFIG.supertonicWorkerUrl) || './supertonic-worker.js';
-        worker = new Worker(workerUrl);
-        return new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Supertonic worker load timeout')), 60000);
-          worker.addEventListener('message', function handler(e) {
-            const msg = e.data;
-            if (msg.status === 'ready') {
-              ready = true;
-              clearTimeout(timeout);
-              worker.removeEventListener('message', handler);
-              resolve();
-            }
-            if (msg.status === 'error') {
-              clearTimeout(timeout);
-              worker.removeEventListener('message', handler);
-              reject(new Error(msg.error));
-            }
-          });
-        });
-      },
-
-      voices: function () {
-        return VOICES.map(v => ({ id: v.id, label: v.label, gender: v.gender, lang: 'multi' }));
-      },
-
-      speak: function (text, p) {
-        return new Promise((resolve, reject) => {
-          resolveSpeak = resolve;
-          const onMsg = function (e) {
-            const msg = e.data;
-            if (msg.status === 'complete') {
-              worker.removeEventListener('message', onMsg);
-              // msg.wav is a Float32Array, msg.sampleRate is the rate
-              const wavBlob = pcmToWavBlob(msg.wav, msg.sampleRate);
-              if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-              currentAudio = new Audio(URL.createObjectURL(wavBlob));
-              currentAudio.onended = () => { currentAudio = null; resolve(); };
-              currentAudio.onerror = (e) => { currentAudio = null; reject(e); };
-              currentAudio.play();
-            }
-            if (msg.status === 'error') {
-              worker.removeEventListener('message', onMsg);
-              reject(new Error(msg.error));
-            }
-          };
-          worker.addEventListener('message', onMsg);
-
-          worker.postMessage({
-            action: 'generate',
-            text: text,
-            voice: p.voice || 'F1',
-            language: p.language || 'en',
-            speed: p.speed || 1.05,
-            totalStep: p.quality || 5,
-          });
-        });
-      },
-
-      pause: function () { if (currentAudio) currentAudio.pause(); },
-      resume: function () { if (currentAudio) currentAudio.play(); },
-      stop: function () {
-        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
-        if (resolveSpeak) { resolveSpeak(); resolveSpeak = null; }
-      },
-    });
-
-    // PCM float array → WAV blob
-    function pcmToWavBlob(pcm, sampleRate) {
-      const length = pcm.length;
-      const buffer = new ArrayBuffer(44 + length * 2);
-      const view = new DataView(buffer);
-      // RIFF header
-      writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + length * 2, true);
-      writeString(view, 8, 'WAVE');
-      writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, 1, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeString(view, 36, 'data');
-      view.setUint32(40, length * 2, true);
-      for (let i = 0; i < length; i++) {
-        const s = Math.max(-1, Math.min(1, pcm[i]));
-        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      }
-      return new Blob([buffer], { type: 'audio/wav' });
-    }
-    function writeString(view, offset, str) {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    }
   })();
 
   // ── Gemini TTS Engine ──────────────────────────────────────────────────────

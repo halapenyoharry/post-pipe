@@ -258,9 +258,8 @@ ${SETTINGS.rights && SETTINGS.rights.noAiTraining ? '<meta name="robots" content
 window.TTS_CONFIG = {
   exposedEngines: ${JSON.stringify(exposedEngineIds())},
   defaultEngine: '${SETTINGS.tts?.default_engine || 'browser'}',
-  kokoroMode: '${SETTINGS.tts?.engines?.kokoro?.mode || 'wasm'}',
-  kokoroHost: '${SETTINGS.tts?.engines?.kokoro?.host || ''}',
-  kokoroVoices: ${JSON.stringify(SETTINGS.tts?.engines?.kokoro?.voices || [])},
+  preferredVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.preferredVoices || [])},
+  maxVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.maxVoices || 5)},
 ${geminiConfigBlock()}};
 </script>
 <script>
@@ -749,12 +748,6 @@ async function main() {
     fs.writeFileSync(path.join(SITE_DIR, 'robots.txt'), robots);
   }
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
-
-  // Copy worker if it exists
-  const workerSrc = path.join(__dirname, 'kokoro-worker.js');
-  if (fs.existsSync(workerSrc)) {
-    fs.copyFileSync(workerSrc, path.join(SITE_DIR, 'kokoro-worker.js'));
-  }
 
   console.log(`Generated _site/feed.json (${feed.items.length} items, ${feed.edges.length} edges)`);
   console.log('Generated _site/index.html');

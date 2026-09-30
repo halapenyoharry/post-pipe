@@ -674,12 +674,13 @@ const PostPipe = {
     container.style.background = (config.theme && config.theme.bg) || DEFAULT_THEME.bg;
 
     // Set up TTS config on window (for tts.js which reads it)
+    const browserTts = (config.settings && config.settings.tts && config.settings.tts.engines
+      && config.settings.tts.engines.browser) || {};
     window.TTS_CONFIG = window.TTS_CONFIG || {
       exposedEngines: ['browser'],
       defaultEngine: 'browser',
-      kokoroMode: 'wasm',
-      kokoroHost: '',
-      kokoroVoices: [],
+      preferredVoices: browserTts.preferredVoices || [],
+      maxVoices: browserTts.maxVoices || 5,
     };
 
     // Fetch the feed

@@ -181,7 +181,7 @@ The generated `_site/index.html` is a self-contained page with:
 
 1. **D3 force-directed graph** — nodes are content items; edges are tag co-occurrence (and in future: explicit `connected_to` edges, substrate clusters)
 2. **Reader panel** — slides in on node click; dispatches rendering based on `content.kind`
-3. **TTS toolbar** — engine-agnostic registry (browser / kokoro / supertonic / gemini)
+3. **TTS toolbar** — engine-agnostic registry (browser / gemini)
 4. **Syndication toolbar** — platform icons linking to cross-posted versions
 
 ### Substrate dispatch in the reader
@@ -213,10 +213,8 @@ window.TTS.register(engineName, {
 
 ### Engines
 
-- **Browser (Web Speech API)** — instant, OS-native voices
-- **Kokoro-82M** — 53 voices, 9 languages, ~82MB on first play
-- **Supertonic** — 10 voices, 5 languages, ~66MB
-- **Google Gemini** — 30 multilingual voices via API
+- **Browser (Web Speech API)** — instant, OS-native voices. Only a curated few English voices are offered: `settings.tts.engines.browser.preferredVoices` (ordered names, matched exactly or by prefix) and `maxVoices` (default 5); one English fallback if none of the names exist on the device.
+- **Google Gemini** — 30 multilingual voices via API; billed, so off in the picker unless `exposed: true`.
 
 ### Highlighting principle
 
