@@ -77,6 +77,7 @@ function configFor(entry) {
     return {
       ...base,
       visibilityDefault: SETTINGS.visibility?.default || 'public',
+      commits: { hideMeta: SETTINGS.commits?.hideMeta !== false },
 
       path: localPath,
       pagesBase: PAGES_BASE,

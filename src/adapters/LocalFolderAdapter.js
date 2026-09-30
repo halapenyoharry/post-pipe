@@ -14,6 +14,7 @@ const path = require('path');
 const { marked } = require('marked');
 
 const { ingestFolder } = require('../../ingest');
+const { stripFrontMatter, commitTimes } = require('../lib/frontMatter');
 
 const ID = 'local';
 
@@ -56,7 +57,7 @@ async function load(config) {
       c.connected_to = c.connected_to.filter(slug => !hiddenSlugs.has(slug));
     }
     generateItemPage(c, rootPath, pagesDir, hiddenSlugs);
-    return contentToItem(c, rootPath, pagesBase, coversDir);
+    return contentToItem(c, rootPath, pagesBase, coversDir, config.commits || {});
   });
 
   return {
@@ -73,7 +74,8 @@ async function load(config) {
 // existing extension fields. Field shapes match the legacy output exactly
 // so this adapter is a drop-in for the inlined loadLocalContent() that
 // used to live in generate-index.js.
-function contentToItem(c, rootPath, pagesBase, coversDir) {
+function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}) {
+  const hideMeta = commitSettings.hideMeta !== false;
   const isTitleOnly = c.posted === 'title';
   const imageUrl = copyCoverIfPresent(c, rootPath, coversDir);
   const pagesUrl = `${pagesBase}/${c.id}.html`;
@@ -97,15 +99,23 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     series: c.series || '',
     series_part: c.series_part || null,
     timeline: c.timeline || undefined,
-    commit_times: isTitleOnly ? [] : (Array.isArray(c.commit_times) ? c.commit_times : (() => {
+    // Commits with messages come first: they can be filtered. A bare
+    // commit_times list is taken as given. Failing both, the item folder's
+    // own git history.
+    commit_times: isTitleOnly ? [] : (Array.isArray(c.commits) ? commitTimes(c.commits, { hideMeta })
+      : Array.isArray(c.commit_times) ? c.commit_times : (() => {
       try {
         const itemFolder = path.join(resolveHome(rootPath), c.id);
-        const out = require('child_process').execFileSync('git', ['log', '--format=%cI', '--reverse', '--', '.'], {
+        const out = require('child_process').execFileSync('git', ['log', '--format=%cI%x09%s', '--reverse', '--', '.'], {
           cwd: itemFolder,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
         });
-        return out.split('\n').filter(Boolean);
+        const commits = out.split('\n').filter(Boolean).map((line) => {
+          const tab = line.indexOf('\t');
+          return { date: line.slice(0, tab), message: line.slice(tab + 1) };
+        });
+        return commitTimes(commits, { hideMeta });
       } catch {
         return [];
       }
@@ -240,7 +250,9 @@ function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set()) {
     if (format === 'html') {
       fs.copyFileSync(srcPath, outPath);
     } else if (format === 'md') {
-      let rawMd = fs.readFileSync(srcPath, 'utf8');
+      // Front matter is metadata, never text: stripped before anything
+      // numbers, anchors, counts, or reads the body aloud.
+      let rawMd = stripFrontMatter(fs.readFileSync(srcPath, 'utf8'));
       if (hiddenSlugs.size > 0) {
         // Find links in markdown, e.g. [some text](slug) or [some text](slug.html) or [some text](./slug.html)
         // We replace them with just the text if the slug is hidden.
