@@ -1082,10 +1082,10 @@ export function GraphViewer({
         const hullW = maxX - minX;
         const minFs = graphSettings.labelSize?.min || 32;
         const maxFs = graphSettings.labelSize?.max || 96;
-        const fs = Math.max(minFs, Math.min(maxFs, hullW / 8));
+        const fs2 = Math.max(minFs, Math.min(maxFs, hullW / 8));
 
         const badge = group.select('.container-badge');
-        badge.select('.container-badge-text').attr('font-size', `${fs}px`);
+        badge.select('.container-badge-text').attr('font-size', `${fs2}px`);
         badge.select('.label-count').text(` ${memberNodes.length}`);
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : hullAvgX;
