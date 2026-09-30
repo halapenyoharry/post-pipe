@@ -460,7 +460,8 @@ ${reactJs}
           sources: feed._sources || [],
           hiddenSources: hiddenSources,
           onToggleSource: toggleSource,
-          viewState: viewState
+          viewState: viewState,
+          showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false)
         }),
         React.createElement(TimeOverlay, {
           feedData: feed,

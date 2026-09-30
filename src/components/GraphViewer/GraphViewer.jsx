@@ -5,6 +5,7 @@ import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
 import { containerLayout } from './containerLayout';
+import { showContainerCount, containerCountText } from './containerCount';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -582,10 +583,11 @@ export function GraphViewer({
 
 
     // A container's label: its title wrapped to a few lines, the member count
-    // after the last line. Lines are placed explicitly around the origin so the
+    // after the last line (unless graph.containerCount is false). Lines are placed explicitly around the origin so the
     // rendered block matches the rectangle the layout reserved for it.
     const LABEL_LINE_H = 1.05;
     const LABEL_WRAP = 15;
+    const SHOW_COUNT = showContainerCount(GS);
     function labelLines(d) {
       const words = (d.label || d.id).split(/\s+/);
       const lines = [];
@@ -618,7 +620,7 @@ export function GraphViewer({
           .attr('x', 0)
           .attr('y', `${top + (i + 0.5) * LABEL_LINE_H}em`)
           .text(line);
-        if (i === nLines - 1) {
+        if (SHOW_COUNT && i === nLines - 1) {
           textSel.append('tspan')
             .attr('class', 'label-count')
             .attr('font-weight', '500')
@@ -654,7 +656,7 @@ export function GraphViewer({
     // The rectangle a container's label occupies at font size fs.
     function labelBlockSize(c, fs) {
       const lines = labelLines(c);
-      const countW = labelInkWidth(' 000', fs * 0.5, 500) + 12;
+      const countW = SHOW_COUNT ? labelInkWidth(' 000', fs * 0.5, 500) + 12 : 0;
       const status = statusOf(c);
       const w = Math.max(
         ...lines.map((l, i) => labelInkWidth(l, fs, 700) + (i === lines.length - 1 ? countW : 0)),
@@ -1179,7 +1181,7 @@ export function GraphViewer({
           group.select('.container-macro-node')
             .style('display', null)
             .attr('transform', `translate(${pos.x}, ${pos.y})`)
-            .select('.label-count').text(` ${memberNodes.length}`);
+            .select('.label-count').text(containerCountText(GS, memberNodes.length));
           return;
         }
 
@@ -1267,7 +1269,7 @@ export function GraphViewer({
         group.select('.container-hull').attr('d', hullLine(hull));
 
         const badge = group.select('.container-badge');
-        badge.select('.label-count').text(` ${memberNodes.length}`);
+        badge.select('.label-count').text(containerCountText(GS, memberNodes.length));
 
         const sizeHit = (size) => {
           const blk = labelBlockSize(c, size);

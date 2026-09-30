@@ -372,6 +372,8 @@
     "initialFocus": "all",
     "_initialFocus_note": "What the first screen frames: all (default) or a container id. A container is framed so its cards are still cards (initialFocusMinScale, default 0.4); when the whole top-level container fits at that scale, it is framed instead. Zoom to Fit always frames everything.",
     "visibleLayers": ["sequence"],
-    "_visibleLayers_note": "Which edge layers draw lines: sequence, authored, tag, topology. Default sequence only. Containment is never a line; the hulls show it. A connected_to between two pieces that follow one another in a series is folded into that next edge."
+    "_visibleLayers_note": "Which edge layers draw lines: sequence, authored, tag, topology. Default sequence only. Containment is never a line; the hulls show it. A connected_to between two pieces that follow one another in a series is folded into that next edge.",
+    "containerCount": true,
+    "_containerCount_note": "Whether a container's title shows how many items it holds: the open container's label, the closed container's blob, and the source pill at the top. Default true."
   }
 }

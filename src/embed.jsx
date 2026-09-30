@@ -32,6 +32,7 @@ import { GraphViewer } from './components/GraphViewer/GraphViewer';
 import { ReaderPanel } from './components/ReaderPanel/ReaderPanel';
 import { TTS } from './components/TTS/TTS';
 import { FeedZ } from './components/FeedZ';
+import { showContainerCount } from './components/GraphViewer/containerCount';
 import { Settings } from './components/Settings';
 import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
@@ -379,6 +380,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           onToggleSource={toggleSource}
           viewState={viewState}
           showAddButton={features.addFeed}
+          showCount={showContainerCount(settings.graph)}
         />
       )}
 

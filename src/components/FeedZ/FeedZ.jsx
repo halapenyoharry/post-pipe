@@ -19,8 +19,10 @@ import styles from './FeedZ.module.css';
  *   onToggleSource — (sourceId) => void
  *   viewState      — optional; enables the dot's color-ring picker and
  *                    persists the reader's choice per source
+ *   showCount      — optional, default true; false hides the item count
+ *                    (settings.graph.containerCount)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true }) {
   if (!sources || sources.length === 0) return null;
 
   const hidden = hiddenSources || new Set();
@@ -34,6 +36,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState }) {
           hidden={hidden.has(src.id)}
           onToggle={() => onToggleSource && onToggleSource(src.id)}
           viewState={viewState}
+          showCount={showCount}
         />
       ))}
       <AddPill />
@@ -46,7 +49,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState }) {
 // nesting <button> inside <button> is invalid HTML that browsers handle
 // inconsistently (the outer control can silently stop receiving events).
 // role="button" + a key handler keep it keyboard-operable regardless.
-function FeedPill({ source, hidden, onToggle, viewState }) {
+function FeedPill({ source, hidden, onToggle, viewState, showCount }) {
   const title = source.title || source.id;
   const ok = source.ok !== false;
   const color = (viewState && viewState.sourceColor(source.id)) || source.color;
@@ -62,7 +65,7 @@ function FeedPill({ source, hidden, onToggle, viewState }) {
     >
       <FeedDot color={color} sourceId={source.id} viewState={viewState} />
       <span className={styles.title}>{title}</span>
-      <span className={styles.count}>{source.itemCount}</span>
+      {showCount && <span className={styles.count}>{source.itemCount}</span>}
     </div>
   );
 }
