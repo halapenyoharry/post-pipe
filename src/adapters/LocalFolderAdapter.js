@@ -43,7 +43,7 @@ async function load(config) {
   for (const c of contents) {
     let vis = c.posted;
     if (vis === undefined || vis === null) vis = config.visibilityDefault;
-    const isVisible = (vis === true || vis === 'yes' || vis === 'true' || vis === 'public');
+    const isVisible = (vis === true || vis === 'yes' || vis === 'true' || vis === 'public' || vis === 'title');
     if (isVisible) {
       visibleContents.push(c);
     } else {
@@ -74,6 +74,7 @@ async function load(config) {
 // so this adapter is a drop-in for the inlined loadLocalContent() that
 // used to live in generate-index.js.
 function contentToItem(c, rootPath, pagesBase, coversDir) {
+  const isTitleOnly = c.posted === 'title';
   const imageUrl = copyCoverIfPresent(c, rootPath, coversDir);
   const pagesUrl = `${pagesBase}/${c.id}.html`;
   const bucket   = statusBucket(c);
@@ -96,7 +97,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     series: c.series || '',
     series_part: c.series_part || null,
     timeline: c.timeline || undefined,
-    commit_times: Array.isArray(c.commit_times) ? c.commit_times : (() => {
+    commit_times: isTitleOnly ? [] : (Array.isArray(c.commit_times) ? c.commit_times : (() => {
       try {
         const itemFolder = path.join(resolveHome(rootPath), c.id);
         const out = require('child_process').execFileSync('git', ['log', '--format=%cI', '--reverse', '--', '.'], {
@@ -108,7 +109,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
       } catch {
         return [];
       }
-    })(),
+    })()),
     license: c.license || '',
     canonical_url: c.syndication?.canonical || pagesUrl,
     syndication: c.syndication || {},
@@ -118,6 +119,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     // shared/external media that other items might also reference.
     attachments: buildAttachments(c, imageUrl),
     _status: bucket,
+    _posted: c.posted,
     // Generalized references — every "thing the item points to that other
     // items can also point to" lives here, typed. Tags are the first
     // case; future case includes images-as-edges (type: 'image'),
@@ -141,8 +143,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir) {
     note: c.note,
     todos: c.todos || [],
     schema: c.schema,
-    version: c.version || undefined,
-    version_maps: c.version_maps || undefined,
+    version: isTitleOnly ? undefined : (c.version || undefined),
+    version_maps: isTitleOnly ? undefined : (c.version_maps || undefined),
   };
 }
 
@@ -220,7 +222,7 @@ function escapeHtml(str) {
 }
 
 function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set()) {
-  if (!pagesDir || !c.body) return;
+  if (!pagesDir || !c.body || c.posted === 'title') return;
   try {
     const { file, format } = c.body;
     if (format !== 'md' && format !== 'html') return;

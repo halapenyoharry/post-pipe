@@ -550,6 +550,11 @@ export function GraphViewer({
       .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
 
     const closedContainers = new Set();
+    if (GS.initialCollapsed === 'all') {
+      (feedData.containers || []).forEach(c => closedContainers.add(c.id));
+    } else if (Array.isArray(GS.initialCollapsed)) {
+      GS.initialCollapsed.forEach(id => closedContainers.add(id));
+    }
     const containerCentroids = new Map();
 
 
@@ -619,8 +624,8 @@ export function GraphViewer({
 
     containerMacroNodes.append('rect')
       .attr('class', 'container-macro-bg')
-      .attr('rx', 12)
-      .attr('ry', 12)
+      .attr('rx', 40)
+      .attr('ry', 40)
       .attr('fill', (d) => d.fill || 'rgba(212, 175, 55, 0.08)')
       .attr('stroke', (d) => getContainerColor(d))
       .attr('stroke-width', 1.8)
@@ -669,7 +674,7 @@ export function GraphViewer({
     updateMacroBounds();
 
     function createContainerDragHandler({ isCollapsed }) {
-      return d3.drag()
+      return d3.drag().clickDistance(5)
         .filter((event) => {
           if (event.ctrlKey) return false;
           if (event.button !== undefined && event.button !== 0) return false;
@@ -767,6 +772,58 @@ export function GraphViewer({
 
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
+
+        function createContainerSpiralForce() {
+      let nodes = [];
+      function force(alpha) {
+        if (graphSettings.spiral?.enabled === false) return;
+        const spacing = graphSettings.spiral?.spacing || 20;
+        
+        containerGroups.each(function (c) {
+          if (closedContainers.has(c.id)) return;
+          const memberSlugs = getAllMemberSlugs(c.id);
+          const memberNodes = memberSlugs
+            .map((slug) => nodeBySlug.get(slug))
+            .filter((n) => n && Number.isFinite(n.x) && Number.isFinite(n.y));
+          
+          if (memberNodes.length < 2) return;
+          
+          const sorted = memberNodes.sort((a, b) => {
+             const tA = Date.parse(a.date || '') || 0;
+             const tB = Date.parse(b.date || '') || 0;
+             return tA - tB;
+          });
+          
+          const cp = containerCentroids.get(c.id) || {x: 0, y: 0};
+          const first = sorted[0];
+          
+          const w = first._size?.width || CARD.width;
+          const h = first._size?.height || CARD.height;
+          
+          // Pull first directly below label
+          // Label is at top 1/3, center is cp.y, top is roughly cp.y - h/2.
+          const targetY = cp.y - h/2 + 80;
+          first.vy += (cp.y - first.y) * 0.1 * alpha;
+          first.vx += (cp.x - first.x) * 0.1 * alpha;
+
+          const golden = 137.508 * (Math.PI / 180);
+          for (let i = 1; i < sorted.length; i++) {
+             const node = sorted[i];
+             const radius = (Math.hypot(w, h)/2 + spacing) * Math.sqrt(i);
+             const angle = i * golden;
+             const tx = first.x + radius * Math.cos(angle);
+             const ty = first.y + radius * Math.sin(angle);
+             
+             node.vx += (tx - node.x) * 0.05 * alpha;
+             node.vy += (ty - node.y) * 0.05 * alpha;
+          }
+        });
+      }
+      force.initialize = function(_nodes) {
+        nodes = _nodes;
+      };
+      return force;
+    }
 
     function createContainerSeparationForce() {
       let simNodes = [];
@@ -1075,6 +1132,7 @@ export function GraphViewer({
         group.select('.container-hull').attr('d', pathD);
 
         const minY = Math.min(...hull.map((p) => p[1]));
+        const maxY = Math.max(...hull.map((p) => p[1]));
         const hullAvgX = d3.mean(hull, (p) => p[0]);
 
         const minX = Math.min(...hull.map((p) => p[0]));
@@ -1089,7 +1147,11 @@ export function GraphViewer({
         badge.select('.label-count').text(` ${memberNodes.length}`);
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : hullAvgX;
-        const cy = Number.isFinite(center[1]) ? center[1] : d3.mean(hull, (p) => p[1]);
+        
+        // Label position: horizontally centered, vertically about one third down from the top
+        const hullH = maxY - minY;
+        const cy = minY + (hullH / 3);
+        
         badge.attr('transform', `translate(${cx}, ${cy})`);
       });
     }
@@ -1249,7 +1311,7 @@ export function GraphViewer({
       .enter().append('g')
       .attr('class', 'node');
 
-    const dragHandler = d3.drag()
+    const dragHandler = d3.drag().clickDistance(5)
         // Under a mouse, moving a card and scrolling its text are different
         // gestures — drag versus wheel. Under a thumb they are the same
         // gesture, and drag would win every time, so a card's text could never
@@ -1780,7 +1842,7 @@ export function GraphViewer({
         articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
       }
-      // Open nodes stay open on a background click; each closes by clicking it.
+      if (onNodeSelectRef.current) onNodeSelectRef.current(null);
     });
 
     // Simulation tick → position nodes. When alpha falls below alphaMin,

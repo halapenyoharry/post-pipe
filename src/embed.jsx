@@ -247,25 +247,39 @@ function EmbedApp({ initialConfig, feedData }) {
             const parts = hash.substring(6).split('&p=');
             const id = parts[0];
             const p = parts[1] ? parseInt(parts[1], 10) : null;
-            // The items are in feed.items (or feedData.items)
             const items = typeof feed !== 'undefined' ? (feed.items || []) : (typeof feedData !== 'undefined' ? (feedData.items || []) : []);
             const item = items.find(i => (i.id === decodeURIComponent(id)) || (i.url === decodeURIComponent(id)));
             if (item) {
-              if (viewState) {
-                viewState.markSeen(item.id);
-              }
+              if (viewState) viewState.markSeen(item.id);
               setSelectedArticle(item);
-              if (p !== null && !isNaN(p)) {
-                setTargetParagraph(p);
-              } else {
-                setTargetParagraph(null);
-              }
+              setTargetParagraph(p !== null && !isNaN(p) ? p : null);
             }
+          } else {
+            setSelectedArticle(null);
+            setTargetParagraph(null);
           }
         }
         window.addEventListener('hashchange', onHashChange);
         onHashChange();
-        return function () { window.removeEventListener('hashchange', onHashChange); };
+        
+        const onKeyDown = (e) => {
+          if (e.key === 'Escape') {
+             history.replaceState(null, '', window.location.pathname + window.location.search);
+             window.dispatchEvent(new Event('hashchange'));
+          }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        const onResetLayout = () => {
+             history.replaceState(null, '', window.location.pathname + window.location.search);
+             window.dispatchEvent(new Event('hashchange'));
+        };
+        window.addEventListener('graph:reset-layout', onResetLayout);
+        
+        return function () { 
+          window.removeEventListener('hashchange', onHashChange);
+          window.removeEventListener('keydown', onKeyDown);
+          window.removeEventListener('graph:reset-layout', onResetLayout);
+        };
       }, [typeof feed !== 'undefined' ? feed : feedData, viewState]);
   
       const hiddenSources = React.useMemo(() => {
@@ -327,17 +341,21 @@ function EmbedApp({ initialConfig, feedData }) {
         timeAxis={viewState ? viewState.state.timeAxis : { on: false }}
         graphSettings={settings.graph || {}}
         onNodeSelect={(article) => {
-          if (features.readerPanel) {
-            if (article && article.originalItem && viewState) {
-              viewState.markSeen(article.originalItem.id);
+          if (!features.readerPanel) return;
+          if (!article) {
+             history.replaceState(null, '', window.location.pathname + window.location.search);
+             window.dispatchEvent(new Event('hashchange'));
+             return;
+          }
+          if (article && article.originalItem) {
+            if (viewState) viewState.markSeen(article.originalItem.id);
+            const id = encodeURIComponent(article.originalItem.id);
+            if (window.location.hash === '#read=' + id) {
+               history.replaceState(null, '', window.location.pathname + window.location.search);
+            } else {
+               history.pushState(null, '', '#read=' + id);
             }
-            if (article && article.originalItem) {
-              const id = encodeURIComponent(article.originalItem.id);
-              history.pushState(null, '', '#read=' + id);
-              // Manually trigger so listener fires
-              window.dispatchEvent(new Event('hashchange'));
-            }
-            setSelectedArticle(article);
+            window.dispatchEvent(new Event('hashchange'));
           }
         }}
         hiddenSources={hiddenSources}

@@ -1,0 +1,12 @@
+I have completed Task T6 per the instructions in [_handoff/T6-layout-edges-task.md](file:///Users/harold/Projects/post-pipe/_handoff/T6-layout-edges-task.md) without running any shell commands.
+
+### Summary of Changes
+1. **Identified update and transition code** in [src/components/GraphViewer/GraphViewer.jsx](file:///Users/harold/Projects/post-pipe/src/components/GraphViewer/GraphViewer.jsx):
+   - Update function: `applyPositions()`, which updates straight links, curved sequence rails (`linkPath`), traveling pulse beads (`sequencePulses`), SVG node transforms, HTML article card transforms, and container hulls via `updateContainers()`.
+   - Layout transition: `useEffect(() => { ... }, [layout])`.
+2. **Synchronized layout transition frames**:
+   - Replaced mismatched transitions on paths with a D3 transition driving a `.tween('layout-transition', ...)`.
+   - The tween interpolates each node's `(x, y)` between starting and target positions, invoking `g.applyPositions()` (and `connectorUpdateRef.current()`) on every frame.
+   - Guaranteed exact final placement and cleanup by calling `g.applyPositions()` on transition `end`.
+3. **Generated Report**:
+   - Documented the findings, changes, and verification in [_handoff/T6-report.md](file:///Users/harold/Projects/post-pipe/_handoff/T6-report.md).

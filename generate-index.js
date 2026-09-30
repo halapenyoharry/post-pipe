@@ -125,7 +125,7 @@ function geminiConfigBlock() {
 // ─── Build feed.json ─────────────────────────────────────────────────────────
 
 function buildFeed(articles) {
-  return {
+  const f = {
     version: 'https://jsonfeed.org/version/1.1',
     title: SETTINGS.site.title,
     home_page_url: PAGES_BASE,
@@ -133,6 +133,10 @@ function buildFeed(articles) {
     authors: [{ name: SETTINGS.author.name }],
     items: articles,
   };
+  if (SETTINGS.rights) {
+    f.rights = SETTINGS.rights;
+  }
+  return f;
 }
 
 
@@ -191,6 +195,8 @@ function buildIndexHTML() {
 <meta name="generator" content="post-pipe ${new Date().toISOString()}">
 <title>${SETTINGS.site.title}</title>
 <meta name="description" content="${SETTINGS.site.description}">
+${SETTINGS.rights ? `<meta name="copyright" content="${SETTINGS.rights.holder} ${SETTINGS.rights.year}">` : ''}
+${SETTINGS.rights && SETTINGS.rights.noAiTraining ? '<meta name="robots" content="noai, noimageai">' : ''}
 <meta property="og:title" content="${SETTINGS.site.title}">
 <meta property="og:description" content="${SETTINGS.site.description}">
 <meta property="og:type" content="website">
@@ -736,6 +742,11 @@ async function main() {
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 
   fs.writeFileSync(path.join(SITE_DIR, 'feed.json'), JSON.stringify(feed, null, 2));
+
+  if (SETTINGS.rights && SETTINGS.rights.noAiTraining) {
+    const robots = `User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n`;
+    fs.writeFileSync(path.join(SITE_DIR, 'robots.txt'), robots);
+  }
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
 
   // Copy worker if it exists

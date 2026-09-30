@@ -1,7 +1,7 @@
 {
   "name": "post-pipe",
   "version": "1.0.0",
-  "description": "markdown in \u2192 platform post out",
+  "description": "markdown in → platform post out",
   "main": "index.js",
   "bin": {
     "post-pipe": "./index.js"
@@ -21,11 +21,12 @@
     "fast-xml-parser": "^5.5.9",
     "gray-matter": "^4.0.3",
     "marked": "^12.0.0",
-    "playwright": "^1.44.0",
+    "playwright": "^1.63.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "serve-handler": "^6.1.7"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.1",
