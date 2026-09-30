@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import styles from './ConfigPanel.module.css';
 
 /**
@@ -66,35 +65,31 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
   const [showSnippet, setShowSnippet] = useState(false);
   const fileInputRef = useRef(null);
 
-  const [extWin, setExtWin] = useState(null);
-  const containerRef = useRef(null);
+  // Swipe-to-dismiss state
+  const touchStartY = useRef(null);
+  const panelRef = useRef(null);
 
-  const openPopout = () => {
-    const win = window.open('', '_blank', 'width=420,height=650,noopener,noreferrer');
-    if (!win) return;
-    
-    // Copy all stylesheets from main window
-    document.querySelectorAll('style, link[rel="stylesheet"]').forEach(el => {
-      win.document.head.appendChild(el.cloneNode(true));
-    });
-    
-    win.document.body.style.margin = '0';
-    win.document.body.style.background = '#14161e';
-    win.document.body.style.color = '#fff';
-    
-    const div = win.document.createElement('div');
-    win.document.body.appendChild(div);
-    containerRef.current = div;
-    
-    win.addEventListener('beforeunload', () => {
-      setExtWin(null);
-      containerRef.current = null;
-    });
-    
-    setExtWin(win);
-    setOpen(false);
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
   };
 
+  const handleTouchMove = (e) => {
+    if (touchStartY.current === null) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartY.current;
+    
+    // If scrolling inside the panel content, don't dismiss immediately unless at top
+    if (panelRef.current && panelRef.current.scrollTop > 0) return;
+
+    if (diff > 80) { // Swipe down threshold
+      setOpen(false);
+      touchStartY.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartY.current = null;
+  };
 
   // Close on Escape
   useEffect(() => {
@@ -179,7 +174,15 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
       {open && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} />
-          <div className={styles.panel} role="dialog" aria-label="Viewer Configuration">
+          <div 
+            className={styles.panel} 
+            role="dialog" 
+            aria-label="Viewer Configuration"
+            ref={panelRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <div className={styles.header}>
               <span className={styles.panelTitle}>Viewer Configuration</span>
               <button
@@ -190,7 +193,6 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
                 ×
               </button>
             </div>
-
             {/* ── Features ────────────────────────────────────────────── */}
             <div className={styles.section}>
               <div className={styles.sectionTitle}>Features</div>
@@ -306,6 +308,7 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
     </>
   );
 }
+
 
 // ── Toggle sub-component ─────────────────────────────────────────────────────
 
