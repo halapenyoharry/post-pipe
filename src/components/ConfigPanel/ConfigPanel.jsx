@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './ConfigPanel.module.css';
 
 /**
@@ -64,6 +65,36 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
   const [toast, setToast] = useState(null);
   const [showSnippet, setShowSnippet] = useState(false);
   const fileInputRef = useRef(null);
+
+  const [extWin, setExtWin] = useState(null);
+  const containerRef = useRef(null);
+
+  const openPopout = () => {
+    const win = window.open('', '_blank', 'width=420,height=650,noopener,noreferrer');
+    if (!win) return;
+    
+    // Copy all stylesheets from main window
+    document.querySelectorAll('style, link[rel="stylesheet"]').forEach(el => {
+      win.document.head.appendChild(el.cloneNode(true));
+    });
+    
+    win.document.body.style.margin = '0';
+    win.document.body.style.background = '#14161e';
+    win.document.body.style.color = '#fff';
+    
+    const div = win.document.createElement('div');
+    win.document.body.appendChild(div);
+    containerRef.current = div;
+    
+    win.addEventListener('beforeunload', () => {
+      setExtWin(null);
+      containerRef.current = null;
+    });
+    
+    setExtWin(win);
+    setOpen(false);
+  };
+
 
   // Close on Escape
   useEffect(() => {
