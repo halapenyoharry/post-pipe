@@ -1,5 +1,5 @@
 .timeOverlay {
-  --to-accent: #64ffda;
+  --to-accent: var(--accent, #64ffda);
   --to-bg-start: rgba(17, 24, 39, 0.85);
   --to-bg-mid: rgba(17, 24, 39, 0.45);
   --to-bg-end: rgba(17, 24, 39, 0);

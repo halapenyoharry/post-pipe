@@ -330,8 +330,7 @@
       "cornerRadius": 10,
       "glowPadding": 16,
       "labelMinFontSize": 14,
-      "labelMaxFontSize": 36,
-      "compactHeight": 260,
+      "labelMaxFontSize": 26,
       "imageMarkSize": 22
     },
     "tag": {

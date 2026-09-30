@@ -422,7 +422,7 @@ ${reactJs}
         React.createElement(LayoutControls, null),
         React.createElement(DimensionsControls, null),
         React.createElement(HistoryControls, null),
-        React.createElement(Settings, { viewState: viewState }),
+        React.createElement(Settings, { viewState: viewState, feedData: feed }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
           onClose: function () { setSelectedArticle(null); },

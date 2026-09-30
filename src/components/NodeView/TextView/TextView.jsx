@@ -100,6 +100,9 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         width,
         height,
         background: bgColor,
+        // settings.graph.card.cornerRadius; a marker stays a dot.
+        ...(cardSettings?.cornerRadius != null && !(viewState.lod === 'marker' && !expanded)
+          ? { borderRadius: cardSettings.cornerRadius } : {}),
         // Provenance moves from a full coloured ring to a bar down one edge.
         // Ringing the whole card in a saturated feed colour competed with the
         // content for attention; an edge bar says the same thing quietly.
@@ -127,7 +130,10 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
       {hasImage && (
         <div
           className={styles.imageMark}
-          style={{ backgroundImage: `url('${article.image}')` }}
+          style={{
+            backgroundImage: `url('${article.image}')`,
+            ...(cardSettings?.imageMarkSize ? { width: cardSettings.imageMarkSize, height: cardSettings.imageMarkSize } : {}),
+          }}
           title="has an image"
         />
       )}
@@ -273,8 +279,8 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     : (article.title || article.label);
 
   const titleFontSize = fitFontSize(title, width, subtitle ? (height - 30) : height, {
-    min: 14,
-    max: 26,
+    min: cardSettings?.labelMinFontSize ?? 14,
+    max: cardSettings?.labelMaxFontSize ?? 26,
     lineHeight: 1.05,
     pad: 8,
   });

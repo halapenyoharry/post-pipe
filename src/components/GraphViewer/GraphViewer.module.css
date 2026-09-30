@@ -1,20 +1,28 @@
-.graphContainer {
-  --gv-width: 100vw;
-  --gv-height: 100vh;
+/* Defaults only. :where() has no specificity, so the page's own :root theme
+   (settings.theme, written by generate-index.js or the embed) always wins.
+   Declaring these on .graphContainer instead shadowed the theme completely:
+   settings.theme.node_draft and friends never reached the graph. */
+:global(:where(:root)) {
   --gv-node-draft: #555;
   --gv-node-published: #2ecc71;
   --gv-tag-color: #f39c12;
   --gv-topology-color: #9b59b6;
   --gv-placeholder-color: #7f8c8d;
   --gv-accent: #64ffda;
+}
+
+.graphContainer {
+  --gv-width: 100vw;
+  --gv-height: 100vh;
 
   /* TextView (article cards) reads these — declared here, on the shared
      ancestor of every card, so Settings' color profile can override them
-     for the whole graph in one place. See TextView.module.css for why they
-     are deliberately NOT redeclared closer to the card itself. */
-  --nv-accent: #64ffda;
-  --nv-published: #2ecc71;
-  --nv-draft: #555;
+     for the whole graph in one place (inline on this element). They follow
+     the theme until it does. See TextView.module.css for why they are
+     deliberately NOT redeclared closer to the card itself. */
+  --nv-accent: var(--gv-accent);
+  --nv-published: var(--gv-node-published);
+  --nv-draft: var(--gv-node-draft);
 
   width: var(--gv-width);
   height: var(--gv-height);

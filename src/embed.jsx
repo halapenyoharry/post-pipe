@@ -75,8 +75,8 @@ const DEFAULT_SETTINGS = {
       minWidth: 110, minHeight: 80,
       maxWidth: 620, maxHeight: 520,
       cornerRadius: 10, glowPadding: 16,
-      labelMinFontSize: 14, labelMaxFontSize: 36,
-      compactHeight: 260, imageMarkSize: 22,
+      labelMinFontSize: 14, labelMaxFontSize: 26,
+      imageMarkSize: 22,
     },
     tag: {
       fontSize: 22, padding: 11,
@@ -391,7 +391,7 @@ function EmbedApp({ initialConfig, feedData }) {
 
       {/* Color settings */}
       {features.colorSettings && viewState && (
-        <Settings viewState={viewState} />
+        <Settings viewState={viewState} feedData={feedData} />
       )}
 
       {/* Config panel */}

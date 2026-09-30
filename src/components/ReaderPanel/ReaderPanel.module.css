@@ -17,13 +17,17 @@
   display: block;
 }
 
-.panel {
+/* Theme defaults; settings.theme on :root wins (see GraphViewer.module.css). */
+:global(:where(:root)) {
   --rp-bg: #16213e;
   --rp-surface: #141829;
   --rp-border: rgba(100, 255, 218, 0.25);
   --rp-accent: #64ffda;
   --rp-text: #ccd6f6;
   --rp-text-bright: #fff;
+}
+
+.panel {
   /* Default floating width */
   --rp-width: 520px;
   --rp-toolbar-bg: rgba(17, 24, 39, 0.96);

@@ -40,12 +40,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
   const getPersistentId = (item) => {
     if (!item) return null;
-    const pId = getPersistentId(article);
-  const currentBookmark = viewState ? viewState.bookmarks().find(b => b.id === pId) : null;
-  const allBookmarks = viewState ? viewState.bookmarks() : [];
-
-  return (item.originalItem && item.originalItem.id) || item.id || item.url;
+    return (item.originalItem && item.originalItem.id) || item.id || item.url;
   };
+
+  // A bookmark belongs to an item (b.item); its own id is separate.
+  const pId = getPersistentId(article);
+  const itemBookmarks = viewState && pId ? viewState.bookmarks(pId) : [];
+  const currentBookmark = itemBookmarks.length ? itemBookmarks[itemBookmarks.length - 1] : null;
+  const allBookmarks = viewState ? viewState.bookmarks() : [];
 
   const handleToolbarMouseDown = (e) => {
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
@@ -148,9 +150,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const toggleBookmark = () => {
     if (!viewState || !article) return;
     const pId = getPersistentId(article);
-    const hasBookmark = viewState.bookmarks().some(b => b.id === pId);
-    if (hasBookmark) {
-      viewState.removeBookmark(pId);
+    const marks = viewState.bookmarks(pId);
+    if (marks.length) {
+      marks.forEach(b => viewState.removeBookmark(b.id));
     } else {
       const topP = findTopVisibleParagraph();
       viewState.addBookmark({ item: pId, para: topP !== null ? topP : undefined, version: article.version });
@@ -259,40 +261,35 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     }
   }, [contentHtml, targetParagraph]);
 
+  // Where a bookmark lands in the current text, through the version map or
+  // its quote when the text has changed since it was made.
+  const getPlacedBookmarkParagraph = (b, article, ps) => {
+    const para = b.para !== undefined ? b.para : b.paragraph;
+    if (para === undefined || para === null) return null;
+    if (b.version && article.version && b.version !== article.version) {
+      if (article.version_maps && article.version_maps[b.version]) {
+        const mapped = article.version_maps[b.version][para];
+        if (mapped !== undefined && mapped !== -1) return mapped;
+      }
+      if (b.quote) {
+        const paragraphTexts = Array.from(ps).map(p => p.innerText);
+        return resolveParagraph(para, b.quote, paragraphTexts);
+      }
+    }
+    return para;
+  };
+
   useEffect(() => {
     if (!viewState || !bodyRef.current) return;
     const pId = article ? getPersistentId(article) : null;
     const marks = viewState.bookmarks();
     
     // Clear old ribbons
-    const getPlacedBookmarkParagraph = (b, article, ps) => {
-    let para = b.para !== undefined ? b.para : b.paragraph;
-    if (para === undefined || para === null) return null;
-    
-    if (b.version && article.version && b.version !== article.version) {
-      if (article.version_maps && article.version_maps[b.version]) {
-        const mapped = article.version_maps[b.version][para];
-        if (mapped !== undefined && mapped !== -1) {
-          return mapped;
-        }
-      }
-      
-      // Fallback
-      if (b.quote) {
-        const paragraphTexts = Array.from(ps).map(p => p.innerText);
-        const resolved = resolveParagraph(para, b.quote, paragraphTexts);
-        return resolved;
-      }
-    }
-    
-    return para;
-  };
-
     const oldRibbons = bodyRef.current.querySelectorAll('.bookmarkRibbon');
     oldRibbons.forEach(el => el.remove());
 
     if (pId) {
-      const b = marks.find(m => m.id === pId);
+      const b = marks.find(m => m.item === pId);
       if (b) {
         const ps = bodyRef.current.querySelectorAll('p');
         const placedPara = getPlacedBookmarkParagraph(b, article, ps);
@@ -358,10 +355,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
           <div className={styles.toolbarGroup}>
             <button
-              className={`${styles.tb} ${viewState && viewState.bookmarks().some(b => b.id === getPersistentId(article)) ? styles.active : ''}`}
+              className={`${styles.tb} ${viewState && viewState.bookmarks(getPersistentId(article)).length > 0 ? styles.active : ''}`}
               onClick={toggleBookmark}
               title="Bookmark this position"
-              dangerouslySetInnerHTML={{ __html: `${viewState && viewState.bookmarks().some(b => b.id === getPersistentId(article)) ? ICONS.bookmark : ICONS.bookmark}<span class="${styles.tbTooltip}">Bookmark</span>` }}
+              dangerouslySetInnerHTML={{ __html: `${viewState && viewState.bookmarks(getPersistentId(article)).length > 0 ? ICONS.bookmark : ICONS.bookmark}<span class="${styles.tbTooltip}">Bookmark</span>` }}
             />
             <button
               className={`${styles.tb} ${showMarksList ? styles.active : ''}`}
@@ -467,7 +464,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               type="text"
               placeholder="Add an optional note to this bookmark..."
               value={currentBookmark.note || ''}
-              onChange={(e) => viewState.setBookmarkNote(pId, e.target.value)}
+              onChange={(e) => viewState.setBookmarkNote(currentBookmark.id, e.target.value)}
               className={styles.noteInput}
             />
           </div>
@@ -499,7 +496,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
                     )}
                   </div>
                   <div className={styles.markActions}>
-                    {b.id === pId && b.paragraph !== undefined && (
+                    {b.item === pId && (b.para ?? b.paragraph) !== undefined && (
                       <button onClick={() => { const ps = bodyRef.current?.querySelectorAll('p'); const p = ps ? getPlacedBookmarkParagraph(b, article, ps) : b.para !== undefined ? b.para : b.paragraph; jumpToParagraph(p); }} title="Jump to paragraph">Jump</button>
                     )}
                     <button onClick={() => { const ps = bodyRef.current?.querySelectorAll('p'); const p = ps ? getPlacedBookmarkParagraph(b, article, ps) : b.para !== undefined ? b.para : b.paragraph; handleCopyBookmarkLink(b.id, p); }} title="Copy link" dangerouslySetInnerHTML={{ __html: ICONS.copy }} />

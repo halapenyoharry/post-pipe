@@ -10,10 +10,46 @@ import styles from './Settings.module.css';
  * arrangement lives in.
  */
 
-const DEFAULT_COLORS = {
+const ENGINE_COLORS = {
   draft: '#555555', published: '#2ecc71', tag: '#f39c12',
   topology: '#9b59b6', placeholder: '#7f8c8d',
 };
+
+// "Default" means the site's own theme (settings.theme), not the engine's.
+function themeColors() {
+  const t = (typeof window !== 'undefined' && window.SETTINGS && window.SETTINGS.theme) || {};
+  return {
+    ...ENGINE_COLORS,
+    ...(t.node_draft ? { draft: t.node_draft } : {}),
+    ...(t.node_published ? { published: t.node_published } : {}),
+    ...(t.tag_color ? { tag: t.tag_color } : {}),
+  };
+}
+
+// Which of the five colors this corpus actually draws. A card inside a
+// container takes the container's color, so draft/published only count for
+// cards outside one; tag, topology, and placeholder only exist if there are
+// such nodes. Offering a picker that changes nothing on screen is the thing
+// this avoids.
+export function colorKeysInUse(feed) {
+  if (!feed || !Array.isArray(feed.items)) return null;
+  const containers = feed.containers || [];
+  const inContainer = (item) => containers.some((c) => c.parent && c.tag && (item.tags || []).includes(c.tag));
+  const used = new Set();
+  const ids = new Set(feed.items.map((i) => i.id));
+  for (const item of feed.items) {
+    if (inContainer(item)) continue;
+    used.add(item._status === 'published' ? 'published' : 'draft');
+  }
+  for (const e of feed.edges || []) {
+    if (e.layer === 'tag') used.add('tag');
+    else if (e.layer === 'topology') used.add('topology');
+    else if (e.layer === 'authored' && !ids.has(e.target)) used.add('placeholder');
+  }
+  return used;
+}
+
+const DEFAULT_COLORS = themeColors();
 
 const PRESETS = [
   { id: 'default', label: 'Default', colors: DEFAULT_COLORS },
@@ -39,7 +75,7 @@ const FIELDS = [
   { key: 'placeholder', label: 'Placeholder' },
 ];
 
-export function Settings({ viewState }) {
+export function Settings({ viewState, feedData }) {
   const [open, setOpen] = useState(false);
   const [, bump] = useState(0);
 
@@ -71,6 +107,8 @@ export function Settings({ viewState }) {
 
   const current = { ...DEFAULT_COLORS, ...viewState.graphColors() };
   const activeProfile = viewState.colorProfileId();
+  const inUse = colorKeysInUse(feedData);
+  const fields = inUse ? FIELDS.filter((f) => inUse.has(f.key)) : FIELDS;
 
   return (
     <>
@@ -90,9 +128,11 @@ export function Settings({ viewState }) {
           <div className={styles.backdrop} onClick={() => setOpen(false)} />
           <div className={styles.popover} role="dialog" aria-label="Settings">
             <div className={styles.header}>
-              <span className={styles.title}>Color Scheme</span>
+              <span className={styles.title}>{fields.length ? 'Color Scheme' : 'Settings'}</span>
               <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close">×</button>
             </div>
+
+            {fields.length > 0 && (<>
 
             <div className={styles.presetRow}>
               {PRESETS.map((p) => (
@@ -103,7 +143,7 @@ export function Settings({ viewState }) {
                   title={p.label}
                 >
                   <span className={styles.presetSwatches}>
-                    {FIELDS.map((f) => (
+                    {fields.map((f) => (
                       <span key={f.key} className={styles.miniSwatch} style={{ background: p.colors[f.key] }} />
                     ))}
                   </span>
@@ -115,7 +155,7 @@ export function Settings({ viewState }) {
             <div className={styles.hint}>Pick a preset, then adjust any color below if you like.</div>
 
             <div className={styles.fieldList}>
-              {FIELDS.map((f) => (
+              {fields.map((f) => (
                 <label key={f.key} className={styles.fieldRow}>
                   <span className={styles.fieldLabel}>{f.label}</span>
                   <input
@@ -128,6 +168,7 @@ export function Settings({ viewState }) {
                 </label>
               ))}
             </div>
+            </>)}
 
             <div className={styles.hint} style={{ marginTop: '14px' }}>Paragraphs</div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -150,12 +191,14 @@ export function Settings({ viewState }) {
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              <button
-                className={styles.resetBtn}
-                onClick={() => viewState.applyColorProfile('default', DEFAULT_COLORS)}
-              >
-                Reset Colors
-              </button>
+              {fields.length > 0 && (
+                <button
+                  className={styles.resetBtn}
+                  onClick={() => viewState.applyColorProfile('default', DEFAULT_COLORS)}
+                >
+                  Reset Colors
+                </button>
+              )}
               <button
                 className={styles.resetBtn}
                 style={{ color: '#e74c3c', borderColor: '#e74c3c4d' }}

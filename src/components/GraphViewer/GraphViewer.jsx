@@ -17,8 +17,6 @@ function feedToGraph(feed, config = {}) {
   const articleSlugs = new Set();
   const idToSlug = new Map(); // item.id (feed-item identity) -> renderer slug
 
-  const draftColor = config.nodeDraftColor || '#555';
-  const publishedColor = config.nodePublishedColor || '#2ecc71';
   const tagColor = config.tagColor || '#f39c12';
   const topologyColor = config.topologyColor || '#9b59b6';
   const placeholderColor = config.placeholderColor || '#7f8c8d';
@@ -65,7 +63,9 @@ function feedToGraph(feed, config = {}) {
       syndication: item.syndication || {},
       size: 60,
       containerColor,
-      color: containerColor || (status === 'published' ? publishedColor : draftColor),
+      // A variable, not a value: the card resolves it, so the theme and the
+      // reader's color profile both reach it without a rebuild.
+      color: containerColor || (status === 'published' ? 'var(--nv-published)' : 'var(--nv-draft)'),
       kind: item.kind || 'essay',
       substrate: item.substrate || 'essay',
       seed: item.seed || '',
@@ -314,8 +314,6 @@ export function GraphViewer({
 
     const computedStyles = getComputedStyle(container);
     const config = {
-      nodeDraftColor: computedStyles.getPropertyValue('--gv-node-draft').trim() || '#555',
-      nodePublishedColor: computedStyles.getPropertyValue('--gv-node-published').trim() || '#2ecc71',
       tagColor: computedStyles.getPropertyValue('--gv-tag-color').trim() || '#f39c12',
       topologyColor: computedStyles.getPropertyValue('--gv-topology-color').trim() || '#9b59b6',
       placeholderColor: computedStyles.getPropertyValue('--gv-placeholder-color').trim() || '#7f8c8d'
