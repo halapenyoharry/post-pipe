@@ -361,6 +361,14 @@
     },
     "collapseGesture": "tap",
     "_collapseGesture_note": "tap (default) or doubletap: what opens and closes a container, on its title or its closed node. A tap is under 4px of movement; more than that drags the container.",
+    "spiral": {
+      "mode": "path",
+      "_mode_note": "path (default): a container's chapters sit one after another on a golden spiral, radius growing by the golden ratio each quarter turn, so each next edge is short. scatter: the golden-angle arrangement. Containers of containers place their children beside the first one, the label about a third of the way down.",
+      "spacing": 20,
+      "_spacing_note": "Gap between neighbouring cards along the spiral, in px.",
+      "startRadius": null,
+      "_startRadius_note": "The spiral's radius at the first chapter. null = about two thirds of a card."
+    },
     "visibleLayers": ["sequence"],
     "_visibleLayers_note": "Which edge layers draw lines: sequence, authored, tag, topology. Default sequence only. Containment is never a line; the hulls show it. A connected_to between two pieces that follow one another in a series is folded into that next edge."
   }

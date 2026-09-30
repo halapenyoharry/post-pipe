@@ -404,6 +404,7 @@ export function GraphViewer({
       if (newLod !== currentLodRef.current) {
         currentLodRef.current = newLod;
         renderAllArticleBodies();
+        redrawLinks();
       }
     });
     svg.call(zoom).on('dblclick.zoom', null);
@@ -845,8 +846,9 @@ export function GraphViewer({
 
     // ── Nested container layout (cluster layout only) ──────────────────────
     // Every container is laid out in its own frame by containerLayout: label
-    // reserved at the origin, first unit directly below it, the rest on a
-    // golden-angle spiral, child containers placed as whole boxes. The result
+    // reserved at the origin, first unit directly below it, chapters one after
+    // another along a golden spiral (or the golden-angle scatter, with
+    // spiral.mode 'scatter'), child containers placed as whole boxes. The result
     // is a set of target positions relative to each top-level container; the
     // top-level container itself is free to drift wherever the simulation puts
     // it, so the offset is re-measured from the members every time.
@@ -888,6 +890,8 @@ export function GraphViewer({
         macroSize: (c) => ({ w: (c._macroHalfW || 130) * 2, h: (c._macroHalfH || 45) * 2 }),
         options: {
           spacing: graphSettings.spiral?.spacing ?? 20,
+          mode: graphSettings.spiral?.mode || 'path',
+          startRadius: graphSettings.spiral?.startRadius,
           gap: 28,
           padding: (c) => (c.padding != null ? c.padding : (c.parent ? 42 : 75)),
         },
@@ -1180,12 +1184,29 @@ export function GraphViewer({
           );
         }
 
-        // The label is part of the container: the hull wraps it too.
+        // The label is part of the container: the hull wraps it too, and the
+        // labels of the open containers inside it.
         let labelAt = null;
         if (f) {
+          const lp = pad / 2;
+          const inner = [];
+          const walk = (id) => {
+            for (const ch of (containerChildren.get(id) || [])) {
+              if (closedContainers.has(ch)) continue;
+              const info = CL.containers.get(ch);
+              if (info) inner.push(info.label);
+              walk(ch);
+            }
+          };
+          walk(c.id);
+          for (const L of inner) {
+            points.push(
+              [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp], [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
+              [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp], [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp]
+            );
+          }
           const L = f.info.label;
           labelAt = { x: f.off.x + (L.x0 + L.x1) / 2, y: f.off.y + (L.y0 + L.y1) / 2 };
-          const lp = pad / 2;
           points.push(
             [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp], [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
             [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp], [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp]
@@ -1316,6 +1337,17 @@ export function GraphViewer({
         .on('end', () => { if (!userMovedView) fitToViewport({ animate: true }); });
     }
 
+    // Half the size a card is drawn at right now, so an edge ends at its edge
+    // whether it is a full card or, zoomed far out, a marker.
+    function drawnHalf(n) {
+      const hovered = hoveredIdRef.current === n.id;
+      const pinned = pinnedIdsRef.current.has(n.id);
+      const lod = getLOD(zoomScaleRef.current);
+      if (lod === 'marker' && !hovered && !pinned) return { w: 8, h: 8 };
+      const size = n._size || cardSizeFor({ hovered, pinned, lod });
+      return { w: size.width / 2, h: size.height / 2 };
+    }
+
     function linkEndpoints(l) {
       let sx = typeof l.source === 'object' ? l.source.x : 0;
       let sy = typeof l.source === 'object' ? l.source.y : 0;
@@ -1361,15 +1393,17 @@ export function GraphViewer({
       const cos = dx / dist;
       const sin = dy / dist;
 
-      const srcW = srcClosed ? 90 : ((l.source._size?.width || CARD.width) / 2 + 4);
-      const srcH = srcClosed ? 45 : ((l.source._size?.height || CARD.height) / 2 + 4);
+      const srcHalf = drawnHalf(l.source);
+      const srcW = srcClosed ? 90 : srcHalf.w + 4;
+      const srcH = srcClosed ? 45 : srcHalf.h + 4;
       const rSrc = Math.min(
         Math.abs(cos) > 1e-4 ? srcW / Math.abs(cos) : Infinity,
         Math.abs(sin) > 1e-4 ? srcH / Math.abs(sin) : Infinity
       );
 
-      const tgtW = tgtClosed ? 90 : ((l.target._size?.width || CARD.width) / 2 + 4);
-      const tgtH = tgtClosed ? 45 : ((l.target._size?.height || CARD.height) / 2 + 4);
+      const tgtHalf = drawnHalf(l.target);
+      const tgtW = tgtClosed ? 90 : tgtHalf.w + 4;
+      const tgtH = tgtClosed ? 45 : tgtHalf.h + 4;
       const rTgt = Math.min(
         Math.abs(cos) > 1e-4 ? tgtW / Math.abs(cos) : Infinity,
         Math.abs(sin) > 1e-4 ? tgtH / Math.abs(sin) : Infinity
@@ -2118,17 +2152,17 @@ export function GraphViewer({
     // on requestAnimationFrame, and a page in a hidden tab or a collapsed pane
     // gets no frames at all. A reader whose whole arrangement is already saved
     // needs no simulation — and would have got a graph stacked at the origin.
-    function applyPositions() {
+    function redrawLinks() {
       links.each(function(l) {
         l._path = linkPath(l, linkEndpoints(l));
         d3.select(this).attr('d', l._path);
       });
       linkHits.attr('d', (l) => l._path || 'M 0 0');
+      sequencePulses.attr('d', (l) => l._path || 'M 0 0');
       if (edgeLabelFor) placeEdgeLabel();
-      sequencePulses.each(function(l) {
-        const ep = linkEndpoints(l);
-        d3.select(this).attr('d', linkPath(l, ep));
-      });
+    }
+    function applyPositions() {
+      redrawLinks();
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
       if (articleNodes) {
         articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);

@@ -8,7 +8,7 @@ const { containerLayout, rectsOverlap } = require('../src/components/GraphViewer
 const card = (id, order, extra = {}) => ({ id, w: 180, h: 140, order, ...extra });
 const rectOf = (p) => ({ x0: p.x - 90, y0: p.y - 70, x1: p.x + 90, y1: p.y + 70 });
 
-function book(closed) {
+function book(closed, options) {
   const containers = [
     { id: 'book', parent: null },
     { id: 'a1', parent: 'book' },
@@ -25,6 +25,7 @@ function book(closed) {
     containers, members, closed,
     labelSize: (c, depth) => (depth === 0 ? { w: 600, h: 200 } : { w: 280, h: 100 }),
     macroSize: () => ({ w: 300, h: 120 }),
+    options,
   });
 }
 
@@ -92,4 +93,65 @@ test('a closed child is one box; its members collapse to its centre', () => {
   const p = L.nodes.get('a2-3');
   assert.strictEqual(p.x, a2.center.x);
   assert.strictEqual(p.y, a2.center.y);
+});
+
+test('chapters sit one after another along a golden spiral', () => {
+  const L = book();
+  const a1 = L.containers.get('a1');
+  const { cx, cy } = a1.spiral;
+  const pts = Array.from({ length: 11 }, (_, i) => L.nodes.get('a1-' + (i + 1)));
+  // Neighbours: each next edge is short, about one card plus spacing.
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    assert.ok(d < Math.hypot(180, 140) + 40, 'chapter ' + i + ' to ' + (i + 1) + ' is ' + Math.round(d));
+  }
+  // Along the curve: the angle round the centre keeps turning one way and the
+  // radius keeps growing.
+  let turned = 0;
+  let prevA = Math.atan2(pts[0].y - cy, pts[0].x - cx);
+  let prevR = Math.hypot(pts[0].x - cx, pts[0].y - cy);
+  for (const p of pts.slice(1)) {
+    const ang = Math.atan2(p.y - cy, p.x - cx);
+    let d = ang - prevA;
+    while (d < 0) d += 2 * Math.PI;
+    assert.ok(d > 0 && d < Math.PI, 'clockwise, a little at a time');
+    turned += d;
+    const r = Math.hypot(p.x - cx, p.y - cy);
+    assert.ok(r > prevR, 'outward');
+    prevA = ang;
+    prevR = r;
+  }
+  assert.ok(turned > Math.PI, 'a spiral, not a cluster');
+});
+
+test('the radius grows by the golden ratio every quarter turn', () => {
+  const L = book();
+  const { a, b } = L.containers.get('a1').spiral;
+  assert.ok(a > 0);
+  assert.ok(Math.abs(Math.exp(b * Math.PI / 2) - (1 + Math.sqrt(5)) / 2) < 1e-9);
+});
+
+test('the book places its acts below and beside its label, label a third of the way down', () => {
+  const L = book();
+  const bk = L.containers.get('book');
+  const frac = ((bk.label.y0 + bk.label.y1) / 2 - bk.box.y0) / (bk.box.y1 - bk.box.y0);
+  assert.ok(frac > 0.25 && frac < 0.42, 'label at ' + frac.toFixed(2));
+  for (const id of ['a1', 'a2', 'a3']) {
+    const box = L.containers.get(id).box;
+    const sideBySide = box.x1 <= bk.label.x0 || box.x0 >= bk.label.x1;
+    assert.ok(sideBySide || box.y0 >= bk.label.y1, id + ' is above the book label');
+  }
+  // Acts never overlap one another.
+  const boxes = ['a1', 'a2', 'a3'].map((id) => L.containers.get(id).box);
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) assert.ok(!rectsOverlap(boxes[i], boxes[j]));
+});
+
+test('scatter mode is the golden-angle arrangement, and still keeps every rule', () => {
+  const L = book(undefined, { mode: 'scatter' });
+  assert.strictEqual(L.containers.get('a1').spiral, null);
+  const all = [...L.nodes.values()];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) assert.ok(!rectsOverlap(rectOf(all[i]), rectOf(all[j])));
+  }
+  for (const [, info] of L.containers) for (const p of all) assert.ok(!rectsOverlap(info.label, rectOf(p)));
 });
