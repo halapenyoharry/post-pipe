@@ -1478,6 +1478,8 @@ export function GraphViewer({
           // incident link endpoints below. Nothing else in the graph
           // moves, period.
           d.fx = d.x; d.fy = d.y;
+          d._dragFrom = { x: event.x, y: event.y };
+          d._dragMoved = false;
 
           // A drag that begins on the resize grip resizes instead of moving.
           // Same gesture, same handler; only the thing it changes differs.
@@ -1509,6 +1511,14 @@ export function GraphViewer({
             }
             updateContainers();
             return;
+          }
+          // Under the click distance a press is a tap, not a drag: nothing
+          // moves and nothing is written, or the write re-renders the card
+          // mid-click and WebKit never delivers the click.
+          if (!d._dragMoved) {
+            const from = d._dragFrom || { x: event.x, y: event.y };
+            if (Math.hypot(event.x - from.x, event.y - from.y) < 5) return;
+            d._dragMoved = true;
           }
           d.x = event.x; d.y = event.y;
           d.fx = event.x; d.fy = event.y;
@@ -1550,6 +1560,7 @@ export function GraphViewer({
             return;
           }
           d.fx = d.x; d.fy = d.y;
+          if (!d._dragMoved) return;
           // One history entry for the whole drag, not one per frame.
           if (vs) {
             vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
@@ -1799,6 +1810,11 @@ export function GraphViewer({
     // (with <h1> removed) or null on fetch failure.
     const articleContentCache = new Map();
     function loadFullContent(d) {
+      // A title-only item has no page to fetch, by design.
+      if ((d.originalItem && d.originalItem._posted) === 'title') {
+        d._fullContent = null;
+        return Promise.resolve();
+      }
       if (articleContentCache.has(d.id)) {
         d._fullContent = articleContentCache.get(d.id);
         return Promise.resolve();

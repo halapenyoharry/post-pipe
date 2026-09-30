@@ -370,12 +370,46 @@ ${reactJs}
                 setTargetParagraph(null);
               }
             }
+          } else {
+            setSelectedArticle(null);
+            setTargetParagraph(null);
           }
         }
         window.addEventListener('hashchange', onHashChange);
         onHashChange();
-        return function () { window.removeEventListener('hashchange', onHashChange); };
+        // Escape and Reset layout both put the reader away.
+        function onKeyDown(e) { if (e.key === 'Escape') closeReader(); }
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('graph:reset-layout', closeReader);
+        return function () {
+          window.removeEventListener('hashchange', onHashChange);
+          window.removeEventListener('keydown', onKeyDown);
+          window.removeEventListener('graph:reset-layout', closeReader);
+        };
       }, [typeof feed !== 'undefined' ? feed : feedData, viewState]);
+
+      // The open chapter lives in the address as #read=<id>, so a link opens
+      // it. Every way of closing the reader clears it again; otherwise a
+      // reload (or a hard refresh) reopened a chapter the reader had closed.
+      const selectedRef = React.useRef(null);
+      selectedRef.current = selectedArticle;
+      function closeReader() {
+        if (window.location.hash.startsWith('#read=')) {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+        setSelectedArticle(null);
+        setTargetParagraph(null);
+      }
+      function selectArticle(item) {
+        if (!item) { closeReader(); return; }
+        // Choosing the chapter that is already open closes it.
+        if (selectedRef.current && selectedRef.current.id === item.id) { closeReader(); return; }
+        viewState.markSeen(item.id);
+        const target = '#read=' + encodeURIComponent(item.id);
+        if (window.location.hash !== target) history.pushState(null, '', target);
+        setSelectedArticle(item);
+        setTargetParagraph(null);
+      }
   
       const hiddenSources = React.useMemo(function () {
         return new Set(viewState.state.hiddenSources);
@@ -414,8 +448,7 @@ ${reactJs}
           timeAxis: viewState.state.timeAxis,
           graphSettings: (window.SETTINGS && window.SETTINGS.graph) || {},
           onNodeSelect: function (article) {
-            if (article && article.originalItem) viewState.markSeen(article.originalItem.id);
-            setSelectedArticle(article);
+            selectArticle(article && article.originalItem ? article.originalItem : article);
           },
           hiddenSources: hiddenSources,
           filteredArticleIds: filteredArticleIds,
@@ -439,7 +472,7 @@ ${reactJs}
         React.createElement(Settings, { viewState: viewState, feedData: feed }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
-          onClose: function () { setSelectedArticle(null); },
+          onClose: closeReader,
           settings: window.SETTINGS,
           viewState: viewState,
           targetParagraph: targetParagraph
