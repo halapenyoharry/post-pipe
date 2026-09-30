@@ -10,7 +10,7 @@
 
 .triggerBtn {
   position: fixed;
-  bottom: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
@@ -54,7 +54,7 @@
 
 .panel {
   position: fixed;
-  bottom: 56px;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 61;
@@ -367,7 +367,7 @@
 
 .toast {
   position: fixed;
-  bottom: 100px;
+  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 70;
@@ -391,6 +391,14 @@
 @media (max-width: 440px) {
   .panel {
     width: calc(100vw - 16px);
-    bottom: 52px;
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 440px) {
+  .triggerBtn {
+    left: auto;
+    right: 12px;
+    transform: none;
   }
 }

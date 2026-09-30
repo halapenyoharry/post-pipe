@@ -10,7 +10,7 @@
   position: fixed;
   top: 56px;
   left: 12px;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   width: 280px;
   z-index: 45;
   pointer-events: none;
@@ -225,4 +225,11 @@
 .weekPill.activeWeek .weekBadge {
   background: #0d131f;
   color: var(--to-accent);
+}
+
+@media (max-width: 440px) {
+  .timeOverlay {
+    width: auto;
+    right: 60px;
+  }
 }
