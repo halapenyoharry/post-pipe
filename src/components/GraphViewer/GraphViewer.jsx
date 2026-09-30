@@ -2089,6 +2089,8 @@ export function GraphViewer({
         // back to its resting size.
         event.stopPropagation();
         event.preventDefault();
+        clearTimeout(d._pinTimer);
+        d._pinTimer = null;
         if (onNodeSelectRef.current) {
           onNodeSelectRef.current(d.originalItem || d);
         }
@@ -2116,28 +2118,45 @@ export function GraphViewer({
           return;
         }
         event.stopPropagation();
-        // Any number of nodes can be open at once. Opening one never closes
-        // another: text you have open stays open until you close that node.
-        if (pinnedIdsRef.current.has(d.id)) {
-          pinnedIdsRef.current.delete(d.id);
-          if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
-          renderArticleBody(d);
-          event.currentTarget.style.zIndex = '';
-        } else {
-          pinnedIdsRef.current.add(d.id);
-          if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), true);
-          renderArticleBody(d);
-          nodes.filter(nd => nd.id === d.id).raise();
-          articleNodes.filter(nd => nd.id === d.id).raise();
-          event.currentTarget.style.zIndex = 10;
-          // Fetch full article body so the pinned node becomes a mini-reader.
-          // Re-render when content arrives, but only if this node is still
-          // open (user might have closed it in the meantime).
-          loadFullContent(d).then(() => {
-            if (pinnedIdsRef.current.has(d.id)) renderArticleBody(d);
-          });
+        // A click opens or closes the node a moment later, so the second click
+        // of a double-click can cancel it. Changing the card between the two
+        // clicks (an open node re-renders with its text) replaced the element
+        // under the pointer, and browsers drop a dblclick whose target changed.
+        const cardEl = event.currentTarget;
+        if (d._pinTimer) {
+          clearTimeout(d._pinTimer);
+          d._pinTimer = null;
+          return;
         }
+        d._pinTimer = setTimeout(() => {
+          d._pinTimer = null;
+          togglePinned(d, cardEl);
+        }, 260);
       });
+
+    function togglePinned(d, cardEl) {
+      // Any number of nodes can be open at once. Opening one never closes
+      // another: text you have open stays open until you close that node.
+      if (pinnedIdsRef.current.has(d.id)) {
+        pinnedIdsRef.current.delete(d.id);
+        if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
+        renderArticleBody(d);
+        cardEl.style.zIndex = '';
+      } else {
+        pinnedIdsRef.current.add(d.id);
+        if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), true);
+        renderArticleBody(d);
+        nodes.filter(nd => nd.id === d.id).raise();
+        articleNodes.filter(nd => nd.id === d.id).raise();
+        cardEl.style.zIndex = 10;
+        // Fetch full article body so the pinned node becomes a mini-reader.
+        // Re-render when content arrives, but only if this node is still
+        // open (user might have closed it in the meantime).
+        loadFullContent(d).then(() => {
+          if (pinnedIdsRef.current.has(d.id)) renderArticleBody(d);
+        });
+      }
+    }
 
     // Bubble click (tag, topology, or placeholder): highlight only — no
     // rearrangement, no simulation restart.
