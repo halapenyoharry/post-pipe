@@ -578,15 +578,25 @@ export function GraphViewer({
       if (currentLine) lines.push(currentLine);
       return lines;
     }
+    // Status line under the title (e.g. "soon"), smaller, in the same color.
+    const STATUS_SCALE = 0.42;
+    const STATUS_GAP = 0.2;
+    const statusOf = (d) => (d.status ? String(d.status) : '');
+    function labelBlockEm(d) {
+      const n = labelLines(d).length;
+      const statusH = statusOf(d) ? STATUS_GAP + STATUS_SCALE * 1.3 : 0;
+      return { n, statusH, total: n * LABEL_LINE_H + statusH };
+    }
     function buildWrappedLabel(textSel, d) {
       const lines = labelLines(d);
+      const { n: nLines, total } = labelBlockEm(d);
+      const top = -total / 2;
       textSel.selectAll('*').remove();
-      const nLines = lines.length;
       lines.forEach((line, i) => {
         textSel.append('tspan')
           .attr('class', 'label-line')
           .attr('x', 0)
-          .attr('y', `${(i - (nLines - 1) / 2) * LABEL_LINE_H}em`)
+          .attr('y', `${top + (i + 0.5) * LABEL_LINE_H}em`)
           .text(line);
         if (i === nLines - 1) {
           textSel.append('tspan')
@@ -597,6 +607,19 @@ export function GraphViewer({
             .text('');
         }
       });
+      const status = statusOf(d);
+      if (status) {
+        // y is in the tspan's own (smaller) em, hence the division.
+        const yParent = top + nLines * LABEL_LINE_H + STATUS_GAP + (STATUS_SCALE * 1.3) / 2;
+        textSel.append('tspan')
+          .attr('class', 'label-status')
+          .attr('x', 0)
+          .attr('font-size', `${STATUS_SCALE}em`)
+          .attr('font-weight', '500')
+          .attr('letter-spacing', '0.02em')
+          .attr('y', `${yParent / STATUS_SCALE}em`)
+          .text(status);
+      }
     }
     const labelMeasureCtx = typeof document !== 'undefined'
       ? document.createElement('canvas').getContext('2d')
@@ -612,9 +635,13 @@ export function GraphViewer({
     function labelBlockSize(c, fs) {
       const lines = labelLines(c);
       const countW = labelInkWidth(' 000', fs * 0.5, 500) + 12;
-      const w = Math.max(...lines.map((l, i) => labelInkWidth(l, fs, 700) + (i === lines.length - 1 ? countW : 0)));
+      const status = statusOf(c);
+      const w = Math.max(
+        ...lines.map((l, i) => labelInkWidth(l, fs, 700) + (i === lines.length - 1 ? countW : 0)),
+        status ? labelInkWidth(status, fs * STATUS_SCALE, 500) : 0,
+      );
       // A text box is taller than its lines: ascenders and descenders.
-      const h = lines.length * LABEL_LINE_H * fs + 0.3 * fs;
+      const h = labelBlockEm(c).total * fs + 0.3 * fs;
       return { w: w + 24, h: h + 12 };
     }
     function getContainerColor(c) {

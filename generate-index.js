@@ -735,7 +735,15 @@ async function main() {
   const feed = buildFeed(items);
   feed.edges = buildEdges(items, SETTINGS);
   if (SETTINGS.containment) {
-    feed.containers = SETTINGS.containment;
+    // settings.containers.<id> carries per-container extras (a status line
+    // such as "soon"); it wins over the same field on the containment entry.
+    // Keyed by the full id ("container:act-2") or the bare one ("act-2").
+    const extras = SETTINGS.containers || {};
+    feed.containers = SETTINGS.containment.map((c) => {
+      const extra = extras[c.id] || extras[String(c.id).replace(/^container:/, '')] || {};
+      const status = extra.status != null ? extra.status : c.status;
+      return status != null && status !== '' ? { ...c, status: String(status) } : c;
+    });
   }
   feed._sources = sources;
 
