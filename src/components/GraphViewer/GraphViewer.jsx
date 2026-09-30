@@ -552,6 +552,44 @@ export function GraphViewer({
     const closedContainers = new Set();
     const containerCentroids = new Map();
 
+
+    function buildWrappedLabel(textSel, d, maxLineChars) {
+      const label = d.label || d.id;
+      // We'll update the count text in updateContainers
+      const words = label.split(/\s+/);
+      const lines = [];
+      let currentLine = '';
+      for (const w of words) {
+        if (!currentLine) {
+          currentLine = w;
+        } else if (currentLine.length + 1 + w.length > maxLineChars) {
+          lines.push(currentLine);
+          currentLine = w;
+        } else {
+          currentLine += ' ' + w;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+
+      textSel.selectAll('*').remove();
+      const nLines = lines.length;
+      lines.forEach((line, i) => {
+        const isLast = (i === nLines - 1);
+        textSel.append('tspan')
+          .attr('class', 'label-line')
+          .attr('x', 0)
+          .attr('dy', i === 0 ? `-${(nLines - 1) * 0.5}em` : '1em')
+          .text(line);
+        if (isLast) {
+          textSel.append('tspan')
+            .attr('class', 'label-count')
+            .attr('font-weight', '500')
+            .attr('dx', '12px')
+            .attr('font-size', '0.5em')
+            .text('');
+        }
+      });
+    }
     function getContainerColor(c) {
       return c.badgeColor || c.color || c.stroke || '#d4af37';
     }
@@ -568,15 +606,10 @@ export function GraphViewer({
       .attr('fill', (d) => getContainerColor(d))
       .attr('opacity', 0.55)
       .attr('font-size', (d) => (!d.parent ? '64px' : '52px'));
-
-    containerBadgeTexts.append('tspan')
-      .attr('class', 'container-badge-name')
-      .text((d) => d.label || d.id);
-
-    containerBadgeTexts.append('tspan')
-      .attr('class', 'container-badge-count')
-      .attr('font-size', (d) => (!d.parent ? '29px' : '23px'))
-      .attr('dx', '12px');
+      
+    containerBadgeTexts.each(function(d) {
+      buildWrappedLabel(d3.select(this), d, 15);
+    });
 
     // Collapsed container macro node (when container is closed, represented like a single node)
     const containerMacroNodes = containerGroups.append('g')
@@ -601,17 +634,11 @@ export function GraphViewer({
       .attr('font-size', (d) => (!d.parent ? '64px' : '52px'))
       .attr('font-family', "'Atkinson', sans-serif")
       .attr('font-weight', '700')
-      .attr('letter-spacing', '0.05em');
+      .attr('letter-spacing', '-0.02em');
 
-    containerMacroTexts.append('tspan')
-      .attr('class', 'container-macro-name')
-      .text((d) => d.label || d.id);
-
-    containerMacroTexts.append('tspan')
-      .attr('class', 'container-macro-count')
-      .attr('font-size', (d) => (!d.parent ? '29px' : '23px'))
-      .attr('font-weight', '500')
-      .attr('dx', '12px');
+    containerMacroTexts.each(function(d) {
+      buildWrappedLabel(d3.select(this), d, 15);
+    });
 
     function updateMacroBounds() {
       containerMacroNodes.each(function (d) {
@@ -841,6 +868,10 @@ export function GraphViewer({
             if (d > maxDist) maxDist = d;
           }
           const radius = maxDist + pad;
+          
+          const minFs = graphSettings.labelSize?.min || 32;
+          const maxFs = graphSettings.labelSize?.max || 96;
+          c._fs = Math.max(minFs, Math.min(maxFs, (radius * 2) / 8));
 
           containerCircles.set(c.id, {
             x: cx,
@@ -865,7 +896,8 @@ export function GraphViewer({
             const dx = circle2.x - circle1.x;
             const dy = circle2.y - circle1.y;
             const dist = Math.hypot(dx, dy);
-            const minDist = circle1.r + circle2.r;
+            const spacing = graphSettings.containerSpacing !== undefined ? graphSettings.containerSpacing : -20;
+            const minDist = circle1.r + circle2.r + spacing;
 
             if (dist < minDist) {
               const overlap = minDist - dist;
@@ -969,10 +1001,13 @@ export function GraphViewer({
         containerCentroids.set(c.id, { x: avgX, y: avgY });
 
         const isClosed = closedContainers.has(c.id);
+        const fs = c._fs || 52;
+
         if (isClosed) {
           group.style('display', null);
           group.select('.container-hull').style('display', 'none');
           group.select('.container-badge').style('display', 'none');
+          group.select('.container-macro-text').attr('font-size', `${fs}px`);
           group.select('.container-macro-node')
             .style('display', null)
             .attr('transform', `translate(${avgX}, ${avgY})`);
@@ -1042,10 +1077,16 @@ export function GraphViewer({
         const minY = Math.min(...hull.map((p) => p[1]));
         const hullAvgX = d3.mean(hull, (p) => p[0]);
 
+        const minX = Math.min(...hull.map((p) => p[0]));
+        const maxX = Math.max(...hull.map((p) => p[0]));
+        const hullW = maxX - minX;
+        const minFs = graphSettings.labelSize?.min || 32;
+        const maxFs = graphSettings.labelSize?.max || 96;
+        const fs = Math.max(minFs, Math.min(maxFs, hullW / 8));
+
         const badge = group.select('.container-badge');
-        // Label sits at the center of the hull: name, then a smaller count.
-        // No box; text size and color are set when the label is created.
-        badge.select('.container-badge-count').text(` ${memberNodes.length}`);
+        badge.select('.container-badge-text').attr('font-size', `${fs}px`);
+        badge.select('.label-count').text(` ${memberNodes.length}`);
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : hullAvgX;
         const cy = Number.isFinite(center[1]) ? center[1] : d3.mean(hull, (p) => p[1]);
