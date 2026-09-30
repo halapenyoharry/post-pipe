@@ -165,6 +165,9 @@ async function run(browserType, engineName, size) {
   record('reload with #read= opens once, then unselects and stays closed', opened && closed && !(await readerOpen(page)));
 
   // ── containers ──
+  // The first screen may frame one container; bring every title on screen.
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:zoom-to-fit')));
+  await page.waitForTimeout(1200);
   const state = () => page.evaluate(() => window.PostPipeGraph.getContainerState());
   const centerOf = (id, sel) => page.evaluate(([id, sel]) => {
     const e = document.querySelector(`[data-container-id="${id}"] ${sel}`);
