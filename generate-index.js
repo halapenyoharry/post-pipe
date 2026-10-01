@@ -385,7 +385,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, useContributions, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -610,7 +610,10 @@ ${reactJs}
           onNavigate: selectArticle,
           contributions: readers.list,
           contributionsConfig: readers.config
-        })
+        }),
+        // The opening (settings.opening), over everything while it lasts;
+        // the graph loads underneath it.
+        React.createElement(Opening, { settings: window.SETTINGS, viewState: viewState })
       );
     }
 

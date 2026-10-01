@@ -1,0 +1,125 @@
+/* The opening (settings.opening): one image over everything, on the theme's
+   paper (the sketchbook's grain and fibres when the site wears it). The
+   durations come from src/lib/opening.js as custom properties on the layer. */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg, #1a1a2e);
+  background-image: var(--sk-fibres, none), var(--sk-grain, none);
+  background-size: 500px 500px, 220px 220px;
+  opacity: 1;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+/* The image's own box, as large as fits: the byline is placed inside it. */
+.frame {
+  position: relative;
+  width: min(100vw, calc(100vh * var(--pp-opening-ratio, 0.6667)));
+  width: min(100vw, calc(100dvh * var(--pp-opening-ratio, 0.6667)));
+  aspect-ratio: var(--pp-opening-ratio, 0.6667);
+  container-type: inline-size;
+  filter: blur(0);
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.broken {
+  opacity: 0;
+  transition: opacity var(--pp-opening-swap, 250ms) linear;
+}
+
+.layer[data-phase="broken"] .broken,
+.layer[data-phase="dissolve"] .broken {
+  opacity: 1;
+}
+
+.layer[data-phase="dissolve"] {
+  opacity: 0;
+  transition: opacity var(--pp-opening-dissolve, 1350ms) ease-in;
+}
+
+.layer[data-phase="dissolve"] .frame {
+  filter: blur(var(--pp-opening-blur, 9px));
+  transition: filter var(--pp-opening-dissolve, 1350ms) ease-out;
+}
+
+/* Reduced motion: no break-up and no blur, one short fade. */
+.layer[data-phase="fade"] {
+  opacity: 0;
+  transition: opacity var(--pp-opening-fade, 300ms) linear;
+}
+
+/* The byline, centred in the image's bottom 12%, readable on the art. */
+.byline {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translate(-50%, 50%);
+  max-width: 86%;
+  padding: 0.25em 0.8em 0.3em;
+  border-radius: 0.6em;
+  background: rgba(0, 0, 0, 0.42);
+  color: #f3ecdc;
+  font-family: var(--pp-title-font, 'Atkinson', sans-serif);
+  font-size: clamp(15px, 5.2cqw, 30px);
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.byline:hover,
+.byline:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.byline:focus-visible,
+.skip:focus-visible {
+  outline: 2px solid #f3ecdc;
+  outline-offset: 2px;
+}
+
+.skip {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(243, 236, 220, 0.35);
+  background: rgba(0, 0, 0, 0.42);
+  color: #f3ecdc;
+  font: 13px/1.2 'Atkinson', system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.skip:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .broken,
+  .frame {
+    transition: none;
+  }
+}

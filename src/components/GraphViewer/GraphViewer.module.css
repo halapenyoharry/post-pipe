@@ -239,6 +239,9 @@
 .graphContainer :global(.root[data-state="seen"] .root-fine) { stroke-width: 0.7px; stroke-opacity: 0.28; }
 .graphContainer :global(.root[data-state="done"] .root-main) { stroke-width: 2.2px; stroke-opacity: 0.62; }
 .graphContainer :global(.root[data-state="done"] .root-fine) { stroke-width: 1.1px; stroke-opacity: 0.45; }
+/* Every root at once while the opening plays, as light as a reached one. */
+.graphContainer :global(.root[data-state="glimpse"] .root-main) { stroke-width: 1.1px; stroke-opacity: 0.38; }
+.graphContainer :global(.root[data-state="glimpse"] .root-fine) { stroke-width: 0.7px; stroke-opacity: 0.28; }
 
 /* Sketchbook theme: pencil on paper. Hulls and edges get a second, lighter
    pass (.container-hull-ghost, .link-ghost, drawn only in this theme), titles

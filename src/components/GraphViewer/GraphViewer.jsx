@@ -11,6 +11,7 @@ import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
+import { TIMINGS as OPENING_TIMINGS } from '../../lib/opening';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
@@ -2630,11 +2631,15 @@ export function GraphViewer({
       if (!ps.length || !ps.some((p) => p.seen || p.max > 0)) return 'hidden';
       return ps.every((p) => p.done) ? 'done' : 'seen';
     }
+    // While the opening plays (settings.opening), every root shows, not only
+    // the ones this reader has reached: `glimpse` until they recede.
+    let glimpse = null;
     function paintRoots() {
       rootsFrame = null;
       if (!rootsList.length) return;
       for (const r of rootsList) {
-        const state = reachState(r.reach);
+        let state = reachState(r.reach);
+        if (state === 'hidden' && glimpse) state = 'glimpse';
         const a = rootEnd(r.from), b = rootEnd(r.to);
         if (state === 'hidden' || !a || !b) {
           r.el.style('display', 'none');
@@ -2647,7 +2652,7 @@ export function GraphViewer({
         r.el.style('display', null).attr('data-state', state);
         // A root this reader has just reached draws in; one already there
         // when the page opened is simply there.
-        if (r.state === 'hidden' && rootsPainted) {
+        if (r.state === 'hidden' && rootsPainted && !glimpse) {
           for (const p of [r.main, r.fine]) {
             p.attr('pathLength', 1).style('stroke-dasharray', '1 1').style('stroke-dashoffset', 1).style('transition', 'none');
             const node = p.node();
@@ -2667,6 +2672,67 @@ export function GraphViewer({
       rootsFrame = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame(paintRoots) : setTimeout(paintRoots, 16);
     }
     rootsUpdateRef.current = ROOTS ? scheduleRoots : null;
+
+    // The opening hands the page over to the graph: as its image dissolves,
+    // every root draws in, nearest first, from the book's title outward. The
+    // roots this reader has reached stay; the rest recede a little after the
+    // opening is over, so the roots are still only where they have been.
+    const glimpseTimers = [];
+    function drawIn(p, delay, ms) {
+      p.attr('pathLength', 1).style('stroke-dasharray', '1 1').style('stroke-dashoffset', 1).style('transition', 'none');
+      const node = p.node();
+      if (node) node.getBoundingClientRect();
+      p.style('transition', `stroke-dashoffset ${ms}ms ease-out ${delay}ms`).style('stroke-dashoffset', 0);
+    }
+    function undrawn(p) {
+      p.attr('pathLength', null).style('stroke-dasharray', null).style('stroke-dashoffset', null).style('transition', null);
+    }
+    function openingOrigin() {
+      const top = (data.containers || []).find((c) => !c.parent);
+      return (top && containerAnchor.get(top.id)) || null;
+    }
+    function onOpening(e) {
+      const d = (e && e.detail) || {};
+      if (!rootsList.length) return;
+      const T = OPENING_TIMINGS;
+      if (d.phase === 'play') {
+        while (glimpseTimers.length) clearTimeout(glimpseTimers.pop());
+        glimpse = { reduced: Boolean(d.reducedMotion) };
+        for (const r of rootsList) r.el.style('opacity', null).style('transition', null);
+        paintRoots();
+        if (glimpse.reduced) return;
+        const origin = openingOrigin();
+        const near = (r) => {
+          if (!origin) return 0;
+          const a = rootEnd(r.from), b = rootEnd(r.to);
+          return Math.min(a ? Math.hypot(a.x - origin.x, a.y - origin.y) : Infinity, b ? Math.hypot(b.x - origin.x, b.y - origin.y) : Infinity);
+        };
+        const shown = rootsList.filter((r) => r.el.style('display') !== 'none');
+        const dist = shown.map(near);
+        const far = Math.max(1, ...dist.filter(Number.isFinite));
+        shown.forEach((r, i) => {
+          const delay = Number.isFinite(dist[i]) ? Math.round(T.rootsSpreadMs * dist[i] / far) : 0;
+          for (const p of [r.main, r.fine]) drawIn(p, delay, T.rootsDrawMs);
+        });
+        glimpseTimers.push(setTimeout(() => {
+          for (const r of rootsList) for (const p of [r.main, r.fine]) undrawn(p);
+        }, T.rootsSpreadMs + T.rootsDrawMs + 100));
+      } else if (d.phase === 'done' && glimpse) {
+        const reduced = glimpse.reduced;
+        glimpseTimers.push(setTimeout(() => {
+          const going = rootsList.filter((r) => r.state === 'glimpse');
+          const end = () => {
+            glimpse = null;
+            for (const r of going) r.el.style('opacity', null).style('transition', null);
+            paintRoots();
+          };
+          if (reduced || !going.length) { end(); return; }
+          for (const r of going) r.el.style('transition', `opacity ${T.rootsRecedeMs}ms ease-in`).style('opacity', 0);
+          glimpseTimers.push(setTimeout(end, T.rootsRecedeMs + 50));
+        }, T.rootsHoldMs));
+      }
+    }
+    if (ROOTS) window.addEventListener('postpipe:opening', onOpening);
 
     let hasFitted = false;
     graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen };
@@ -3103,6 +3169,8 @@ export function GraphViewer({
     return () => {
       renderAllArticleBodiesRef.current = null;
       rootsUpdateRef.current = null;
+      window.removeEventListener('postpipe:opening', onOpening);
+      while (glimpseTimers.length) clearTimeout(glimpseTimers.pop());
       readersUpdateRef.current = null;
       if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
       if (themeObserver) themeObserver.disconnect();
