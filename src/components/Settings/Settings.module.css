@@ -245,3 +245,25 @@
   line-height: 1.35;
   color: rgba(224, 224, 224, 0.5);
 }
+
+.fontRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.fontBtn {
+  flex: 1 1 120px;
+  padding: 7px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: rgba(224, 224, 224, 0.75);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.hintLink {
+  color: rgba(100, 255, 218, 0.75);
+}

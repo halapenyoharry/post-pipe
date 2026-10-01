@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Settings.module.css';
+import { readerFonts } from '../../lib/readerSettings';
 
 /**
  * Settings — a compact popover (never full-screen; the canvas must always
@@ -110,6 +111,8 @@ export function Settings({ viewState, feedData }) {
       document.documentElement.setAttribute('data-pp-indent', indent ? 'on' : 'off');
       document.documentElement.setAttribute('data-pp-space', space ? 'on' : 'off');
       document.documentElement.removeAttribute('data-pp-paragraph');
+      const font = viewState.readerAid ? viewState.readerAid('font') : 'default';
+      document.documentElement.setAttribute('data-pp-font', font);
     }
   });
 
@@ -130,6 +133,8 @@ export function Settings({ viewState, feedData }) {
 
   if (!viewState) return null;
 
+  const fonts = readerFonts(typeof window !== 'undefined' ? window.SETTINGS : null);
+  const font = viewState.readerAid ? viewState.readerAid('font') : 'default';
   const current = { ...DEFAULT_COLORS, ...viewState.graphColors() };
   const activeProfile = viewState.colorProfileId();
   const inUse = colorKeysInUse(feedData);
@@ -234,6 +239,26 @@ export function Settings({ viewState, feedData }) {
             </div>
 
             <div className={styles.hint} style={{ marginTop: '14px' }}>Reading</div>
+            <div className={styles.fontRow} role="radiogroup" aria-label="Font">
+              {fonts.map((f) => (
+                <button
+                  key={f.id}
+                  role="radio"
+                  aria-checked={font === f.id}
+                  data-font={f.id}
+                  className={`${styles.fontBtn} ${font === f.id ? styles.aidOn : ''}`}
+                  style={{ fontFamily: f.family }}
+                  onClick={() => viewState.setReaderAid && viewState.setReaderAid('font', f.id)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {fonts.filter((f) => f.license).map((f) => (
+              <div key={f.id} className={styles.hint} style={{ marginTop: '4px' }}>
+                {f.label} is under the <a className={styles.hintLink} href={`./fonts/${f.license}`} target="_blank" rel="noopener">{f.licenseName}</a>.
+              </div>
+            ))}
             <div className={styles.aidList}>
               <ReadingAid
                 viewState={viewState}

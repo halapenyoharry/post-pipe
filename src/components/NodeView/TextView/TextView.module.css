@@ -357,3 +357,9 @@
 :global(html[data-pp-space="off"]) .scroll :global(p) {
   margin: 0;
 }
+
+/* The reader's chosen face (Settings → Reading) also sets the text of an
+   open card. Titles keep the page face, since their size is fitted to it. */
+:global(html[data-pp-font="opendyslexic"]) .scroll {
+  font-family: 'OpenDyslexic', 'Atkinson', sans-serif;
+}

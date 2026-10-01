@@ -323,7 +323,12 @@
     "progressBar": "top",
     "_progressBar_note": "top (a bar along the top edge of the reader, default), side (down its right edge), or none.",
     "allowDownload": true,
-    "_allowDownload_note": "Whether the reader offers Export (download the piece as a markdown file). Default true."
+    "_allowDownload_note": "Whether the reader offers Export (download the piece as a markdown file). Default true.",
+    "fonts": [
+      "default",
+      "opendyslexic"
+    ],
+    "_fonts_note": "The faces offered for the text in the panel. default is the page's own face (Atkinson Hyperlegible) and is always offered. opendyslexic ships as fonts/OpenDyslexic-Regular.woff2 next to the page, with its SIL Open Font License in fonts/OpenDyslexic-OFL.txt; it loads only when chosen."
   },
   "graph": {
     "_note": "Visual parameters for the graph. Here rather than in the code so they can be tuned without a rebuild, and so a fork can look different without editing components. Not all of these are exposed in the interface, and they do not need to be \u2014 being reachable is the point.",

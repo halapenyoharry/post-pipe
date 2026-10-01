@@ -89,6 +89,31 @@ function configFor(entry) {
 }
 
 const { buildEdges } = require('./src/corpus/buildEdges');
+const { readerFonts } = require('./src/lib/readerSettings');
+
+// Reader faces other than the page's own ship as files next to the page,
+// with their license, and load only when chosen. No font is fetched from
+// anywhere else.
+function copyReaderFonts() {
+  const dir = path.join(SITE_DIR, 'fonts');
+  const faces = readerFonts(SETTINGS).filter((f) => f.file);
+  if (!faces.length) return;
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  for (const f of faces) {
+    for (const name of [f.file, f.license].filter(Boolean)) {
+      fs.copyFileSync(path.join(__dirname, 'fonts', name), path.join(dir, name));
+    }
+  }
+}
+
+function readerFontFaces() {
+  return readerFonts(SETTINGS).filter((f) => f.file).map((f) => `
+  @font-face {
+    font-family: '${f.label}';
+    src: url(./fonts/${f.file}) format('woff2');
+    font-weight: normal; font-style: normal; font-display: swap;
+  }`).join('');
+}
 const { labelLadder } = require('./src/corpus/titleNucleus');
 
 // ─── TTS exposure ────────────────────────────────────────────────────────────
@@ -214,6 +239,7 @@ ${SETTINGS.rights && SETTINGS.rights.noAiTraining ? '<meta name="robots" content
     src: url(data:font/woff2;base64,${fontBoldB64}) format('woff2');
     font-weight: bold; font-style: normal;
   }
+${readerFontFaces()}
 
   :root {
     --bg: ${SETTINGS.theme.bg};
@@ -803,6 +829,7 @@ async function main() {
     const robots = `User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: Applebot-Extended\nDisallow: /\n`;
     fs.writeFileSync(path.join(SITE_DIR, 'robots.txt'), robots);
   }
+  copyReaderFonts();
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
 
   console.log(`Generated _site/feed.json (${feed.items.length} items, ${feed.edges.length} edges)`);

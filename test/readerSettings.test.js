@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { progressBarMode, allowDownload } = require('../src/lib/readerSettings');
+const { progressBarMode, allowDownload, readerFonts } = require('../src/lib/readerSettings');
 
 test('reader.progressBar defaults to top', () => {
   for (const s of [undefined, null, {}, { reader: {} }, { reader: { progressBar: 'sideways' } }]) {
@@ -21,4 +21,15 @@ test('reader.allowDownload defaults to true; false turns it off', () => {
     assert.strictEqual(allowDownload(s), true);
   }
   assert.strictEqual(allowDownload({ reader: { allowDownload: false } }), false);
+});
+
+test('reader.fonts offers the page face and OpenDyslexic by default, each shipped as a local file', () => {
+  const ids = (s) => readerFonts(s).map((f) => f.id);
+  assert.deepStrictEqual(ids(undefined), ['default', 'opendyslexic']);
+  assert.deepStrictEqual(ids({ reader: { fonts: [] } }), ['default']);
+  assert.deepStrictEqual(ids({ reader: { fonts: ['opendyslexic', 'nonesuch', 'opendyslexic'] } }), ['default', 'opendyslexic']);
+  const od = readerFonts(undefined)[1];
+  assert.strictEqual(od.file, 'OpenDyslexic-Regular.woff2');
+  assert.strictEqual(od.license, 'OpenDyslexic-OFL.txt');
+  assert.ok(!/https?:/.test(JSON.stringify(readerFonts(undefined))));
 });

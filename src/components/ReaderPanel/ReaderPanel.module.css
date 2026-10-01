@@ -833,6 +833,13 @@
   .articleByline { color: #555 !important; }
 }
 
+/* Font (Settings → Reading). The face file sits next to the page. */
+:global(html[data-pp-font="opendyslexic"]) .body {
+  font-family: 'OpenDyslexic', 'Atkinson', sans-serif;
+  font-size: 14px;
+  line-height: 1.85;
+}
+
 /* Follow along (Settings → Reading). A horizontal drag marks the text; a
    vertical one still scrolls. The marks are painted, not inserted. */
 .body.following {
