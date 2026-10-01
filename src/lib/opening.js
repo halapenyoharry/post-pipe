@@ -1,11 +1,13 @@
-// The two-state page (settings.opening, mode 'two-state'). One image, the
-// cover art, sits fixed behind the page on a dark ground. At the top state
-// (art) it is scrolled so the whole plant fits, with the byline under it. At
-// the other (graph) it is scrolled up until the roots fill the view and only
-// the bush's lowest leaves, the drop and the stem come in at the top; the
-// graph is drawn over the roots. One progress value p runs between the two
-// rests, art (0) and graph (1): the image moves up, and the graph layer fades
-// and rises in over it. A reader can scrub partway; let go and it snaps to a
+// The two-state page (settings.opening, mode 'two-state'). The cover art
+// sits fixed behind the page on a dark ground: two images of one canvas,
+// stacked at the same place and size, the art state's (the whole plant) and
+// the graph state's (a small plant at the crown over the same roots). At the
+// top state (art) the canvas is scrolled so the whole plant fits, with the
+// byline under it. At the other (graph) it is scrolled up until the roots
+// fill the view; the graph is drawn over the roots. One progress value p runs
+// between the two rests, art (0) and graph (1): the canvas moves up, the two
+// images crossfade (the art state's at 1 - p, the graph state's at p), and
+// the graph layer fades and rises in over them. A reader can scrub partway; let go and it snaps to a
 // rest. Nothing is unmounted: the graph is only hidden in the art state, and
 // exactly as it was on return. The art never moves with the graph's own pan
 // and zoom.
@@ -17,7 +19,7 @@
 const DEFAULTS = {
   enabled: false,
   mode: 'two-state',
-  art: { bush: '', roots: '', full: '' },
+  art: { artState: '', graphState: '', full: '' },
   alt: '',
   ground: 'dark',
   graph: { artOffset: 0.33, artOpacity: 1 },
@@ -53,20 +55,26 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (x) => { const t = clamp01(x); return t * t * (3 - 2 * t); };
 
 // settings.opening with its defaults, or null when it is off, in another mode,
-// or has no art (full, or bush and roots).
+// or has no art: artState and graphState, or full alone (one image for both
+// states, no crossfade).
 function openingConfig(settings) {
   const o = settings && settings.opening;
   if (!o || o.enabled !== true) return null;
   if (o.mode !== undefined && o.mode !== 'two-state') return null;
   const art = o.art && typeof o.art === 'object' ? o.art : {};
-  const bush = str(art.bush), roots = str(art.roots), full = str(art.full);
-  if (!full && !(bush && roots)) return null;
+  let artState = str(art.artState), graphState = str(art.graphState);
+  const full = str(art.full);
+  if (!(artState && graphState)) {
+    if (!full) return null;
+    artState = full;
+    graphState = '';
+  }
   const graph = o.graph && typeof o.graph === 'object' ? o.graph : {};
   const byline = o.byline && typeof o.byline === 'object' ? o.byline : {};
   return {
     enabled: true,
     mode: 'two-state',
-    art: { bush, roots, full },
+    art: { artState, graphState, full },
     alt: str(o.alt),
     ground: o.ground === 'paper' ? 'paper' : 'dark',
     graph: {
@@ -90,11 +98,12 @@ function startState(config, { stored, hash } = {}) {
 }
 
 // Where everything is at progress p, in px, for a viewport (vw, vh), the
-// art's natural size (w, h: the full image, or bush over roots), and the
+// art's natural size (w, h: the canvas both state images share), and the
 // space the page keeps at the bottom (bottom: the rights line, say). The art
 // keeps one scale throughout, the largest that fits the whole plant, with
 // the byline under it, in the art state; only its top moves.
-//   art         { top, left, width, height, scale, opacity }
+//   art         { top, left, width, height, scale, opacity }: the canvas
+//   fade        { art, graph }: the two state images' opacities (1 - p, p)
 //   artTop0, artTop1   its top at the two rests (artTop1 = -artOffset of its height)
 //   travel      px the art moves between the rests (a whole scrub)
 //   graph       { opacity, shift }: the graph layer, shift px below its rest
@@ -120,6 +129,7 @@ function coverGeometry(config, { vw, vh, art, bottom = 0 } = {}, p = 0) {
     p: t,
     vw, vh,
     art: { top, left: (vw - width) / 2, width, height, scale, opacity: lerp(1, g.artOpacity, t) },
+    fade: { art: 1 - t, graph: t },
     artTop0, artTop1,
     travel: Math.max(1, artTop0 - artTop1),
     graph: { opacity: show, shift: (1 - show) * T.rise * vh },

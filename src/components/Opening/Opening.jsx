@@ -4,12 +4,14 @@ import { openingConfig, startState, coverGeometry, createCover, pageKey, TUNING 
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
- * art is one image fixed behind the page on a dark ground. In the art state
- * it is scrolled so the whole plant fits, with the byline under it; in the
- * graph state it is scrolled up until the roots fill the view, and the graph
- * (this component's children: the canvas and its controls) is drawn over the
+ * art is fixed behind the page on a dark ground: the art state's image and
+ * the graph state's, stacked on one canvas. In the art state the canvas is
+ * scrolled so the whole plant fits, with the byline under it; in the graph
+ * state it is scrolled up until the roots fill the view, and the graph (this
+ * component's children: the canvas and its controls) is drawn over the
  * roots. Scrolling, a touch drag, a key or a tap moves one progress value
- * between the two: the image moves up, the graph layer fades and rises in.
+ * between the two: the canvas moves up, the two images crossfade, the graph
+ * layer fades and rises in.
  * Every frame is written straight to the DOM from src/lib/opening.js's
  * geometry, so scrubbing never re-renders React. The graph is mounted once
  * and never unmounted; in the art state it is only hidden, so it is exactly
@@ -66,32 +68,26 @@ function Cover({ config, viewState, children }) {
   const groundRef = useRef(null);
   const stageRef = useRef(null);
   const artRef = useRef(null);
+  const artStateRef = useRef(null);
+  const graphStateRef = useRef(null);
   const bylineRef = useRef(null);
   const sectionRef = useRef(null);
   const handleRef = useRef(null);
   const machineRef = useRef(null);
   const sizeRef = useRef(null);
   const dragRef = useRef(() => false);
-  const [art, setArt] = useState(null); // { w, h, bushShare }
+  const [art, setArt] = useState(null); // { w, h }: the canvas
   const reduced = useMemo(reducedMotionNow, []);
   const start = useMemo(() => startState(config, {
     stored: viewState && viewState.openingState ? viewState.openingState() : null,
     hash: typeof window !== 'undefined' ? window.location.hash : '',
   }), [config, viewState]);
 
-  // The art's natural size: the full image's, or bush over roots.
+  // The canvas's natural size: the art state's image (the graph state's is
+  // drawn on the same canvas).
   useEffect(() => {
     let live = true;
-    const { full, bush, roots } = config.art;
-    const done = (size) => { if (live) setArt(size); };
-    if (full) {
-      loadSize(full).then((s) => done(s ? { ...s, bushShare: 0 } : { w: 1, h: 2, bushShare: 0 }));
-    } else {
-      Promise.all([loadSize(bush), loadSize(roots)]).then(([b, r]) => {
-        const bh = b ? b.h : 1, rh = r ? r.h : 1;
-        done({ w: Math.max(b ? b.w : 1, r ? r.w : 1), h: bh + rh, bushShare: bh / (bh + rh) });
-      });
-    }
+    loadSize(config.art.artState).then((s) => { if (live) setArt(s || { w: 1, h: 2 }); });
     return () => { live = false; };
   }, [config]);
 
@@ -115,6 +111,10 @@ function Cover({ config, viewState, children }) {
       a.style.height = `${g.art.height}px`;
       a.style.transform = `translate3d(${g.art.left}px, ${g.art.top}px, 0)`;
       a.style.opacity = sizeRef.current ? String(g.art.opacity) : '0';
+    }
+    if (graphStateRef.current) {
+      if (artStateRef.current) artStateRef.current.style.opacity = String(g.fade.art);
+      graphStateRef.current.style.opacity = String(g.fade.graph);
     }
     if (groundRef.current) groundRef.current.style.opacity = String(g.ground);
     const by = bylineRef.current;
@@ -337,14 +337,12 @@ function Cover({ config, viewState, children }) {
           }}
         >
           <div ref={artRef} className={styles.art} data-cover-art style={{ opacity: 0 }}>
-            {config.art.full ? (
-              <img className={styles.full} src={config.art.full} alt="" draggable="false" data-cover-full />
-            ) : (<>
-              <img className={styles.part} src={config.art.bush} alt="" draggable="false" data-cover-bush
-                style={{ height: art ? `${art.bushShare * 100}%` : '50%' }} />
-              <img className={styles.part} src={config.art.roots} alt="" draggable="false" data-cover-roots
-                style={{ height: art ? `${(1 - art.bushShare) * 100}%` : '50%' }} />
-            </>)}
+            <img ref={artStateRef} className={styles.image} src={config.art.artState} alt="" draggable="false"
+              data-cover-image="art" style={config.art.graphState ? { opacity: startArt ? 1 : 0 } : undefined} />
+            {config.art.graphState && (
+              <img ref={graphStateRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
+                data-cover-image="graph" style={{ opacity: startArt ? 0 : 1 }} />
+            )}
           </div>
           {config.alt && <span className={styles.alt} role="img" aria-label={config.alt} data-cover-alt />}
           {config.byline.text && (

@@ -111,7 +111,7 @@ const stored = (page) => page.evaluate(() => {
 // Where things are: the art, the byline, the graph layer, what is on top.
 const coverInfo = (page) => page.evaluate(() => {
   const art = document.querySelector('[data-cover-art]');
-  const img = art && art.querySelector('img');
+  const imgs = art ? [...art.querySelectorAll('img')] : [];
   const r = art.getBoundingClientRect();
   const by = document.querySelector('[data-cover-byline]');
   const br = by ? by.getBoundingClientRect() : null;
@@ -123,7 +123,10 @@ const coverInfo = (page) => page.evaluate(() => {
   return {
     W: innerWidth, H: innerHeight,
     art: { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height, opacity: getComputedStyle(art).opacity },
-    img: img ? { src: img.getAttribute('src'), loaded: img.complete && img.naturalWidth > 0, natural: [img.naturalWidth, img.naturalHeight] } : null,
+    imgs: imgs.map((img) => {
+      const ir = img.getBoundingClientRect();
+      return { which: img.getAttribute('data-cover-image'), src: img.getAttribute('src'), url: img.currentSrc || img.src, loaded: img.complete && img.naturalWidth > 0, natural: [img.naturalWidth, img.naturalHeight], opacity: Number(getComputedStyle(img).opacity), box: [ir.left, ir.top, ir.width, ir.height].map(Math.round) };
+    }),
     alt: (document.querySelector('[data-cover-alt]') || {}).getAttribute ? document.querySelector('[data-cover-alt]').getAttribute('aria-label') : null,
     byline: by ? { text: by.textContent, top: br.top, bottom: br.bottom, cx: br.left + br.width / 2, opacity: getComputedStyle(by).opacity, font: getComputedStyle(by).fontFamily, href: by.getAttribute('href') } : null,
     section: { opacity: getComputedStyle(sec).opacity, inert: !!sec.inert, events: getComputedStyle(sec).pointerEvents, bg: bg(sec) },
@@ -271,9 +274,18 @@ async function run(bt, name, size, record) {
     const st = await state(s.page);
     const c = await coverInfo(s.page);
     record('fresh: the art state first', st === 'art' && c.onTop === 'art' && c.section.opacity === '0' && c.section.inert, `state ${st}, on top ${c.onTop}, graph opacity ${c.section.opacity}, inert ${c.section.inert}`);
-    const want = OPENING.art.full || OPENING.art.bush;
-    record('fresh: the whole plant fits, loaded, with its alt', !!c.img && c.img.loaded && c.img.src === want && c.art.top >= 0 && c.art.bottom <= c.H && c.art.left >= 0 && c.art.right <= c.W && c.alt === OPENING.alt,
-      `${c.img && c.img.src} ${c.img && c.img.natural.join('x')} at ${Math.round(c.art.left)},${Math.round(c.art.top)}–${Math.round(c.art.right)},${Math.round(c.art.bottom)}, alt "${c.alt}"`);
+    const artImg = c.imgs.find((i) => i.which === 'art');
+    const graphImg = c.imgs.find((i) => i.which === 'graph');
+    record('fresh: the whole plant fits, loaded, with its alt', !!artImg && artImg.loaded && artImg.src === OPENING.art.artState && c.art.top >= 0 && c.art.bottom <= c.H && c.art.left >= 0 && c.art.right <= c.W && c.alt === OPENING.alt,
+      `${artImg && artImg.src} ${artImg && artImg.natural.join('x')} at ${Math.round(c.art.left)},${Math.round(c.art.top)}–${Math.round(c.art.right)},${Math.round(c.art.bottom)}, alt "${c.alt}"`);
+    record('art state: the full-bush image is the visible one', !!artImg && !!graphImg && artImg.opacity === 1 && graphImg.opacity === 0,
+      `${artImg && artImg.src} at ${artImg && artImg.opacity}, ${graphImg && graphImg.src} at ${graphImg && graphImg.opacity}`);
+    const own = await s.page.evaluate(async (list) => Promise.all(list.map(async (u) => {
+      const r = await fetch(u); const b = await r.arrayBuffer(); return { u, ok: r.ok, bytes: b.byteLength };
+    })), c.imgs.map((i) => i.url));
+    const files = c.imgs.map((i) => fs.statSync(path.join(SITE, i.src)).size);
+    record('both state images are the site\'s own files, stacked on one canvas', c.imgs.length === 2 && own.every((o, i) => o.ok && o.u.startsWith(BASE) && o.bytes === files[i]) && c.imgs.every((i) => i.loaded && JSON.stringify(i.box) === JSON.stringify(c.imgs[0].box) && i.natural.join('x') === c.imgs[0].natural.join('x')),
+      c.imgs.map((i, k) => `${i.src} ${i.natural.join('x')} ${own[k].bytes} bytes (file ${files[k]})`).join('; ') + `, both at ${c.imgs[0] && c.imgs[0].box.join(',')}`);
     const b = c.byline;
     record('fresh: the byline under the art, centred, in the title face', !!b && b.text === OPENING.byline.text && b.top >= c.art.bottom - 2 && Math.abs(b.cx - c.W / 2) < 3 && b.opacity === '1' && /PP Sketch Title/.test(b.font),
       b ? `"${b.text}" ${Math.round(b.top)}–${Math.round(b.bottom)} under art ending ${Math.round(c.art.bottom)}, ${b.font.split(',')[0]}` : 'none');
@@ -298,12 +310,20 @@ async function run(bt, name, size, record) {
     }
     record('scrub: partway shows the in-between', between(mid.p, 0.05, 0.95) && mid.c.art.top < c.art.top - 5 && Number(mid.c.section.opacity) < 1,
       `p ${mid.p.toFixed(2)}, art top ${Math.round(c.art.top)} → ${Math.round(mid.c.art.top)}, graph opacity ${Number(mid.c.section.opacity).toFixed(2)}`);
+    const mA = mid.c.imgs.find((i) => i.which === 'art'), mG = mid.c.imgs.find((i) => i.which === 'graph');
+    record('scrub: partway the two images crossfade with p', !!mA && !!mG && Math.abs(mA.opacity - (1 - mid.p)) < 0.03 && Math.abs(mG.opacity - mid.p) < 0.03 && mG.opacity > 0,
+      `p ${mid.p.toFixed(2)}: art-state image ${mA && mA.opacity.toFixed(2)}, graph-state image ${mG && mG.opacity.toFixed(2)}`);
     await settle(s.page);
     record('scrub: let go short, it settles back on the art', (await state(s.page)) === 'art' && (await progress(s.page)) === 0, `${await state(s.page)}`);
 
     await scrollDown(s);
     const g = await coverInfo(s.page);
-    const crown = (g.art.top + g.art.height * (878 / 1383)) / g.H;
+    // Where the plant meets the roots: row 1330 of the 2111-row canvas.
+    const crown = (g.art.top + g.art.height * (1330 / 2111)) / g.H;
+    const gArt = g.imgs.find((i) => i.which === 'art');
+    const gGraph = g.imgs.find((i) => i.which === 'graph');
+    record('graph state: the small-plant image is the visible one', !!gArt && !!gGraph && gGraph.opacity === 1 && gArt.opacity === 0 && gGraph.src === OPENING.art.graphState,
+      `${gGraph && gGraph.src} at ${gGraph && gGraph.opacity}, ${gArt && gArt.src} at ${gArt && gArt.opacity}`);
     record('scroll down: reaches the graph', (await state(s.page)) === 'graph' && g.onTop === 'graph' && g.section.opacity === '1' && !g.section.inert, `state ${await state(s.page)}, on top ${g.onTop}`);
     record('graph state: the art is still there, behind the graph', g.coverVisible && g.art.opacity === '1' && g.art.bottom > g.H * 0.4 && g.art.top < 0 && /rgba\(0, 0, 0, 0\)|transparent/.test(g.section.bg) && /rgba\(0, 0, 0, 0\)|transparent/.test(g.graphBg),
       `art ${Math.round(g.art.top)}–${Math.round(g.art.bottom)} of ${g.H}, opacity ${g.art.opacity}, layer ${g.section.bg}`);

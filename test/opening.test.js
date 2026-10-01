@@ -40,7 +40,7 @@ function fakeClock() {
 const SITE = {
   opening: {
     enabled: true, mode: 'two-state',
-    art: { bush: 'cover/bush.png', roots: 'cover/roots.png', full: 'cover/art.png' },
+    art: { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png' },
     alt: 'A plant', ground: 'dark', graph: { artOffset: 0.33, artOpacity: 1 },
     byline: { text: 'by someone', href: 'someone/' }, startOn: 'remembered', snapMs: 420,
   },
@@ -67,14 +67,18 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.equal(openingConfig({}), null);
   assert.equal(openingConfig({ opening: { ...SITE.opening, enabled: false } }), null);
   assert.equal(openingConfig({ opening: { ...SITE.opening, mode: 'dissolve' } }), null, 'another mode is not this one');
-  assert.equal(openingConfig({ opening: { enabled: true, art: { bush: 'b.png' } } }), null, 'no full and no roots: no art');
+  assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png' } } }), null, 'one state image and no full: no art');
+  assert.equal(openingConfig({ opening: { enabled: true, art: { bush: 'b.png', roots: 'r.png' } } }), null, 'the old halves are not read');
+  const both = openingConfig(SITE);
+  assert.deepStrictEqual(both.art, { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png', full: '' });
   const onlyFull = openingConfig({ opening: { enabled: true, art: { full: 'a.png' } } });
   assert.ok(onlyFull, 'full alone is enough');
+  assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png' }, 'full stands for both states');
+  assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
   assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artOpacity: 1 });
   assert.equal(onlyFull.ground, 'dark');
   assert.equal(onlyFull.startOn, 'remembered');
   assert.equal(onlyFull.snapMs, 420);
-  assert.ok(openingConfig({ opening: { enabled: true, art: { bush: 'b.png', roots: 'r.png' } } }), 'bush over roots is the art');
   const odd = openingConfig({ opening: { enabled: true, art: { full: 'a.png' }, ground: 'neon', startOn: 'middle', snapMs: -5, graph: { artOffset: 3, artOpacity: 7 } } });
   assert.equal(odd.ground, 'dark');
   assert.equal(odd.startOn, 'remembered');
@@ -98,18 +102,20 @@ test('start: remembered lands where the reader left, the art with no memory, the
 test('geometry: the whole plant fits at the art rest, scrolled up by artOffset at the graph rest, one scale throughout', () => {
   const c = openingConfig(SITE);
   for (const [vw, vh] of [[390, 844], [1280, 800]]) {
-    const view = { vw, vh, art: { w: 685, h: 1383 }, bottom: 100 };
+    const view = { vw, vh, art: { w: 1045, h: 2111 }, bottom: 100 };
     const a = coverGeometry(c, view, 0);
     const g = coverGeometry(c, view, 1);
     assert.ok(a.art.top >= 0, 'top inside');
     assert.ok(a.byline.y + TUNING.bylineSize * 1.3 <= vh - 100 + 1, 'byline above the kept space');
     assert.ok(a.art.left >= 0 && a.art.left + a.art.width <= vw + 0.01, 'fits across');
-    assert.ok(Math.abs(a.art.width / a.art.height - 685 / 1383) < 1e-9, 'shape kept');
+    assert.ok(Math.abs(a.art.width / a.art.height - 1045 / 2111) < 1e-9, 'shape kept');
     assert.equal(g.art.scale, a.art.scale, 'one scale');
     assert.ok(Math.abs(g.art.top - (-0.33 * g.art.height)) < 1e-9);
     assert.equal(a.travel, a.art.top - g.art.top);
-    const crown = (g.art.top + (878 / 1383) * g.art.height) / vh;
-    assert.ok(crown > 0.15 && crown < 0.35, `where bush meets roots, about a quarter down (${crown.toFixed(2)})`);
+    const crown = (g.art.top + (1330 / 2111) * g.art.height) / vh;
+    assert.ok(crown > 0.15 && crown < 0.35, `where the plant meets the roots, about a quarter down (${crown.toFixed(2)})`);
+    assert.deepStrictEqual(a.fade, { art: 1, graph: 0 }, "the art state's image at the art rest");
+    assert.deepStrictEqual(g.fade, { art: 0, graph: 1 }, "the graph state's image at the graph rest");
     assert.equal(a.graph.opacity, 0);
     assert.ok(a.graph.shift > 0, 'the graph is below at the art rest');
     assert.equal(g.graph.opacity, 1);
@@ -123,10 +129,11 @@ test('geometry: the whole plant fits at the art rest, scrolled up by artOffset a
 
 test('geometry: everything follows p continuously between the rests', () => {
   const c = openingConfig(SITE);
-  const view = { vw: 390, vh: 844, art: { w: 685, h: 1383 } };
+  const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 } };
   let prev = coverGeometry(c, view, 0);
   for (let i = 1; i <= 20; i += 1) {
     const g = coverGeometry(c, view, i / 20);
+    assert.ok(Math.abs(g.fade.art - (1 - i / 20)) < 1e-9 && Math.abs(g.fade.graph - i / 20) < 1e-9, 'the images crossfade with p');
     assert.ok(g.art.top < prev.art.top, 'the art moves up');
     assert.ok(g.graph.opacity >= prev.graph.opacity, 'the graph comes in');
     assert.ok(g.graph.shift <= prev.graph.shift, 'and rises');

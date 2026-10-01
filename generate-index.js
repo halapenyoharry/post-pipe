@@ -372,7 +372,7 @@ window.SETTINGS = ${settingsJSON};
     // reader's own mode is kept for the reader (src/components/Theme).
     var o = S.opening || {};
     var art = o.art || {};
-    var cover = o.enabled === true && (o.mode === undefined || o.mode === 'two-state') && (art.full || (art.bush && art.roots));
+    var cover = o.enabled === true && (o.mode === undefined || o.mode === 'two-state') && (art.full || (art.artState && art.graphState));
     var page = cover && o.ground !== 'paper' ? 'dark' : mode;
     document.documentElement.setAttribute('data-pp-theme', name);
     document.documentElement.setAttribute('data-pp-mode', page);
