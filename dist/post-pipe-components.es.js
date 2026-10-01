@@ -16492,13 +16492,13 @@ function Ic({ viewState: e, feedData: t, subject: n, readerOpen: r }) {
 	}, []), (0, _.useEffect)(() => {
 		if (!i) return;
 		let e = (e) => {
-			e.key === "Escape" && a(!1);
+			e.key === "Escape" && (e.stopImmediatePropagation(), a(!1));
 		};
-		if (window.addEventListener("keydown", e), c.current && s.current) {
+		if (window.addEventListener("keydown", e, !0), c.current && s.current) {
 			let e = s.current.querySelector(`[data-section="${c.current}"]`);
 			e && (s.current.scrollTop = e.offsetTop - 8), c.current = null;
 		}
-		return () => window.removeEventListener("keydown", e);
+		return () => window.removeEventListener("keydown", e, !0);
 	}, [i]), !e) return null;
 	let l = (0, Ms.readerFonts)(typeof window < "u" ? window.SETTINGS : null), u = e.readerAid ? e.readerAid("font") : "default", d = e.readerAid ? e.readerAid("size") : "m", f = {
 		...Tc,

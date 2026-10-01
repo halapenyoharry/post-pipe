@@ -8473,13 +8473,13 @@ function Cc({ viewState: e, feedData: t, subject: n, readerOpen: i }) {
 	}, []), r(() => {
 		if (!a) return;
 		let e = (e) => {
-			e.key === "Escape" && c(!1);
+			e.key === "Escape" && (e.stopImmediatePropagation(), c(!1));
 		};
-		if (window.addEventListener("keydown", e), m.current && p.current) {
+		if (window.addEventListener("keydown", e, !0), m.current && p.current) {
 			let e = p.current.querySelector(`[data-section="${m.current}"]`);
 			e && (p.current.scrollTop = e.offsetTop - 8), m.current = null;
 		}
-		return () => window.removeEventListener("keydown", e);
+		return () => window.removeEventListener("keydown", e, !0);
 	}, [a]), !e) return null;
 	let h = (0, ys.readerFonts)(typeof window < "u" ? window.SETTINGS : null), g = e.readerAid ? e.readerAid("font") : "default", _ = e.readerAid ? e.readerAid("size") : "m", v = {
 		...fc,
