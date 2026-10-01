@@ -36,3 +36,4 @@ scrap.md
 dist-lib/
 node_modules
 _local/
+_handoff/
