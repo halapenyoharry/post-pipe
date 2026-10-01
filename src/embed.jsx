@@ -401,6 +401,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
       {viewState && (features.layoutControls || features.dimensions || features.undoRedo) && (
         <Toolbar
           viewState={viewState}
+          settings={settings}
           show={{ history: !!features.undoRedo, layout: !!features.layoutControls, dimensions: !!features.dimensions }}
         />
       )}

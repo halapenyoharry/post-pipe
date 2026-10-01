@@ -610,7 +610,51 @@ async function part4(bt, name, size, record) {
   }
 }
 
-const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2, 3: part3, 4: part4 };
+// ── 5. "revisions" ─────────────────────────────────────────────────────────
+const wordsShown = (page) => page.evaluate(() => {
+  const out = [];
+  out.push(document.body.innerText);
+  for (const e of document.querySelectorAll('[title], [aria-label]')) out.push(e.getAttribute('title') || '', e.getAttribute('aria-label') || '');
+  return out.join('\n');
+});
+
+async function part5(bt, name, size, record) {
+  const s = await open(bt, name, size, BASE);
+  const { page } = s;
+  try {
+    const want = (SETTINGS.dimensions && SETTINGS.dimensions.labels && SETTINGS.dimensions.labels.commits) || 'commits';
+    const seen = [await wordsShown(page)];
+    if (s.phone) await page.tap('[data-toolbar-more]'); else await page.click('[data-toolbar-more]');
+    await page.waitForTimeout(400);
+    seen.push(await wordsShown(page));
+    // On a wide screen the dimensions are in the bar, under the sheet's
+    // backdrop while it is open.
+    if (!s.phone) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
+    const btn = await page.$(`[data-toolbar] button:text-is("${want}"):visible, [data-toolbar-sheet] button:text-is("${want}"):visible`);
+    record(`5 the bottom bar says "${want}"`, !!btn, btn ? 'shown' : 'missing');
+    if (btn) {
+      await btn.click();
+      await page.waitForTimeout(800);
+      const on = await page.evaluate(() => document.querySelectorAll('.time-axis .time-connector').length);
+      record(`5 "${want}" turns on the same dimension`, on > 0, `${on} connectors`);
+    }
+    await page.keyboard.press('Escape');
+    await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(FIRST));
+    await page.waitForTimeout(1500);
+    seen.push(await wordsShown(page));
+    if (s.phone) await page.tap('[data-reader-settings]'); else await page.click('[data-reader-settings]');
+    await page.waitForTimeout(400);
+    seen.push(await wordsShown(page));
+    const all = seen.join('\n');
+    const hits = (all.match(/[^\n]{0,30}\bcommits?\b[^\n]{0,30}/gi) || []);
+    record('5 "commit" reaches the reader nowhere (bar, More, tooltips, panel, reader)', hits.length === 0, hits.length ? hits.slice(0, 3).join(' | ') : 'none');
+    record('5 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  } finally {
+    await s.browser.close();
+  }
+}
+
+const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2, 3: part3, 4: part4, 5: part5 };
 
 const server = http.createServer((req, res) => handler(req, res, {
   public: SITE,

@@ -1,5 +1,6 @@
 import React, { useEffect, useReducer, useState } from 'react';
 import styles from './Toolbar.module.css';
+import { dimensionLabels } from '../../lib/dimensionLabels';
 
 /**
  * Toolbar — the one bar along the bottom of the graph.
@@ -21,12 +22,7 @@ export const LAYOUTS = [
   { id: 'radial', label: 'ring', title: 'Ring: each container its own ring' },
 ];
 
-const DIMENSIONS = [
-  { id: 'time', label: 'published', title: 'Published date' },
-  { id: 'commits', label: 'commits', title: 'Edit history: one link per commit bucket' },
-  { id: 'narrative', label: 'narrative', title: 'Narrative position: reading order, 0 to 1' },
-  { id: 'chronology', label: 'chronology', title: 'Chronological position in story-world time' },
-];
+// The dimensions, named by settings.dimensions.labels (src/lib/dimensionLabels.js).
 
 const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
 
@@ -38,7 +34,8 @@ const VIEW_ACTIONS = [
 
 const fire = (name) => window.dispatchEvent(new CustomEvent(name));
 
-export function Toolbar({ viewState, show = {}, layouts = LAYOUTS }) {
+export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings }) {
+  const DIMENSIONS = dimensionLabels(settings || (typeof window !== 'undefined' ? window.SETTINGS : null));
   const [, bump] = useReducer((n) => n + 1, 0);
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => (viewState ? viewState.subscribe(bump) : undefined), [viewState]);

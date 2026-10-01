@@ -566,7 +566,7 @@ ${reactJs}
         }),
         // The bottom bar: history, layout, dimensions, and the view actions
         // (the timeline layout stays out of it until it is redesigned).
-        React.createElement(Toolbar, { viewState: viewState }),
+        React.createElement(Toolbar, { viewState: viewState, settings: window.SETTINGS }),
         React.createElement(Settings, {
           viewState: viewState,
           feedData: feed,
