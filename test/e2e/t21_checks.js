@@ -118,12 +118,12 @@ async function singleAt(s, p) {
   await s.page.waitForTimeout(900);
 }
 
-// ── 0. double-tap zooms ────────────────────────────────────────────────────
+// ── 0. double-tap zooms, except on a card, where it reads ───────────────────
 async function part0(bt, name, size, record) {
   const s = await open(bt, name, size, BASE);
   const { page } = s;
   try {
-    for (const kind of ['canvas', 'hull', 'card', 'title']) {
+    for (const kind of ['canvas', 'hull', 'title']) {
       await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
       await page.waitForTimeout(1500);
       const p = await findPoint(page, kind);
@@ -141,6 +141,45 @@ async function part0(bt, name, size, record) {
       }, [p.x, p.y, before, after]);
       record(`0 double-${s.phone ? 'tap' : 'click'} on ${kind} zooms in about 2x at the point`, ratio > 1.8 && ratio < 2.2 && under < 4, `x${ratio.toFixed(2)}, point moved ${under.toFixed(1)}px`);
       record(`0 double-${s.phone ? 'tap' : 'click'} on ${kind} opens and toggles nothing`, JSON.stringify(snap) === JSON.stringify(snap2), JSON.stringify(snap) === JSON.stringify(snap2) ? 'unchanged' : JSON.stringify(snap2));
+    }
+
+    // On a chapter card, anywhere on it including its title, two taps open
+    // the reader for that chapter and do not zoom (Harold, 2026-09-30).
+    for (const where of ['card', 'card title']) {
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
+      await page.waitForTimeout(1500);
+      let p = await findPoint(page, 'card', 'eoej-a1-');
+      let id = null;
+      if (p) {
+        const got = await page.evaluate(([x, y, title]) => {
+          const card = document.elementFromPoint(x, y).closest('.node-card');
+          const d = card.__data__;
+          const want = (d.originalItem && d.originalItem.title) || d.title;
+          let at = { x, y };
+          if (title) {
+            const el = [...card.querySelectorAll('*')].find((e) => e.children.length === 0 && e.textContent.trim() === String(want).trim());
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            at = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+            if (!card.contains(document.elementFromPoint(at.x, at.y))) return null;
+          }
+          return { ...at, id: (d.originalItem && d.originalItem.id) || d.id };
+        }, [p.x, p.y, where === 'card title']);
+        if (got) { p = got; id = got.id; } else p = null;
+      }
+      const label = `0 double-${s.phone ? 'tap' : 'click'} on a ${where} opens the reader for it`;
+      if (!p) { record(label, false, 'no such point on screen'); continue; }
+      const before = await view(page);
+      const pinned0 = (await snapshot(page)).pinned;
+      await doubleAt(s, p);
+      await page.waitForTimeout(500);
+      const after = await view(page);
+      const snap = await snapshot(page);
+      const open = await openId(page);
+      record(label, snap.reader && open === id, `${open.split('/').pop() || 'no reader'} (want ${id.split('/').pop()})`);
+      record(`0 double-${s.phone ? 'tap' : 'click'} on a ${where} does not zoom or open the card`, Math.abs(after.k / before.k - 1) < 0.02 && snap.pinned === pinned0, `x${(after.k / before.k).toFixed(2)}, ${snap.pinned} open`);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(800);
     }
 
     if (!s.phone) {

@@ -522,7 +522,8 @@ export function GraphViewer({
     }
 
     // One tap or two. A double-tap (or double-click) zooms in about 2x at the
-    // point tapped, wherever it lands: empty canvas, a hull, a card, a title.
+    // point tapped: empty canvas, a hull, a container title, an edge. On a
+    // card it opens the reader for that piece instead (see the card's click).
     // Shift+double-click, or a double-tap with two fingers, zooms out. Because
     // a double-tap must not also open or toggle anything, a single tap waits
     // DOUBLE_TAP_MS to be sure no second tap is coming, and only then acts.
@@ -2196,7 +2197,7 @@ export function GraphViewer({
       .style('top', '0')
       .style('will-change', 'transform')
       .style('pointer-events', 'auto')
-      // No browser double-tap zoom on a card: two taps zoom the graph.
+      // No browser double-tap zoom on a card: two taps open the reader.
       .style('touch-action', 'manipulation')
       .call(dragHandler);
       
@@ -2384,11 +2385,19 @@ export function GraphViewer({
           event.currentTarget.style.zIndex = '';
         }
       })
-      .on('dblclick', (event) => {
-        // The two clicks have already been read as a double-tap (it zooms);
-        // the browser's own double-click (selecting a word) is not wanted.
+      .on('dblclick', (event, d) => {
+        // The browser's own double-click (selecting a word) is not wanted.
         event.stopPropagation();
         event.preventDefault();
+        // Usually the two clicks have already been read as a double-tap and
+        // opened the reader. A double-click that arrives on its own (from
+        // assistive technology, or a browser that sends one for a
+        // double-tap) opens it too, once.
+        if (Date.now() - lastCardDouble < 300) return;
+        const t = event.target;
+        if (t && (t.dataset?.popout === '1' || t.closest?.('[data-popout="1"]'))) return;
+        tapGate.cancel();
+        readCard(d);
       })
       .on('click', (event, d) => {
         const target = event.target;
@@ -2410,10 +2419,17 @@ export function GraphViewer({
         }
         event.stopPropagation();
         // A tap opens or closes the node once it is clear no second tap is
-        // coming; two taps zoom instead and leave the node as it was.
+        // coming. Two taps anywhere on the card, its title included, open the
+        // reader for it and leave the card as it was; they do not zoom.
         const cardEl = event.currentTarget;
-        tapOrDouble(event, () => togglePinned(d, cardEl));
+        tapOrDouble(event, () => togglePinned(d, cardEl), () => readCard(d));
       });
+
+    let lastCardDouble = 0;
+    function readCard(d) {
+      lastCardDouble = Date.now();
+      if (onNodeSelectRef.current) onNodeSelectRef.current(d.originalItem || d);
+    }
 
     function togglePinned(d, cardEl) {
       // Any number of nodes can be open at once. Opening one never closes
