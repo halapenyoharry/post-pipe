@@ -32,6 +32,7 @@ html[data-pp-theme="sketchbook"] {
   --border: var(--sk-line-soft);
   --gv-accent: var(--sk-line);
   --gv-readers: #a8336a;
+  --pp-error: #9e2a1f;
 
   --rp-bg: var(--sk-paper);
   --rp-surface: var(--sk-card);
@@ -58,6 +59,7 @@ html[data-pp-theme="sketchbook"] {
 
 html[data-pp-theme="sketchbook"][data-pp-mode="dark"] {
   --gv-readers: #e58fb4;
+  --pp-error: #f0938c;
   --sk-paper: #2a2a2e;
   --sk-card: #333337;
   --sk-ink: #ece6da;

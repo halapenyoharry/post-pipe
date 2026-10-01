@@ -90,3 +90,44 @@
 :global(::highlight(pp-contrib-passage)) {
   background-color: color-mix(in srgb, var(--gv-readers, #e58fb4) 28%, transparent);
 }
+
+/* The form (settings.contributions.submit). */
+.addRow { padding: 10px 0 8px; border-top: 1px solid var(--rp-border, rgba(255, 255, 255, 0.12)); }
+.addBtn {
+  min-height: 34px;
+  padding: 4px 14px;
+  border: 1px solid var(--gv-readers, #e58fb4);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rp-text-bright, #ccd6f6);
+  font: inherit;
+  cursor: pointer;
+}
+.addBtn:disabled { opacity: 0.6; cursor: default; }
+.form {
+  padding: 12px 0 10px;
+  border-top: 1px solid var(--rp-border, rgba(255, 255, 255, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.formTitle { font-weight: 700; color: var(--rp-text-bright, #ccd6f6); }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--rp-border, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  background: var(--rp-surface, #0a0e1a);
+  color: var(--rp-text-bright, #ccd6f6);
+  font: inherit;
+  font-size: 15px;
+}
+.field textarea { resize: vertical; line-height: 1.45; }
+.passage { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; }
+.errors { margin: 0; padding-left: 18px; font-size: 13px; color: var(--pp-error, #f0938c); }
+.thanks { font-size: 13px; }
+.formActions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }

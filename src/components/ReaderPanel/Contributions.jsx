@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import styles from './Contributions.module.css';
-import { forChapter, resolveQuote, paragraphsOf, assetUrl, slugOf } from '../../lib/contributions';
+import { forChapter, resolveQuote, paragraphsOf, assetUrl, slugOf, quoteFromSelection, checkSubmission } from '../../lib/contributions';
 
 /**
  * Contributions — what readers brought to this chapter, under the chapter and
@@ -112,7 +112,7 @@ export function Contributions({ article, contributions, config, feedData, textRe
     }, 4000);
   };
 
-  if (!list.length && !children) return null;
+  if (!list.length && !children && !(config && config.submit)) return null;
 
   const quoteLine = (c) => {
     if (!c.quote) return null;
@@ -207,7 +207,186 @@ export function Contributions({ article, contributions, config, feedData, textRe
           </li>
         ))}
       </ul>
+      {config && config.submit && (
+        <SubmitForm article={article} chapter={chapter} config={config} feedData={feedData} textRef={textRef} />
+      )}
       {children}
     </aside>
+  );
+}
+
+// The passage the reader has selected in the chapter's text, within one
+// paragraph, as a quote with a few words either side; null otherwise.
+function selectedQuote(textEl) {
+  const sel = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
+  if (!sel || sel.isCollapsed || !sel.rangeCount || !textEl) return null;
+  const range = sel.getRangeAt(0);
+  if (!textEl.contains(range.commonAncestorContainer)) return null;
+  const startEl = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+  const p = startEl && startEl.closest('p');
+  if (!p || !textEl.contains(p) || !p.contains(range.endContainer)) return { error: 'Choose a passage within one paragraph.' };
+  const pre = document.createRange();
+  pre.setStart(p, 0);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = pre.toString().length;
+  return quoteFromSelection(p.textContent, start, start + range.toString().length);
+}
+
+/**
+ * The form a reader sends a contribution with (settings.contributions.submit).
+ * A name to show, what it is, the text, and if they like a passage they
+ * selected. Nothing else about them is asked for or sent. It goes to a queue;
+ * nothing appears until it has been read and approved.
+ */
+function SubmitForm({ article, chapter, config, feedData, textRef }) {
+  const [open, setOpen] = useState(false);
+  const [author, setAuthor] = useState('');
+  const [type, setType] = useState('comment');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [to, setTo] = useState('');
+  const [quote, setQuote] = useState(null);
+  const [lastSel, setLastSel] = useState(null);
+  const [state, setState] = useState({ sending: false, errors: [], done: false });
+  const limits = config.limits || {};
+
+  useEffect(() => { setQuote(null); setLastSel(null); setState({ sending: false, errors: [], done: false }); }, [chapter]);
+
+  // A tap on a button can clear a selection on a phone, so the last
+  // selection made in the text is kept while the form is open.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onSel = () => {
+      const q = selectedQuote(textRef && textRef.current);
+      if (q) setLastSel(q);
+    };
+    document.addEventListener('selectionchange', onSel);
+    return () => document.removeEventListener('selectionchange', onSel);
+  }, [open, textRef]);
+
+  const others = ((feedData && feedData.items) || [])
+    .filter((it) => slugOf(it) !== chapter && it._posted !== 'title')
+    .map((it) => ({ id: slugOf(it), title: it.title || slugOf(it) }));
+
+  const submission = () => ({
+    author: author.trim(),
+    type,
+    ...(type === 'essay' && title.trim() ? { title: title.trim() } : {}),
+    body,
+    anchor: { chapter, ...(quote && !quote.error ? quote : {}) },
+    ...(type === 'connection' ? { to } : {}),
+  });
+
+  const send = async (e) => {
+    e.preventDefault();
+    const s = submission();
+    const errors = checkSubmission(s, config);
+    if (errors.length) { setState({ sending: false, errors, done: false }); return; }
+    setState({ sending: true, errors: [], done: false });
+    try {
+      const r = await fetch(config.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s),
+      });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setState({ sending: false, errors: out.errors || [out.error || 'It could not be sent just now. Please try again later.'], done: false });
+        return;
+      }
+      setBody(''); setTitle(''); setQuote(null);
+      setState({ sending: false, errors: [], done: true });
+    } catch (_) {
+      setState({ sending: false, errors: ['It could not be sent just now. Please try again later.'], done: false });
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className={styles.addRow}>
+        <button type="button" className={styles.addBtn} onClick={() => setOpen(true)} data-contrib-add>
+          Add yours
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form className={styles.form} onSubmit={send} data-contrib-form noValidate>
+      <div className={styles.formTitle}>Add yours</div>
+      <div className={styles.note}>
+        It is read before it appears here. Only the name you give is kept with it; nothing else about you is asked for or stored.
+      </div>
+      <label className={styles.field}>
+        <span>Name to show</span>
+        <input value={author} maxLength={limits.name} onChange={(e) => setAuthor(e.target.value)} autoComplete="nickname" data-contrib-field="author" />
+      </label>
+      <label className={styles.field}>
+        <span>What it is</span>
+        <select value={type} onChange={(e) => setType(e.target.value)} data-contrib-field="type">
+          <option value="comment">A comment</option>
+          <option value="essay">An essay</option>
+          <option value="connection">A connection to another chapter</option>
+        </select>
+      </label>
+      {type === 'essay' && (
+        <label className={styles.field}>
+          <span>Title (optional)</span>
+          <input value={title} maxLength={140} onChange={(e) => setTitle(e.target.value)} data-contrib-field="title" />
+        </label>
+      )}
+      {type === 'connection' && (
+        <label className={styles.field}>
+          <span>The other chapter</span>
+          <select value={to} onChange={(e) => setTo(e.target.value)} data-contrib-field="to">
+            <option value="">Choose…</option>
+            {others.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+          </select>
+        </label>
+      )}
+      <label className={styles.field}>
+        <span>{type === 'connection' ? 'How they connect' : 'Your words'}</span>
+        <textarea value={body} maxLength={limits.body} rows={type === 'essay' ? 10 : 4} onChange={(e) => setBody(e.target.value)} data-contrib-field="body" />
+      </label>
+      <div className={styles.passage}>
+        {quote && !quote.error ? (
+          <>
+            <span className={styles.quoteText}>About: “{clip(quote.exact, 120)}”</span>
+            <button type="button" className={styles.linkBtn} onClick={() => setQuote(null)}>Not about a passage</button>
+          </>
+        ) : (
+          <>
+            <span className={styles.note}>
+              {quote && quote.error ? quote.error : 'To write about a passage, select it in the chapter, then:'}
+            </span>
+            <button
+              type="button"
+              className={styles.linkBtn}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setQuote(selectedQuote(textRef && textRef.current) || lastSel || { error: 'Select a passage in the chapter first.' })}
+              data-contrib-use-selection
+            >
+              Use the passage I selected
+            </button>
+          </>
+        )}
+      </div>
+      {state.errors.length > 0 && (
+        <ul className={styles.errors} role="alert">
+          {state.errors.map((m, i) => <li key={i}>{m}</li>)}
+        </ul>
+      )}
+      {state.done && (
+        <div className={styles.thanks} role="status" data-contrib-sent>
+          Thank you. It will appear here once it has been read and approved.
+        </div>
+      )}
+      <div className={styles.formActions}>
+        <button type="submit" className={styles.addBtn} disabled={state.sending} data-contrib-send>
+          {state.sending ? 'Sending…' : 'Send'}
+        </button>
+        <button type="button" className={styles.linkBtn} onClick={() => setOpen(false)}>Close</button>
+      </div>
+    </form>
   );
 }
