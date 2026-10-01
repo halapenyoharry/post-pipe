@@ -549,6 +549,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         onClick={onClose}
       />
       <div
+        data-reader-panel
         className={`${styles.panel} ${isOpen && !isMinimized ? styles.open : ''} ${isMinimized ? styles.minimized : ''} ${wide ? styles.wide : ''}`}
         style={floatingPos ? { transform: `translate3d(${floatingPos.x}px, ${floatingPos.y}px, 0px)` } : undefined}
       >

@@ -5,7 +5,6 @@ import { bookmarkLabel, placedParagraph } from '../../lib/bookmarkPlace';
 import { TTSSettings } from '../TTS/TTS';
 import { config as todConfig } from '../../lib/timeOfDay';
 import { THEMES, themeName } from '../../lib/theme';
-import { openingConfig } from '../../lib/opening';
 
 /**
  * Settings — the panel that slides out from the right edge, from the graph's
@@ -16,8 +15,7 @@ import { openingConfig } from '../../lib/opening';
  *   Reading     the text: font, size, paragraphs, follow along, bold beginnings
  *   Listening   the voice and its speed (play and pause stay in the reader)
  *   Your place  the selected piece's bookmarks, with a legend, then the rest
- *   View        theme, time of day, containers open or closed, the opening
- *               again, colors, reset
+ *   View        theme, time of day, containers open or closed, colors, reset
  *
  * It acts on the selected node (`subject`): the piece open in the reader, or
  * else the card last opened on the graph. Everything it changes goes through
@@ -469,24 +467,6 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
                   <span className={styles.choices}>
                     <button className={styles.choiceBtn} onClick={() => window.dispatchEvent(new CustomEvent('graph:open-all-containers'))}>Open all</button>
                     <button className={styles.choiceBtn} onClick={() => window.dispatchEvent(new CustomEvent('graph:close-all-containers'))}>Close all</button>
-                  </span>
-                </div>
-              )}
-
-              {openingConfig(typeof window !== 'undefined' ? window.SETTINGS : null) && (
-                <div className={styles.choiceRow}>
-                  <span className={styles.rowLabel}>Opening</span>
-                  <span className={styles.choices}>
-                    <button
-                      className={styles.choiceBtn}
-                      data-show-opening
-                      onClick={() => {
-                        setOpen(false);
-                        window.dispatchEvent(new CustomEvent('postpipe:show-opening'));
-                      }}
-                    >
-                      Show the opening again
-                    </button>
                   </span>
                 </div>
               )}
