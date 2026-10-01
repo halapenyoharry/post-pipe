@@ -205,9 +205,12 @@ async function run(browserType, engineName, size) {
     const pg = await ctx.newPage();
     pg.on('pageerror', (e) => errors.push(e.message));
     await pg.goto(BASE + want);
-    await pg.waitForSelector('select[title=Voice]', { timeout: 15000 });
+    // The voice picker lives in the settings panel's Listening group.
+    await pg.waitForSelector('[data-reader-settings]', { timeout: 15000 });
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { section: 'listening', open: true } })));
+    await pg.waitForSelector('[data-tts-voice]', { timeout: 15000 });
     await pg.waitForTimeout(800);
-    const opts = await pg.$$eval('select[title=Voice] option', (os) => os.map((o) => o.textContent));
+    const opts = await pg.$$eval('[data-tts-voice] option', (os) => os.map((o) => o.textContent));
     await ctx.close();
     return opts;
   };
