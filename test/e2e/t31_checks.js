@@ -13,6 +13,10 @@
 //      its label as its accessible name, and follows its href (the same tab,
 //      or a new one with newTab); a page with an icon and showLabel false
 //      shows the icon alone;
+//   4. the site as built: the bar at the top and none at the bottom, its
+//      pages, links and sign-up beside the title pill in one row, the menu
+//      headed with the site's group label, the containers open and closed at
+//      launch as the site says, and a refresh landing on the cover;
 //   5. topBar.subscribe, against a stubbed route: nothing sent on load; the
 //      sheet opens with the focus in the field; a submit posts the JSON and
 //      the thanks line shows; a 400 with { error } shows that text; Escape
@@ -514,10 +518,67 @@ async function part5(bt, name, size, record) {
   await s.browser.close();
 }
 
+const { topBarConfig } = require('../../src/lib/topBar');
+const SITE_TOP = topBarConfig(SETTINGS);
+const GRAPH_SET = SETTINGS.graph || {};
+// Which acts start closed: graph.containersStart when set, else the ones
+// graph.initialCollapsed names.
+const startsClosed = (id) => (GRAPH_SET.containersStart === 'closed' ? true
+  : GRAPH_SET.containersStart === 'open' ? false
+    : (GRAPH_SET.initialCollapsed || []).includes(id));
+
+async function part4(bt, name, size, record) {
+  const s = await open(bt, name, size);
+  const p = s.page;
+  const pos = toolbarConfig(SETTINGS).position;
+  const a = await bar(p);
+  record(`4 site: the controls ${pos === 'top' ? 'in the top bar, no bottom bar' : 'in the bottom bar'}`,
+    pos === 'top' ? a.bottomBar === 0 && a.controlsInBar : a.bottomBar === 1, `toolbar.position ${pos}; ${a.bottomBar} bottom bars`);
+  const items = await p.evaluate(() => ({
+    pages: [...document.querySelectorAll('[data-top-page]')].map((b) => ({ id: b.getAttribute('data-top-page'), name: b.getAttribute('aria-label') || b.textContent.trim(), svg: !!b.querySelector('svg[data-icon]'), left: b.getBoundingClientRect().left })),
+    links: [...document.querySelectorAll('[data-top-link]')].map((l) => ({ id: l.getAttribute('data-top-link'), name: l.getAttribute('aria-label'), href: l.getAttribute('href'), target: l.getAttribute('target'), svg: !!l.querySelector('svg[data-icon]'), left: l.getBoundingClientRect().left })),
+    sub: (() => { const b = document.querySelector('[data-top-subscribe]'); return b && { name: b.getAttribute('aria-label'), svg: !!b.querySelector('svg[data-icon]'), left: b.getBoundingClientRect().left }; })(),
+    title: (() => { const t = document.querySelector('[data-source-pill]'); return t && t.getBoundingClientRect().right; })(),
+  }));
+  record('4 site: its pages beside the title pill, with their icons', SITE_TOP.pages.every((pg) => items.pages.some((x) => x.id === pg.id && x.name === pg.label && x.svg === !!pg.icon && x.left > items.title)),
+    items.pages.map((x) => `${x.id} "${x.name}"${x.svg ? ' icon' : ''}`).join(', '));
+  record('4 site: its links next, each an icon to its address', SITE_TOP.links.every((l) => items.links.some((x) => x.id === l.id && x.name === l.label && x.href === l.href && (x.target === '_blank') === l.newTab && x.svg === !!l.icon)),
+    items.links.map((x) => `${x.id} "${x.name}" ${x.href} ${x.target || ''}`).join(', ') || 'none');
+  record('4 site: its sign-up after them', !SITE_TOP.subscribe || (!!items.sub && items.sub.name === SITE_TOP.subscribe.label && items.sub.svg === !!SITE_TOP.subscribe.icon),
+    items.sub ? `"${items.sub.name}"` : 'none');
+  record('4 site: one row in the art state', oneRow(a), `${a.row.map((r) => r.what).join(' | ')}; fit ${a.fit.join(',') || 'none'}`);
+  await shot(s, 't31-site-art');
+  await go(s, 'graph');
+  const g = await bar(p);
+  record('4 site: one row in the graph state', oneRow(g), `fit ${g.fit.join(',') || 'none'}; first pill ${g.firstPill && r1(g.firstPill.w)} px`);
+  const acts = {};
+  for (const id of ACTS) acts[id] = await actCentre(p, id);
+  record('4 site: the acts open and closed at launch as the site says', ACTS.every((id) => acts[id] && acts[id].closed === startsClosed(id)),
+    ACTS.map((id) => `${id.replace('container:', '')} ${acts[id] && (acts[id].closed ? 'closed' : 'open')}`).join(', '));
+  if (pos === 'top') {
+    await p.click('[data-top-menu-button]');
+    await p.waitForTimeout(250);
+    const menu = await p.evaluate(() => ({ heading: (document.querySelector('[data-top-menu] [data-group-label]') || {}).textContent, rows: [...document.querySelectorAll('[data-top-menu] [data-dimension]')].map((e) => e.textContent.trim()), layout: document.querySelectorAll('[data-top-menu] [data-layout]').length }));
+    record(`4 site: the hourglass menu lists the "${GROUP}" rows`, menu.heading.toLowerCase() === GROUP.toLowerCase() && menu.rows.length === DIMS.length && (menu.layout > 0) === SHOW.layout,
+      `"${menu.heading}": ${menu.rows.join(', ')}; ${menu.layout} layout options`);
+    await shot(s, 't31-site-menu');
+    await p.keyboard.press('Escape');
+  }
+  await shot(s, 't31-site-graph');
+  await p.reload();
+  await ready(p);
+  await settle(p);
+  record('4 site: a refresh lands on the cover', (await state(p)) === 'art', await state(p));
+  record('4 site: no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  record('4 site: nothing fetched from elsewhere', s.outside.length === 0, s.outside.slice(0, 2).join(' | '));
+  await s.browser.close();
+}
+
 async function run(bt, name, size, record) {
   await part1(bt, name, size, record);
   await part2(bt, name, size, record);
   await part3(bt, name, size, record);
+  await part4(bt, name, size, record);
   await part5(bt, name, size, record);
 }
 
