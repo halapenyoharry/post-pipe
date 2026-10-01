@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, TUNING } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, TUNING } from '../../lib/opening';
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
@@ -16,6 +16,11 @@ import { openingConfig, startState, coverGeometry, createCover, pageKey, TUNING 
  * geometry, so scrubbing never re-renders React. The graph is mounted once
  * and never unmounted; in the art state it is only hidden, so it is exactly
  * as it was on return. The art does not pan or zoom with the graph.
+ *
+ * A title can be set over the art (opening.title): real text in the site's
+ * own face, one layout per state, drawn on the art's canvas so it scales and
+ * moves with it, and crossfaded with the images. While it is there the
+ * graph's own title for the whole book is not drawn (hideGraphTitle).
  *
  * The state a reader leaves it in is kept in viewState (opening.state) and is
  * where they land next time (startOn: 'remembered'). A #read= link opens on
@@ -63,6 +68,60 @@ function bottomInset(vh) {
 
 const DRAG_PX = 8; // a touch that moved this far was a drag, not a tap
 
+// The title over the art: an SVG on the art's own canvas (its viewBox is the
+// canvas's natural size), so each line's left edge and baseline land where
+// the layout puts them on the image at any size. A span's rise lifts it off
+// the baseline, and the next span comes back down.
+function TitleLayout({ layout, size, which, opacity }) {
+  const lines = titleLayout(layout, { left: 0, top: 0, width: size.w, height: size.h }).lines;
+  if (!lines.length) return null;
+  return (
+    <g data-cover-title={which} style={{ opacity }}>
+      {lines.map((line, i) => {
+        let lifted = 0;
+        return (
+          <text key={i} x={line.x} y={line.y} data-cover-title-line={i} xmlSpace="preserve">
+            {line.spans.map((sp, k) => {
+              const dy = lifted - sp.rise;
+              lifted = sp.rise;
+              return (
+                <tspan key={k} fontSize={sp.size} dy={dy || undefined} data-cover-title-span={k}>{sp.text}</tspan>
+              );
+            })}
+          </text>
+        );
+      })}
+    </g>
+  );
+}
+
+function CoverTitle({ title, size, start, refs }) {
+  if (!title || !size) return null;
+  return (
+    <svg
+      className={styles.title}
+      viewBox={`0 0 ${size.w} ${size.h}`}
+      preserveAspectRatio="none"
+      role="heading"
+      aria-level="1"
+      aria-label={title.text}
+      data-cover-title-svg
+      style={{
+        fontFamily: title.family,
+        fill: title.color || 'var(--pp-accent, var(--accent))',
+        fillOpacity: title.opacity,
+      }}
+    >
+      <g ref={refs.art}>
+        <TitleLayout layout={title.art} size={size} which="art" opacity={start === 'art' ? 1 : 0} />
+      </g>
+      <g ref={refs.graph}>
+        <TitleLayout layout={title.graph} size={size} which="graph" opacity={start === 'art' ? 0 : 1} />
+      </g>
+    </svg>
+  );
+}
+
 function Cover({ config, viewState, children }) {
   const coverRef = useRef(null);
   const groundRef = useRef(null);
@@ -70,6 +129,8 @@ function Cover({ config, viewState, children }) {
   const artRef = useRef(null);
   const artStateRef = useRef(null);
   const graphStateRef = useRef(null);
+  const titleArtRef = useRef(null);
+  const titleGraphRef = useRef(null);
   const bylineRef = useRef(null);
   const sectionRef = useRef(null);
   const handleRef = useRef(null);
@@ -116,6 +177,10 @@ function Cover({ config, viewState, children }) {
       if (artStateRef.current) artStateRef.current.style.opacity = String(g.fade.art);
       graphStateRef.current.style.opacity = String(g.fade.graph);
     }
+    const ta = titleArtRef.current && titleArtRef.current.firstChild;
+    const tg = titleGraphRef.current && titleGraphRef.current.firstChild;
+    if (ta) ta.style.opacity = String(g.fade.art);
+    if (tg) tg.style.opacity = String(g.fade.graph);
     if (groundRef.current) groundRef.current.style.opacity = String(g.ground);
     const by = bylineRef.current;
     if (by) {
@@ -153,6 +218,15 @@ function Cover({ config, viewState, children }) {
   const paintRef = useRef(paint);
   paintRef.current = paint;
 
+  // While the title is on the cover, the graph does not draw its own title
+  // for the whole book (GraphViewer marks it data-container-top).
+  useEffect(() => {
+    if (!config.title || !config.title.hideGraphTitle) return undefined;
+    const root = document.documentElement;
+    root.setAttribute('data-pp-cover-title', '');
+    return () => root.removeAttribute('data-pp-cover-title');
+  }, [config]);
+
   // The art's size is known: the whole scrub is the art's move.
   useLayoutEffect(() => {
     if (!art) return;
@@ -180,11 +254,19 @@ function Cover({ config, viewState, children }) {
           const els = [coverRef.current, sectionRef.current].filter(Boolean);
           for (const el of els) { el.style.transition = `opacity ${half}ms linear`; el.style.opacity = '0'; }
           if (fadeTimer) clearTimeout(fadeTimer);
-          fadeTimer = setTimeout(() => {
+          // The new state is painted once the cover is out of sight, not
+          // merely when the fade should have ended: a slow first frame (a
+          // new layer to draw) would otherwise show the art jump.
+          const t0 = Date.now();
+          const outOfSight = () => {
+            const el = coverRef.current;
+            const o = el ? Number(getComputedStyle(el).opacity) : 0;
+            if (o > 0.02 && Date.now() - t0 < half * 4) { fadeTimer = setTimeout(outOfSight, 16); return; }
             paintRef.current(p);
-            if (coverRef.current) coverRef.current.style.opacity = '1';
-            fadeTimer = setTimeout(() => { for (const el of els) el.style.transition = ''; fadeTimer = null; }, half + 20);
-          }, half);
+            if (el) el.style.opacity = '1';
+            fadeTimer = setTimeout(() => { for (const x of els) x.style.transition = ''; fadeTimer = null; }, half + 20);
+          };
+          fadeTimer = setTimeout(outOfSight, half);
           return;
         }
         paintRef.current(p);
@@ -343,6 +425,7 @@ function Cover({ config, viewState, children }) {
               <img ref={graphStateRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
                 data-cover-image="graph" style={{ opacity: startArt ? 0 : 1 }} />
             )}
+            <CoverTitle title={config.title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
           </div>
           {config.alt && <span className={styles.alt} role="img" aria-label={config.alt} data-cover-alt />}
           {config.byline.text && (

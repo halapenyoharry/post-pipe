@@ -91,6 +91,7 @@ function configFor(entry) {
 
 const { buildEdges } = require('./src/corpus/buildEdges');
 const { readerFonts } = require('./src/lib/readerSettings');
+const { accentCss } = require('./src/lib/accent');
 const { rightsMeta, rightsFooterHtml } = require('./src/lib/rights');
 
 // Reader faces other than the page's own ship as files next to the page,
@@ -132,6 +133,56 @@ function themeFontFaces() {
 function themeFontPreload() {
   if (!(SETTINGS.theme && SETTINGS.theme.name === 'sketchbook')) return '';
   return THEME_FONTS.map((f) => `<link rel="preload" href="./fonts/${f.file}" as="font" type="font/ttf" crossorigin>`).join('\n');
+}
+
+// A site's own faces (settings.fonts: [{ family, file, license }], paths
+// relative to the site root): copied next to the page with their license,
+// declared and preloaded. Nothing is fetched from anywhere else. A face whose
+// file is not there is left out, and whatever names it falls back to the
+// faces after it.
+const FONT_FORMATS = { ttf: ['truetype', 'font/ttf'], otf: ['opentype', 'font/otf'], woff: ['woff', 'font/woff'], woff2: ['woff2', 'font/woff2'] };
+let siteFontList = null;
+function siteFonts() {
+  if (siteFontList) return siteFontList;
+  siteFontList = (Array.isArray(SETTINGS.fonts) ? SETTINGS.fonts : []).filter((f) => {
+    if (!f || typeof f.family !== 'string' || !f.family.trim() || typeof f.file !== 'string') return false;
+    if (f.file.split(/[\\/]/).includes('..') || path.isAbsolute(f.file)) { console.warn(`  fonts: ${f.file} is outside the site; left out`); return false; }
+    const ext = path.extname(f.file).slice(1).toLowerCase();
+    if (!FONT_FORMATS[ext]) { console.warn(`  fonts: ${f.file} is not a font file this page can declare; left out`); return false; }
+    if (!fs.existsSync(path.join(SITE_ROOT, f.file))) {
+      console.warn(`  fonts: ${f.file} not found under ${SITE_ROOT}; "${f.family}" falls back to the faces after it`);
+      return false;
+    }
+    return true;
+  }).map((f) => {
+    const ext = path.extname(f.file).slice(1).toLowerCase();
+    const rel = f.file.replace(/^\.?\//, '');
+    const license = typeof f.license === 'string' && !f.license.split(/[\\/]/).includes('..') ? f.license.replace(/^\.?\//, '') : '';
+    return { family: f.family.trim().replace(/'/g, ''), file: rel, license, format: FONT_FORMATS[ext][0], type: FONT_FORMATS[ext][1] };
+  });
+  return siteFontList;
+}
+function copySiteFonts() {
+  for (const f of siteFonts()) {
+    for (const rel of [f.file, f.license].filter(Boolean)) {
+      const from = path.join(SITE_ROOT, rel);
+      if (!fs.existsSync(from)) { console.warn(`  fonts: ${rel} not found; not copied`); continue; }
+      const to = path.join(SITE_DIR, rel);
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.copyFileSync(from, to);
+    }
+  }
+}
+function siteFontFaces() {
+  return siteFonts().map((f) => `
+  @font-face {
+    font-family: '${f.family}';
+    src: url(./${f.file}) format('${f.format}');
+    font-weight: normal; font-style: normal; font-display: swap;
+  }`).join('');
+}
+function siteFontPreload() {
+  return siteFonts().map((f) => `<link rel="preload" href="./${f.file}" as="font" type="${f.type}" crossorigin>`).join('\n');
 }
 
 function readerFontFaces() {
@@ -272,6 +323,7 @@ ${rightsMeta(SETTINGS.rights)}
 <meta property="og:url" content="${PAGES_BASE}">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 ${themeFontPreload()}
+${siteFontPreload()}
 <style>
   @font-face {
     font-family: 'Atkinson';
@@ -285,6 +337,7 @@ ${themeFontPreload()}
   }
 ${readerFontFaces()}
 ${themeFontFaces()}
+${siteFontFaces()}
 
   :root {
     --bg: ${SETTINGS.theme.bg};
@@ -328,6 +381,7 @@ ${themeFontFaces()}
 
   /* Injected React Components CSS */
   ${reactCss}
+${accentCss(SETTINGS)}
 </style>
 </head>
 <body>
@@ -710,6 +764,7 @@ async function main() {
   }
   copyReaderFonts();
   copyThemeFonts();
+  copySiteFonts();
   copyContributions();
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
 

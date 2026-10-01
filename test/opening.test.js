@@ -307,3 +307,64 @@ test('the state is remembered, kept through undo, and forgotten with the rest', 
   assert.equal(vs.openingState(), null);
   assert.equal(startState(openingConfig(SITE), { stored: vs.openingState() }), 'art');
 });
+
+// The title over the cover (opening.title): its settings, and its layouts
+// from fractions of the canvas to px on the art as it is drawn.
+const { titleConfig, titleLayout, TITLE_FALLBACK } = require('../src/lib/opening');
+
+const TITLE = {
+  font: 'Some Face', color: '#00a7a4', opacity: 0.56,
+  art: { lines: [
+    { x: 0.2, y: 0.4, spans: [{ text: 'The', size: 0.06, rise: 0.03 }, { text: ' Big ', size: 0.1 }, { text: 'of', size: 0.08 }] },
+    { x: 0.25, y: 0.5, spans: [{ text: 'Word', size: 0.15 }] },
+  ] },
+  graph: { lines: [{ x: 0.1, y: 0.6, spans: [{ text: 'The Big Word', size: 0.05 }] }] },
+};
+
+test('title: off without lines, its defaults, the face before the fallback', () => {
+  assert.equal(titleConfig(null), null);
+  assert.equal(titleConfig({ font: 'X', art: { lines: [] } }), null, 'no lines: no title');
+  assert.equal(titleConfig({ art: { lines: [{ x: 0, y: 0, spans: [{ text: '' }] }] } }), null, 'empty spans do not count');
+  const t = titleConfig(TITLE);
+  assert.equal(t.text, 'The Big of Word', 'its name: the art layout\'s words');
+  assert.equal(t.family, `'Some Face', ${TITLE_FALLBACK}`);
+  assert.equal(TITLE_FALLBACK, "'Arial Black', Impact, sans-serif");
+  assert.equal(t.opacity, 0.56);
+  assert.equal(t.hideGraphTitle, true);
+  assert.equal(titleConfig({ ...TITLE, hideGraphTitle: false }).hideGraphTitle, false);
+  assert.equal(titleConfig({ ...TITLE, opacity: 4 }).opacity, 1);
+  assert.equal(titleConfig({ ...TITLE, text: 'Named' }).text, 'Named');
+  assert.equal(titleConfig({ graph: TITLE.graph }).art.lines.length, 0, 'a state can have no title');
+  assert.equal(titleConfig({ art: TITLE.art }).family, TITLE_FALLBACK, 'no face named: the fallback alone');
+  const c = openingConfig({ opening: { ...SITE.opening, title: TITLE } });
+  assert.equal(c.title.art.lines.length, 2);
+  assert.equal(openingConfig(SITE).title, null, 'no title set: none');
+});
+
+test('title: fractions of the canvas to px, at two sizes of the art', () => {
+  const t = titleConfig(TITLE);
+  for (const box of [{ left: 29, top: 16, width: 331, height: 670 }, { left: 478, top: -215, width: 323, height: 653 }]) {
+    const L = titleLayout(t.art, box);
+    assert.equal(L.lines.length, 2);
+    const [a, b] = L.lines;
+    assert.ok(Math.abs(a.x - (box.left + 0.2 * box.width)) < 1e-9, 'left edge');
+    assert.ok(Math.abs(a.y - (box.top + 0.4 * box.height)) < 1e-9, 'baseline');
+    assert.ok(Math.abs(a.spans[0].size - 0.06 * box.width) < 1e-9, 'size scales with the art\'s width');
+    assert.ok(Math.abs(a.spans[0].rise - 0.03 * box.width) < 1e-9, 'and so does the rise');
+    assert.equal(a.spans[1].rise, 0);
+    assert.deepStrictEqual(a.spans.map((s) => s.text), ['The', ' Big ', 'of']);
+    assert.ok(Math.abs(b.x - (box.left + 0.25 * box.width)) < 1e-9);
+    assert.ok(Math.abs(b.spans[0].size - 0.15 * box.width) < 1e-9);
+    const G = titleLayout(t.graph, box);
+    assert.ok(Math.abs(G.lines[0].y - (box.top + 0.6 * box.height)) < 1e-9);
+  }
+  // Twice the art, twice everything about its own origin.
+  const one = titleLayout(t.art, { left: 0, top: 0, width: 300, height: 600 });
+  const two = titleLayout(t.art, { left: 0, top: 0, width: 600, height: 1200 });
+  assert.ok(Math.abs(two.lines[1].x - 2 * one.lines[1].x) < 1e-9);
+  assert.ok(Math.abs(two.lines[1].y - 2 * one.lines[1].y) < 1e-9);
+  assert.ok(Math.abs(two.lines[1].spans[0].size - 2 * one.lines[1].spans[0].size) < 1e-9);
+  // On the natural canvas the fractions give the canvas's own px.
+  const nat = titleLayout(t.graph, { width: 1045, height: 2111 });
+  assert.ok(Math.abs(nat.lines[0].x - 104.5) < 1e-9 && Math.abs(nat.lines[0].y - 1266.6) < 1e-9);
+});

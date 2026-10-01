@@ -26,9 +26,73 @@ const DEFAULTS = {
   byline: { text: '', href: '' },
   startOn: 'remembered',
   snapMs: 420,
+  title: null,
 };
 
+// The title set over the cover (opening.title), off unless it has lines.
+const TITLE_DEFAULTS = {
+  text: '',
+  font: '',
+  color: '',
+  opacity: 1,
+  hideGraphTitle: true,
+};
+// After the title's own face: what draws when that face is not there.
+const TITLE_FALLBACK = "'Arial Black', Impact, sans-serif";
+
 const STATES = ['art', 'graph'];
+
+// One layout of the title: lines, each with its left edge x and baseline y
+// as fractions of the canvas's width and height, and spans, each with its
+// text, its size and an optional rise above the baseline as fractions of the
+// canvas's width (so the title scales with the art).
+function titleLayoutConfig(layout) {
+  const lines = layout && Array.isArray(layout.lines) ? layout.lines : [];
+  const out = [];
+  for (const line of lines) {
+    if (!line || typeof line !== 'object') continue;
+    const spans = (Array.isArray(line.spans) ? line.spans : [])
+      .filter((sp) => sp && typeof sp.text === 'string' && sp.text !== '')
+      .map((sp) => ({ text: sp.text, size: Math.max(0, num(sp.size, 0.05)), rise: num(sp.rise, 0) }));
+    if (!spans.length) continue;
+    out.push({ x: num(line.x, 0), y: num(line.y, 0), spans });
+  }
+  return { lines: out };
+}
+
+// opening.title with its defaults, or null. A state without lines shows no
+// title in that state.
+function titleConfig(t) {
+  if (!t || typeof t !== 'object') return null;
+  const art = titleLayoutConfig(t.art);
+  const graph = titleLayoutConfig(t.graph);
+  if (!art.lines.length && !graph.lines.length) return null;
+  const joined = (art.lines.length ? art : graph).lines.map((l) => l.spans.map((sp) => sp.text).join('')).join(' ');
+  const font = str(t.font).trim();
+  return {
+    text: str(t.text).trim() || joined.replace(/\s+/g, ' ').trim(),
+    font,
+    family: font ? `'${font.replace(/'/g, '')}', ${TITLE_FALLBACK}` : TITLE_FALLBACK,
+    color: str(t.color).trim(),
+    opacity: clamp01(num(t.opacity, TITLE_DEFAULTS.opacity)),
+    hideGraphTitle: t.hideGraphTitle !== false,
+    art,
+    graph,
+  };
+}
+
+// A title layout in px for the canvas drawn in box { left, top, width,
+// height }: each line's left edge and baseline, each span's size and rise.
+function titleLayout(layout, box) {
+  const { left = 0, top = 0, width = 1, height = 1 } = box || {};
+  return {
+    lines: ((layout && layout.lines) || []).map((l) => ({
+      x: left + l.x * width,
+      y: top + l.y * height,
+      spans: l.spans.map((sp) => ({ text: sp.text, size: sp.size * width, rise: sp.rise * width })),
+    })),
+  };
+}
 
 // Tuning that is not a setting, in one place.
 const TUNING = {
@@ -84,6 +148,7 @@ function openingConfig(settings) {
     byline: { text: str(byline.text), href: str(byline.href) },
     startOn: ['remembered', 'art', 'graph'].includes(o.startOn) ? o.startOn : DEFAULTS.startOn,
     snapMs: Math.max(0, num(o.snapMs, DEFAULTS.snapMs)),
+    title: titleConfig(o.title),
   };
 }
 
@@ -103,7 +168,8 @@ function startState(config, { stored, hash } = {}) {
 // keeps one scale throughout, the largest that fits the whole plant, with
 // the byline under it, in the art state; only its top moves.
 //   art         { top, left, width, height, scale, opacity }: the canvas
-//   fade        { art, graph }: the two state images' opacities (1 - p, p)
+//   fade        { art, graph }: the two state images' opacities (1 - p, p),
+//               and the title's two layouts'
 //   artTop0, artTop1   its top at the two rests (artTop1 = -artOffset of its height)
 //   travel      px the art moves between the rests (a whole scrub)
 //   graph       { opacity, shift }: the graph layer, shift px below its rest
@@ -370,6 +436,6 @@ function pageKey(e) {
 }
 
 module.exports = {
-  DEFAULTS, TUNING, STATES,
-  openingConfig, startState, coverGeometry, createCover, pageKey,
+  DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
+  openingConfig, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
 };

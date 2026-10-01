@@ -873,6 +873,9 @@ export function GraphViewer({
 
     const containerBadges = containerGroups.append('g')
       .attr('class', 'container-badge')
+      // The whole book's title: a page that sets the title elsewhere (a
+      // cover, src/components/Opening) can leave this one undrawn.
+      .attr('data-container-top', (d) => (!d.parent ? '' : null))
       .style('touch-action', 'manipulation');
 
     // The title's text ignores the pointer, so this is what a tap lands on.
