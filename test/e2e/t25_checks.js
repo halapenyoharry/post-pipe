@@ -453,7 +453,21 @@ async function run(bt, name, size, record) {
   // ── reduced motion ──
   {
     const s = await open(bt, name, size, { reduced: true });
-    await s.page.evaluate(() => { window.__cover.ps = []; });
+    await s.page.evaluate(() => {
+      window.__cover.ps = [];
+      // The cover's opacity and the art's top, every frame until it settles.
+      window.__fade = [];
+      const t0 = performance.now();
+      const tick = () => {
+        const c = getComputedStyle(document.querySelector('[data-cover]')).opacity;
+        const top = Math.round(document.querySelector('[data-cover-art]').getBoundingClientRect().top);
+        const last = window.__fade[window.__fade.length - 1];
+        const row = [Math.round(performance.now() - t0), Number(c).toFixed(2).replace(/\.?0+$/, '') || '0', top];
+        if (!last || last[1] !== row[1] || last[2] !== row[2]) window.__fade.push(row);
+        if (performance.now() - t0 < 900) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     const t0 = Date.now();
     await s.page.keyboard.press('ArrowDown');
     await s.page.waitForFunction(() => { const s = document.querySelector('[data-cover-section]'); return s && getComputedStyle(s).opacity === '1' && window.PostPipeCover.state === 'graph'; }, null, { timeout: 3000 }).catch(() => {});
@@ -461,7 +475,14 @@ async function run(bt, name, size, record) {
     await s.page.waitForTimeout(500);
     const ps = await s.page.evaluate(() => window.__cover.ps.map((x) => x[0]));
     record('reduced motion: no scrub, the states swap', ps.every((p) => p === 0 || p === 1) && (await state(s.page)) === 'graph', `p ${ps.join(',')}`);
-    record('reduced motion: a short crossfade', ms < 700, `${ms}ms to the graph`);
+    const fade = await s.page.evaluate(() => window.__fade);
+    // Sampled once a frame: the art's move falls in the frame where the
+    // cover is at its faintest.
+    const moved = fade.findIndex(([, , top]) => Math.abs(top - fade[0][2]) > 1);
+    const artJumpedWhileShown = moved < 0 || Number(fade[moved][1]) > 0.25;
+    const outThenIn = Math.min(...fade.map(([, c]) => Number(c))) <= 0.25 && fade[fade.length - 1][1] === '1';
+    record('reduced motion: a 200 ms crossfade, out and in, the art moved out of sight', ms < 700 && outThenIn && !artJumpedWhileShown && fade[fade.length - 1][0] >= 150 && fade[fade.length - 1][0] <= 450,
+      fade.map(([t, c, top]) => `${t}ms ${c} @${top}`).join(', '));
     if (s.phone) await touchDrag(s.page, '[data-cover-handle]', 195, 4, 200);
     else { await s.page.mouse.move(640, 6); await s.page.mouse.wheel(0, -200); }
     await s.page.waitForTimeout(600);
