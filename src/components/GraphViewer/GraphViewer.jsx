@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
@@ -360,6 +360,19 @@ export function GraphViewer({
       if (value) containerRef.current.style.setProperty(prop, value);
     }
   }, [colorOverrides]);
+
+  // An undo or a redo puts back an arrangement: where things were dragged,
+  // which containers were open. The graph is drawn again from it, as a
+  // reload would draw it.
+  const [historyTick, setHistoryTick] = useState(0);
+  useEffect(() => {
+    if (!viewState) return undefined;
+    let seen = viewState.historyVersion || 0;
+    return viewState.subscribe(() => {
+      const v = viewState.historyVersion || 0;
+      if (v !== seen) { seen = v; setHistoryTick(v); }
+    });
+  }, [viewState]);
 
   // When bookmarks or other node viewState changes, re-render article cards
   useEffect(() => {
@@ -3503,7 +3516,7 @@ export function GraphViewer({
       });
       reactRoots.clear();
     };
-  }, [feedData]);
+  }, [feedData, historyTick]);
 
   // The time axis. Drawn rather than laid out: it spends no position, so it
   // composes with whatever arrangement is on screen and you can read topic and
@@ -3520,7 +3533,7 @@ export function GraphViewer({
     const draw = () => drawAxis(g, axis);
     redrawAxisRef.current = axis.on ? draw : null;
     draw();
-  }, [timeAxis, layout, feedData]);
+  }, [timeAxis, layout, feedData, historyTick]);
 
   function drawAxis(g, axis) {
     g.axisLayer.selectAll('*').remove();

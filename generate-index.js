@@ -452,7 +452,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, toolbarConfig, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
 
     // The top bar's pages (settings.topBar.pages): buttons beside the source
     // pills that open an item in the reader. An item kept out of the graph
@@ -461,6 +461,9 @@ ${reactJs}
     const TOP_BAR = topBarConfig(window.SETTINGS);
     const TOP_PAGES = resolvePages(TOP_BAR, feed.items || []);
     const GRAPH_FEED = graphFeed(feed, TOP_BAR);
+    // The graph's controls (settings.toolbar): along the bottom, or in the
+    // top bar beside the pills (position top).
+    const TOOLBAR = toolbarConfig(window.SETTINGS);
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -635,6 +638,16 @@ ${reactJs}
 
       if (!hydrated) return null;
 
+      // History, layout, dimensions, and the view actions (the timeline
+      // layout stays out of them until it is redesigned).
+      const graphControls = React.createElement(Toolbar, {
+        viewState: viewState,
+        settings: window.SETTINGS,
+        layers: readers.layers,
+        show: TOOLBAR.show,
+        placement: TOOLBAR.position
+      });
+
       return React.createElement(React.Fragment, null,
         React.createElement(Theme, { settings: window.SETTINGS, viewState: viewState }),
         // The background follows the selected or open piece's time of day
@@ -673,15 +686,15 @@ ${reactJs}
             pages: TOP_PAGES,
             showAddButton: TOP_BAR.addFeed,
             intro: window.PP_INTRO_HTML || '',
+            controls: TOOLBAR.position === 'top' ? graphControls : null,
             onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
           }),
           React.createElement(TimeOverlay, {
             feedData: feed,
             onFilterChange: handleTimeFilter
           }),
-          // The bottom bar: history, layout, dimensions, and the view actions
-          // (the timeline layout stays out of it until it is redesigned).
-          React.createElement(Toolbar, { viewState: viewState, settings: window.SETTINGS, layers: readers.layers })
+          // The bottom bar, unless the controls are in the top bar.
+          TOOLBAR.position === 'top' ? null : graphControls
         ),
         React.createElement(Settings, {
           viewState: viewState,

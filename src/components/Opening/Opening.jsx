@@ -92,13 +92,13 @@ function topControls(vh) {
 
 // Keys belong to whatever is being typed in, and to the reader or a dialog
 // when one has focus or is open over the page.
-const KEYED_ROLES = new Set(['radio', 'slider', 'listbox', 'option', 'menu', 'menuitem', 'tab', 'spinbutton', 'textbox', 'combobox']);
+const KEYED_ROLES = new Set(['radio', 'slider', 'listbox', 'option', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'spinbutton', 'textbox', 'combobox']);
 function keysBelongElsewhere(e) {
   const t = e.target;
   if (t && t.nodeType === 1) {
     if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return true;
     if (KEYED_ROLES.has(t.getAttribute('role'))) return true;
-    if (t.closest('[data-reader-panel], [role="dialog"], [data-settings-panel]')) return true;
+    if (t.closest('[data-reader-panel], [role="dialog"], [role="menu"], [data-settings-panel]')) return true;
     if ((e.key === ' ' || e.key === 'Spacebar') && t.closest('button, a[href], summary, [role="button"]')) return true;
   }
   if (typeof window !== 'undefined' && window.location.hash.startsWith('#read=')) return true;
@@ -466,6 +466,9 @@ function Cover({ config, viewState, children }) {
         if (label === 'art') el.setAttribute('aria-hidden', 'true');
         else el.removeAttribute('aria-hidden');
       }
+      // The graph's controls in the top bar (toolbar.position top) are there
+      // in both states, and take taps only once the graph rests.
+      for (const el of sec.querySelectorAll('[data-top-graph-controls]')) el.inert = !atRest;
     }
     const h = handleRef.current;
     if (h) {

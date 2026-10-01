@@ -40,6 +40,7 @@ import { Theme } from './components/Theme/Theme';
 import { Toolbar } from './components/Toolbar/Toolbar';
 import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
+import { toolbarConfig } from './lib/toolbar';
 import './themes/sketchbook.css';
 
 // ── Default settings (mirrors settings.json structure) ───────────────────────
@@ -350,6 +351,21 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
 
   if (!hydrated) return null;
 
+  // The graph's controls (settings.toolbar, and the embed's switches): along
+  // the bottom, or in the top bar beside the pills (position top).
+  const toolbar = toolbarConfig(settings, features);
+  const atTop = toolbar.position === 'top' && !!features.feedBar;
+  const anyControls = features.layoutControls || features.dimensions || features.undoRedo;
+  const graphControls = viewState && anyControls ? (
+    <Toolbar
+      viewState={viewState}
+      settings={settings}
+      layers={readers.layers}
+      show={toolbar.show}
+      placement={atTop ? 'top' : 'bottom'}
+    />
+  ) : null;
+
   return (
     <>
       {/* The theme and mode, on <html> */}
@@ -399,18 +415,12 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           viewState={viewState}
           showAddButton={features.addFeed}
           showCount={showContainerCount(settings.graph)}
+          controls={atTop ? graphControls : null}
         />
       )}
 
       {/* The bottom bar: undo/redo, layout, dimensions, view actions */}
-      {viewState && (features.layoutControls || features.dimensions || features.undoRedo) && (
-        <Toolbar
-          viewState={viewState}
-          settings={settings}
-          layers={readers.layers}
-          show={{ history: !!features.undoRedo, layout: !!features.layoutControls, dimensions: !!features.dimensions }}
-        />
-      )}
+      {!atTop && graphControls}
 
       {/* Color settings */}
       {features.colorSettings && viewState && (

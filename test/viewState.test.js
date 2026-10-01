@@ -490,3 +490,22 @@ test('reading progress keeps the furthest point and stays done', async () => {
   await b.ready();
   assert.deepStrictEqual(b.readingProgress('x'), { at: 0.1, max: 1, done: true, seen: true });
 });
+
+test('historyVersion counts the undos and redos that happen, and nothing else', async () => {
+  const s = mk(); await s.ready();
+  assert.strictEqual(s.historyVersion, 0);
+  s.setNodePosition('n', 1, 2, { transient: true });
+  s.setNodePosition('n', 5, 6, { transient: true });
+  s.commit();
+  s.setLayout('radial');
+  assert.strictEqual(s.historyVersion, 0);
+  s.undo();
+  assert.strictEqual(s.historyVersion, 1);
+  s.undo();
+  assert.strictEqual(s.nodeState('n'), null);
+  s.undo(); // nothing left to undo
+  assert.strictEqual(s.historyVersion, 2);
+  s.redo();
+  assert.strictEqual(s.historyVersion, 3);
+  assert.strictEqual(s.nodeState('n').x, 5);
+});

@@ -25,6 +25,13 @@
     "syndication"
   ],
   "toolbar": {
+    "position": "bottom",
+    "show": {
+      "history": true,
+      "layout": true,
+      "dimensions": true
+    },
+    "_position_note": "Where the graph's controls sit. bottom (default): the bar along the bottom (undo, redo; the layout, cluster or ring; the dimensions; Reset; More, with the view actions). top: no bottom bar; they join the top bar after its pages and links and before the gear, as icon buttons the height of the pills: undo, redo, Reset, and a menu (an hourglass) with each dimension as a checkbox row (one on at a time), the bucket size when the one on has it, the view actions (Zoom to fit, Unpin all, Reset sizes) and, when show.layout is on, the layout as a row. The menu's heading is dimensions.groupLabel. The top bar then keeps to one row: when it does not fit, the source pills after the first shrink to their dot, then the first pill's text gives way to an ellipsis. In the art state of a cover they are there but take no taps until the graph rests. show: history, layout and dimensions each on unless set false.",
     "show_canonical_crown": true,
     "syndication_icons": {
       "github": {

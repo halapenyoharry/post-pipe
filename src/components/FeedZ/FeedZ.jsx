@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import styles from './FeedZ.module.css';
 
 /**
@@ -30,15 +30,31 @@ import styles from './FeedZ.module.css';
  *   intro          — optional HTML (settings.graph.intro, rendered at build
  *                    time): one short block under the pills, for a site's
  *                    bio line
+ *   controls       — optional; the graph's controls when they sit in the top
+ *                    bar (settings.toolbar.position top), after the rest.
+ *                    The row then never wraps: when it does not fit, the
+ *                    source pills after the first shrink to their dot, then
+ *                    the first pill's text gives way (an ellipsis; its whole
+ *                    text stays its name)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, showAddButton = true, intro = '' }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, showAddButton = true, intro = '', controls = null }) {
+  const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
-  if ((!sources || sources.length === 0) && !hasPages && !intro) return null;
+  const fit = !!controls;
+  useLayoutEffect(() => { if (fit && barRef.current) fitRow(barRef.current); });
+  useEffect(() => {
+    if (!fit) return undefined;
+    const run = () => { if (barRef.current) fitRow(barRef.current); };
+    window.addEventListener('resize', run);
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) document.fonts.ready.then(run);
+    return () => window.removeEventListener('resize', run);
+  }, [fit]);
+  if ((!sources || sources.length === 0) && !hasPages && !intro && !controls) return null;
 
   const hidden = hiddenSources || new Set();
 
   return (
-    <div className={styles.bar} data-feeds>
+    <div ref={barRef} className={styles.bar} data-feeds>
       {(sources || []).map(src => (
         <FeedPill
           key={src.id}
@@ -63,9 +79,49 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
         </button>
       ))}
       {showAddButton !== false && <AddPill />}
+      {controls}
       {intro && <div className={styles.intro} data-graph-intro dangerouslySetInnerHTML={{ __html: intro }} />}
     </div>
   );
+}
+
+// The bar's one row: the items that sit in it (not the intro's own line,
+// nor what floats out of it).
+function rowItems(bar) {
+  return [...bar.children].filter((el) => {
+    if (el.matches('[data-graph-intro]')) return false;
+    const pos = getComputedStyle(el).position;
+    return pos !== 'fixed' && pos !== 'absolute' && el.getBoundingClientRect().width > 0;
+  });
+}
+
+function wraps(bar) {
+  const items = rowItems(bar);
+  if (items.length < 2) return false;
+  const top = items[0].getBoundingClientRect().top;
+  return items.some((el) => Math.abs(el.getBoundingClientRect().top - top) > 2);
+}
+
+// Keeps the row on one line, each step only when the one before is not
+// enough: the source pills after the first shrink to their dot; a page or
+// link with an icon shows the icon alone; the first pill's text gives way.
+function fitRow(bar) {
+  const steps = ['data-fit-dots', 'data-fit-icons'];
+  const first = bar.querySelector('[data-source-pill]');
+  for (const a of [...steps, 'data-fit-title']) bar.removeAttribute(a);
+  if (first) first.style.maxWidth = '';
+  for (const a of steps) {
+    if (!wraps(bar)) return;
+    bar.setAttribute(a, '');
+  }
+  if (!wraps(bar) || !first) return;
+  bar.setAttribute('data-fit-title', '');
+  const items = rowItems(bar);
+  const gap = parseFloat(getComputedStyle(bar).columnGap) || 0;
+  const used = items.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0) + gap * (items.length - 1);
+  const over = used - bar.clientWidth;
+  const w = first.getBoundingClientRect().width;
+  first.style.maxWidth = `${Math.max(34, Math.floor(w - over - 1))}px`;
 }
 
 // The pill is a div (not a <button>) because it hosts a real interactive
@@ -80,6 +136,7 @@ function FeedPill({ source, hidden, onToggle, viewState, showCount }) {
   return (
     <div
       className={`${styles.pill} ${hidden ? styles.hidden : ''} ${!ok ? styles.failed : ''}`}
+      data-source-pill
       onClick={onToggle}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
       role="button"

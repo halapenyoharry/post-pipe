@@ -1,0 +1,361 @@
+// Browser checks for one bar at the top, on a built site:
+//   1. toolbar.position top: no bottom bar; undo, redo, Reset and the
+//      dimensions menu in the top bar in both states (inert in the art
+//      state), in one row with the pills, the pages and the gear; the menu
+//      opens, a dimension toggles the time axis, Reset resets, undo undoes a
+//      drag, Escape and a tap outside close it; no emoji in the bar; the
+//      graph's visible height on a phone with the bar at the bottom and at
+//      the top;
+// and no page errors, nothing fetched from elsewhere. Chromium and WebKit,
+// desktop (1280x800) and phone (390x844). The site is checked as built, with
+// toolbar.position set to top where it is not (and to bottom for the
+// "before" measure). Screenshots go to PP_E2E_SHOTS when set.
+//
+//   node test/e2e/t31_checks.js [path/to/_site]
+//
+// PP_E2E_ENGINES=chromium,webkit picks engines, PP_E2E_SIZES=desktop,phone sizes. An engine that cannot start
+// is reported as not run, not as passing.
+
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const handler = require('serve-handler');
+const { chromium, webkit } = require('playwright');
+const { toolbarConfig } = require('../../src/lib/toolbar');
+const { dimensionGroupLabel, dimensionLabels } = require('../../src/lib/dimensionLabels');
+
+const SITE = path.resolve(process.argv[2] || path.join(process.env.HOME, 'Projects/epicofelinorjones.com/_site'));
+const PORT = 39461;
+const BASE = `http://localhost:${PORT}/`;
+const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
+const SETTINGS_RE = /window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/;
+const SETTINGS = JSON.parse(HTML.match(SETTINGS_RE)[1]);
+const GROUP = dimensionGroupLabel(SETTINGS);
+const DIMS = dimensionLabels(SETTINGS);
+const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
+const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
+const ACTS = Object.entries(SETTINGS.containers || {})
+  .filter(([id, c]) => id.startsWith('container:') && c && c.anchor)
+  .map(([id]) => id);
+const EMOJI = /[☀-➿]|[\u{1F300}-\u{1FAFF}]/u;
+
+// The page as served with settings changed.
+const withSettings = (edit) => (html) => html.replace(SETTINGS_RE, (all, json) => {
+  const s = JSON.parse(json);
+  edit(s);
+  return all.replace(json, JSON.stringify(s));
+});
+const atPosition = (position) => withSettings((s) => { s.toolbar = { ...(s.toolbar || {}), position }; });
+const TOP_SITE = toolbarConfig(SETTINGS).position === 'top' ? null : atPosition('top');
+const SHOW = toolbarConfig(SETTINGS).show;
+
+const r1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : String(n));
+const off = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+async function open(bt, name, size, { variant = null } = {}) {
+  const phone = size === 'phone';
+  const browser = await bt.launch();
+  const ctx = await browser.newContext({
+    ...(phone
+      ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: name === 'chromium' }
+      : { viewport: { width: 1280, height: 800 } }),
+  });
+  if (variant) {
+    await ctx.route(BASE, async (route) => {
+      const res = await route.fetch();
+      route.fulfill({ response: res, body: variant(await res.text()) });
+    });
+  }
+  await ctx.addInitScript(touchEvents);
+  const page = await ctx.newPage();
+  const errors = [];
+  const outside = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('request', (r) => { const u = r.url(); if (!u.startsWith(BASE) && !u.startsWith('data:') && !u.startsWith('blob:')) outside.push(u); });
+  await page.goto(BASE);
+  await ready(page);
+  return { browser, ctx, page, errors, outside, phone, name, W: phone ? 390 : 1280, H: phone ? 844 : 800 };
+}
+
+async function ready(page) {
+  await page.waitForSelector('.container-group', { state: 'attached' });
+  await page.waitForFunction(() => window.PostPipeCover && window.PostPipeCoverFrame
+    && document.querySelector('[data-cover-art]') && document.querySelector('[data-cover-art]').style.opacity !== '0', null, { timeout: 10000 });
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(700);
+}
+
+const state = (page) => page.evaluate(() => (window.PostPipeCover ? window.PostPipeCover.state : null));
+const settle = (page) => page.waitForFunction(() => window.PostPipeCover && window.PostPipeCover.state !== 'moving', null, { timeout: 4000 }).then(() => page.waitForTimeout(200));
+async function go(s, to) {
+  await s.page.evaluate((t) => window.PostPipeCover.go(t), to);
+  await settle(s.page);
+  await s.page.waitForTimeout(450);
+}
+
+function touchEvents() {
+  window.__touchEvent = (type, el, x, y, ended) => {
+    const fields = { identifier: 7, target: el, clientX: x, clientY: y, pageX: x, pageY: y, screenX: x, screenY: y };
+    try {
+      const t = new Touch(fields);
+      return new TouchEvent(type, { bubbles: true, cancelable: true, composed: true, touches: ended ? [] : [t], targetTouches: ended ? [] : [t], changedTouches: [t] });
+    } catch (_) {
+      const ev = new Event(type, { bubbles: true, cancelable: true, composed: true });
+      const list = (a) => Object.assign([...a], { item: (i) => a[i] || null });
+      Object.defineProperty(ev, 'touches', { value: list(ended ? [] : [fields]) });
+      Object.defineProperty(ev, 'targetTouches', { value: list(ended ? [] : [fields]) });
+      Object.defineProperty(ev, 'changedTouches', { value: list([fields]) });
+      return ev;
+    }
+  };
+}
+async function drag(page, from, by, steps = 8) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i++) await page.mouse.move(from.x + (by.x * i) / steps, from.y + (by.y * i) / steps);
+  await page.mouse.up();
+}
+async function tapAt(s, p) {
+  if (s.phone) await s.page.touchscreen.tap(p.x, p.y); else await s.page.mouse.click(p.x, p.y);
+}
+
+// The top bar: its row, the graph's controls in it, the gear.
+const bar = (page) => page.evaluate(() => {
+  const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, w: r.width, h: r.height }; };
+  const feeds = document.querySelector('[data-feeds]');
+  const row = feeds ? [...feeds.children].filter((el) => !el.matches('[data-graph-intro]') && getComputedStyle(el).position !== 'fixed' && el.getBoundingClientRect().width > 0) : [];
+  const controls = document.querySelector('[data-top-graph-controls]');
+  const icon = (sel) => {
+    const el = document.querySelector(`[data-top-graph-controls] ${sel}`);
+    if (!el) return null;
+    return { ...box(el), label: el.getAttribute('aria-label') || '', title: el.getAttribute('title') || '', svg: !!el.querySelector('svg[data-icon]'), inert: !!el.closest('[inert]'), text: el.textContent };
+  };
+  const gear = document.querySelector('[data-settings-gear]');
+  return {
+    bottomBar: document.querySelectorAll('[data-toolbar]').length,
+    row: row.map((el) => ({ ...box(el), what: el.getAttribute('data-top-page') || (el.matches('[data-top-graph-controls]') ? 'controls' : el.getAttribute('title') || el.tagName) })),
+    controlsInBar: !!(controls && feeds && feeds.contains(controls)),
+    icons: { undo: icon('[data-top-undo]'), redo: icon('[data-top-redo]'), reset: icon('[data-toolbar-reset]'), menu: icon('[data-top-menu-button]') },
+    gear: box(gear),
+    text: (feeds ? feeds.textContent : '') + (gear ? gear.textContent : ''),
+    fit: feeds ? ['data-fit-dots', 'data-fit-icons', 'data-fit-title'].filter((a) => feeds.hasAttribute(a)) : [],
+    firstPill: (() => { const p = document.querySelector('[data-source-pill]'); return p ? { w: p.getBoundingClientRect().width, text: p.textContent, title: p.getAttribute('title') } : null; })(),
+  };
+});
+
+const oneRow = (b) => {
+  if (!b.row.length) return false;
+  const top = b.row[0].top;
+  const same = b.row.every((r) => Math.abs(r.top - top) <= 2);
+  const rowMid = top + b.row[0].h / 2;
+  const gearOk = !b.gear || (b.gear.top <= rowMid && b.gear.bottom >= rowMid && b.row.every((r) => r.right <= b.gear.left));
+  return same && gearOk;
+};
+
+const timeAxis = (page) => page.evaluate(() => {
+  const s = JSON.parse(localStorage.getItem('post-pipe:viewstate') || '{}');
+  return s.timeAxis || { on: false };
+});
+
+const actCentre = (page, id) => page.evaluate((id) => {
+  const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"]`);
+  if (!g) return null;
+  const macro = g.querySelector('.container-macro-node');
+  const closed = !!macro && getComputedStyle(macro).display !== 'none';
+  const m = (closed ? macro : g.querySelector('.container-badge')).getScreenCTM();
+  return { closed, x: m.e, y: m.f };
+}, id);
+
+// The graph's visible height: from the bottom of the top bar's row (and the
+// gear) to the top of the bottom bar, or the screen's foot without one.
+const visible = (page) => page.evaluate(() => {
+  let top = 0;
+  for (const el of document.querySelectorAll('[data-feeds] > *:not([data-graph-intro]), [data-settings-gear]')) {
+    const r = el.getBoundingClientRect();
+    if (r.width && r.top < innerHeight * 0.2) top = Math.max(top, r.bottom);
+  }
+  const tb = document.querySelector('[data-toolbar]');
+  const bottom = tb ? tb.getBoundingClientRect().top : innerHeight;
+  const rights = document.querySelector('[data-rights]');
+  return { top, bottom, height: bottom - top, H: innerHeight, rightsTop: rights ? rights.getBoundingClientRect().top : null };
+});
+
+async function shot(s, name) {
+  if (!SHOTS) return;
+  fs.mkdirSync(SHOTS, { recursive: true });
+  await s.page.screenshot({ path: path.join(SHOTS, `${name}-${s.phone ? 'phone' : 'desktop'}-${s.name}.png`) });
+}
+
+const VERTICAL = [];
+
+async function part1(bt, name, size, record) {
+  const s = await open(bt, name, size, { variant: TOP_SITE });
+  const p = s.page;
+
+  // The art state: present, in one row, not live.
+  const a = await bar(p);
+  record('1 no bottom bar in the DOM', a.bottomBar === 0, `${a.bottomBar} [data-toolbar]`);
+  const icons = Object.entries(a.icons);
+  const want = SHOW.history ? ['undo', 'redo', 'reset', 'menu'] : ['reset', 'menu'];
+  record('1 art state: the icons are in the top bar', a.controlsInBar && want.every((k) => a.icons[k] && a.icons[k].svg),
+    want.map((k) => `${k} ${a.icons[k] ? 'svg' : 'missing'}`).join(', '));
+  record('1 art state: they take no taps (inert)', want.every((k) => a.icons[k] && a.icons[k].inert));
+  record('1 art state: one row (pills, pages, icons, gear)', oneRow(a), `${a.row.map((r) => `${r.what}@${r.top}`).join(' ')}; gear ${a.gear && a.gear.left}; fit ${a.fit.join(',') || 'none'}`);
+  record('1 each icon has an aria-label and a title, and the pills\' height',
+    icons.filter(([, v]) => v).every(([, v]) => v.label && v.title && Math.abs(v.h - a.row[0].h) <= 0.5),
+    icons.filter(([, v]) => v).map(([k, v]) => `${k} "${v.label}" ${v.h}px`).join(', '));
+  record('1 no emoji in the top bar', !EMOJI.test(a.text), JSON.stringify(a.text.match(EMOJI) || ''));
+  const tapReset = await p.evaluate(() => { const el = document.querySelector('[data-toolbar-reset]'); const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(hit && el.contains(hit)) && !el.closest('[inert]'); });
+  record('1 art state: Reset cannot be tapped', !tapReset);
+  await shot(s, 't31-art');
+
+  // The graph state: live, still one row.
+  await go(s, 'graph');
+  const g = await bar(p);
+  record('1 graph state: the icons are in the top bar, live', want.every((k) => g.icons[k] && !g.icons[k].inert));
+  record('1 graph state: one row', oneRow(g), `${g.row.map((r) => `${r.what}@${r.top}`).join(' ')}; fit ${g.fit.join(',') || 'none'}; first pill ${g.firstPill && r1(g.firstPill.w)} px`);
+  record('1 the first pill keeps its whole text as its name', !!g.firstPill && g.firstPill.text.length > 0 && g.firstPill.title.includes(g.firstPill.text.trim()), g.firstPill && `${g.firstPill.text} / ${g.firstPill.title}`);
+  await shot(s, 't31-graph');
+
+  // The menu.
+  await p.click('[data-top-menu-button]');
+  await p.waitForTimeout(250);
+  const menu = await p.evaluate(() => {
+    const m = document.querySelector('[role="menu"][data-top-menu]');
+    if (!m) return null;
+    const r = m.getBoundingClientRect();
+    const b = document.querySelector('[data-top-menu-button]').getBoundingClientRect();
+    return {
+      heading: (m.querySelector('[data-group-label]') || {}).textContent || '',
+      dims: [...m.querySelectorAll('[role="menuitemcheckbox"][data-dimension]')].map((e) => e.textContent.trim()),
+      actions: [...m.querySelectorAll('[data-view-action]')].map((e) => e.textContent.trim()),
+      layout: m.querySelectorAll('[data-layout]').length,
+      under: r.top >= b.bottom - 1,
+      inView: r.left >= 0 && r.right <= innerWidth,
+      focus: document.activeElement && m.contains(document.activeElement),
+      expanded: document.querySelector('[data-top-menu-button]').getAttribute('aria-expanded'),
+    };
+  });
+  record('1 the menu opens under the hourglass, within the screen', !!menu && menu.under && menu.inView && menu.expanded === 'true');
+  record('1 the menu: headed with the group label, a row per dimension, the view actions',
+    !!menu && menu.heading.toLowerCase() === GROUP.toLowerCase() && menu.dims.length === DIMS.length && menu.actions.join('|') === 'Zoom to fit|Unpin all|Reset sizes',
+    menu && `"${menu.heading}"; ${menu.dims.join(', ')}; ${menu.actions.join(', ')}`);
+  record('1 the menu: layout row only when show.layout', !!menu && (menu.layout > 0) === SHOW.layout, `${menu && menu.layout} layout options, show.layout ${SHOW.layout}`);
+  record('1 the menu takes the focus; ArrowDown moves it', !!menu && menu.focus);
+  await p.keyboard.press('ArrowDown');
+  const second = await p.evaluate(() => document.activeElement && document.activeElement.textContent.trim());
+  record('1 ArrowDown moves to the next row', second === (menu && menu.dims[1]), `focus on "${second}"`);
+
+  const before = await timeAxis(p);
+  const pick = DIMS[1] || DIMS[0];
+  await p.click(`[data-top-menu] [data-dimension="${pick.id}"]`);
+  await p.waitForTimeout(500);
+  const after = await timeAxis(p);
+  const checked = await p.evaluate((id) => (document.querySelector(`[data-top-menu] [data-dimension="${id}"]`) || {}).getAttribute && document.querySelector(`[data-top-menu] [data-dimension="${id}"]`).getAttribute('aria-checked'), pick.id);
+  record('1 a dimension row turns its axis on (viewState.timeAxis)', !before.on && after.on === true && after.dimension === pick.id && checked === 'true',
+    `before ${JSON.stringify({ on: !!before.on, dimension: before.dimension })}, after ${JSON.stringify({ on: after.on, dimension: after.dimension })}, row ${checked}`);
+  await p.click(`[data-top-menu] [data-dimension="${pick.id}"]`);
+  await p.waitForTimeout(500);
+  const again = await timeAxis(p);
+  record('1 the same row again turns it off', again.on === false, JSON.stringify({ on: again.on }));
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(200);
+  const esc = await p.evaluate(() => ({ menu: !!document.querySelector('[data-top-menu]'), focus: document.activeElement && document.activeElement.matches('[data-top-menu-button]') }));
+  record('1 Escape closes the menu, the focus back on the hourglass', !esc.menu && esc.focus);
+  await p.click('[data-top-menu-button]');
+  await p.waitForTimeout(200);
+  await p.mouse.click(s.W / 2, s.H - 120);
+  await p.waitForTimeout(250);
+  record('1 a tap outside closes the menu', !(await p.$('[data-top-menu]')));
+
+  // Undo undoes a drag; Reset resets.
+  const id = ACTS[ACTS.length - 1];
+  const from = await actCentre(p, id);
+  const by = { x: s.phone ? -40 : -60, y: s.phone ? 50 : 40 };
+  await drag(p, from, by);
+  await p.waitForTimeout(1200);
+  const dropped = await actCentre(p, id);
+  await p.click('[data-top-undo]');
+  await p.waitForTimeout(1500);
+  const undone = await actCentre(p, id);
+  record('1 undo undoes a drag', off(dropped, from) > 20 && off(undone, from) <= 3,
+    `dragged ${r1(off(dropped, from))} px, after undo ${r1(off(undone, from))} px from where it was`);
+  await drag(p, undone, by);
+  await p.waitForTimeout(1200);
+  const moved = await actCentre(p, id);
+  await p.click('[data-toolbar-reset]');
+  await p.waitForTimeout(1800);
+  const reset = await actCentre(p, id);
+  record('1 Reset puts it back', off(moved, from) > 20 && off(reset, from) <= 3, `${r1(off(reset, from))} px from its place after Reset`);
+
+  // Cmd+Z and Cmd+Shift+Z.
+  await drag(p, reset, by);
+  await p.waitForTimeout(1200);
+  await p.mouse.click(s.W / 2, s.H - 60);
+  await p.keyboard.press(name === 'webkit' ? 'Meta+z' : 'Control+z');
+  await p.waitForTimeout(1500);
+  const kz = await actCentre(p, id);
+  await p.keyboard.press(name === 'webkit' ? 'Meta+Shift+z' : 'Control+Shift+z');
+  await p.waitForTimeout(1500);
+  const kr = await actCentre(p, id);
+  record('1 Cmd+Z undoes, Cmd+Shift+Z redoes', off(kz, from) <= 3 && off(kr, from) > 20, `after undo ${r1(off(kz, from))} px, after redo ${r1(off(kr, from))} px from its place`);
+
+  if (s.phone) {
+    const v = await visible(p);
+    VERTICAL.push({ run: `${name} top`, ...v });
+  }
+  record('1 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  record('1 nothing fetched from elsewhere', s.outside.length === 0, s.outside.slice(0, 2).join(' | '));
+  await s.browser.close();
+
+  // The space before: the same page with the bar at the bottom.
+  if (s.phone) {
+    const b = await open(bt, name, size, { variant: atPosition('bottom') });
+    await go(b, 'graph');
+    const v = await visible(b.page);
+    VERTICAL.push({ run: `${name} bottom`, ...v });
+    await shot(b, 't31-before');
+    await b.browser.close();
+  }
+}
+
+async function run(bt, name, size, record) {
+  await part1(bt, name, size, record);
+}
+
+(async () => {
+  const server = http.createServer((req, res) => handler(req, res, { public: SITE }));
+  await new Promise((r) => server.listen(PORT, r));
+  const results = [];
+  const runs = [];
+  for (const name of ENGINES) {
+    const bt = name === 'webkit' ? webkit : chromium;
+    for (const size of (process.env.PP_E2E_SIZES || 'desktop,phone').split(',')) {
+      const label = `${name} ${size === 'phone' ? '390x844' : '1280x800'}`;
+      const rec = (check, ok, note = '') => { results.push({ run: label, check, ok, note }); console.log(`${ok ? 'PASS' : 'FAIL'}  [${label}] ${check}${note ? ' — ' + note : ''}`); };
+      try {
+        await run(bt, name, size, rec);
+        runs.push({ label, ran: true });
+      } catch (e) {
+        const msg = String(e.message || e).split('\n')[0] + ' @' + ((String(e.stack).match(/t31_checks\.js:(\d+)/) || [])[1] || '?');
+        if (/Executable doesn't exist|Failed to launch|browserType\.launch/.test(msg)) {
+          runs.push({ label, ran: false });
+          console.log(`NOT RUN  [${label}] ${msg}`);
+        } else {
+          rec('run', false, msg);
+          runs.push({ label, ran: true });
+        }
+      }
+    }
+  }
+  server.close();
+  for (const v of VERTICAL) {
+    console.log(`VERTICAL [${v.run}] graph visible ${r1(v.height)} px of ${v.H} (top bar to ${r1(v.top)}, bottom at ${r1(v.bottom)}; rights line at ${r1(v.rightsTop)})`);
+  }
+  const pass = results.filter((r) => r.ok).length;
+  const fail = results.filter((r) => !r.ok).length;
+  const notRun = runs.filter((r) => !r.ran).length;
+  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run`);
+  if (process.env.PP_E2E_JSON) fs.writeFileSync(process.env.PP_E2E_JSON, JSON.stringify({ results, runs, vertical: VERTICAL }, null, 2));
+  process.exit(fail ? 1 : 0);
+})();

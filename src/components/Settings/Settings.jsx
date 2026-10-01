@@ -6,6 +6,8 @@ import { TTSSettings } from '../TTS/TTS';
 import { config as todConfig } from '../../lib/timeOfDay';
 import { THEMES, themeName } from '../../lib/theme';
 import { isLinkItem } from '../../lib/linkNode';
+import { iconBody } from '../../lib/icons';
+import { Icon } from '../Icon/Icon';
 
 /**
  * Settings — the panel that slides out from the right edge, from the graph's
@@ -296,7 +298,7 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
         aria-expanded={open}
         data-settings-gear
       >
-        ⚙
+        <Icon body={iconBody('settings')} size={18} />
       </button>
 
       {open && (

@@ -192,6 +192,9 @@ function createViewState(opts = {}) {
   let state = emptyState(opts.corpusId, opts.layoutVersion);
   let past = [];
   let future = [];
+  // Counts undos and redos, so a view can tell one from other changes and
+  // put what it shows back to the arrangement now in force.
+  let historyVersion = 0;
   let listeners = [];
   let saveTimer = null;
   let pendingSave = null;
@@ -290,6 +293,7 @@ function createViewState(opts = {}) {
     state.reading = reading;
     state.opening = opening;
     gestureBase = null;
+    historyVersion += 1;
     notify();
     scheduleSave();
     return true;
@@ -306,6 +310,7 @@ function createViewState(opts = {}) {
     state.reading = reading;
     state.opening = opening;
     gestureBase = null;
+    historyVersion += 1;
     notify();
     scheduleSave();
     return true;
@@ -315,6 +320,7 @@ function createViewState(opts = {}) {
     get state() { return state; },
     get canUndo() { return past.length > 0; },
     get canRedo() { return future.length > 0; },
+    get historyVersion() { return historyVersion; },
     backendId: backend.id,
 
     async ready() {

@@ -56,6 +56,29 @@
   }
 }
 
+/* The row kept to one line (FeedZ fitRow): the source pills after the
+   first as their dot; then the first pill's text with an ellipsis. */
+.bar[data-fit-dots] .pill[data-source-pill] ~ .pill[data-source-pill] .title,
+.bar[data-fit-dots] .pill[data-source-pill] ~ .pill[data-source-pill] .count {
+  display: none;
+}
+
+.bar[data-fit-dots] .pill[data-source-pill] ~ .pill[data-source-pill] {
+  padding: 0 4px;
+}
+
+.bar[data-fit-title] .pill[data-source-pill]:first-child {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.bar[data-fit-title] .pill[data-source-pill]:first-child .title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* A page of the site's top bar (settings.topBar.pages): a pill without a
    dot that opens its item in the reader. */
 .pagePill {
