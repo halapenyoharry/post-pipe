@@ -2770,7 +2770,22 @@ export function GraphViewer({
       const root = rootOff
         ? { x0: rootOff.x + rootInfo.box.x0, y0: rootOff.y + rootInfo.box.y0, x1: rootOff.x + rootInfo.box.x1, y1: rootOff.y + rootInfo.box.y1 }
         : null;
-      return { box, root };
+      // The layout says where the cards belong; a reader may have left some
+      // elsewhere (and open ones are larger). The frame takes in where they
+      // actually are too.
+      const withCards = (r, cId) => {
+        if (!r) return r;
+        const out = { ...r };
+        for (const slug of getAllMemberSlugs(cId)) {
+          const d = nodeBySlug.get(slug);
+          if (!d || d.type !== 'article' || d._closedHidden || !Number.isFinite(d.x) || !Number.isFinite(d.y)) continue;
+          const size = d._size || cardSizeFor({ hovered: false, pinned: pinnedIdsRef.current.has(d.id) });
+          out.x0 = Math.min(out.x0, d.x - size.width / 2); out.x1 = Math.max(out.x1, d.x + size.width / 2);
+          out.y0 = Math.min(out.y0, d.y - size.height / 2); out.y1 = Math.max(out.y1, d.y + size.height / 2);
+        }
+        return out;
+      };
+      return { box: withCards(box, id), root: withCards(root, info.root) };
     }
 
     // How much of the graph's top and bottom the page's own fixed controls
