@@ -286,15 +286,10 @@ export function Settings({ viewState, feedData }) {
               <button
                 className={styles.resetBtn}
                 style={{ color: '#e74c3c', borderColor: '#e74c3c4d' }}
-                onClick={() => {
-                  if (confirm('Reset all node positions and layout arrangements?')) {
-                    viewState.resetLayout();
-                    // Optional: force reload so the graph redraws from scratch
-                    window.location.reload();
-                  }
-                }}
+                title="Layout, zoom, rotation, open and closed containers, and selection, back to how the site starts"
+                onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent('graph:reset-all')); }}
               >
-                Reset Layout
+                Reset everything
               </button>
             </div>
           </div>

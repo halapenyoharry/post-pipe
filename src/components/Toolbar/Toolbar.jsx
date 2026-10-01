@@ -5,14 +5,14 @@ import styles from './Toolbar.module.css';
  * Toolbar — the one bar along the bottom of the graph.
  *
  * Grouped: history (undo, redo), layout (cluster, ring), dimensions (the
- * time-axis rails), and view actions (zoom to fit, unpin, sizes, layout
- * reset). A wide screen shows every group in the bar. A phone shows the
+ * time-axis rails), Reset (everything back to the site's defaults), and the
+ * finer view actions (zoom to fit, unpin, sizes). A wide screen shows every group in the bar. A phone shows the
  * compact set (history, layout, More) and puts dimensions and the view
  * actions in a sheet one tap away, so nothing overlaps or runs off the edge
  * from 320px up. The bar keeps clear of the safe-area insets.
  *
  * Everything it does goes through viewState or the graph's window events
- * (graph:zoom-to-fit, graph:unpin-all, graph:reset-sizes, graph:reset-layout),
+ * (graph:reset-all, graph:zoom-to-fit, graph:unpin-all, graph:reset-sizes),
  * so the generated page and the embed share it unchanged.
  */
 
@@ -34,7 +34,6 @@ const VIEW_ACTIONS = [
   { event: 'graph:zoom-to-fit', label: 'Zoom to fit', title: 'Frame every node' },
   { event: 'graph:unpin-all', label: 'Unpin all', title: 'Release every dragged node' },
   { event: 'graph:reset-sizes', label: 'Reset sizes', title: 'Return every card to its default size' },
-  { event: 'graph:reset-layout', label: 'Reset layout', title: 'Clear remembered positions and lay out again' },
 ];
 
 const fire = (name) => window.dispatchEvent(new CustomEvent(name));
@@ -134,14 +133,23 @@ export function Toolbar({ viewState, show = {}, layouts = LAYOUTS }) {
 
         <div className={styles.group} data-group="view">
           <button
+            className={styles.seg}
+            title="Reset: layout, zoom, rotation, open and closed containers, and selection, back to how the site starts (Undo brings the arrangement back)"
+            data-toolbar-reset
+            onClick={() => { setMoreOpen(false); fire('graph:reset-all'); }}
+          >
+            Reset
+          </button>
+          <button
             className={`${styles.seg} ${styles.more} ${moreOpen ? styles.on : ''}`}
             aria-expanded={moreOpen}
             aria-controls="pp-toolbar-more"
             title="More: dimensions and view actions"
+            aria-label="More"
             data-toolbar-more
             onClick={() => setMoreOpen((o) => !o)}
           >
-            More <span aria-hidden="true">{moreOpen ? '▾' : '▴'}</span>
+            <span className={styles.moreText}>More </span><span aria-hidden="true" className={styles.moreMark}>{moreOpen ? '▾' : '▴'}</span>
           </button>
         </div>
       </div>

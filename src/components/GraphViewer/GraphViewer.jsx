@@ -653,12 +653,12 @@ export function GraphViewer({
       .attr('stroke-width', (d) => d.strokeWidth || 1.5)
       .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
 
-    const closedContainers = new Set();
-    if (GS.initialCollapsed === 'all') {
-      (feedData.containers || []).forEach(c => closedContainers.add(c.id));
-    } else if (Array.isArray(GS.initialCollapsed)) {
-      GS.initialCollapsed.forEach(id => closedContainers.add(id));
-    }
+    // Containers closed from the start (settings.graph.initialCollapsed); a
+    // reset returns to the same set.
+    const initiallyClosed = () => (GS.initialCollapsed === 'all'
+      ? (feedData.containers || []).map((c) => c.id)
+      : (Array.isArray(GS.initialCollapsed) ? GS.initialCollapsed : []));
+    const closedContainers = new Set(initiallyClosed());
     const containerCentroids = new Map();
 
 
@@ -2622,6 +2622,7 @@ export function GraphViewer({
     const handleResetLayout = () => {
       const vs = viewStateRef.current;
       if (vs && vs.resetLayout) vs.resetLayout();
+      resetRotation({ repaint: false });
       data.nodes.forEach(d => {
         d.fx = null;
         d.fy = null;
@@ -2631,6 +2632,47 @@ export function GraphViewer({
       fitToViewport({ animate: true });
     };
 
+    // Reset: everything back to the site's defaults in one go: positions,
+    // sizes and open cards, the layout, which containers are open, the
+    // reader and any highlight, rotation, and the first screen's framing.
+    // The positions go through viewState, so Undo can bring them back.
+    const handleResetAll = () => {
+      const vs = viewStateRef.current;
+      if (vs && vs.resetLayout) vs.resetLayout();
+      if (onNodeSelectRef.current) onNodeSelectRef.current(null);
+      hideEdgeLabel();
+      activeTag = null;
+      hoveredIdRef.current = null;
+      nodes.classed('dimmed', false).classed('tag-active', false);
+      articleNodes.classed('dimmed', false).style('z-index', null);
+      links.classed('highlighted', false);
+      pinnedIdsRef.current.clear();
+      data.nodes.forEach((d) => {
+        delete d._size; delete d._customWidth; delete d._customHeight; delete d._forcePos;
+        d.fx = null; d.fy = null;
+      });
+      closedContainers.clear();
+      for (const id of initiallyClosed()) closedContainers.add(id);
+      resetRotation({ repaint: false });
+      userMovedView = false;
+      focusActive = !!GS.initialFocus && GS.initialFocus !== 'all';
+      renderAllArticleBodies();
+      applyClosedDisplay();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('graph:containers-changed', { detail: containerState() }));
+      }
+      if (data.containers && data.containers.length && spiralOn()) {
+        relayoutContainers();
+        updateContainers();
+        applyPositions();
+        fitToViewport({ animate: true });
+      } else {
+        simulation.alpha(0.8).restart();
+        fitToViewport({ animate: true });
+      }
+    };
+
+    window.addEventListener('graph:reset-all', handleResetAll);
     window.addEventListener('graph:zoom-to-fit', handleZoomToFit);
     window.addEventListener('graph:unpin-all', handleUnpinAll);
     window.addEventListener('graph:reset-sizes', handleResetSizes);
@@ -2655,6 +2697,7 @@ export function GraphViewer({
       container.removeEventListener('touchmove', onRotateMove, { capture: true });
       container.removeEventListener('touchend', onRotateEnd, { capture: true });
       container.removeEventListener('touchcancel', onRotateEnd, { capture: true });
+      window.removeEventListener('graph:reset-all', handleResetAll);
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
       window.removeEventListener('graph:reset-sizes', handleResetSizes);

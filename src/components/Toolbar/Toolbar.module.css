@@ -86,7 +86,7 @@
   }
 }
 
-.more span {
+.moreMark {
   font-size: 9px;
   margin-left: 2px;
 }
@@ -147,14 +147,30 @@
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .wideOnly {
     display: none;
   }
   .narrowOnly {
     display: block;
   }
+}
+
+@media (max-width: 600px) {
   .label {
     display: none;
+  }
+  .seg {
+    padding: 0 8px;
+  }
+}
+
+/* The narrowest phones: More is just its mark. */
+@media (max-width: 360px) {
+  .moreText {
+    display: none;
+  }
+  .more {
+    min-width: 30px;
   }
 }
