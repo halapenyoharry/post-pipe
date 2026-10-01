@@ -400,6 +400,12 @@ ${reactJs}
       layoutVersion: LAYOUT_VERSION
     });
 
+    // After "Forget my usage" the page starts over at its first screen, as a
+    // first-time visitor would see it: no hash, nothing remembered.
+    window.addEventListener('postpipe:forgotten', function () {
+      window.location.replace(window.location.pathname + window.location.search);
+    });
+
     // Programs on the page can open and close containers:
     // PostPipeGraph.openContainer(id), closeContainer(id), toggleContainer(id),
     // openAllContainers(), closeAllContainers(), getContainerState().

@@ -206,6 +206,7 @@ function BookmarkRow({ b, feedData, viewState }) {
 
 export function Settings({ viewState, feedData, subject, readerOpen }) {
   const [open, setOpen] = useState(false);
+  const [confirmForget, setConfirmForget] = useState(false);
   const [, bump] = useState(0);
   const panelRef = useRef(null);
   const wantSection = useRef(null);
@@ -252,6 +253,7 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
       setOpen(false);
     };
     window.addEventListener('keydown', onKey, true);
+    setConfirmForget(false);
     if (wantSection.current && panelRef.current) {
       const el = panelRef.current.querySelector(`[data-section="${wantSection.current}"]`);
       if (el) panelRef.current.scrollTop = el.offsetTop - 8;
@@ -516,6 +518,46 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
               >
                 Reset the view
               </button>
+
+              <div className={styles.forgetBlock} data-forget>
+                <div className={styles.hint} data-forget-note>
+                  What you open, arrange, choose, mark and read here is kept on this device only.
+                  Reset the view keeps your notes and progress; Forget removes all of it.
+                </div>
+                {!confirmForget ? (
+                  <button
+                    className={styles.resetBtn}
+                    data-forget-ask
+                    onClick={() => setConfirmForget(true)}
+                  >
+                    Forget my usage on this site
+                  </button>
+                ) : (
+                  <div className={styles.forgetConfirm} role="group" aria-label="Confirm forgetting" data-forget-confirm>
+                    <div className={styles.hint}>
+                      Remove your bookmarks and notes, reading progress, open cards, positions,
+                      and every choice made here, from this device? This can't be undone.
+                    </div>
+                    <span className={styles.choices}>
+                      <button
+                        className={styles.resetBtn}
+                        data-forget-yes
+                        onClick={async () => {
+                          setConfirmForget(false);
+                          setOpen(false);
+                          if (viewState.forget) await viewState.forget();
+                          window.dispatchEvent(new CustomEvent('postpipe:forgotten'));
+                        }}
+                      >
+                        Forget
+                      </button>
+                      <button className={styles.choiceBtn} data-forget-no onClick={() => setConfirmForget(false)}>
+                        Keep it
+                      </button>
+                    </span>
+                  </div>
+                )}
+              </div>
             </Section>
           </aside>
         </>

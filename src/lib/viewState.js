@@ -18,6 +18,56 @@
 
 const VERSION = 1;
 
+// Every key the engine writes to a browser's storage starts with this, so
+// forgetting a reader's usage is one sweep by prefix rather than a list of
+// keys that goes stale the first time someone adds one. A new key that does
+// not start with it is a bug.
+const STORAGE_PREFIX = 'post-pipe:';
+
+function engineKeys(store) {
+  const keys = [];
+  if (!store) return keys;
+  try {
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (typeof k === 'string' && k.startsWith(STORAGE_PREFIX)) keys.push(k);
+    }
+  } catch (_) { /* storage refused; nothing of ours is in it */ }
+  return keys;
+}
+
+/**
+ * Remove everything the engine keeps in this browser: every localStorage and
+ * sessionStorage key under STORAGE_PREFIX, and every IndexedDB database whose
+ * name starts with it. Keys that are not the engine's are left alone.
+ * Returns the keys it removed.
+ */
+async function forgetStorage(opts = {}) {
+  const g = typeof globalThis !== 'undefined' ? globalThis : {};
+  const pick = (name) => {
+    if (opts[name] !== undefined) return opts[name];
+    try { return g[name] || null; } catch (_) { return null; }
+  };
+  const removed = [];
+  for (const store of [pick('localStorage'), pick('sessionStorage')]) {
+    for (const k of engineKeys(store)) {
+      try { store.removeItem(k); removed.push(k); } catch (_) { /* keep going */ }
+    }
+  }
+  const idb = pick('indexedDB');
+  if (idb && typeof idb.databases === 'function') {
+    try {
+      const dbs = await idb.databases();
+      for (const db of dbs || []) {
+        if (db && typeof db.name === 'string' && db.name.startsWith(STORAGE_PREFIX)) {
+          try { idb.deleteDatabase(db.name); removed.push('indexedDB:' + db.name); } catch (_) { /* keep going */ }
+        }
+      }
+    } catch (_) { /* not supported here */ }
+  }
+  return removed;
+}
+
 function emptyState(corpusId, layoutVersion) {
   return {
     version: VERSION,
@@ -57,6 +107,7 @@ function memoryBackend(initial) {
     id: 'memory',
     async load() { return clone(saved); },
     async save(state) { saved = clone(state); },
+    async clear() { saved = null; },
   };
 }
 
@@ -89,6 +140,10 @@ function localStorageBackend(key, storage) {
         // Quota exceeded, or storage disabled mid-session. Losing the
         // arrangement is bad; taking the page down with it is worse.
       }
+    },
+    async clear() {
+      if (!store) return;
+      try { store.removeItem(key); } catch (_) { /* nothing to remove */ }
     },
   };
 }
@@ -139,6 +194,8 @@ function createViewState(opts = {}) {
   let listeners = [];
   let saveTimer = null;
   let pendingSave = null;
+  // Set by forget(): nothing more is written until the page starts again.
+  let forgotten = false;
 
   function notify() {
     for (const fn of listeners.slice()) fn(state);
@@ -153,6 +210,7 @@ function createViewState(opts = {}) {
 
   async function flush() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (forgotten) return;
     pendingSave = backend.save(clone(state));
     await pendingSave;
     pendingSave = null;
@@ -296,6 +354,29 @@ function createViewState(opts = {}) {
 
       notify();
       return state;
+    },
+
+    /**
+     * Forget this reader's usage: open and closed nodes, positions and sizes,
+     * layout, theme and reading choices, bookmarks and notes, progress, and
+     * anything else the engine stored in this browser. Distinct from
+     * resetLayout, which only puts the view back and keeps the rest.
+     * After this the store writes nothing; the page is expected to start
+     * over. `where` names the storages to sweep (for tests); by default the
+     * browser's own.
+     */
+    async forget(where) {
+      forgotten = true;
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      if (pendingSave) { try { await pendingSave; } catch (_) { /* gone anyway */ } }
+      state = emptyState(state.corpusId, state.layoutVersion);
+      past = [];
+      future = [];
+      gestureBase = null;
+      if (backend.clear) { try { await backend.clear(); } catch (_) { /* swept below */ } }
+      const removed = await forgetStorage(where || {});
+      notify();
+      return removed;
     },
 
     update,
@@ -587,6 +668,8 @@ function createViewState(opts = {}) {
 }
 
 module.exports = {
+  STORAGE_PREFIX,
+  forgetStorage,
   createViewState,
   memoryBackend,
   localStorageBackend,
@@ -597,5 +680,5 @@ module.exports = {
 // Browser global, for the static page which inlines this file the way it
 // inlines tts.js. Same module, no build step, no second copy.
 if (typeof window !== "undefined") {
-  window.ViewState = { createViewState, memoryBackend, localStorageBackend, hostParamsBackend, VERSION };
+  window.ViewState = { createViewState, memoryBackend, localStorageBackend, hostParamsBackend, VERSION, STORAGE_PREFIX, forgetStorage };
 }

@@ -408,3 +408,11 @@
   color: #ff8a7a;
   border-color: rgba(255, 138, 122, 0.4);
 }
+
+.forgetBlock,
+.forgetConfirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
