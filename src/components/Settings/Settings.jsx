@@ -3,6 +3,7 @@ import styles from './Settings.module.css';
 import { readerFonts } from '../../lib/readerSettings';
 import { bookmarkLabel, placedParagraph } from '../../lib/bookmarkPlace';
 import { TTSSettings } from '../TTS/TTS';
+import { config as todConfig } from '../../lib/timeOfDay';
 
 /**
  * Settings — the panel that slides out from the right edge, from the graph's
@@ -409,6 +410,15 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
             </Section>
 
             <Section id="view" title="View">
+              {todConfig(typeof window !== 'undefined' ? window.SETTINGS : null) && (
+                <Switch
+                  on={viewState.preference('timeOfDay') !== false}
+                  onChange={(v) => viewState.setPreference('timeOfDay', v ? null : false)}
+                  label="Time of day background"
+                  hint="The page behind the graph takes on the light of the chapter's time of day, tinted by its season."
+                  data-pref="timeOfDay"
+                />
+              )}
               {hasContainers && (
                 <div className={styles.choiceRow}>
                   <span className={styles.rowLabel}>Containers</span>

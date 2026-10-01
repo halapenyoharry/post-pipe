@@ -101,6 +101,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}) {
     series: c.series || '',
     series_part: c.series_part || null,
     timeline: c.timeline || undefined,
+    // When and where it happens: { time_of_day, date, place }.
+    scene: c.scene || undefined,
     // Commits with messages come first: they can be filtered. A bare
     // commit_times list is taken as given. Failing both, the item folder's
     // own git history.

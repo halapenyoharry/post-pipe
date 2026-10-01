@@ -6,6 +6,8 @@
 const fs     = require('fs');
 const path   = require('path');
 const matter = require('gray-matter');
+const { sceneFrom } = require('./src/lib/scene');
+const { splitFrontMatter } = require('./src/lib/frontMatter');
 
 const AUDIO_EXTS = new Set(['.m4a', '.mp3', '.wav', '.ogg', '.flac', '.aac']);
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi']);
@@ -55,6 +57,13 @@ function readQmdFrontmatter(dir) {
   if (!fs.existsSync(p)) return null;
   try { return matter(fs.readFileSync(p, 'utf8')).data; }
   catch (err) { console.warn(`[ingest] couldn't parse ${p} — ${err.message}`); return null; }
+}
+
+// The front matter of a piece's own text file, if it has any.
+function readBodyFrontMatter(dir, body) {
+  if (!body || body.format !== 'md') return null;
+  try { return splitFrontMatter(fs.readFileSync(path.join(dir, body.file), 'utf8')).data; }
+  catch (_) { return null; }
 }
 
 // ─── Body & cover resolution ────────────────────────────────────────────────
@@ -128,6 +137,7 @@ function findMedia(dir, files) {
 
 function buildFromFrontmatterJson(id, fm, files, dir) {
   const substrate = detectSubstrate(files, fm.idea?.substrate);
+  const body = findBody(dir, files, fm.body?.file);
   return {
     id,
     kind: substrate,
@@ -147,6 +157,7 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
     series:         fm.series || null,
     series_part:    fm.series_part ?? null,
     timeline:       fm.timeline || null,
+    scene:          sceneFrom(readBodyFrontMatter(dir, body), fm),
     license:        fm.meta?.license || null,
     forms_current:  fm.forms?.current || substrate,
     forms_potential: fm.forms?.potential || [],
@@ -155,7 +166,7 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
     connected_to:   fm.connected_to || [],
     note:           fm.note || null,
     cover:          findCover(dir, files, null),
-    body:           findBody(dir, files, fm.body?.file),
+    body,
     media:          findMedia(dir, files),
     todos:          files.filter(isTodo),
     commit_times:   Array.isArray(fm.commit_times) ? fm.commit_times : null,
@@ -188,6 +199,7 @@ function buildFromQmd(id, yaml, files, dir) {
     series:         yaml.series || null,
     series_part:    yaml.series_part ?? null,
     timeline:       null,
+    scene:          sceneFrom(yaml),
     license:        yaml.license || null,
     forms_current:  'essay',
     forms_potential: [],

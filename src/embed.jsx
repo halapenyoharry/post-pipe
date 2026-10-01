@@ -34,6 +34,7 @@ import { TTS } from './components/TTS/TTS';
 import { FeedZ } from './components/FeedZ';
 import { showContainerCount } from './components/GraphViewer/containerCount';
 import { Settings } from './components/Settings';
+import { TimeOfDay } from './components/TimeOfDay/TimeOfDay';
 import { Toolbar } from './components/Toolbar/Toolbar';
 import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
@@ -345,6 +346,9 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
 
   return (
     <>
+      {/* The background follows the time of day (settings.theme.timeOfDay) */}
+      <TimeOfDay item={selectedArticle || focusedItem} settings={settings} viewState={viewState} />
+
       {/* The graph — always on */}
       <GraphViewer
         feedData={feedData}

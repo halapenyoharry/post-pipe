@@ -277,7 +277,7 @@ ${readerFontFaces()}
     bottom: calc(58px + env(safe-area-inset-bottom, 0px));
     z-index: 30; width: max-content; max-width: calc(100vw - 32px);
     font: 10px/1.35 system-ui, -apple-system, sans-serif; text-align: center;
-    color: rgba(255, 255, 255, 0.38); pointer-events: none;
+    color: var(--pp-quiet-text, #a3abc4); pointer-events: none;
   }
 
   #error { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #e74c3c; font-size: 18px; }
@@ -322,7 +322,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -483,6 +483,13 @@ ${reactJs}
       if (!hydrated) return null;
 
       return React.createElement(React.Fragment, null,
+        // The background follows the selected or open piece's time of day
+        // (settings.theme.timeOfDay).
+        React.createElement(TimeOfDay, {
+          item: selectedArticle || focusedItem,
+          settings: window.SETTINGS,
+          viewState: viewState
+        }),
         React.createElement(GraphViewer, {
           feedData: feed,
           layout: viewState.state.layout,

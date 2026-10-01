@@ -9,4 +9,5 @@ export { Settings } from './components/Settings';
 export { ConfigPanel } from './components/ConfigPanel';
 export { TimeOverlay } from './components/TimeOverlay';
 export { Toolbar } from './components/Toolbar/Toolbar';
+export { TimeOfDay } from './components/TimeOfDay/TimeOfDay';
 export { React, ReactDOM };

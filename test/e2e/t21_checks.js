@@ -339,7 +339,85 @@ async function part6(bt, name, size, record) {
   }
 }
 
-const PART_FNS = { 0: part0, 6: part6 };
+// ── 1. time of day ─────────────────────────────────────────────────────────
+const byTime = (t) => FEED.items.find((i) => i.scene && i.scene.time_of_day === t);
+
+// Contrast of the text drawn straight on the background against the showing
+// time-of-day layer, measured in the page.
+const todState = (page) => page.evaluate(() => {
+  const lum = (rgb) => { const [r, g, b] = rgb.map((n) => { const c = n / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const parse = (c) => { const m = c.match(/[\d.]+/g); return m ? m.slice(0, 4).map(Number) : null; };
+  const front = document.querySelector('[data-tod-layer="front"]');
+  const cs = front && getComputedStyle(front);
+  const stops = cs ? (cs.backgroundImage.match(/rgba?\([^)]*\)/g) || []).map(parse) : [];
+  const blend = (fg, a, bg) => fg.slice(0, 3).map((n, i) => n * a + bg[i] * (1 - a));
+  const rights = document.querySelector('body > .pp-rights');
+  const rc = rights ? parse(getComputedStyle(rights).color) : null;
+  const rightsMin = rc && stops.length ? Math.min(...stops.map((b) => ratio(blend(rc, rc[3] == null ? 1 : rc[3], b), b))) : null;
+  const labels = [...document.querySelectorAll('.container-badge-text')].filter((t) => t.getBoundingClientRect().width > 0);
+  const labelMin = labels.length && stops.length ? Math.min(...labels.map((t) => { const c = parse(getComputedStyle(t).fill); const op = Number(getComputedStyle(t).opacity) * Number(getComputedStyle(t).fillOpacity || 1); return Math.min(...stops.map((b) => ratio(blend(c, op, b), b))); })) : null;
+  return {
+    tod: document.documentElement.getAttribute('data-pp-tod'),
+    season: document.documentElement.getAttribute('data-pp-season'),
+    opacity: cs ? Number(cs.opacity) : 0,
+    duration: cs ? parseFloat(cs.transitionDuration) : 0,
+    stops: stops.length,
+    rightsMin, labelMin,
+  };
+});
+
+async function part1(bt, name, size, record) {
+  const dusk = byTime('dusk'), afternoon = byTime('afternoon');
+  const blank = FEED.items.find((i) => /a1-/.test(i.id) && (!i.scene || !i.scene.time_of_day));
+  const s = await open(bt, name, size, READ(dusk));
+  const { page } = s;
+  try {
+    await page.waitForTimeout(4600);
+    const a = await todState(page);
+    record('1 an open chapter sets the background to its time of day', a.tod === 'dusk' && a.opacity > 0.95 && a.stops >= 2, `${a.tod} (${a.season || 'no season'}), opacity ${a.opacity.toFixed(2)}`);
+    record('1 the season tints it (summer for June)', a.season === 'summer', a.season || 'none');
+    record('1 the change is slow', a.duration >= 3, `${a.duration}s`);
+    record('1 the rights line keeps AA on it', a.rightsMin == null || a.rightsMin >= 4.5, a.rightsMin == null ? 'not shown' : a.rightsMin.toFixed(2));
+    // From the graph: the card last opened.
+    await page.evaluate(() => { history.replaceState(null, '', location.pathname); dispatchEvent(new HashChangeEvent('hashchange')); });
+    await page.waitForTimeout(600);
+    const c = await findPoint(page, 'card', slugOf(afternoon));
+    if (c) {
+      if (s.phone) await page.touchscreen.tap(c.x, c.y); else { await page.mouse.move(c.x, c.y); await page.waitForTimeout(300); await page.mouse.click(c.x, c.y); }
+      await page.waitForTimeout(4800);
+      const b = await todState(page);
+      record('1 a card selected on the graph sets it too', b.tod === 'afternoon' && b.opacity > 0.95, `${b.tod}, opacity ${b.opacity.toFixed(2)}`);
+      record('1 container titles keep AA for large text on it', b.labelMin == null || b.labelMin >= 3, b.labelMin == null ? 'none on screen' : b.labelMin.toFixed(2));
+      record('1 the rights line keeps AA on it', b.rightsMin == null || b.rightsMin >= 4.5, b.rightsMin == null ? 'not shown' : b.rightsMin.toFixed(2));
+    } else record('1 a card selected on the graph sets it too', false, 'card not on screen');
+    if (blank) {
+      await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(blank));
+      await page.waitForTimeout(4800);
+      const z = await todState(page);
+      record('1 a chapter with no time of day leaves the plain background', !z.tod && z.opacity === 0, `${slugOf(blank)}: ${z.tod || 'none'}`);
+    }
+    // The reader can turn it off.
+    await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(dusk));
+    await page.waitForTimeout(1200);
+    if (s.phone) await page.tap('[data-reader-settings]'); else await page.click('[data-reader-settings]');
+    await page.waitForTimeout(400);
+    const sw = await page.$('[data-pref="timeOfDay"]');
+    if (sw) {
+      await sw.click();
+      await page.waitForTimeout(4800);
+      const off = await todState(page);
+      record('1 the panel turns it off', !off.tod && off.opacity === 0, off.tod || 'off');
+      await (await page.$('[data-pref="timeOfDay"]')).click();
+    } else record('1 the panel turns it off', false, 'no switch in View');
+    if (SHOTS && name === 'chromium') await page.screenshot({ path: path.join(SHOTS, `time-of-day-dusk-${size}.png`) });
+    record('1 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  } finally {
+    await s.browser.close();
+  }
+}
+
+const PART_FNS = { 0: part0, 6: part6, 1: part1 };
 
 const server = http.createServer((req, res) => handler(req, res, {
   public: SITE,

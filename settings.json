@@ -264,7 +264,8 @@
     "border": "rgba(100, 255, 218, 0.2)",
     "node_published": "#3498db",
     "node_draft": "#7f8c8d",
-    "tag_color": "#f39c12"
+    "tag_color": "#f39c12",
+    "_timeOfDay_note": "Off unless set. true, or { enabled, transitionSeconds (4), seasonTint (0.1), hemisphere ('north'), palettes: { <time>: { dark: [top, bottom], light: [top, bottom] } }, seasons: { winter, spring, summer, autumn }, text, quiet }. When a piece is selected or open, the page background fades to the palette for its scene.time_of_day (dawn, morning, midday, afternoon, dusk, evening, night, late-night), tinted by the season of scene.date. The default palettes keep text at WCAG AA in both modes. A piece's scene (time_of_day, date, place) is read from its text's front matter, else its frontmatter.json (scene object or top-level fields). The reader can turn it off in the panel."
   },
   "feed_cache_ttl": 3600,
   "feeds": [

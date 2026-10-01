@@ -9,6 +9,7 @@ import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
+import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -839,6 +840,26 @@ export function GraphViewer({
     containerBadgeTexts.each(function(d) {
       buildWrappedLabel(d3.select(this), d);
     });
+
+    // A container's title sits straight on the page, translucent. It keeps
+    // that look, but never below 3:1 (WCAG AA for large text) on any
+    // background the page can show in the current mode: its own, and every
+    // time-of-day palette. Repainted when the theme or mode changes.
+    function applyLabelContrast() {
+      if (typeof document === 'undefined') return;
+      const S = typeof window !== 'undefined' ? window.SETTINGS : null;
+      const mode = document.documentElement.getAttribute('data-pp-mode') || 'dark';
+      const bodyBg = getComputedStyle(document.body).backgroundColor;
+      const transparent = !bodyBg || /rgba\([^)]*,\s*0\)$/.test(bodyBg) || bodyBg === 'transparent';
+      const bgs = allBackgrounds(todConfig(S), mode, transparent ? null : bodyBg);
+      containerBadgeTexts.each(function (d) {
+        const l = legibleOn(getContainerColor(d), bgs, { opacity: 0.55 });
+        d3.select(this).attr('fill', l.color).attr('opacity', l.opacity);
+      });
+    }
+    applyLabelContrast();
+    const themeObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(applyLabelContrast) : null;
+    if (themeObserver) themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-pp-mode', 'data-pp-theme'] });
 
     // Collapsed container macro node (when container is closed, represented like a single node)
     const containerMacroNodes = containerGroups.append('g')
@@ -2750,6 +2771,7 @@ export function GraphViewer({
 
     return () => {
       renderAllArticleBodiesRef.current = null;
+      if (themeObserver) themeObserver.disconnect();
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
