@@ -1556,8 +1556,13 @@ export function GraphViewer({
       };
     }
 
+    // A hidden edge has no geometry at all. It used to be "M 0 0": a path of
+    // one point at the graph's origin, which still drew its arrowhead there.
+    // With the whole book closed, all 25 next-chapter arrowheads stacked on
+    // that point, a small orange mark north-west of the closed book. An empty
+    // path draws nothing, markers included, whatever its display says.
     function linkPath(l, ep) {
-      if (ep.hidden) return 'M 0 0';
+      if (ep.hidden) return '';
       if (l.layer !== 'sequence') {
         return `M ${ep.x1} ${ep.y1} L ${ep.x2} ${ep.y2}`;
       }
@@ -1820,7 +1825,7 @@ export function GraphViewer({
               d3.select(this).attr('d', l._path);
             }
           });
-          linkHits.attr('d', (l) => l._path || 'M 0 0');
+          linkHits.attr('d', (l) => l._path || '');
           hideEdgeLabel();
           sequencePulses.each(function(l) {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
@@ -2313,8 +2318,8 @@ export function GraphViewer({
         l._path = linkPath(l, linkEndpoints(l));
         d3.select(this).attr('d', l._path);
       });
-      linkHits.attr('d', (l) => l._path || 'M 0 0');
-      sequencePulses.attr('d', (l) => l._path || 'M 0 0');
+      linkHits.attr('d', (l) => l._path || '');
+      sequencePulses.attr('d', (l) => l._path || '');
       if (edgeLabelFor) placeEdgeLabel();
     }
     function applyPositions() {
