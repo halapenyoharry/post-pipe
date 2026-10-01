@@ -14141,7 +14141,7 @@ function Es({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 				return n.text();
 			})().then((t) => {
 				let n = new DOMParser().parseFromString(t, "text/html"), r = n.querySelector("h1");
-				r && r.remove();
+				r && r.remove(), n.querySelectorAll(".pp-rights").forEach((e) => e.remove());
 				let i = n.querySelector("body") ? n.querySelector("body").innerHTML : t;
 				Pn.set(e.id, i), e._fullContent = i;
 			}).catch(() => {
@@ -16720,7 +16720,7 @@ function Ic({ viewState: e, feedData: t, subject: n, readerOpen: r }) {
 							value: n,
 							onChange: (n) => e.setPreference("theme", n === (0, xc.themeName)(t, null) ? null : n)
 						}), r.length > 1 && /* @__PURE__ */ (0, V.jsx)(jc, {
-							label: "Light",
+							label: "Mode",
 							name: "mode",
 							options: [
 								{
