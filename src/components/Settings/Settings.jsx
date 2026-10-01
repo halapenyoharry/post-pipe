@@ -266,6 +266,12 @@ export function Settings({ viewState, feedData }) {
                 label="Follow along"
                 hint="Tap or drag through the text to mark the sentence and word you are on."
               />
+              <ReadingAid
+                viewState={viewState}
+                aid="boldStart"
+                label="Bold word beginnings"
+                hint="The first part of each word is bold, to lead the eye. The text itself is unchanged."
+              />
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>

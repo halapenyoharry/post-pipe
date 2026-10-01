@@ -58,13 +58,16 @@
       return p || node.parentElement;
     }
 
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    // Text nodes are joined as written: the spaces between words are already
+    // in them, and a word drawn in two pieces (bold word beginnings) must read
+    // as one word. A <br> counts as a space.
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode: function (node) {
+        if (node.nodeType === 1) return node.tagName === 'BR' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         const tag = parent.tagName;
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NAV') return NodeFilter.FILTER_REJECT;
-        if (node.textContent.trim().length === 0) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -73,6 +76,7 @@
     let currentBlockText = '';
 
     function flushBlock() {
+      currentBlockText = currentBlockText.replace(/\s+/g, ' ');
       if (currentBlockText.trim().length > 0) {
         const parts = currentBlockText.match(/[^.!?]*[.!?]+[\s]*/g);
         if (parts) {
@@ -91,12 +95,14 @@
 
     let node;
     while ((node = walker.nextNode())) {
+      if (node.nodeType === 1) { currentBlockText += ' '; continue; }
+      if (node.textContent.trim().length === 0 && currentBlockText.length === 0) continue;
       const block = getBlockParent(node);
       if (block !== currentBlockElement) {
         flushBlock();
         currentBlockElement = block;
       }
-      currentBlockText += node.textContent + ' ';
+      currentBlockText += node.textContent;
     }
     flushBlock();
     return result;

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styles from './ReaderPanel.module.css';
 import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
 import { progressBarMode, allowDownload } from '../../lib/readerSettings';
 import { attachFollowAlong } from './followHighlighter';
+import { boldStartHtml } from './boldStartHtml';
 
 
 export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
@@ -51,6 +52,11 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const itemBookmarks = viewState && pId ? viewState.bookmarks(pId) : [];
   const currentBookmark = itemBookmarks.length ? itemBookmarks[itemBookmarks.length - 1] : null;
   const allBookmarks = viewState ? viewState.bookmarks() : [];
+
+  // Bold word beginnings (Settings → Reading): applied to the drawn copy
+  // only; contentHtml stays the text as published.
+  const boldOn = Boolean(viewState && viewState.readerAid && viewState.readerAid('boldStart'));
+  const displayHtml = useMemo(() => (boldOn ? boldStartHtml(contentHtml) : contentHtml), [contentHtml, boldOn]);
 
   const handleToolbarMouseDown = (e) => {
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
@@ -316,7 +322,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         }
       }
     }
-  }, [contentHtml, viewState ? viewState.bookmarks() : null, article]);
+  }, [displayHtml, viewState ? viewState.bookmarks() : null, article]);
 
   // Follow along (Settings → Reading): tap or drag through the text and the
   // sentence and word under the finger are marked, with or without the voice.
@@ -324,7 +330,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   useEffect(() => {
     if (!followOn || !bodyRef.current) return;
     return attachFollowAlong(bodyRef.current);
-  }, [followOn, contentHtml, article]);
+  }, [followOn, displayHtml, article]);
 
   if (!article) return null;
 
@@ -597,7 +603,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               </div>
             )}
           </div>
-          <div dangerouslySetInnerHTML={{ __html: contentHtml }} />
+          <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
         </div>
       </div>
 

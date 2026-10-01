@@ -840,6 +840,12 @@
   line-height: 1.85;
 }
 
+/* Bold word beginnings (Settings → Reading). */
+.body :global(b.pp-bs) {
+  font-weight: 700;
+  color: inherit;
+}
+
 /* Follow along (Settings → Reading). A horizontal drag marks the text; a
    vertical one still scrolls. The marks are painted, not inserted. */
 .body.following {
