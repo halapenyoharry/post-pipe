@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
 import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, TUNING } from '../../lib/opening';
+import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
@@ -21,6 +22,17 @@ import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLa
  * own face, one layout per state, drawn on the art's canvas so it scales and
  * moves with it, and crossfaded with the images. While it is there the
  * graph's own title for the whole book is not drawn (hideGraphTitle).
+ *
+ * The backdrop's roots fade as the reader zooms the graph in past the zoom it
+ * rests at (opening.backdrop), the small plant at the top of the graph
+ * state's image keeping its strength (a second copy of that image, masked
+ * to the part above backdrop.keepAbove). With opening.reach, drawn rootlets
+ * grow from tips named on the art to the containers the graph says they
+ * reach for (window.PostPipeGraphWorld), stop short of each, and follow
+ * them with a lag when they move: one SVG layer between the art and the
+ * graph, drawn at most once a frame (ReachLayer below). Where the art sits in
+ * the graph state is published as window.PostPipeCoverFrame, so the graph
+ * can rest containers on their anchors on the art.
  *
  * The state a reader leaves it in is kept in viewState (opening.state) and is
  * where they land next time (startOn: 'remembered'). A #read= link opens on
@@ -68,6 +80,106 @@ function bottomInset(vh) {
 
 const DRAG_PX = 8; // a touch that moved this far was a drag, not a tap
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// The rootlets (opening.reach), drawn into one SVG layer in screen px. Each
+// frame: the art's tips where the art is now; for each container the graph
+// says they reach for, its nearest tips; from each, a rootlet aimed at the
+// container's centre that stops stopShort before its outline. A rootlet's
+// end follows its target with the lag; its start is on the art and moves
+// with it at once. A new rootlet draws in over drawMs the first time it
+// shows; with reduced motion it is simply there and follows at once.
+//   draw(now, { box, opacity, settledCover, world })   world is the graph's
+//   snapshot; returns true while any end is still on its way, so the caller
+//   asks for another frame.
+function createReach(cfg, layer, { reduced, seed }) {
+  const rootlets = new Map();
+  const lagMs = reduced ? 0 : cfg.lagMs;
+
+  function make(key, cId, tip) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-reach', key);
+    g.setAttribute('data-reach-container', cId);
+    g.setAttribute('data-reach-tip', String(tip));
+    const main = document.createElementNS(SVG_NS, 'path');
+    main.setAttribute('class', 'reach-main');
+    const fine = document.createElementNS(SVG_NS, 'path');
+    fine.setAttribute('class', 'reach-fine');
+    g.append(main, fine);
+    g.style.visibility = 'hidden';
+    layer.appendChild(g);
+    return { key, g, main, fine, shape: reachShape(`${seed}|${key}`), lag: createLag(lagMs), state: 'new', timer: null };
+  }
+
+  function drawIn(r) {
+    r.state = 'drawn';
+    r.g.style.visibility = '';
+    if (reduced || !cfg.drawMs) { r.g.setAttribute('data-drawn', 'drawn'); return; }
+    r.g.setAttribute('data-drawn', 'drawing');
+    for (const el of [r.main, r.fine]) {
+      el.setAttribute('pathLength', '1');
+      el.style.transition = 'none';
+      el.style.strokeDasharray = '1 1';
+      el.style.strokeDashoffset = '1';
+    }
+    r.main.getBoundingClientRect();
+    for (const el of [r.main, r.fine]) {
+      el.style.transition = `stroke-dashoffset ${cfg.drawMs}ms cubic-bezier(0.25, 0.6, 0.35, 1)`;
+      el.style.strokeDashoffset = '0';
+    }
+    r.timer = setTimeout(() => {
+      r.timer = null;
+      for (const el of [r.main, r.fine]) {
+        el.removeAttribute('pathLength');
+        el.style.transition = '';
+        el.style.strokeDasharray = '';
+        el.style.strokeDashoffset = '';
+      }
+      r.g.setAttribute('data-drawn', 'drawn');
+    }, cfg.drawMs + 60);
+  }
+
+  function remove(r) {
+    if (r.timer) clearTimeout(r.timer);
+    r.g.remove();
+  }
+
+  function draw(now, { box, opacity, settledCover, world }) {
+    layer.style.opacity = String(opacity);
+    if (!world || !box) return false;
+    const tips = cfg.tips.map((t) => artPoint(t, box));
+    const seen = new Set();
+    let moving = false;
+    for (const c of world.containers) {
+      for (const hit of reachFor(tips, c, cfg.perContainer, cfg.stopShort)) {
+        const i = hit.tip;
+        const key = `${c.id}|${i}`;
+        seen.add(key);
+        let r = rootlets.get(key);
+        if (!r) { r = make(key, c.id, i); rootlets.set(key, r); }
+        // While the cover itself moves, the ends ride with it.
+        if (r.state === 'new' || !settledCover) r.lag.jump(hit.end);
+        else r.lag.to(hit.end, now);
+        const end = r.lag.at(now);
+        if (!r.lag.settled(now)) moving = true;
+        const d = reachPath(tips[i], end, r.shape);
+        r.main.setAttribute('d', d.main);
+        r.fine.setAttribute('d', d.fine);
+        r.g.setAttribute('data-target', `${hit.end.x.toFixed(1)},${hit.end.y.toFixed(1)}`);
+        r.g.setAttribute('data-hit', `${hit.hit.x.toFixed(1)},${hit.hit.y.toFixed(1)}`);
+        if (r.state === 'new' && opacity > 0.05) drawIn(r);
+      }
+    }
+    for (const [key, r] of rootlets) if (!seen.has(key)) { remove(r); rootlets.delete(key); }
+    return moving;
+  }
+
+  return {
+    draw,
+    dispose() { for (const r of rootlets.values()) remove(r); rootlets.clear(); },
+  };
+}
+
 // The title over the art: an SVG on the art's own canvas (its viewBox is the
 // canvas's natural size), so each line's left edge and baseline land where
 // the layout puts them on the image at any size. A span's rise lifts it off
@@ -93,6 +205,18 @@ function TitleLayout({ layout, size, which, opacity }) {
       })}
     </g>
   );
+}
+
+// The graph state's image in two parts: the part above keepAbove (a share
+// of the canvas's height: the small plant) and the rest (its roots), with a
+// short soft seam between them.
+function keepMask(keepAbove, part) {
+  if (!(keepAbove > 0)) return undefined;
+  const a = Math.max(0, keepAbove * 100 - 1.5), b = Math.min(100, keepAbove * 100 + 1.5);
+  const img = part === 'above'
+    ? `linear-gradient(to bottom, #000 0%, #000 ${a}%, transparent ${b}%)`
+    : `linear-gradient(to bottom, transparent 0%, transparent ${a}%, #000 ${b}%)`;
+  return { WebkitMaskImage: img, maskImage: img, WebkitMaskSize: '100% 100%', maskSize: '100% 100%', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat' };
 }
 
 function CoverTitle({ title, size, start, refs }) {
@@ -129,6 +253,13 @@ function Cover({ config, viewState, children }) {
   const artRef = useRef(null);
   const artStateRef = useRef(null);
   const graphStateRef = useRef(null);
+  const graphKeepRef = useRef(null);
+  const reachLayerRef = useRef(null);
+  const reachRef = useRef(null);
+  const zoomRef = useRef(null);       // { k, homeK }: the graph's zoom, from its world
+  const geomRef = useRef(null);       // the last painted geometry
+  const shiftRef = useRef(0);         // how far below its rest the graph layer is drawn
+  const frameRef = useRef(null);
   const titleArtRef = useRef(null);
   const titleGraphRef = useRef(null);
   const bylineRef = useRef(null);
@@ -154,8 +285,56 @@ function Cover({ config, viewState, children }) {
 
   const geometry = (p) => {
     const vw = window.innerWidth, vh = window.innerHeight;
-    return coverGeometry(config, { vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh) }, p);
+    return coverGeometry(config, { vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh), zoom: zoomRef.current }, p);
   };
+
+  // The backdrop's strength (it follows the graph's zoom) and the rootlets:
+  // at most once a frame, and again while a rootlet's end is on its way.
+  const drawFrame = () => {
+    frameRef.current = null;
+    const world = window.PostPipeGraphWorld ? window.PostPipeGraphWorld.snapshot() : null;
+    if (world && world.k > 0 && world.homeK > 0) zoomRef.current = { k: world.k, homeK: world.homeK };
+    const m = machineRef.current;
+    if (!m) return;
+    const g = geometry(m.p);
+    geomRef.current = g;
+    paintRoots(g);
+    const reach = reachRef.current;
+    if (!reach || !sizeRef.current) return;
+    const zoomed = zoomRef.current ? backdropOpacity(config.backdrop, zoomRef.current.k, zoomRef.current.homeK) : config.backdrop.opacity;
+    const moving = reach.draw(performance.now(), {
+      box: g.art, world, opacity: g.graph.opacity * zoomed, settledCover: m.p >= 1 && !m.moving,
+    });
+    if (moving) requestFrame();
+  };
+  const requestFrame = () => {
+    if (frameRef.current) return;
+    frameRef.current = requestAnimationFrame(() => drawFrameRef.current());
+  };
+  const drawFrameRef = useRef(drawFrame);
+  drawFrameRef.current = drawFrame;
+
+  // The graph state's image: its roots at the backdrop's strength, the
+  // small plant (the copy masked above keepAbove) at its own.
+  const paintRoots = (g) => {
+    const roots = graphStateRef.current;
+    if (roots) roots.style.opacity = String(g.fade.graph * g.roots);
+    else if (artStateRef.current) artStateRef.current.style.opacity = String(g.roots);
+    if (graphKeepRef.current) graphKeepRef.current.style.opacity = String(g.fade.graph);
+  };
+
+  // Where the art sits in the graph state, for the graph's anchors.
+  const publishFrame = () => {
+    if (!sizeRef.current) return;
+    const g1 = geometry(1);
+    window.PostPipeCoverFrame = {
+      art: { left: g1.art.left, top: g1.art.top, width: g1.art.width, height: g1.art.height },
+      natural: { ...sizeRef.current },
+    };
+    window.dispatchEvent(new CustomEvent('postpipe:cover-frame'));
+  };
+  const publishFrameRef = useRef(publishFrame);
+  publishFrameRef.current = publishFrame;
 
   // Paint progress p: every moving part, straight to the DOM.
   const paint = (p) => {
@@ -173,10 +352,9 @@ function Cover({ config, viewState, children }) {
       a.style.transform = `translate3d(${g.art.left}px, ${g.art.top}px, 0)`;
       a.style.opacity = sizeRef.current ? String(g.art.opacity) : '0';
     }
-    if (graphStateRef.current) {
-      if (artStateRef.current) artStateRef.current.style.opacity = String(g.fade.art);
-      graphStateRef.current.style.opacity = String(g.fade.graph);
-    }
+    geomRef.current = g;
+    if (graphStateRef.current && artStateRef.current) artStateRef.current.style.opacity = String(g.fade.art);
+    paintRoots(g);
     const ta = titleArtRef.current && titleArtRef.current.firstChild;
     const tg = titleGraphRef.current && titleGraphRef.current.firstChild;
     if (ta) ta.style.opacity = String(g.fade.art);
@@ -199,6 +377,7 @@ function Cover({ config, viewState, children }) {
     const sec = sectionRef.current;
     if (sec) {
       const atRest = label === 'graph';
+      shiftRef.current = atRest ? 0 : g.graph.shift;
       // At the graph rest the layer carries no opacity or transform, so it
       // makes no stacking context and the controls inside it sit as before.
       sec.style.opacity = atRest ? '' : String(g.graph.opacity);
@@ -214,6 +393,7 @@ function Cover({ config, viewState, children }) {
       h.style.pointerEvents = label === 'graph' ? 'auto' : 'none';
       h.tabIndex = label === 'graph' ? 0 : -1;
     }
+    requestFrame();
   };
   const paintRef = useRef(paint);
   paintRef.current = paint;
@@ -236,7 +416,26 @@ function Cover({ config, viewState, children }) {
       m.resize(geometry(0).travel);
       paintRef.current(m.p);
     }
+    publishFrameRef.current();
   }, [art]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The rootlets' layer, and the graph's word that its world has changed.
+  useEffect(() => {
+    if (config.reach && reachLayerRef.current) {
+      reachRef.current = createReach(config.reach, reachLayerRef.current, { reduced, seed: config.art.graphState || config.art.artState });
+    }
+    const onWorld = () => requestFrame();
+    window.addEventListener('graph:world', onWorld);
+    requestFrame();
+    return () => {
+      window.removeEventListener('graph:world', onWorld);
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      if (reachRef.current) reachRef.current.dispose();
+      reachRef.current = null;
+      if (window.PostPipeCoverFrame) delete window.PostPipeCoverFrame;
+    };
+  }, [config, reduced]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The machine, from the first frame. Its rests are remembered.
   useLayoutEffect(() => {
@@ -291,12 +490,14 @@ function Cover({ config, viewState, children }) {
     window.PostPipeCover = {
       get state() { return machine.moving ? 'moving' : machine.rest; },
       get p() { return machine.p; },
+      get shift() { return shiftRef.current; },
       go: (s, o) => machine.go(s, o),
     };
 
     const onResize = () => {
       machine.resize(geometry(0).travel);
       paintRef.current(machine.p);
+      publishFrameRef.current();
     };
     window.addEventListener('resize', onResize);
 
@@ -423,7 +624,11 @@ function Cover({ config, viewState, children }) {
               data-cover-image="art" style={config.art.graphState ? { opacity: startArt ? 1 : 0 } : undefined} />
             {config.art.graphState && (
               <img ref={graphStateRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
-                data-cover-image="graph" style={{ opacity: startArt ? 0 : 1 }} />
+                data-cover-image="graph" style={{ opacity: startArt ? 0 : config.backdrop.opacity, ...keepMask(config.backdrop.keepAbove, 'below') }} />
+            )}
+            {config.art.graphState && config.backdrop.keepAbove > 0 && (
+              <img ref={graphKeepRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
+                data-cover-image="graph-keep" style={{ opacity: startArt ? 0 : 1, ...keepMask(config.backdrop.keepAbove, 'above') }} />
             )}
             <CoverTitle title={config.title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
           </div>
@@ -441,6 +646,7 @@ function Cover({ config, viewState, children }) {
             </a>
           )}
         </div>
+        {config.reach && <svg ref={reachLayerRef} className={styles.reach} aria-hidden="true" data-cover-reach style={{ opacity: 0 }} />}
       </div>
       <div
         ref={sectionRef}

@@ -41,7 +41,7 @@ const SITE = {
   opening: {
     enabled: true, mode: 'two-state',
     art: { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png' },
-    alt: 'A plant', ground: 'dark', graph: { artOffset: 0.33, artOpacity: 1 },
+    alt: 'A plant', ground: 'dark', graph: { artOffset: 0.33 },
     byline: { text: 'by someone', href: 'someone/' }, startOn: 'remembered', snapMs: 420,
   },
 };
@@ -75,16 +75,18 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.ok(onlyFull, 'full alone is enough');
   assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png' }, 'full stands for both states');
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
-  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artOpacity: 1 });
+  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33 });
+  assert.deepStrictEqual(onlyFull.backdrop, { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 });
+  assert.equal(onlyFull.reach, null, 'no reach unless it is on and names tips');
   assert.equal(onlyFull.ground, 'dark');
   assert.equal(onlyFull.startOn, 'remembered');
   assert.equal(onlyFull.snapMs, 420);
   const odd = openingConfig({ opening: { enabled: true, art: { full: 'a.png' }, ground: 'neon', startOn: 'middle', snapMs: -5, graph: { artOffset: 3, artOpacity: 7 } } });
+  assert.equal(odd.backdrop.opacity, 1, 'the earlier artOpacity still read, held to 0..1');
   assert.equal(odd.ground, 'dark');
   assert.equal(odd.startOn, 'remembered');
   assert.equal(odd.snapMs, 0);
   assert.equal(odd.graph.artOffset, 0.95);
-  assert.equal(odd.graph.artOpacity, 1);
 });
 
 test('start: remembered lands where the reader left, the art with no memory, the graph for #read=', () => {
@@ -142,8 +144,12 @@ test('geometry: everything follows p continuously between the rests', () => {
   }
   const half = coverGeometry(c, view, 0.5);
   assert.ok(half.graph.opacity > 0 && half.graph.opacity < 1, 'partway is in between');
-  const dim = coverGeometry({ ...c, graph: { artOffset: 0.33, artOpacity: 0.4 } }, view, 1);
-  assert.equal(dim.art.opacity, 0.4, 'artOpacity behind the graph');
+  const dim = openingConfig({ opening: { ...SITE.opening, backdrop: { opacity: 0.4, opacityZoomedIn: 0.1, zoomForFloor: 2 } } });
+  assert.equal(coverGeometry(dim, view, 1).roots, 0.4, 'the roots at backdrop.opacity behind the graph');
+  assert.equal(coverGeometry(dim, view, 1).art.opacity, 1, 'the canvas itself (the small plant) at full strength');
+  assert.equal(coverGeometry(dim, view, 0).roots, 1, 'the art state at full strength');
+  assert.ok(Math.abs(coverGeometry(dim, { ...view, zoom: { k: 0.8, homeK: 0.4 } }, 1).roots - 0.1) < 1e-9, 'zoomed in to the floor');
+  assert.equal(coverGeometry(dim, { ...view, zoom: { k: 0.2, homeK: 0.4 } }, 1).roots, 0.4, 'zoomed out: resting');
 });
 
 test('a wheel scrubs partway, and a pause settles it: on past the threshold, back short of it', () => {

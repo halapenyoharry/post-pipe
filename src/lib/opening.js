@@ -22,7 +22,9 @@ const DEFAULTS = {
   art: { artState: '', graphState: '', full: '' },
   alt: '',
   ground: 'dark',
-  graph: { artOffset: 0.33, artOpacity: 1 },
+  graph: { artOffset: 0.33 },
+  backdrop: { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 },
+  reach: { enabled: false, tips: [], perContainer: 3, stopShort: 18, lagMs: 600, drawMs: 1800 },
   byline: { text: '', href: '' },
   startOn: 'remembered',
   snapMs: 420,
@@ -112,6 +114,8 @@ const TUNING = {
   reducedWheelPx: 40,    // reduced motion: this much wheel or touch moves to the other state
 };
 
+const { reachConfig, backdropConfig, backdropOpacity } = require('./reach');
+
 const num = (v, d) => (v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : d);
 const str = (v) => (typeof v === 'string' ? v : '');
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -143,8 +147,9 @@ function openingConfig(settings) {
     ground: o.ground === 'paper' ? 'paper' : 'dark',
     graph: {
       artOffset: Math.max(0, Math.min(0.95, num(graph.artOffset, DEFAULTS.graph.artOffset))),
-      artOpacity: clamp01(num(graph.artOpacity, DEFAULTS.graph.artOpacity)),
     },
+    backdrop: backdropConfig(o),
+    reach: reachConfig(o),
     byline: { text: str(byline.text), href: str(byline.href) },
     startOn: ['remembered', 'art', 'graph'].includes(o.startOn) ? o.startOn : DEFAULTS.startOn,
     snapMs: Math.max(0, num(o.snapMs, DEFAULTS.snapMs)),
@@ -164,10 +169,14 @@ function startState(config, { stored, hash } = {}) {
 
 // Where everything is at progress p, in px, for a viewport (vw, vh), the
 // art's natural size (w, h: the canvas both state images share), and the
-// space the page keeps at the bottom (bottom: the rights line, say). The art
+// space the page keeps at the bottom (bottom: the rights line, say), and the
+// graph's zoom (zoom: { k, homeK }). The art
 // keeps one scale throughout, the largest that fits the whole plant, with
 // the byline under it, in the art state; only its top moves.
 //   art         { top, left, width, height, scale, opacity }: the canvas
+//   roots       the backdrop's roots' strength at p: 1 at art, and at graph
+//               backdrop.opacity, lowered as the graph is zoomed in past the
+//               zoom it rests at (zoom: { k, homeK }; reach.js backdropOpacity)
 //   fade        { art, graph }: the two state images' opacities (1 - p, p),
 //               and the title's two layouts'
 //   artTop0, artTop1   its top at the two rests (artTop1 = -artOffset of its height)
@@ -175,7 +184,7 @@ function startState(config, { stored, hash } = {}) {
 //   graph       { opacity, shift }: the graph layer, shift px below its rest
 //   ground      the art state's ground's opacity (1 at art, 0 at graph)
 //   byline      { x, y, size, opacity }: (x, y) is the centre of its top
-function coverGeometry(config, { vw, vh, art, bottom = 0 } = {}, p = 0) {
+function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null } = {}, p = 0) {
   const t = clamp01(p);
   const T = TUNING;
   const W = Math.max(1, (art && art.w) || 1), H = Math.max(1, (art && art.h) || 1);
@@ -187,6 +196,7 @@ function coverGeometry(config, { vw, vh, art, bottom = 0 } = {}, p = 0) {
   const scale = Math.max(0.01, Math.min(room / H, (vw - 2 * pad) / W));
   const width = W * scale, height = H * scale;
   const g = (config && config.graph) || DEFAULTS.graph;
+  const bd = (config && config.backdrop) || DEFAULTS.backdrop;
   const artTop0 = pad + Math.max(0, (room - height) / 2);
   const artTop1 = -g.artOffset * height;
   const top = lerp(artTop0, artTop1, t);
@@ -194,7 +204,8 @@ function coverGeometry(config, { vw, vh, art, bottom = 0 } = {}, p = 0) {
   return {
     p: t,
     vw, vh,
-    art: { top, left: (vw - width) / 2, width, height, scale, opacity: lerp(1, g.artOpacity, t) },
+    art: { top, left: (vw - width) / 2, width, height, scale, opacity: 1 },
+    roots: lerp(1, zoom ? backdropOpacity(bd, zoom.k, zoom.homeK) : bd.opacity, t),
     fade: { art: 1 - t, graph: t },
     artTop0, artTop1,
     travel: Math.max(1, artTop0 - artTop1),

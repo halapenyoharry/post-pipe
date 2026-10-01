@@ -12,6 +12,7 @@ import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { layoutKey } from './layoutKey';
+import { fraction, anchorWorld, homeView } from '../../lib/reach';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
@@ -162,18 +163,20 @@ function feedToGraph(feed, config = {}) {
 function applyVisibility(svg, cardsLayer, hiddenSet) {
   const isHiddenArticle = (d) =>
     d && d.type === 'article' && d._source && hiddenSet.has(d._source.id);
+  // A member of a closed container stays hidden whatever its source.
+  const isHidden = (d) => Boolean(d && (d._closedHidden || isHiddenArticle(d)));
 
   svg.selectAll('.node')
-    .style('display', (d) => isHiddenArticle(d) ? 'none' : null);
+    .style('display', (d) => isHidden(d) ? 'none' : null);
 
   cardsLayer.selectAll('.node-card')
-    .style('display', (d) => isHiddenArticle(d) ? 'none' : null);
+    .style('display', (d) => isHidden(d) ? 'none' : null);
 
   svg.selectAll('.link, .link-hit')
     .style('display', (l) => {
       const sNode = typeof l.source === 'object' ? l.source : null;
       const tNode = typeof l.target === 'object' ? l.target : null;
-      if (isHiddenArticle(sNode) || isHiddenArticle(tNode)) return 'none';
+      if (isHidden(sNode) || isHidden(tNode)) return 'none';
       return null;
     });
 }
@@ -202,6 +205,23 @@ function applyTimeFilter(svg, cardsLayer, filteredSet) {
       const tid = typeof l.target === 'object' ? l.target.id : l.target;
       return !filteredSet.has(sid) && !filteredSet.has(tid);
     });
+}
+
+// Where a site rests each container on its cover's art: { id: { x, y } },
+// fractions of the art's width and height (containers[].anchor).
+function anchorsOf(feed) {
+  const out = {};
+  for (const c of (feed && feed.containers) || []) {
+    const a = fraction(c.anchor);
+    if (a) out[c.id] = a;
+  }
+  return out;
+}
+
+// A container's title: where the layout puts it ('center', the default), at
+// the top of its hull ('top'), or not drawn ('hidden').
+function labelPositionOf(c) {
+  return c && (c.labelPosition === 'top' || c.labelPosition === 'hidden') ? c.labelPosition : 'center';
 }
 
 // Zoom-aware level of detail.
@@ -295,11 +315,13 @@ export function GraphViewer({
   // the settings that shape it (layoutKey.js: a changed spiral, or a bumped
   // graph.layoutVersion, retires the old positions). How big the reader made
   // it does not, so size is filed against the item alone.
-  const layoutKeys = useRef({ settings: null, keys: new Map() });
+  // A container's anchor (where a site rests it on its cover's art) is part
+  // of that signature too.
+  const layoutKeys = useRef({ settings: null, feed: null, keys: new Map() });
   const placeOf = (name) => {
     const c = layoutKeys.current;
-    if (c.settings !== graphSettings) { c.settings = graphSettings; c.keys = new Map(); }
-    if (!c.keys.has(name)) c.keys.set(name, layoutKey(name, graphSettings) + '::');
+    if (c.settings !== graphSettings || c.feed !== feedData) { c.settings = graphSettings; c.feed = feedData; c.keys = new Map(); }
+    if (!c.keys.has(name)) c.keys.set(name, layoutKey(name, graphSettings, { anchors: anchorsOf(feedData) }) + '::');
     return c.keys.get(name);
   };
   const positionKey = (d) => placeOf(layoutRef.current) + persistKey(d);
@@ -444,6 +466,7 @@ export function GraphViewer({
     let rotGesture = null; // { theta0, a0, mx, my, started }
     let paintedRotation = 0;
     let positionsReady = false;
+    let homeK = null; // the zoom the graph state rests at (applyHomeView, fitToViewport)
     let view = { x: 0, y: 0, k: 1 };
     const upright = () => (rotation ? ` rotate(${-rotation})` : '');
     const viewFor = (t) => rotatedView(t, rotGesture, rotation);
@@ -471,6 +494,7 @@ export function GraphViewer({
       // The rail is pinned to the window and the nodes are not, so every pan
       // and zoom moves one end of every connector.
       if (connectorUpdateRef.current) connectorUpdateRef.current();
+      if (positionsReady) publishWorld();
       const newLod = getLOD(newScale);
       if (newLod !== currentLodRef.current) {
         currentLodRef.current = newLod;
@@ -1058,6 +1082,7 @@ export function GraphViewer({
           const totalMove = state ? state.totalMove : 0;
 
           if (totalMove >= 4) {
+            anchorsAuto = false;
             const memberSlugs = getAllMemberSlugs(c.id);
             const vs = viewStateRef.current;
             for (const slug of memberSlugs) {
@@ -1194,17 +1219,152 @@ export function GraphViewer({
     const spiralOn = () => graphSettings.spiral?.enabled !== false
       && (layoutRef.current === 'force' || layoutRef.current === 'radial');
 
+    // ── Anchors ────────────────────────────────────────────────────────────
+    // A site can rest a container on its cover's art (containers[].anchor,
+    // fractions of the art; src/components/Opening publishes where the art
+    // sits in the graph state as window.PostPipeCoverFrame). The view the
+    // graph rests at is then the home view, at initialFocusMinScale from the
+    // frame's corner, and a fresh layout (or Reset) puts each anchored
+    // container's centre (its title, or its closed node) where its anchor
+    // falls on the art. Each anchored container keeps a frame of its own:
+    // it can be dragged on its own, and opens and closes in place. Saved
+    // positions work as before; the anchors are part of their key.
+    const ANCHORS = new Map(Object.entries(anchorsOf(feedData)).filter(([id]) => containerById.has(id)));
+    let coverFrame = typeof window !== 'undefined' ? window.PostPipeCoverFrame || null : null;
+    const anchorsOn = () => ANCHORS.size > 0 && !!(coverFrame && coverFrame.art)
+      && spiralOn() && layoutRef.current === 'force' && CL.containers.size > 0;
+    // Each member's innermost anchored container.
+    const anchoredOf = new Map();
+    for (const cId of [...ANCHORS.keys()].sort((a, b) => depthOf(containerById.get(b)) - depthOf(containerById.get(a)))) {
+      for (const slug of getAllMemberSlugs(cId)) if (!anchoredOf.has(slug)) anchoredOf.set(slug, cId);
+    }
+    // Where an anchored container's centre is in the world now.
+    function centreOf(cId) {
+      const info = CL.containers.get(cId);
+      const off = info && containerOffset(cId);
+      return off ? { x: off.x + info.center.x, y: off.y + info.center.y } : null;
+    }
+    // Where the graph's frame sits on the screen in the graph state (the
+    // cover moves it while it comes in).
+    function graphOrigin() {
+      if (!containerRef.current) return { x: 0, y: 0 };
+      const r = containerRef.current.getBoundingClientRect();
+      const shift = (typeof window !== 'undefined' && window.PostPipeCover && window.PostPipeCover.shift) || 0;
+      return { x: r.left, y: r.top - shift };
+    }
+    // Where each anchor falls in the world, through the home view.
+    function anchorTargets() {
+      const out = new Map();
+      if (!anchorsOn()) return out;
+      const view = homeView(FOCUS_MIN_SCALE);
+      const origin = graphOrigin();
+      for (const [cId, a] of ANCHORS) out.set(cId, anchorWorld(a, coverFrame.art, view, origin));
+      return out;
+    }
+    // Move each anchored container, members and all, so its centre is on
+    // its anchor; they stay there (pinned) until the reader moves them.
+    let anchorsPending = false;   // a fresh layout: place them when the art is known
+    let anchorsAuto = false;      // placed by the layout and not moved since
+    // Saved positions hold an anchored container where the reader left it:
+    // pinned, so nothing pulls it off. With none saved, the layout is fresh.
+    if (ANCHORS.size) {
+      const vs = viewStateRef.current;
+      let saved = false;
+      if (vs && !positionsWereDegenerate) {
+        for (const slug of anchoredOf.keys()) {
+          const n = nodeBySlug.get(slug);
+          const st = n && vs.nodeState(positionKey(n));
+          if (st && Number.isFinite(st.x) && Number.isFinite(st.y)) { saved = true; n.fx = n.x; n.fy = n.y; }
+        }
+      }
+      anchorsPending = !saved;
+    }
+    function placeAnchors() {
+      if (!anchorsOn()) return false;
+      for (const [cId, w] of anchorTargets()) {
+        const c = centreOf(cId);
+        if (!c) continue;
+        const dx = w.x - c.x, dy = w.y - c.y;
+        for (const slug of getAllMemberSlugs(cId)) {
+          const n = nodeBySlug.get(slug);
+          if (!n || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
+          n.x += dx; n.y += dy;
+          n.fx = n.x; n.fy = n.y;
+          n.vx = 0; n.vy = 0;
+        }
+      }
+      anchorsPending = false;
+      anchorsAuto = true;
+      return true;
+    }
+
+    // ── The graph's world, for the page around it ─────────────────────────
+    // The cover's rootlets (src/components/Opening) reach for containers
+    // drawn here. window.PostPipeGraphWorld.snapshot() gives, in screen px,
+    // each container they reach for (the anchored ones, or else each act: a
+    // top-level container's children) as the outline it is drawn with,
+    // closed or open, and its centre; and the zoom, k against the zoom the
+    // graph rests at (homeK). 'graph:world' is sent whenever any of that may
+    // have changed; the page draws at most once a frame.
+    const reachIds = () => (ANCHORS.size
+      ? [...ANCHORS.keys()]
+      : (data.containers || []).filter((c) => c.parent && !containerById.get(c.parent)?.parent).map((c) => c.id));
+    const outlineCache = new WeakMap();
+    function outlineOf(path) {
+      const d = path.getAttribute('d') || '';
+      const hit = outlineCache.get(path);
+      if (hit && hit.d === d) return hit.pts;
+      let pts = [];
+      try {
+        const len = path.getTotalLength();
+        const n = 72;
+        for (let i = 0; i < n; i++) { const q = path.getPointAtLength((len * i) / n); pts.push([q.x, q.y]); }
+      } catch { pts = []; }
+      outlineCache.set(path, { d, pts });
+      return pts;
+    }
+    function worldSnapshot() {
+      const out = [];
+      if (!positionsReady) return { containers: out, k: zoomScaleRef.current, homeK };
+      for (const id of reachIds()) {
+        const group = containerGroups.filter((c) => c.id === id);
+        const el = group.node();
+        if (!el || el.style.display === 'none') continue;
+        const closed = closedContainers.has(id);
+        const path = group.select(closed ? '.container-macro-bg' : '.container-hull').node();
+        if (!path || (!closed && path.style.display === 'none')) continue;
+        const local = outlineOf(path);
+        const m = path.getScreenCTM();
+        if (!m || local.length < 3) continue;
+        const hull = local.map(([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }));
+        let cx = 0, cy = 0;
+        for (const q of hull) { cx += q.x; cy += q.y; }
+        out.push({ id, closed, hull, centre: { x: cx / hull.length, y: cy / hull.length } });
+      }
+      return { containers: out, k: zoomScaleRef.current, homeK };
+    }
+    function publishWorld() {
+      if (typeof window === 'undefined') return;
+      window.dispatchEvent(new CustomEvent('graph:world'));
+    }
+    if (typeof window !== 'undefined') window.PostPipeGraphWorld = { snapshot: worldSnapshot };
+
     function createContainerLayoutForce() {
       function force(alpha) {
         if (!spiralOn() || layoutRef.current !== 'force') return;
         const strength = graphSettings.spiral?.strength ?? 0.35;
+        // An anchored container holds its shape in its own frame.
+        const own = new Map();
+        if (anchorsOn()) for (const cId of ANCHORS.keys()) own.set(cId, containerOffset(cId));
         for (const rootId of CL.roots) {
-          const off = rootOffset(rootId);
-          if (!off) continue;
+          const rootOff = rootOffset(rootId);
           for (const [id, p] of CL.nodes) {
             if (p.root !== rootId) continue;
             const n = nodeBySlug.get(id);
             if (!n || !Number.isFinite(n.x)) continue;
+            const a = anchoredOf.get(id);
+            const off = (a && own.get(a)) || rootOff;
+            if (!off) continue;
             n.vx += (off.x + p.x - n.x) * strength * alpha;
             n.vy += (off.y + p.y - n.y) * strength * alpha;
           }
@@ -1389,6 +1549,7 @@ export function GraphViewer({
 
     function updateContainers() {
       if (sortedContainers.length === 0) return;
+      publishWorld();
       const useLayout = spiralOn() && CL.containers.size > 0;
       // Each container's frame is measured from its own members, so a label
       // follows its container when the reader drags just that container.
@@ -1482,7 +1643,9 @@ export function GraphViewer({
         }
 
         // The label is part of the container: the hull wraps it too, and the
-        // labels of the open containers inside it.
+        // labels of the open containers inside it, each on its own frame.
+        // A label at the top of the hull, or not drawn, is not wrapped.
+        const labelPos = labelPositionOf(c);
         let labelAt = null;
         if (f) {
           const lp = pad / 2;
@@ -1490,24 +1653,27 @@ export function GraphViewer({
           const walk = (id) => {
             for (const ch of (containerChildren.get(id) || [])) {
               if (closedContainers.has(ch)) continue;
-              const info = CL.containers.get(ch);
-              if (info) inner.push(info.label);
+              const chObj = containerById.get(ch);
+              const fc = chObj && framed(chObj);
+              if (fc && labelPositionOf(chObj) !== 'hidden') inner.push({ L: fc.info.label, off: fc.off });
               walk(ch);
             }
           };
           walk(c.id);
-          for (const L of inner) {
+          for (const { L, off } of inner) {
+            points.push(
+              [off.x + L.x0 - lp, off.y + L.y0 - lp], [off.x + L.x1 + lp, off.y + L.y0 - lp],
+              [off.x + L.x1 + lp, off.y + L.y1 + lp], [off.x + L.x0 - lp, off.y + L.y1 + lp]
+            );
+          }
+          const L = f.info.label;
+          labelAt = { x: f.off.x + (L.x0 + L.x1) / 2, y: f.off.y + (L.y0 + L.y1) / 2 };
+          if (labelPos === 'center') {
             points.push(
               [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp], [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
               [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp], [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp]
             );
           }
-          const L = f.info.label;
-          labelAt = { x: f.off.x + (L.x0 + L.x1) / 2, y: f.off.y + (L.y0 + L.y1) / 2 };
-          points.push(
-            [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp], [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
-            [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp], [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp]
-          );
         }
 
         if (points.length === 0) {
@@ -1523,6 +1689,7 @@ export function GraphViewer({
         group.select('.container-hull-ghost').attr('d', sketchOn ? hullLine(jitterPoints(hull, c.id, 3.5)) : '');
 
         const badge = group.select('.container-badge');
+        badge.attr('data-label-position', labelPos);
         badge.select('.label-count').text(containerCountText(GS, memberNodes.length));
 
         const sizeHit = (size) => {
@@ -1530,6 +1697,25 @@ export function GraphViewer({
           badge.select('.container-badge-hit')
             .attr('x', -blk.w / 2).attr('y', -blk.h / 2).attr('width', blk.w).attr('height', blk.h);
         };
+
+        if (labelPos === 'hidden') {
+          badge.style('display', 'none');
+          containerAnchor.set(c.id, labelAt || { x: d3.mean(hull, (p) => p[0]), y: d3.mean(hull, (p) => p[1]) });
+          return;
+        }
+        if (labelPos === 'top') {
+          // Centred across the hull, its top just inside the hull's top.
+          const size = labelAt ? fs : Math.max(LABEL_MIN, Math.min(LABEL_MAX, (d3.max(hull, (p) => p[0]) - d3.min(hull, (p) => p[0])) / 8));
+          const blk = labelBlockSize(c, size);
+          const minY = d3.min(hull, (p) => p[1]);
+          const x0 = d3.min(hull, (p) => p[0]), x1 = d3.max(hull, (p) => p[0]);
+          const at = { x: (x0 + x1) / 2, y: minY + pad * 0.5 + blk.h / 2 };
+          badge.select('.container-badge-text').attr('font-size', `${size}px`);
+          sizeHit(size);
+          badge.attr('transform', `translate(${at.x}, ${at.y})${upright()}`);
+          containerAnchor.set(c.id, at);
+          return;
+        }
 
         if (labelAt) {
           badge.select('.container-badge-text').attr('font-size', `${fs}px`);
@@ -1618,15 +1804,27 @@ export function GraphViewer({
     function relayoutContainers() {
       if (!data.containers || data.containers.length === 0) return;
       const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
+      // An anchored container keeps its centre where it is.
+      const centres = new Map();
+      if (anchorsOn()) for (const cId of ANCHORS.keys()) { const c = centreOf(cId); if (c) centres.set(cId, c); }
       updateMacroBounds();
       computeContainerLayout();
       refreshContainerForces();
       if (!spiralOn()) return;
-      if (!hasSettled) { simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
       const moves = [];
       for (const [id, p] of CL.nodes) {
         const n = nodeBySlug.get(id);
+        const a = anchoredOf.get(id);
+        if (!n || !Number.isFinite(n.x) || !a || !centres.has(a)) continue;
+        const c = centres.get(a), info = CL.containers.get(a);
+        moves.push({ n, x0: n.x, y0: n.y, x1: c.x - info.center.x + p.x, y1: c.y - info.center.y + p.y });
+      }
+      if (!hasSettled && !moves.length) { simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
+      for (const [id, p] of CL.nodes) {
+        const n = nodeBySlug.get(id);
         const off = anchors.get(p.root);
+        const a = anchoredOf.get(id);
+        if (a && centres.has(a)) continue;
         if (!n || !off || !Number.isFinite(n.x)) continue;
         moves.push({ n, x0: n.x, y0: n.y, x1: off.x + p.x, y1: off.y + p.y });
       }
@@ -2044,6 +2242,7 @@ export function GraphViewer({
           }
           d.fx = d.x; d.fy = d.y;
           if (!d._dragMoved) return;
+          anchorsAuto = false;
           // One history entry for the whole drag, not one per frame.
           if (vs) {
             vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
@@ -2685,6 +2884,18 @@ export function GraphViewer({
     graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen };
     positionsReady = true;
 
+    // The cover says where its art sits in the graph state (and again when
+    // that changes): a fresh layout puts the anchored containers on their
+    // anchors, and the view rests at the home view until the reader moves it.
+    function onCoverFrame() {
+      coverFrame = (typeof window !== 'undefined' && window.PostPipeCoverFrame) || null;
+      if (!anchorsOn()) return;
+      if (anchorsPending || (anchorsAuto && !userMovedView)) { placeAnchors(); applyPositions(); }
+      if (!userMovedView) applyHomeView(false);
+    }
+    window.addEventListener('postpipe:cover-frame', onCoverFrame);
+    onCoverFrame();
+
     // The axis is measured against the corpus extent, which keeps changing
     // while the simulation runs — so drawing it once at the start pins it to
     // whatever the first frame happened to look like. Redrawn on a throttle
@@ -2744,10 +2955,21 @@ export function GraphViewer({
     function containerExtent() {
       if (!spiralOn() || CL.roots.length === 0) return null;
       const rects = [];
+      // Anchored containers sit where they were put, each on its own frame.
+      const anchoredOn = anchorsOn();
+      if (anchoredOn) {
+        for (const cId of ANCHORS.keys()) {
+          const info = CL.containers.get(cId);
+          const off = info && containerOffset(cId);
+          if (!off || hasClosedAncestor(containerById.get(cId))) continue;
+          rects.push({ x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 });
+        }
+      }
       for (const rootId of CL.roots) {
         const info = CL.containers.get(rootId);
         const off = rootOffset(rootId);
         if (!info || !off) continue;
+        if (anchoredOn && getAllMemberSlugs(rootId).every((s) => anchoredOf.has(s))) continue;
         if (getAllMemberSlugs(rootId).every((s) => hiddenSourcesRef.current.has(nodeBySlug.get(s)?._source?.id))) continue;
         rects.push({ x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 });
       }
@@ -2820,7 +3042,29 @@ export function GraphViewer({
       return { top: Math.max(0, Math.min(h / 4, top)), bottom: Math.max(0, Math.min(h / 3, bottom)) };
     }
 
+    // The view the graph state rests at, and returns to: with anchors the
+    // home view (initialFocusMinScale from the frame's corner, so each
+    // anchored container sits on its anchor), else the first framing
+    // (homeK, declared with the view above).
+    function applyHomeView(animate) {
+      const v = homeView(FOCUS_MIN_SCALE);
+      const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
+      homeK = v.k;
+      resetRotation({ repaint: false });
+      if (animate) svg.transition().duration(750).call(zoom.transform, transform);
+      else svg.call(zoom.transform, transform);
+      publishWorld();
+      return true;
+    }
+
     function fitToViewport({ animate = false, initialZoomOut = false, focus = true } = {}) {
+      if (focus && anchorsOn()) return applyHomeView(animate);
+      const fitted = fitTo({ animate, initialZoomOut, focus });
+      if (fitted && focus) { homeK = fitted; publishWorld(); }
+      return Boolean(fitted);
+    }
+
+    function fitTo({ animate = false, initialZoomOut = false, focus = true } = {}) {
       const ext = containerExtent();
       if (ext) {
         let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
@@ -2859,7 +3103,7 @@ export function GraphViewer({
         resetRotation({ repaint: false });
         if (animate) svg.transition().duration(750).call(zoom.transform, transform);
         else svg.call(zoom.transform, transform);
-        return true;
+        return transform.k;
       }
       const pts = data.nodes.filter(d => d.type === 'article');
       if (pts.length < 2) return false;
@@ -2941,7 +3185,7 @@ export function GraphViewer({
       } else {
         svg.call(zoom.transform, transform);
       }
-      return true;
+      return transform.k;
     }
 
     let hasSettled = false;
@@ -3052,6 +3296,7 @@ export function GraphViewer({
         d.fy = null;
         delete d._forcePos;
       });
+      if (anchorsOn()) { placeAnchors(); applyPositions(); }
       simulation.alpha(0.8).restart();
       fitToViewport({ animate: true });
     };
@@ -3087,6 +3332,10 @@ export function GraphViewer({
         window.dispatchEvent(new CustomEvent('graph:containers-changed', { detail: containerState() }));
       }
       if (data.containers && data.containers.length && spiralOn()) {
+        // Anchored containers back on their anchors first, then laid out
+        // again round where they now are.
+        anchorsPending = ANCHORS.size > 0;
+        if (anchorsOn()) placeAnchors();
         relayoutContainers();
         updateContainers();
         applyPositions();
@@ -3131,6 +3380,8 @@ export function GraphViewer({
       container.removeEventListener('touchend', onTwoTapEnd, { capture: true });
       tapGate.cancel();
       window.removeEventListener('graph:reset-all', handleResetAll);
+      window.removeEventListener('postpipe:cover-frame', onCoverFrame);
+      if (window.PostPipeGraphWorld && window.PostPipeGraphWorld.snapshot === worldSnapshot) delete window.PostPipeGraphWorld;
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
       window.removeEventListener('graph:reset-sizes', handleResetSizes);

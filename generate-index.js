@@ -742,14 +742,23 @@ async function main() {
   const feed = buildFeed(items);
   feed.edges = buildEdges(items, SETTINGS);
   if (SETTINGS.containment) {
-    // settings.containers.<id> carries per-container extras (a status line
-    // such as "soon"); it wins over the same field on the containment entry.
+    // settings.containers.<id> carries per-container extras: a status line
+    // such as "soon"; an anchor, where the container rests on the cover's
+    // art ({ x, y }, fractions of the art); and labelPosition (center, top or
+    // hidden). Each wins over the same field on the containment entry.
     // Keyed by the full id ("container:act-2") or the bare one ("act-2").
     const extras = SETTINGS.containers || {};
     feed.containers = SETTINGS.containment.map((c) => {
       const extra = extras[c.id] || extras[String(c.id).replace(/^container:/, '')] || {};
+      const out = { ...c };
       const status = extra.status != null ? extra.status : c.status;
-      return status != null && status !== '' ? { ...c, status: String(status) } : c;
+      if (status != null && status !== '') out.status = String(status); else delete out.status;
+      const anchor = extra.anchor != null ? extra.anchor : c.anchor;
+      if (anchor && Number.isFinite(Number(anchor.x)) && Number.isFinite(Number(anchor.y))) out.anchor = { x: Number(anchor.x), y: Number(anchor.y) };
+      else delete out.anchor;
+      const labelPosition = extra.labelPosition != null ? extra.labelPosition : c.labelPosition;
+      if (['center', 'top', 'hidden'].includes(labelPosition)) out.labelPosition = labelPosition; else delete out.labelPosition;
+      return out;
     });
   }
   feed._sources = sources;

@@ -405,7 +405,8 @@
     "readingProgress": true,
     "_readingProgress_note": "A thin bar along the bottom of each card shows how far this viewer has read it, filling as they go; a card read to the end keeps a full bar and a small tick. Kept in the viewer's own browser (viewState), never sent anywhere. Default true; false hides it.",
     "roots": false,
-    "_roots_note": "true, or { seed }, to grow roots behind the graph: thin branching lines along the reading path, from the top container's title to each child's, to the first piece of each run and on along the sequence edges. A root reaching a piece draws in once the viewer opens it and thickens once they finish it (from their own reading progress). Seeded by seed, else the top container's id, so a book always grows the same roots. Drawn under the hulls, never takes a pointer; colour from --pp-root-color. Default false."
+    "_roots_note": "true, or { seed }, to grow roots behind the graph: thin branching lines along the reading path, from the top container's title to each child's, to the first piece of each run and on along the sequence edges. A root reaching a piece draws in once the viewer opens it and thickens once they finish it (from their own reading progress). Seeded by seed, else the top container's id, so a book always grows the same roots. Drawn under the hulls, never takes a pointer; colour from --pp-root-color. Default false.",
+    "_anchors_note": "A container can rest on the cover's art: containers[<id>].anchor { x, y }, fractions of the art's width and height (settings.opening). With anchors and the cover on, the graph state rests at the home view (initialFocusMinScale, default 0.4, from the frame's corner) instead of the first framing, and a fresh layout, or Reset, puts each anchored container's centre (its title, or its closed node) on its anchor. Each anchored container keeps a frame of its own: it can be dragged on its own and opens and closes in place. Zoom to Fit still frames everything. The anchors are part of the saved positions' key, so moving one retires positions saved against the old ones. containers[<id>].labelPosition: center (default, where the layout puts the title), top (centred at the top of the hull) or hidden (not drawn)."
   },
   "dimensions": {
     "labels": {},
@@ -423,8 +424,21 @@
     "alt": "",
     "ground": "dark",
     "graph": {
-      "artOffset": 0.33,
-      "artOpacity": 1
+      "artOffset": 0.33
+    },
+    "backdrop": {
+      "opacity": 1,
+      "opacityZoomedIn": 0.3,
+      "zoomForFloor": 2.5,
+      "keepAbove": 0
+    },
+    "reach": {
+      "enabled": false,
+      "tips": [],
+      "perContainer": 3,
+      "stopShort": 18,
+      "lagMs": 600,
+      "drawMs": 1800
     },
     "byline": {
       "text": "",
@@ -438,14 +452,20 @@
       "color": "",
       "opacity": 1,
       "hideGraphTitle": true,
-      "art": { "lines": [] },
-      "graph": { "lines": [] }
+      "art": {
+        "lines": []
+      },
+      "graph": {
+        "lines": []
+      }
     }
   },
   "_opening_title_note": "Optional: a title set over the cover, as text. art and graph are its two layouts, crossfaded with the images: lines, each { x, y, spans }, with x the line's left edge and y its baseline as fractions of the canvas's width and height, and spans, each { text, size, rise }, with size and rise (a lift off the baseline) as fractions of the canvas's width, so the title scales and moves with the art. font names a face (a site's own in fonts, below), followed by 'Arial Black', Impact, sans-serif; color defaults to the accent; opacity is the text's. text is its accessible name (default: the art layout's words). hideGraphTitle (default true) leaves the graph's own title for the whole book undrawn while the cover carries it.",
+  "_opening_backdrop_note": "How strongly the art shows behind the graph. backdrop.opacity (0..1, default 1) is the graph state's roots at the zoom the graph rests at; zooming in they fade toward opacityZoomedIn (default 0.3), reached at zoomForFloor (default 2.5) times that zoom and held further in; zooming back out they return. keepAbove (a share of the canvas's height from the top, default 0) is the part of the graph state's image that keeps its own strength whatever the zoom, such as a small plant above the roots: it is drawn as a second copy of the image masked to that part, with a short soft seam. The earlier graph.artOpacity is still read as backdrop.opacity.",
+  "_opening_reach_note": "Off by default. reach.enabled draws rootlets from the art to the containers: thin, seeded, forking lines in screen space, in one layer between the art and the graph. tips: points on the art, each { x, y } as fractions of its width and height (the root ends the rootlets grow from). Each container they reach for (those with an anchor, else each child of a top-level container) is reached from its perContainer nearest tips (default 3); a rootlet is aimed at the container's centre and stops stopShort px (default 18) before its outline, closed or open. When a container is dragged or the graph pans or zooms, the ends re-aim, easing over lagMs (default 600); the starts stay on the art. A rootlet draws in over drawMs (default 1800) the first time it shows. They fade with the backdrop's roots as the graph is zoomed in. Reduced motion: they appear without drawing in and follow at once. Anchors: containers[<id>].anchor { x, y }, fractions of the art, rests a container there in the graph state (see graph._anchors_note).",
   "fonts": [],
   "_fonts_note": "A site's own faces: [{ family, file, license }], file and license relative to the site root (ttf, otf, woff or woff2). Copied next to the page, declared with @font-face and preloaded; nothing is fetched from elsewhere. A face whose file is missing is left out with a warning, and text set in it falls back.",
   "accent": "",
   "_accent_note": "Optional: one accent colour for the site in every theme (links, the reader's and the panel's accent, the bottom bar's active pill, the selected state). Kept as given wherever it reaches WCAG AA (4.5:1) for text, else moved toward black on paper or white on graphite just far enough; the tint behind an active control is the colour at 12%. Empty: each theme keeps its own.",
-  "_opening_note": "A cover as the page's top state, off by default. mode two-state (the only one): the cover art fixed behind the page, and the graph drawn over it. art: artState and graphState, two images of one canvas (the same size, the parts they share in the same place), stacked and crossfaded as the page moves, the art state's at 1 - p and the graph state's at p; or full alone, one image for both states; paths relative to the site root. In the art state the whole canvas fits the screen with byline.text under it (a same-tab link to byline.href); in the graph state it is scrolled up by graph.artOffset of its height (0.33 puts the place where the plant meets the roots about a quarter of the way down a phone) and shown at graph.artOpacity (0..1, default 1), and the graph with its controls fades and rises in over it. The art never pans or zooms with the graph. Scroll, a touch drag, a tap on the art, or ArrowDown, PageDown or Space go to the graph; ArrowUp or PageUp, a scroll up at the top edge, or the grip at the top go back; a reader can scrub partway and it settles at one of the two over snapMs. alt describes the image. ground: dark (default) puts the art on the theme's dark paper and keeps the page in dark mode, the reader and the panel keeping the reader's own mode; paper puts it on the theme's paper. startOn: remembered (where this reader left it, the art for a new reader; Forget clears it), art or graph. A #read= link opens on the graph. Reduced motion: the two states swap in a short fade, with no scrolling."
+  "_opening_note": "A cover as the page's top state, off by default. mode two-state (the only one): the cover art fixed behind the page, and the graph drawn over it. art: artState and graphState, two images of one canvas (the same size, the parts they share in the same place), stacked and crossfaded as the page moves, the art state's at 1 - p and the graph state's at p; or full alone, one image for both states; paths relative to the site root. In the art state the whole canvas fits the screen with byline.text under it (a same-tab link to byline.href); in the graph state it is scrolled up by graph.artOffset of its height (0.33 puts the place where the plant meets the roots about a quarter of the way down a phone) with its roots at backdrop.opacity (see _opening_backdrop_note), and the graph with its controls fades and rises in over it. The art never pans or zooms with the graph. Scroll, a touch drag, a tap on the art, or ArrowDown, PageDown or Space go to the graph; ArrowUp or PageUp, a scroll up at the top edge, or the grip at the top go back; a reader can scrub partway and it settles at one of the two over snapMs. alt describes the image. ground: dark (default) puts the art on the theme's dark paper and keeps the page in dark mode, the reader and the panel keeping the reader's own mode; paper puts it on the theme's paper. startOn: remembered (where this reader left it, the art for a new reader; Forget clears it), art or graph. A #read= link opens on the graph. Reduced motion: the two states swap in a short fade, with no scrolling."
 }

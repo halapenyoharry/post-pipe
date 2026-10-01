@@ -61,6 +61,35 @@ html[data-pp-cover="graph"] .stage {
   -webkit-user-drag: none;
 }
 
+/* The rootlets (opening.reach): one layer over the art and under the graph,
+   in screen px, never touched. Drawn in the roots' own pale ink. */
+.reach {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.reach :global(.reach-main),
+.reach :global(.reach-fine) {
+  fill: none;
+  stroke: var(--pp-reach-color, #ece6da);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.reach :global(.reach-main) {
+  stroke-width: 1.4px;
+  stroke-opacity: 0.62;
+}
+
+.reach :global(.reach-fine) {
+  stroke-width: 0.8px;
+  stroke-opacity: 0.42;
+}
+
 /* The title over the art, on the art's canvas (Opening.jsx). Text, not a
    picture: the site's face, its colour and opacity from opening.title. */
 .title {
