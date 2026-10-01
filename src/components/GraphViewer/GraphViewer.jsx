@@ -466,6 +466,7 @@ export function GraphViewer({
     let rotGesture = null; // { theta0, a0, mx, my, started }
     let paintedRotation = 0;
     let positionsReady = false;
+    let anchoredOffsetsReady = false; // set once the anchors below are known
     let homeK = null; // the zoom the graph state rests at (applyHomeView, fitToViewport)
     let view = { x: 0, y: 0, k: 1 };
     const upright = () => (rotation ? ` rotate(${-rotation})` : '');
@@ -1192,6 +1193,18 @@ export function GraphViewer({
     // Where each top-level container's frame currently sits: the mean offset
     // between its members' positions and their targets.
     function rootOffset(rootId) {
+      // With anchored containers inside it, a top-level container's own frame
+      // is the mean of theirs, so what else it holds stays among them.
+      if (anchoredOffsetsReady && anchorsOn()) {
+        let ax = 0, ay = 0, an = 0;
+        for (const cId of ANCHORS.keys()) {
+          const info = CL.containers.get(cId);
+          if (!info || info.root !== rootId) continue;
+          const o = containerOffset(cId);
+          if (o) { ax += o.x; ay += o.y; an++; }
+        }
+        if (an) return { x: ax / an, y: ay / an };
+      }
       let sx = 0, sy = 0, n = 0;
       for (const [id, p] of CL.nodes) {
         if (p.root !== rootId) continue;
@@ -1238,6 +1251,7 @@ export function GraphViewer({
     for (const cId of [...ANCHORS.keys()].sort((a, b) => depthOf(containerById.get(b)) - depthOf(containerById.get(a)))) {
       for (const slug of getAllMemberSlugs(cId)) if (!anchoredOf.has(slug)) anchoredOf.set(slug, cId);
     }
+    anchoredOffsetsReady = true;
     // Where an anchored container's centre is in the world now.
     function centreOf(cId) {
       const info = CL.containers.get(cId);
@@ -1263,26 +1277,30 @@ export function GraphViewer({
     }
     // Move each anchored container, members and all, so its centre is on
     // its anchor; they stay there (pinned) until the reader moves them.
-    let anchorsPending = false;   // a fresh layout: place them when the art is known
-    let anchorsAuto = false;      // placed by the layout and not moved since
+    const anchorsPending = new Set(); // fresh: placed when the art is known
+    let anchorsAuto = false;          // placed by the layout and not moved since
     // Saved positions hold an anchored container where the reader left it:
-    // pinned, so nothing pulls it off. With none saved, the layout is fresh.
-    if (ANCHORS.size) {
+    // pinned, so nothing pulls it off. One with none saved is fresh.
+    for (const cId of ANCHORS.keys()) {
       const vs = viewStateRef.current;
       let saved = false;
       if (vs && !positionsWereDegenerate) {
-        for (const slug of anchoredOf.keys()) {
+        for (const slug of getAllMemberSlugs(cId)) {
+          if (anchoredOf.get(slug) !== cId) continue;
           const n = nodeBySlug.get(slug);
           const st = n && vs.nodeState(positionKey(n));
           if (st && Number.isFinite(st.x) && Number.isFinite(st.y)) { saved = true; n.fx = n.x; n.fy = n.y; }
         }
       }
-      anchorsPending = !saved;
+      if (!saved) anchorsPending.add(cId);
     }
-    function placeAnchors() {
+    function placeAnchors(ids = [...ANCHORS.keys()]) {
       if (!anchorsOn()) return false;
-      for (const [cId, w] of anchorTargets()) {
+      const targets = anchorTargets();
+      for (const cId of ids) {
+        const w = targets.get(cId);
         const c = centreOf(cId);
+        if (!w) continue;
         if (!c) continue;
         const dx = w.x - c.x, dy = w.y - c.y;
         for (const slug of getAllMemberSlugs(cId)) {
@@ -1293,8 +1311,8 @@ export function GraphViewer({
           n.vx = 0; n.vy = 0;
         }
       }
-      anchorsPending = false;
-      anchorsAuto = true;
+      for (const cId of ids) anchorsPending.delete(cId);
+      anchorsAuto = ids.length === ANCHORS.size;
       return true;
     }
 
@@ -2890,7 +2908,11 @@ export function GraphViewer({
     function onCoverFrame() {
       coverFrame = (typeof window !== 'undefined' && window.PostPipeCoverFrame) || null;
       if (!anchorsOn()) return;
-      if (anchorsPending || (anchorsAuto && !userMovedView)) { placeAnchors(); applyPositions(); }
+      // The anchors say where things are; centring the whole on the frame
+      // would only drag whatever is not pinned away after the pinned mass.
+      simulation.force('center', null);
+      if (anchorsAuto && !userMovedView) { placeAnchors(); applyPositions(); }
+      else if (anchorsPending.size) { placeAnchors([...anchorsPending]); applyPositions(); }
       if (!userMovedView) applyHomeView(false);
     }
     window.addEventListener('postpipe:cover-frame', onCoverFrame);
@@ -3334,7 +3356,6 @@ export function GraphViewer({
       if (data.containers && data.containers.length && spiralOn()) {
         // Anchored containers back on their anchors first, then laid out
         // again round where they now are.
-        anchorsPending = ANCHORS.size > 0;
         if (anchorsOn()) placeAnchors();
         relayoutContainers();
         updateContainers();
