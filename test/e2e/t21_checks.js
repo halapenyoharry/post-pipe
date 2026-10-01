@@ -181,6 +181,9 @@ async function part0(bt, name, size, record) {
     const waited = Date.now() - t0;
     const opened = await page.evaluate(() => document.querySelectorAll('.node-card div[data-popout="1"]').length);
     record(`0 a single ${s.phone ? 'tap' : 'click'} still opens a card`, opened === 1, `${opened} open after ${waited}ms`);
+    await page.waitForTimeout(1200);
+    const stray = await page.evaluate(() => document.querySelectorAll('.node-card .pp-rights').length);
+    record('0 an open card carries no stray rights line', stray === 0, `${stray} inside cards`);
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await page.waitForTimeout(1500);
     const t = await findPoint(page, 'title');
