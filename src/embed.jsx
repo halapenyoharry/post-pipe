@@ -34,6 +34,7 @@ import { TTS } from './components/TTS/TTS';
 import { FeedZ } from './components/FeedZ';
 import { showContainerCount } from './components/GraphViewer/containerCount';
 import { Settings } from './components/Settings';
+import { Toolbar } from './components/Toolbar/Toolbar';
 import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
 
@@ -384,19 +385,12 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         />
       )}
 
-      {/* Layout controls */}
-      {features.layoutControls && viewState && (
-        <LayoutControls viewState={viewState} />
-      )}
-
-      {/* Dimensions controls */}
-      {features.dimensions && viewState && (
-        <DimensionsControls viewState={viewState} />
-      )}
-
-      {/* Undo/redo */}
-      {features.undoRedo && viewState && (
-        <HistoryControls viewState={viewState} />
+      {/* The bottom bar: undo/redo, layout, dimensions, view actions */}
+      {viewState && (features.layoutControls || features.dimensions || features.undoRedo) && (
+        <Toolbar
+          viewState={viewState}
+          show={{ history: !!features.undoRedo, layout: !!features.layoutControls, dimensions: !!features.dimensions }}
+        />
       )}
 
       {/* Color settings */}
@@ -430,223 +424,6 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         />
       )}
     </>
-  );
-}
-
-// ── Inline layout/dimensions/history controls ────────────────────────────────
-// These are duplicated from generate-index.js because that file generates
-// them as inline <script> content. Here they're proper React components.
-
-const LAYOUTS = [
-  { id: 'force', label: 'cluster', title: 'Force-directed: related pieces attract' },
-  { id: 'radial', label: 'ring', title: 'Radial: pieces on the rim, tags in the middle' },
-];
-
-function LayoutControls({ viewState }) {
-  const [, bump] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => viewState.subscribe(bump), [viewState]);
-  const active = viewState.state.layout;
-
-  const [popoverOpen, setPopoverOpen] = React.useState(false);
-  const dwellTimer = React.useRef(null);
-  const DWELL_MS = 350;
-
-  function clearDwell() {
-    if (dwellTimer.current) { clearTimeout(dwellTimer.current); dwellTimer.current = null; }
-  }
-  function startDwell() {
-    clearDwell();
-    dwellTimer.current = setTimeout(() => setPopoverOpen(true), DWELL_MS);
-  }
-  function closePopover() { clearDwell(); setPopoverOpen(false); }
-
-  React.useEffect(() => clearDwell, []);
-
-  const RESET_ACTIONS = [
-    { icon: '⊞', label: 'Zoom to Fit', event: 'graph:zoom-to-fit', title: 'Reset zoom and pan to frame all nodes' },
-    { icon: '⊘', label: 'Unpin All', event: 'graph:unpin-all', title: 'Release all dragged nodes, re-run simulation' },
-    { icon: '▣', label: 'Reset Sizes', event: 'graph:reset-sizes', title: 'Return all cards to their default dimensions' },
-    { icon: '×', label: 'Reset Layout', event: 'graph:reset-layout', title: 'Completely clear remembered positions and reset layout' },
-  ];
-
-  const popoverBtnStyle = {
-    border: 0, borderRadius: '5px', padding: '5px 9px',
-    background: 'transparent', cursor: 'pointer',
-    color: 'rgba(255,255,255,0.72)', font: '11px/1.3 system-ui, sans-serif',
-    display: 'flex', alignItems: 'center', gap: '6px',
-    width: '100%', textAlign: 'left', whiteSpace: 'nowrap',
-  };
-
-  const popover = !popoverOpen ? null : (
-    <div
-      onMouseEnter={clearDwell}
-      onMouseLeave={closePopover}
-      style={{
-        position: 'absolute', bottom: '100%', left: 0, marginBottom: '6px',
-        background: 'rgba(20,22,30,0.92)', backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px',
-        padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px',
-        zIndex: 50, minWidth: '130px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-      }}
-    >
-      {RESET_ACTIONS.map((a) => (
-        <button
-          key={a.event}
-          title={a.title}
-          onClick={() => { window.dispatchEvent(new CustomEvent(a.event)); closePopover(); }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          style={popoverBtnStyle}
-        >
-          <span style={{ fontSize: '13px', opacity: 0.6 }}>{a.icon}</span>
-          <span>{a.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-
-  return (
-    <div style={{
-      position: 'fixed', bottom: '14px', left: '92px',
-      display: 'flex', gap: '4px', zIndex: 40, alignItems: 'center',
-      background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
-      border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px',
-    }}>
-      <span style={{ position: 'relative', display: 'inline-flex' }}>
-        {popover}
-        <span
-          onMouseEnter={startDwell}
-          onMouseLeave={() => { if (!popoverOpen) clearDwell(); else closePopover(); }}
-          onTouchStart={(e) => { e.preventDefault(); startDwell(); }}
-          onTouchEnd={() => { if (!popoverOpen) clearDwell(); }}
-          style={{
-            font: '10px/1 system-ui, sans-serif', letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: popoverOpen ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.32)',
-            padding: '0 5px 0 6px', cursor: 'default', transition: 'color 0.15s ease',
-          }}
-        >
-          layout
-        </span>
-      </span>
-      {LAYOUTS.map((l) => {
-        const on = active === l.id;
-        return (
-          <button
-            key={l.id}
-            title={l.title}
-            onClick={() => { if (!on) viewState.setLayout(l.id); }}
-            style={{
-              border: 0, borderRadius: '6px', padding: '5px 10px',
-              cursor: on ? 'default' : 'pointer',
-              background: on ? 'rgba(255,255,255,0.14)' : 'transparent',
-              color: on ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
-              font: '12px/1 system-ui, sans-serif', letterSpacing: '0.02em',
-            }}
-          >
-            {l.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function DimensionsControls({ viewState }) {
-  const [, bump] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => viewState.subscribe(bump), [viewState]);
-  const axis = viewState.timeAxis();
-
-  // One rail at a time. Clicking the active dimension turns the rail off;
-  // clicking another switches the rail to it.
-  const pick = (dim) => {
-    const current = axis.dimension || 'time';
-    if (axis.on && current === dim) viewState.setTimeAxis({ on: false });
-    else viewState.setTimeAxis({ on: true, dimension: dim });
-  };
-  const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
-  const cycleGranularity = () => {
-    const i = GRANULARITIES.indexOf(axis.granularity || 'auto');
-    viewState.setTimeAxis({ granularity: GRANULARITIES[(i + 1) % GRANULARITIES.length] });
-  };
-  const isOn = (dim) => axis.on && (axis.dimension || 'time') === dim;
-
-  function dimBtn(key, label, isActive, onClick, title) {
-    return (
-      <button
-        key={key}
-        title={title}
-        onClick={onClick}
-        style={{
-          border: 0, borderRadius: '6px', padding: '5px 9px', cursor: 'pointer',
-          background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
-          color: isActive ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
-          font: '12px/1 system-ui, sans-serif',
-        }}
-      >
-        {label}
-      </button>
-    );
-  }
-
-  return (
-    <div style={{
-      position: 'fixed', bottom: '14px', right: '14px',
-      display: 'flex', gap: '2px', zIndex: 40, alignItems: 'center',
-      background: 'rgba(20,22,30,0.72)', backdropFilter: 'blur(6px)',
-      border: '1px solid rgba(255,255,255,0.14)', borderRadius: '9px', padding: '3px',
-    }}>
-      <span style={{
-        font: '10px/1 system-ui, sans-serif', letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'rgba(255,255,255,0.32)',
-        padding: '0 7px 0 4px',
-      }}>
-        dimensions
-      </span>
-      {dimBtn('time', 'published', isOn('time'), () => pick('time'), 'Published date')}
-      {dimBtn('commits', 'commits', isOn('commits'), () => pick('commits'), 'Edit history: one link per commit bucket')}
-      {dimBtn('narrative', 'narrative', isOn('narrative'), () => pick('narrative'), 'Narrative position: reading order, 0 to 1')}
-      {dimBtn('chronology', 'chronology', isOn('chronology'), () => pick('chronology'), 'Chronological position in story-world time')}
-      {(isOn('chronology') || isOn('commits'))
-        ? dimBtn('granularity', '\u00b7 ' + (axis.granularity || 'auto'), false, cycleGranularity, 'Bucket size: auto, day, week, month, year')
-        : null}
-    </div>
-  );
-}
-
-function HistoryControls({ viewState }) {
-  const [, bump] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => viewState.subscribe(bump), [viewState]);
-
-  function btn(label, title, enabled, onClick) {
-    return (
-      <button
-        title={title}
-        disabled={!enabled}
-        onClick={onClick}
-        style={{
-          width: '30px', height: '30px', borderRadius: '8px',
-          border: '1px solid rgba(255,255,255,0.14)',
-          background: 'rgba(20,22,30,0.72)',
-          color: enabled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)',
-          cursor: enabled ? 'pointer' : 'default',
-          font: '15px/1 system-ui, sans-serif',
-          backdropFilter: 'blur(6px)',
-        }}
-      >
-        {label}
-      </button>
-    );
-  }
-
-  return (
-    <div style={{
-      position: 'fixed', bottom: '14px', left: '14px',
-      display: 'flex', gap: '6px', zIndex: 40,
-    }}>
-      {btn('\u21A9', 'Undo (Cmd+Z)', viewState.canUndo, () => viewState.undo())}
-      {btn('\u21AA', 'Redo (Cmd+Shift+Z)', viewState.canRedo, () => viewState.redo())}
-    </div>
   );
 }
 

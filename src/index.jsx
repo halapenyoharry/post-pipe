@@ -8,4 +8,5 @@ export { FeedZ } from './components/FeedZ';
 export { Settings } from './components/Settings';
 export { ConfigPanel } from './components/ConfigPanel';
 export { TimeOverlay } from './components/TimeOverlay';
+export { Toolbar } from './components/Toolbar/Toolbar';
 export { React, ReactDOM };
