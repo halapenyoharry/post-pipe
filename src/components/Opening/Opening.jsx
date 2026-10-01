@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, TUNING } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, TUNING } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 
 /**
@@ -52,6 +52,43 @@ function loadSize(src) {
     img.onerror = () => resolve(null);
     img.src = src;
   });
+}
+
+// Where an image's plant starts: the first row with ink, as a share of its
+// height (read off a small copy). null when the image cannot be read.
+function loadInkTop(src) {
+  return new Promise((resolve) => {
+    if (!src) { resolve(null); return; }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = Math.min(260, img.naturalWidth), h = Math.max(1, Math.round((img.naturalHeight * w) / img.naturalWidth));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(firstInkRow(ctx.getImageData(0, 0, w, h).data, w, h));
+      } catch (e) { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+// The bottom edge of the page's own controls along the top (the source
+// pills, the top bar's pages, the settings gear), where they rest, or 0
+// without them. Those inside the graph layer are measured less the layer's
+// own shift (it is drawn lower while the page moves).
+function topControls(vh, shift = 0) {
+  if (typeof document === 'undefined') return 0;
+  let bottom = 0;
+  for (const el of document.querySelectorAll('[data-feeds] > *, [data-top-pages], [data-settings-gear]')) {
+    const r = el.getBoundingClientRect();
+    const dy = el.closest('[data-cover-section]') ? shift : 0;
+    if (!r.width || !r.height || r.top - dy > vh * 0.2) continue;
+    bottom = Math.max(bottom, r.bottom - dy);
+  }
+  return bottom;
 }
 
 // Keys belong to whatever is being typed in, and to the reader or a dialog
@@ -287,6 +324,8 @@ function Cover({ config, viewState, children }) {
   const sizeRef = useRef(null);
   const dragRef = useRef(() => false);
   const [art, setArt] = useState(null); // { w, h }: the canvas
+  const inkRef = useRef(null);         // { art, graph }: where each image's plant starts
+  const controlsRef = useRef(0);       // the top controls' bottom edge, px
   const reduced = useMemo(reducedMotionNow, []);
   const start = useMemo(() => startState(config, {
     stored: viewState && viewState.openingState ? viewState.openingState() : null,
@@ -297,13 +336,23 @@ function Cover({ config, viewState, children }) {
   // drawn on the same canvas).
   useEffect(() => {
     let live = true;
-    loadSize(config.art.artState).then((s) => { if (live) setArt(s || { w: 1, h: 2 }); });
+    const inks = config.top
+      ? Promise.all([loadInkTop(config.art.artState), loadInkTop(config.art.graphState || config.art.artState)])
+      : Promise.resolve([null, null]);
+    Promise.all([loadSize(config.art.artState), inks]).then(([s, [a, g]]) => {
+      if (!live) return;
+      inkRef.current = { art: a, graph: g };
+      setArt(s || { w: 1, h: 2 });
+    });
     return () => { live = false; };
   }, [config]);
 
   const geometry = (p) => {
     const vw = window.innerWidth, vh = window.innerHeight;
-    return coverGeometry(config, { vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh), zoom: zoomRef.current }, p);
+    return coverGeometry(config, {
+      vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh), zoom: zoomRef.current,
+      controls: controlsRef.current, ink: inkRef.current,
+    }, p);
   };
 
   // The backdrop's strength (it follows the graph's zoom) and the rootlets:
@@ -443,12 +492,26 @@ function Cover({ config, viewState, children }) {
   useLayoutEffect(() => {
     if (!art) return;
     sizeRef.current = art;
+    controlsRef.current = config.top ? topControls(window.innerHeight, shiftRef.current) : 0;
     const m = machineRef.current;
     if (m) {
       m.resize(geometry(0).travel);
       paintRef.current(m.p);
     }
     publishFrameRef.current();
+    // The controls take their size once their faces have loaded.
+    let live = true;
+    if (config.top && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        const c = topControls(window.innerHeight, shiftRef.current);
+        if (!live || Math.abs(c - controlsRef.current) < 0.5) return;
+        controlsRef.current = c;
+        const mm = machineRef.current;
+        if (mm) { mm.resize(geometry(0).travel); paintRef.current(mm.p); }
+        publishFrameRef.current();
+      });
+    }
+    return () => { live = false; };
   }, [art]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The rootlets' layer, and the graph's word that its world has changed.
@@ -527,6 +590,7 @@ function Cover({ config, viewState, children }) {
     };
 
     const onResize = () => {
+      if (config.top) controlsRef.current = topControls(window.innerHeight, shiftRef.current);
       machine.resize(geometry(0).travel);
       paintRef.current(machine.p);
       publishFrameRef.current();

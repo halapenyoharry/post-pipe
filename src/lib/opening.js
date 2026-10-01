@@ -23,6 +23,7 @@ const DEFAULTS = {
   alt: '',
   ground: 'dark',
   graph: { artOffset: 0.33 },
+  top: null,
   backdrop: { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 },
   reach: { enabled: false, tips: [], perContainer: 3, stopShort: 18, lagMs: 600, drawMs: 1800 },
   byline: { text: '', href: '' },
@@ -150,6 +151,30 @@ function groundConfig(g) {
   return { mode: g === 'paper' ? 'paper' : 'dark', sky: null };
 }
 
+// How close the plant comes to the top (opening.top): { art, graph }, px of
+// space between the page's top controls (or the screen's top, without them)
+// and the plant's top edge, in each state. Either may be left out: the art
+// state then centres the whole canvas, and the graph state scrolls it up by
+// graph.artOffset, as before. Unset: null.
+function topConfig(t) {
+  if (!t || typeof t !== 'object') return null;
+  const px = (v) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Math.max(0, Number(v)));
+  const art = px(t.art), graph = px(t.graph);
+  return art === null && graph === null ? null : { art, graph };
+}
+
+// The first row, as a share of the image's height, where the image has ink:
+// any pixel at least `threshold` opaque (0..255). Rows of RGBA bytes, w x h.
+// 0 for an image with ink on its first row, 1 for one with none.
+function firstInkRow(data, w, h, threshold = 64) {
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0, i = y * w * 4 + 3; x < w; x += 1, i += 4) {
+      if (data[i] >= threshold) return y / h;
+    }
+  }
+  return 1;
+}
+
 // settings.opening with its defaults, or null when it is off, in another mode,
 // or has no art: artState and graphState, or full alone (one image for both
 // states, no crossfade).
@@ -178,6 +203,7 @@ function openingConfig(settings) {
     graph: {
       artOffset: Math.max(0, Math.min(0.95, num(graph.artOffset, DEFAULTS.graph.artOffset))),
     },
+    top: topConfig(o.top),
     backdrop: backdropConfig(o),
     reach: reachConfig(o),
     byline: { text: str(byline.text), href: str(byline.href) },
@@ -199,8 +225,11 @@ function startState(config, { stored, hash } = {}) {
 
 // Where everything is at progress p, in px, for a viewport (vw, vh), the
 // art's natural size (w, h: the canvas both state images share), and the
-// space the page keeps at the bottom (bottom: the rights line, say), and the
-// graph's zoom (zoom: { k, homeK }). The art
+// space the page keeps at the bottom (bottom: the rights line, say), the
+// graph's zoom (zoom: { k, homeK }), the bottom edge of the page's top
+// controls (controls, px; opening.top is measured from it), and where each
+// state image's plant starts (ink: { art, graph }, shares of the canvas's
+// height; firstInkRow). The art
 // keeps one scale throughout, the largest that fits the whole plant, with
 // the byline under it, in the art state; only its top moves.
 //   art         { top, left, width, height, scale, opacity }: the canvas
@@ -209,12 +238,13 @@ function startState(config, { stored, hash } = {}) {
 //               zoom it rests at (zoom: { k, homeK }; reach.js backdropOpacity)
 //   fade        { art, graph }: the two state images' opacities (1 - p, p),
 //               and the title's two layouts'
-//   artTop0, artTop1   its top at the two rests (artTop1 = -artOffset of its height)
+//   artTop0, artTop1   its top at the two rests (artTop1 = -artOffset of its
+//               height, or from opening.top.graph)
 //   travel      px the art moves between the rests (a whole scrub)
 //   graph       { opacity, shift }: the graph layer, shift px below its rest
 //   ground      the art state's ground's opacity (1 at art, 0 at graph)
 //   byline      { x, y, size, opacity }: (x, y) is the centre of its top
-function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null } = {}, p = 0) {
+function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null } = {}, p = 0) {
   const t = clamp01(p);
   const T = TUNING;
   const W = Math.max(1, (art && art.w) || 1), H = Math.max(1, (art && art.h) || 1);
@@ -222,13 +252,25 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null } = {}, p 
   const below = hasByline ? T.bylineSpace : 0;
   const pad = Math.min(T.pad, vh * 0.03);
   const floor = Math.max(pad, bottom);
-  const room = Math.max(1, vh - pad - floor - below);
-  const scale = Math.max(0.01, Math.min(room / H, (vw - 2 * pad) / W));
+  const topCfg = (config && config.top) || null;
+  // With opening.top.art the plant's top edge (ink.art of the canvas down)
+  // sits that far under the top controls, and the art is as large as fits
+  // from there down; otherwise the whole canvas is centred in the room.
+  const inkArt = clamp01(num(ink && ink.art, 0));
+  const inkGraph = ink && Number.isFinite(ink.graph) ? clamp01(ink.graph) : null;
+  const from = topCfg && topCfg.art !== null ? Math.max(0, controls) + topCfg.art : null;
+  const room = Math.max(1, vh - (from === null ? pad : from) - floor - below);
+  const tall = from === null ? H : H * Math.max(0.05, 1 - inkArt);
+  const scale = Math.max(0.01, Math.min(room / tall, (vw - 2 * pad) / W));
   const width = W * scale, height = H * scale;
   const g = (config && config.graph) || DEFAULTS.graph;
   const bd = (config && config.backdrop) || DEFAULTS.backdrop;
-  const artTop0 = pad + Math.max(0, (room - height) / 2);
-  const artTop1 = -g.artOffset * height;
+  const artTop0 = from === null ? pad + Math.max(0, (room - height) / 2) : from - inkArt * height;
+  // With opening.top.graph the graph state's plant (ink.graph of the canvas
+  // down) sits that far under the top controls; otherwise artOffset.
+  const artTop1 = topCfg && topCfg.graph !== null && inkGraph !== null
+    ? Math.min(artTop0 - 1, Math.max(0, controls) + topCfg.graph - inkGraph * height)
+    : -g.artOffset * height;
   const top = lerp(artTop0, artTop1, t);
   const show = smooth((t - T.graphFrom) / (1 - T.graphFrom));
   return {
@@ -478,5 +520,5 @@ function pageKey(e) {
 
 module.exports = {
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
-  openingConfig, groundConfig, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
+  openingConfig, groundConfig, topConfig, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
 };

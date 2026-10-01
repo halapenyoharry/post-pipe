@@ -8,7 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const {
   DEFAULTS, TUNING, openingConfig, startState, coverGeometry, createCover, pageKey,
-  groundConfig,
+  groundConfig, topConfig, firstInkRow,
 } = require('../src/lib/opening');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
 
@@ -391,4 +391,41 @@ test('ground: dark or paper as before, or a night sky with its gradient and its 
   assert.equal(c.ground, 'dark', 'a sky is a dark ground');
   assert.equal(c.sky.top, '#050505');
   assert.equal(openingConfig({ opening: { enabled: true, art: { full: 'a.png' } } }).sky, null);
+});
+
+test('top: the plant comes up to a margin under the top controls in each state, or as before when unset', () => {
+  assert.equal(topConfig(undefined), null);
+  assert.equal(topConfig({}), null);
+  assert.deepStrictEqual(topConfig({ art: 6, graph: '8' }), { art: 6, graph: 8 });
+  assert.deepStrictEqual(topConfig({ graph: -3 }), { art: null, graph: 0 });
+  // A 4x4 image whose ink starts on its third row.
+  const px = new Uint8ClampedArray(4 * 4 * 4);
+  px[(2 * 4 + 1) * 4 + 3] = 200;
+  assert.equal(firstInkRow(px, 4, 4), 0.5);
+  assert.equal(firstInkRow(new Uint8ClampedArray(16), 2, 2), 1, 'no ink');
+  px[(0 * 4 + 3) * 4 + 3] = 30;
+  assert.equal(firstInkRow(px, 4, 4), 0.5, 'faint pixels below the threshold are not ink');
+
+  const base = openingConfig(SITE);
+  const c = { ...base, top: { art: 6, graph: 6 } };
+  const ink = { art: 0.01, graph: 0.42 };
+  for (const [vw, vh] of [[390, 844], [1280, 800]]) {
+    const view = { vw, vh, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48, ink };
+    const a = coverGeometry(c, view, 0);
+    const g = coverGeometry(c, view, 1);
+    const plantArt = a.art.top + ink.art * a.art.height;
+    const plantGraph = g.art.top + ink.graph * g.art.height;
+    assert.ok(Math.abs(plantArt - 54) < 1e-9, `art state: the plant 6 px under the controls (${plantArt})`);
+    assert.ok(Math.abs(plantGraph - 54) < 1e-9, `graph state: the small plant 6 px under the controls (${plantGraph})`);
+    assert.equal(g.art.scale, a.art.scale, 'one scale');
+    assert.ok(a.byline.y + TUNING.bylineSize * 1.3 <= vh - 100 + 1, 'byline above the kept space');
+    assert.ok(a.art.left >= 0 && a.art.left + a.art.width <= vw + 0.01, 'fits across');
+    const old = coverGeometry(base, view, 0);
+    assert.ok(a.art.height >= old.art.height - 48, 'no smaller than the controls cost');
+    assert.ok(a.travel > 0, 'the graph state is further up');
+  }
+  // Unset, or no ink known: as before.
+  const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48 };
+  assert.deepStrictEqual(coverGeometry({ ...base, top: null }, view, 1).art, coverGeometry(base, view, 1).art);
+  assert.equal(coverGeometry(c, view, 1).art.top, -0.33 * coverGeometry(c, view, 1).art.height, 'no ink for the graph state: artOffset');
 });
