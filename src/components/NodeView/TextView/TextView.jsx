@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './TextView.module.css';
 import { ResizeHandles } from '../ResizeHandles';
+import { numberToLowercaseWords } from '../../../lib/readerHeader';
 
 /**
  * TextView — the lens that renders a text-substrate node (essay, fragment,
@@ -203,23 +204,7 @@ function fitFontSize(text, width, height, opts = {}) {
 // it takes a third of the card and leaves a slot too short to read in.
 const COMPACT_HEIGHT = 260;
 
-// English number words from 0 to 99
-const ONES = [
-  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
-  'seventeen', 'eighteen', 'nineteen'
-];
-const TENS = [
-  '', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'
-];
-
-function numberToLowercaseWords(num) {
-  const n = parseInt(num, 10);
-  if (isNaN(n) || n < 0 || n > 99) return String(num);
-  if (n < 20) return ONES[n];
-  const rem = n % 10;
-  return TENS[Math.floor(n / 10)] + (rem ? `-${ONES[rem]}` : '');
-}
+// English number words from 0 to 99, shared with the reader's header line.
 
 function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent, cardSettings }) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styles from './ReaderPanel.module.css';
 import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
+import { readerHeader } from '../../lib/readerHeader';
 
 
 export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
@@ -328,6 +329,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     authorLink = article.canonical_url || article.url;
   }
 
+  // settings.reader.header: a small line above the title, and whether the
+  // byline sits under it.
+  const header = readerHeader(settings, article);
+
   return (
     <>
       <div
@@ -519,14 +524,19 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           onScroll={handleScroll}
         >
           <div className={styles.articleHeader}>
-            <div className={styles.articleTitle}>{article.title || article.label}</div>
-            <div className={styles.articleByline}>
-              by {authorLink ? (
-                <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
-              ) : (
-                authorName
-              )}
-            </div>
+            {header.kicker && (
+              <div className={styles.articleKicker}>{header.kicker}</div>
+            )}
+            <h1 className={styles.articleTitle}>{article.title || article.label}</h1>
+            {header.byline && (
+              <div className={styles.articleByline}>
+                by {authorLink ? (
+                  <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
+                ) : (
+                  authorName
+                )}
+              </div>
+            )}
             {metaParts.length > 0 && (
               <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
             )}
