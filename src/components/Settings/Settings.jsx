@@ -431,7 +431,7 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
                   />
                   {modes.length > 1 && (
                     <Choice
-                      label="Light"
+                      label="Mode"
                       name="mode"
                       options={[
                         { id: 'auto', label: 'Auto', title: 'Follow this device' },
