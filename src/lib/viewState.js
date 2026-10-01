@@ -92,6 +92,7 @@ function emptyState(corpusId, layoutVersion) {
     timeAxis: { on: false, x: 0, y: -1000 },
     reading: {},    // id -> { scroll, seenAt, t }
     bookmarks: [],  // array of { id, item, para, quote, note, t }
+    opening: {},    // { seenAt } once this reader has seen the opening
   };
 }
 
@@ -283,9 +284,11 @@ function createViewState(opts = {}) {
     future.push(clone(state));
     const bookmarks = state.bookmarks;
     const reading = state.reading;
+    const opening = state.opening;
     state = past.pop();
     state.bookmarks = bookmarks;
     state.reading = reading;
+    state.opening = opening;
     gestureBase = null;
     notify();
     scheduleSave();
@@ -297,9 +300,11 @@ function createViewState(opts = {}) {
     past.push(clone(state));
     const bookmarks = state.bookmarks;
     const reading = state.reading;
+    const opening = state.opening;
     state = future.pop();
     state.bookmarks = bookmarks;
     state.reading = reading;
+    state.opening = opening;
     gestureBase = null;
     notify();
     scheduleSave();
@@ -580,6 +585,14 @@ function createViewState(opts = {}) {
       });
       gestureBase = null;
     },
+
+    // The opening (settings.opening) is shown once per reader: seen when it
+    // has played or been skipped. Not undoable, like reading.
+    markOpeningSeen() {
+      if (state.opening && state.opening.seenAt) return;
+      updateSilent((s) => { s.opening = { seenAt: now() }; });
+    },
+    openingSeen() { return Boolean(state.opening && state.opening.seenAt); },
 
     isSeen(id) { return Boolean(state.reading[id] && state.reading[id].seenAt); },
     readingPosition(id) { return (state.reading[id] && state.reading[id].scroll) || 0; },
