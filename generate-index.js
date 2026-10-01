@@ -409,6 +409,8 @@ ${ttsSource}
 <script>
 // ── Settings ──
 window.SETTINGS = ${settingsJSON};
+</script>
+<script>
 // settings.graph.intro, rendered when the site was built (src/lib/linkNode.js).
 window.PP_INTRO_HTML = ${JSON.stringify(introHtml(introConfig(SETTINGS), (md) => marked(md))).replace(/</g, '\\u003c')};
 </script>
