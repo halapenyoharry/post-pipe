@@ -405,7 +405,8 @@
    it lets the graph have them. */
 .intro {
   flex: 0 0 100%;
-  max-width: min(36em, 100%);
+  box-sizing: border-box;
+  padding-right: max(0px, calc(100% - 36em));
   margin: 4px 0 0 4px;
   color: rgba(224, 224, 224, 0.82);
   font-family: 'Atkinson', sans-serif;

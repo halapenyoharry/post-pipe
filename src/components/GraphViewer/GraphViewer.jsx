@@ -3266,8 +3266,11 @@ export function GraphViewer({
       // crammed on screen at once — a readable core beats a technically-
       // complete but illegible one.
       const MIN_SCALE = 0.2;
+      // Kept clear of the page's own fixed controls, as a container frame is.
+      const inset = chromeInsets(h);
+      const room = Math.max(50, h - inset.top - inset.bottom);
       let k = Math.max(
-        Math.min(w / Math.max(maxX - minX, 1), h / Math.max(maxY - minY, 1), 1),
+        Math.min(w / Math.max(maxX - minX, 1), room / Math.max(maxY - minY, 1), 1),
         MIN_SCALE,
       );
       if (initialZoomOut) {
@@ -3278,10 +3281,6 @@ export function GraphViewer({
           k *= 0.85;
         }
       }
-      // Kept clear of the page's own fixed controls, as a container frame is.
-      const inset = chromeInsets(h);
-      const room = Math.max(50, h - inset.top - inset.bottom);
-      if (room < h) k = Math.max(Math.min(k, k * room / h), MIN_SCALE);
       const tx = w / 2 - centerX * k;
       const ty = inset.top + room / 2 - centerY * k;
       const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
