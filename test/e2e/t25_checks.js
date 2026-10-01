@@ -131,6 +131,7 @@ const coverInfo = (page) => page.evaluate(() => {
     byline: by ? { text: by.textContent, top: br.top, bottom: br.bottom, cx: br.left + br.width / 2, opacity: getComputedStyle(by).opacity, font: getComputedStyle(by).fontFamily, href: by.getAttribute('href') } : null,
     section: { opacity: getComputedStyle(sec).opacity, inert: !!sec.inert, events: getComputedStyle(sec).pointerEvents, bg: bg(sec) },
     graphBg: bg(document.querySelector('[data-graph-root]')),
+    graph: { opacity: Number(getComputedStyle(document.querySelector('[data-graph-root]')).opacity), inert: !!document.querySelector('[data-graph-root]').inert },
     coverVisible: getComputedStyle(cover).visibility === 'visible' && getComputedStyle(cover).opacity === '1',
     groundBg: bg(document.querySelector('[data-cover] > div')),
     body: getComputedStyle(document.body).backgroundColor,
@@ -283,7 +284,9 @@ async function run(bt, name, size, record) {
     s.W = s.phone ? 390 : 1280;
     const st = await state(s.page);
     const c = await coverInfo(s.page);
-    record('fresh: the art state first', st === 'art' && c.onTop === 'art' && c.section.opacity === '0' && c.section.inert, `state ${st}, on top ${c.onTop}, graph opacity ${c.section.opacity}, inert ${c.section.inert}`);
+    // Since T30 the graph is never hidden: in the art state it hangs under
+    // the roots at graph.artStateOpacity, and takes no taps.
+    record('fresh: the art state first, the graph under the roots taking no taps', st === 'art' && c.onTop === 'art' && Math.abs(c.graph.opacity - OPENING.graph.artStateOpacity) < 0.01 && c.graph.inert, `state ${st}, on top ${c.onTop}, graph opacity ${c.graph.opacity}, inert ${c.graph.inert}`);
     const artImg = c.imgs.find((i) => i.which === 'art');
     const graphImg = c.imgs.find((i) => i.which === 'graph');
     record('fresh: the whole plant fits, loaded, with its alt', !!artImg && artImg.loaded && artImg.src === OPENING.art.artState && c.art.top >= 0 && c.art.bottom <= c.H && c.art.left >= 0 && c.art.right <= c.W && c.alt === OPENING.alt,
@@ -304,7 +307,8 @@ async function run(bt, name, size, record) {
       b ? `"${b.text}" ${Math.round(b.top)}–${Math.round(b.bottom)} under art ending ${Math.round(c.art.bottom)}, ${b.font.split(',')[0]}` : 'none');
     const dark = (rgb) => { const m = rgb.match(/\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3 < 80; };
     record('fresh: on the dark ground in light mode', dark(c.groundBg) && dark(c.body) && c.mode === 'dark' && c.readerMode === 'light', `ground ${c.groundBg}, page ${c.body}, mode ${c.mode}, reader's mode ${c.readerMode}`);
-    record('fresh: the controls wait for the graph', c.gear === 'hidden' && c.handle.events === 'none', `gear ${c.gear}, grip ${c.handle.events}`);
+    // Since T30 the top bar (the gear with it) stays in both states.
+    record('fresh: the top bar stays, the grip waits for the graph', c.gear === 'visible' && c.handle.events === 'none', `gear ${c.gear}, grip ${c.handle.events}`);
     record('fresh: nothing stored yet but the state', (await stored(s.page)) === 'art', String(await stored(s.page)));
     await shot(s, 'art-light');
 
@@ -321,8 +325,8 @@ async function run(bt, name, size, record) {
       await s.page.waitForTimeout(40);
       mid = { p: await progress(s.page), c: await coverInfo(s.page) };
     }
-    record('scrub: partway shows the in-between', between(mid.p, 0.05, 0.95) && mid.c.art.top < c.art.top - 5 && Number(mid.c.section.opacity) < 1,
-      `p ${mid.p.toFixed(2)}, art top ${Math.round(c.art.top)} → ${Math.round(mid.c.art.top)}, graph opacity ${Number(mid.c.section.opacity).toFixed(2)}`);
+    record('scrub: partway shows the in-between', between(mid.p, 0.05, 0.95) && mid.c.art.top < c.art.top - 5 && mid.c.graph.opacity < 1 && mid.c.graph.opacity > c.graph.opacity,
+      `p ${mid.p.toFixed(2)}, art top ${Math.round(c.art.top)} → ${Math.round(mid.c.art.top)}, graph opacity ${mid.c.graph.opacity.toFixed(2)}`);
     const mA = mid.c.imgs.find((i) => i.which === 'art'), mG = mid.c.imgs.find((i) => i.which === 'graph');
     record('scrub: partway the two images crossfade with p', !!mA && !!mG && Math.abs(mA.opacity - (1 - mid.p)) < 0.03 && Math.abs(mG.opacity - mid.p) < 0.03 && mG.opacity > 0,
       `p ${mid.p.toFixed(2)}: art-state image ${mA && mA.opacity.toFixed(2)}, graph-state image ${mG && mG.opacity.toFixed(2)}`);
@@ -340,7 +344,10 @@ async function run(bt, name, size, record) {
     record('scroll down: reaches the graph', (await state(s.page)) === 'graph' && g.onTop === 'graph' && g.section.opacity === '1' && !g.section.inert, `state ${await state(s.page)}, on top ${g.onTop}`);
     record('graph state: the art is still there, behind the graph', g.coverVisible && g.art.opacity === '1' && g.art.bottom > g.H * 0.4 && g.art.top < 0 && /rgba\(0, 0, 0, 0\)|transparent/.test(g.section.bg) && /rgba\(0, 0, 0, 0\)|transparent/.test(g.graphBg),
       `art ${Math.round(g.art.top)}–${Math.round(g.art.bottom)} of ${g.H}, opacity ${g.art.opacity}, layer ${g.section.bg}`);
-    record('graph state: scrolled up by artOffset, the crown about a quarter down', Math.abs(-g.art.top / g.art.height - OPENING.graph.artOffset) < 0.01 && between(crown, 0.12, 0.38),
+    // With opening.top.graph (T30) the small plant's top sets the scroll,
+    // not artOffset; the T30 checks measure it.
+    const byTop = OPENING.top && OPENING.top.graph !== null;
+    record(`graph state: scrolled up by ${byTop ? 'opening.top' : 'artOffset'}, the crown about a quarter down`, (byTop ? g.art.top < 0 : Math.abs(-g.art.top / g.art.height - OPENING.graph.artOffset) < 0.01) && between(crown, 0.12, 0.38),
       `${(-g.art.top / g.art.height).toFixed(3)} of the art above the top, crown at ${crown.toFixed(2)} of the height`);
     record('graph state: the byline is out of the way, the grip and gear are there', Number(g.byline.opacity) === 0 && g.handle.events === 'auto' && g.gear === 'visible', `byline ${g.byline.opacity}, grip ${g.handle.events}, gear ${g.gear}`);
     record('graph state: remembered', (await stored(s.page)) === 'graph', String(await stored(s.page)));
@@ -477,7 +484,9 @@ async function run(bt, name, size, record) {
     await tapAt(s, { x: c.byline.cx, y: (c.byline.top + c.byline.bottom) / 2 });
     const navigated = await nav;
     const url = s.page.url();
-    record('byline: follows the link, same tab', navigated && url.replace(/\/$/, '') === expect.replace(/\/$/, ''), url);
+    // The test server serves a.html as /a (clean urls).
+    const bare = (u) => u.replace(/\/$/, '').replace(/\.html$/, '');
+    record('byline: follows the link, same tab', navigated && bare(url) === bare(expect), url);
     record('byline: does not change the state', (await stored(s.page)) === 'art', `stored ${await stored(s.page)}`);
     record('byline: no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
     await s.browser.close();

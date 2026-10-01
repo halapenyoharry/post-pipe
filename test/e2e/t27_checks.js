@@ -208,12 +208,14 @@ async function run(bt, name, size, record) {
   {
     const s = await open(bt, name, size, { scheme: 'light' });
     const p = s.page;
-    await toGraph(s);
+    // Since T30 the graph hangs under the roots in the art state too, so the
+    // rootlets first show there, on load, and draw in then.
     const first = await measure(p);
     const drawing = first.rootlets.filter((r) => r.visible);
     const dashes = drawing.map((r) => Number.parseFloat(r.dash)).filter(Number.isFinite);
-    record('fresh: the rootlets draw in when they first show', drawing.length > 0 && drawing.every((r) => r.drawn === 'drawing') && dashes.length > 0 && dashes.every((d) => d > 0.02 && d < 0.98),
+    record('fresh: the rootlets draw in when they first show (in the art state, with the graph under the roots)', drawing.length > 0 && drawing.every((r) => r.drawn === 'drawing') && dashes.length > 0 && dashes.every((d) => d > 0.02 && d < 0.98),
       `${drawing.length} drawing, dash offsets ${Math.min(...dashes).toFixed(2)}–${Math.max(...dashes).toFixed(2)} of 1, ${REACH.drawMs} ms`);
+    await toGraph(s);
     await p.waitForTimeout(REACH.drawMs + 250);
     const m = await measure(p);
     record('fresh: drawn in by drawMs', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && (r.dasharray === 'none' || r.dasharray === '')),
@@ -231,8 +233,12 @@ async function run(bt, name, size, record) {
     record('rootlets: each starts on its tip on the art', starts.every((d) => d < 0.6), `furthest ${r1(Math.max(...starts))} px`);
     const forked = m.rootlets.filter((r) => r.fine > 0).length;
     const wander = m.rootlets.map((r) => r.wander);
-    record('rootlets: seeded, forking, wandering lines, not straight strokes', m.rootlets.every((r) => r.pts > 8 && r.wander > 0.5) && forked >= m.rootlets.length * 0.66,
-      `${Math.min(...m.rootlets.map((r) => r.pts))}+ points on each main line, off the straight line by ${r1(Math.min(...wander))}–${r1(Math.max(...wander))} px; ${forked} of ${m.rootlets.length} forked`);
+    // A fork needs room (reachPath leaves out one under 6 px), so a rootlet
+    // of 60 px or more always forks; a shorter one may not. The wander is a
+    // share of the length, so one under 20 px may stay within 0.5 px.
+    const long = m.rootlets.filter((r) => off(r.start, r.end) >= 60);
+    record('rootlets: seeded, forking, wandering lines, not straight strokes', m.rootlets.every((r) => r.pts > 8 && (r.wander > 0.5 || off(r.start, r.end) < 20)) && long.length > 0 && long.every((r) => r.fine > 0),
+      `${Math.min(...m.rootlets.map((r) => r.pts))}+ points on each main line, off the straight line by ${r1(Math.min(...wander))}–${r1(Math.max(...wander))} px; ${forked} of ${m.rootlets.length} forked, every one of the ${long.length} of 60 px or more; lengths ${m.rootlets.map((r) => Math.round(off(r.start, r.end))).sort((a, b) => a - b).join(', ')} px`);
     const ss = checkStopShort(m);
     record(`rootlets: end ${REACH.stopShort} ± 2 px short of the act's outline`, ss.ok, `${ss.gaps.length} rootlets, gaps ${r1(Math.min(...ss.gaps))}–${r1(Math.max(...ss.gaps))} px`);
     record('the book\'s own title: hidden as set', m.bookLabel && m.bookLabel.pos === 'hidden' && m.bookLabel.display === 'none', m.bookLabel ? `labelPosition ${m.bookLabel.pos}, display ${m.bookLabel.display}` : 'no badge');
