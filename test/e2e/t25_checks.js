@@ -31,6 +31,8 @@ const FEED = JSON.parse(fs.readFileSync(path.join(SITE, 'feed.json'), 'utf8'));
 const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1]);
 const OPENING = SETTINGS.opening;
+const { openingConfig, bylineText } = require('../../src/lib/opening');
+const BYLINE = openingConfig(SETTINGS).byline;
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
 const SINGLE = process.env.PP_E2E_SINGLE_PROCESS === '1';
 const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
@@ -303,8 +305,14 @@ async function run(bt, name, size, record) {
     record('both state images are the site\'s own files, stacked on one canvas', states.size === 2 && c.imgs.length === 2 + (c.imgs.some((i) => i.which === 'graph-keep') ? 1 : 0) && own.every((o, i) => o.ok && o.u.startsWith(BASE) && o.bytes === files[i]) && c.imgs.every((i) => i.loaded && JSON.stringify(i.box) === JSON.stringify(c.imgs[0].box) && i.natural.join('x') === c.imgs[0].natural.join('x')),
       c.imgs.map((i, k) => `${i.src} ${i.natural.join('x')} ${own[k].bytes} bytes (file ${files[k]})`).join('; ') + `, both at ${c.imgs[0] && c.imgs[0].box.join(',')}`);
     const b = c.byline;
-    record('fresh: the byline under the art, centred, in the title face', !!b && b.text === OPENING.byline.text && b.top >= c.art.bottom - 2 && Math.abs(b.cx - c.W / 2) < 3 && b.opacity === '1' && /PP Sketch Title/.test(b.font),
-      b ? `"${b.text}" ${Math.round(b.top)}–${Math.round(b.bottom)} under art ending ${Math.round(c.art.bottom)}, ${b.font.split(',')[0]}` : 'none');
+    // Since T29 a byline under a title sits under the title, in its face
+    // (the T29 checks measure it); without a title, under the art as before.
+    const underTitle = !!OPENING.title;
+    record(underTitle ? 'fresh: the byline shown, in lower case, in the title face' : 'fresh: the byline under the art, centred, in the title face',
+      underTitle
+        ? !!b && b.text === bylineText(BYLINE) && Math.abs(Number(b.opacity) - BYLINE.opacity.art) < 0.005 && b.font.includes(OPENING.title.font)
+        : !!b && b.text === OPENING.byline.text && b.top >= c.art.bottom - 2 && Math.abs(b.cx - c.W / 2) < 3 && b.opacity === '1' && /PP Sketch Title/.test(b.font),
+      b ? `"${b.text}" ${Math.round(b.top)}–${Math.round(b.bottom)}, art ending ${Math.round(c.art.bottom)}, opacity ${b.opacity}, ${b.font.split(',')[0]}` : 'none');
     const dark = (rgb) => { const m = rgb.match(/\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3 < 80; };
     record('fresh: on the dark ground in light mode', dark(c.groundBg) && dark(c.body) && c.mode === 'dark' && c.readerMode === 'light', `ground ${c.groundBg}, page ${c.body}, mode ${c.mode}, reader's mode ${c.readerMode}`);
     // Since T30 the top bar (the gear with it) stays in both states.
@@ -349,7 +357,8 @@ async function run(bt, name, size, record) {
     const byTop = OPENING.top && OPENING.top.graph !== null;
     record(`graph state: scrolled up by ${byTop ? 'opening.top' : 'artOffset'}, the crown about a quarter down`, (byTop ? g.art.top < 0 : Math.abs(-g.art.top / g.art.height - OPENING.graph.artOffset) < 0.01) && between(crown, 0.12, 0.38),
       `${(-g.art.top / g.art.height).toFixed(3)} of the art above the top, crown at ${crown.toFixed(2)} of the height`);
-    record('graph state: the byline is out of the way, the grip and gear are there', Number(g.byline.opacity) === 0 && g.handle.events === 'auto' && g.gear === 'visible', `byline ${g.byline.opacity}, grip ${g.handle.events}, gear ${g.gear}`);
+    record(OPENING.title ? 'graph state: the byline under the small title, the grip and gear are there' : 'graph state: the byline is out of the way, the grip and gear are there',
+      (OPENING.title ? Math.abs(Number(g.byline.opacity) - BYLINE.opacity.graph) < 0.005 : Number(g.byline.opacity) === 0) && g.handle.events === 'auto' && g.gear === 'visible', `byline ${g.byline.opacity}, grip ${g.handle.events}, gear ${g.gear}`);
     record('graph state: remembered', (await stored(s.page)) === 'graph', String(await stored(s.page)));
     const card = await opensCard(s);
     record('graph state: interactive (a card opens)', card.ok, card.note);
