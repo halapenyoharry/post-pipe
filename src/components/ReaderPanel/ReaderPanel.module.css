@@ -193,8 +193,35 @@
 
 .toolbarGroup {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+}
+
+/* The voice controls take a row of their own when the reader is narrow. */
+.ttsMount {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+/* On a phone the toolbar wraps into rows; nothing runs past the right edge,
+   and a separator never starts or ends a row. */
+@media (max-width: 600px) {
+  .toolbar {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .toolbarSeparator,
+  .dragGrip {
+    display: none;
+  }
+  .ttsMount {
+    flex: 1 1 100%;
+  }
+  .toolbarSpacer {
+    flex: 1 0 0;
+  }
 }
 
 .toolbarSeparator {
@@ -266,8 +293,10 @@
   pointer-events: none;
 }
 
-.tb:hover .tbTooltip {
-  display: block;
+@media (hover: hover) {
+  .tb:hover .tbTooltip {
+    display: block;
+  }
 }
 
 .syndLink {

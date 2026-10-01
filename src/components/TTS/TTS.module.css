@@ -9,8 +9,11 @@
   --tts-border: rgba(100, 255, 218, 0.2);
 
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 6px 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tb {
@@ -56,8 +59,10 @@
   pointer-events: none;
 }
 
-.tb:hover .tbTooltip {
-  display: block;
+@media (hover: hover) {
+  .tb:hover .tbTooltip {
+    display: block;
+  }
 }
 
 .select {
@@ -79,8 +84,10 @@
 
 .params {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 6px 10px;
+  min-width: 0;
 }
 
 .params label {

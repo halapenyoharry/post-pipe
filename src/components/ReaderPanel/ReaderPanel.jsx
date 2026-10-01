@@ -370,7 +370,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         >
           <div className={styles.dragGrip} title="Drag to move reading window">⋮⋮</div>
           {/* TTS Toolbar Placeholder */}
-          <div id="tts-mount-point" className={styles.toolbarGroup}></div>
+          <div id="tts-mount-point" className={`${styles.toolbarGroup} ${styles.ttsMount}`}></div>
 
           <div className={styles.toolbarSeparator}></div>
 
@@ -463,6 +463,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <div className={styles.toolbarSpacer}></div>
 
           <div className={styles.windowControls}>
+            <button
+              className={styles.tb}
+              onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings'))}
+              title="Reading settings"
+              aria-label="Reading settings"
+              data-reader-settings
+              dangerouslySetInnerHTML={{ __html: `${ICONS.settings}<span class="${styles.tbTooltip}">Settings</span>` }}
+            />
             <button
               className={`${styles.tb} ${styles.minimizeBtn}`}
               onClick={() => setIsMinimized(true)}

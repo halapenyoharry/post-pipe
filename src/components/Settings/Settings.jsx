@@ -96,6 +96,14 @@ export function Settings({ viewState, feedData }) {
     }
   });
 
+  // The reader has its own settings button (the graph's sits under the
+  // reader on a phone); it toggles the same panel.
+  useEffect(() => {
+    const onToggle = () => setOpen((o) => !o);
+    window.addEventListener('postpipe:toggle-settings', onToggle);
+    return () => window.removeEventListener('postpipe:toggle-settings', onToggle);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
