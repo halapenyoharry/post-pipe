@@ -17,3 +17,12 @@ test('a site renames commits to revisions everywhere the word shows', () => {
   const t = dimensionLabels({ dimensions: { labels: { commits: { label: 'drafts', title: 'Every draft' } } } });
   assert.strictEqual(t[1].title, 'Every draft');
 });
+
+test('the group of dimensions has a reader-facing name: dimensions by default, the site\'s otherwise', () => {
+  const { dimensionGroupLabel } = require('../src/lib/dimensionLabels');
+  assert.equal(dimensionGroupLabel({}), 'dimensions');
+  assert.equal(dimensionGroupLabel(null), 'dimensions');
+  assert.equal(dimensionGroupLabel({ dimensions: { groupLabel: '  timelines ' } }), 'timelines');
+  assert.equal(dimensionGroupLabel({ dimensions: { groupLabel: '' } }), 'dimensions');
+  assert.equal(dimensionGroupLabel({ dimensions: { groupLabel: 3 } }), 'dimensions');
+});

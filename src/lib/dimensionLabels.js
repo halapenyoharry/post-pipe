@@ -44,4 +44,13 @@ function dimensionLabels(settings, list = DIMENSIONS) {
 
 const layerLabels = (settings) => dimensionLabels(settings, LAYERS);
 
-module.exports = { dimensionLabels, layerLabels, DIMENSIONS, LAYERS };
+// What the group of dimensions is called where a reader sees it (the bottom
+// bar's label, the More sheet's heading): settings.dimensions.groupLabel,
+// 'dimensions' by default.
+const GROUP_LABEL = 'dimensions';
+function dimensionGroupLabel(settings) {
+  const g = settings && settings.dimensions && settings.dimensions.groupLabel;
+  return typeof g === 'string' && g.trim() ? g.trim() : GROUP_LABEL;
+}
+
+module.exports = { dimensionLabels, layerLabels, dimensionGroupLabel, DIMENSIONS, LAYERS, GROUP_LABEL };

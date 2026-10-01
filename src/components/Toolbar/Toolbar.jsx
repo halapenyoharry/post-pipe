@@ -1,6 +1,6 @@
 import React, { useEffect, useReducer, useState } from 'react';
 import styles from './Toolbar.module.css';
-import { dimensionLabels, layerLabels } from '../../lib/dimensionLabels';
+import { dimensionLabels, layerLabels, dimensionGroupLabel } from '../../lib/dimensionLabels';
 
 /**
  * Toolbar — the one bar along the bottom of the graph.
@@ -39,6 +39,8 @@ const fire = (name) => window.dispatchEvent(new CustomEvent(name));
 export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, layers = [] }) {
   const S = settings || (typeof window !== 'undefined' ? window.SETTINGS : null);
   const DIMENSIONS = dimensionLabels(S);
+  const GROUP = dimensionGroupLabel(S);
+  const GROUP_TITLE = GROUP.charAt(0).toUpperCase() + GROUP.slice(1);
   const LAYER_DIMS = layerLabels(S).filter((d) => layers.includes(d.id));
   const [, bump] = useReducer((n) => n + 1, 0);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -139,8 +141,8 @@ export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, lay
         )}
 
         {showDimensions && (
-          <div className={`${styles.group} ${styles.wideOnly}`} data-group="dimensions" aria-label="Dimensions">
-            <span className={styles.label}>dimensions</span>
+          <div className={`${styles.group} ${styles.wideOnly}`} data-group="dimensions" aria-label={GROUP_TITLE}>
+            <span className={styles.label} data-group-label>{GROUP}</span>
             {dimensionButtons}
           </div>
         )}
@@ -160,7 +162,7 @@ export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, lay
             className={`${styles.seg} ${styles.more} ${moreOpen ? styles.on : ''}`}
             aria-expanded={moreOpen}
             aria-controls="pp-toolbar-more"
-            title="More: dimensions and view actions"
+            title={`More: ${GROUP} and view actions`}
             aria-label="More"
             data-toolbar-more
             onClick={() => setMoreOpen((o) => !o)}
@@ -176,7 +178,7 @@ export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, lay
           <div className={styles.sheet} id="pp-toolbar-more" role="dialog" aria-label="More graph controls" data-toolbar-sheet>
             {showDimensions && (
               <div className={`${styles.section} ${styles.narrowOnly}`}>
-                <div className={styles.sectionTitle}>Dimensions</div>
+                <div className={styles.sectionTitle} data-group-label>{GROUP_TITLE}</div>
                 <div className={styles.wrapRow}>{dimensionButtons}</div>
               </div>
             )}

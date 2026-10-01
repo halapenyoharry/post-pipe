@@ -410,6 +410,8 @@
     "_anchors_note": "A container can rest on the cover's art: containers[<id>].anchor { x, y }, fractions of the art's width and height (settings.opening). With anchors and the cover on, the graph state rests at the home view (initialFocusMinScale, default 0.4, from the frame's corner) instead of the first framing, and a fresh layout, or Reset, puts each anchored container's centre (its title, or its closed node) on its anchor. Each anchored container keeps a frame of its own and stays pinned to its anchor: the anchor is its centre, closed or open, through every opening and closing, until the reader drags it; it then stays where it was dropped (kept across visits) until Reset. Zoom to Fit still frames everything. The anchors are part of the saved positions' key, so moving one retires positions saved against the old ones. containers[<id>].labelPosition: center (default, where the layout puts the title), top (centred at the top of the hull) or hidden (not drawn)."
   },
   "dimensions": {
+    "groupLabel": "dimensions",
+    "_groupLabel_note": "What the group of dimensions is called where a reader sees it: the label in the bottom bar and the heading in its More sheet. dimensions by default.",
     "labels": {},
     "_labels_note": "Rename any dimension wherever a reader sees it (the bottom bar and its tooltips): { \"commits\": \"revisions\" }, or { \"commits\": { \"label\": \"revisions\", \"title\": \"...\" } }. Ids: time, commits, narrative, chronology, and readers (the edge layer of readers\u2019 connections, its own switch, off until turned on, shown only when there are any). Engine names unchanged by default."
   },
