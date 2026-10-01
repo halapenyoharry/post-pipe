@@ -321,7 +321,9 @@
       "_note": "kicker: an optional small line above the title, a list of parts joined with separator (default \" \u2014 \"). Tokens: {n} the piece's number, {n_words} it in words, {N_words} capitalized, {book} site.title, {author}, {title}. A part whose token has no value is left out. byline: \"by <author>\" under the title, default true."
     },
     "progressBar": "top",
-    "_progressBar_note": "top (a bar along the top edge of the reader, default), side (down its right edge), or none."
+    "_progressBar_note": "top (a bar along the top edge of the reader, default), side (down its right edge), or none.",
+    "allowDownload": true,
+    "_allowDownload_note": "Whether the reader offers Export (download the piece as a markdown file). Default true."
   },
   "graph": {
     "_note": "Visual parameters for the graph. Here rather than in the code so they can be tuned without a rebuild, and so a fork can look different without editing components. Not all of these are exposed in the interface, and they do not need to be \u2014 being reachable is the point.",

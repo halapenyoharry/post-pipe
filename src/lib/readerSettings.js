@@ -10,4 +10,10 @@ function progressBarMode(settings) {
   return PROGRESS_BARS.includes(v) ? v : 'top';
 }
 
-module.exports = { progressBarMode, PROGRESS_BARS };
+// settings.reader.allowDownload: whether the reader offers to download the
+// piece as a file (Export). Default true; false removes the button.
+function allowDownload(settings) {
+  return !(settings && settings.reader && settings.reader.allowDownload === false);
+}
+
+module.exports = { progressBarMode, allowDownload, PROGRESS_BARS };

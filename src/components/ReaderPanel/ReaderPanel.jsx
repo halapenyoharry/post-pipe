@@ -3,7 +3,7 @@ import styles from './ReaderPanel.module.css';
 import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
-import { progressBarMode } from '../../lib/readerSettings';
+import { progressBarMode, allowDownload } from '../../lib/readerSettings';
 
 
 export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
@@ -233,7 +233,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   };
 
   const handleExport = () => {
-    if (!article || !bodyRef.current) return;
+    if (!article || !bodyRef.current || !allowDownload(settings)) return;
     const licenseHeader = settings?.export?.license_header || '';
     const license = licenseHeader.replace('{{canonical_url}}', article.canonical_url || article.url);
     const text = `${license}\n\n---\n\n${bodyRef.current.innerText}`;
@@ -337,6 +337,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // byline sits under it.
   const header = readerHeader(settings, article);
   const progressMode = progressBarMode(settings);
+  const canDownload = allowDownload(settings);
 
   return (
     <>
@@ -420,12 +421,15 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               title="Article details"
               dangerouslySetInnerHTML={{ __html: `${ICONS.info}<span class="${styles.tbTooltip}">Details</span>` }}
             />
-            <button
-              className={styles.tb}
-              onClick={handleExport}
-              title="Export markdown"
-              dangerouslySetInnerHTML={{ __html: `${ICONS.download}<span class="${styles.tbTooltip}">Export</span>` }}
-            />
+            {canDownload && (
+              <button
+                className={styles.tb}
+                onClick={handleExport}
+                title="Export markdown"
+                data-reader-download
+                dangerouslySetInnerHTML={{ __html: `${ICONS.download}<span class="${styles.tbTooltip}">Export</span>` }}
+              />
+            )}
             <button
               className={styles.tb}
               onClick={handleCopy}
