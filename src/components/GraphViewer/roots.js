@@ -1,4 +1,4 @@
-// Roots: thin, branching lines in the manner of an agarita's roots, grown
+// Roots: thin, branching lines in the manner of a desert shrub's roots, grown
 // along the reading path behind the graph. Pure geometry, so it can be
 // tested: a segment's shape comes from a seed (the book's, plus the
 // segment's own key), never from Math.random, so the same book draws the
