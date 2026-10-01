@@ -9,6 +9,7 @@ import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
+import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
@@ -2675,8 +2676,37 @@ export function GraphViewer({
     // while the simulation runs — so drawing it once at the start pins it to
     // whatever the first frame happened to look like. Redrawn on a throttle
     // during the settle and once more at the end.
+    // Open cards are larger than the closed ones a layout spaces for, and a
+    // stored arrangement can put two of them on top of each other. Until the
+    // first layout has settled, overlapping open cards are nudged apart; the
+    // closed nodes are not moved. After that a reader's own arrangement is
+    // left as they make it.
+    let openNudgeDone = false;
+    const nodeByIdForNudge = new Map(data.nodes.map((d) => [d.id, d]));
+    function nudgeOpenCards() {
+      if (openNudgeDone || layoutRef.current !== 'force') return false;
+      const rects = [];
+      for (const d of data.nodes) {
+        if (d.type !== 'article' || !pinnedIdsRef.current.has(d.id) || d._closedHidden) continue;
+        if (!Number.isFinite(d.x) || !Number.isFinite(d.y)) continue;
+        const size = d._size || cardSizeFor({ hovered: false, pinned: true });
+        rects.push({ id: d.id, x: d.x, y: d.y, w: size.width, h: size.height });
+      }
+      if (rects.length < 2) return false;
+      const moved = separateOpen(rects, { gap: 12 });
+      for (const [id, p] of moved) {
+        const d = nodeByIdForNudge.get(id);
+        if (!d) continue;
+        d.x = p.x; d.y = p.y; d.vx = 0; d.vy = 0;
+        if (d.fx != null) d.fx = p.x;
+        if (d.fy != null) d.fy = p.y;
+      }
+      return moved.size > 0;
+    }
+
     let tickCount = 0;
     simulation.nodes(data.nodes).on('tick', () => {
+      nudgeOpenCards();
       applyPositions();
       if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
       if (connectorUpdateRef.current) connectorUpdateRef.current();
@@ -2687,6 +2717,7 @@ export function GraphViewer({
 
     // Paint once now, from whatever positions were restored or seeded, so the
     // first frame is correct with or without the simulation ever running.
+    nudgeOpenCards();
     if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
     applyPositions();
 
@@ -2899,6 +2930,8 @@ export function GraphViewer({
       // would bake, e.g., timeline's shape into cluster permanently. Only
       // capture the arrangement when cluster is actually what's displayed.
       if (layoutRef.current !== 'force') return;
+      if (nudgeOpenCards()) applyPositions();
+      openNudgeDone = true;
       data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; d._forcePos = { x: d.x, y: d.y }; });
 
       // The layout the simulation settled on is itself an arrangement worth
