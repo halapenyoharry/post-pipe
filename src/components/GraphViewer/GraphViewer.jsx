@@ -6,6 +6,7 @@ import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
 import { containerLayout } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
+import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -392,12 +393,38 @@ export function GraphViewer({
     // Whether automatic framing still goes to settings.graph.initialFocus.
     let focusActive = !!GS.initialFocus && GS.initialFocus !== 'all';
     const FOCUS_MIN_SCALE = GS.initialFocusMinScale != null ? GS.initialFocusMinScale : 0.4;
+
+    // Rotation (two fingers on a touch screen). The view is
+    // translate · rotate · scale; d3.zoom keeps translate and scale and works
+    // in the rotated frame, which pans and zooms correctly at any angle. While
+    // two fingers turn, the drawn translate is corrected so the point under
+    // them stays put; when they lift, that translate becomes d3's own. Labels
+    // and cards turn back by the same angle, so they stay upright.
+    let rotation = 0; // degrees
+    let rotGesture = null; // { theta0, a0, mx, my, started }
+    let paintedRotation = 0;
+    let positionsReady = false;
+    let view = { x: 0, y: 0, k: 1 };
+    const upright = () => (rotation ? ` rotate(${-rotation})` : '');
+    const viewFor = (t) => rotatedView(t, rotGesture, rotation);
+    function paintView(t) {
+      view = viewFor(t);
+      g.attr('transform', `translate(${view.x},${view.y}) rotate(${rotation}) scale(${view.k})`);
+      if (cardsTransform) {
+        cardsTransform.style('transform', `translate3d(${view.x}px, ${view.y}px, 0px) rotate(${rotation}deg) scale(${view.k})`);
+      }
+      if (container) container.style.setProperty('--gv-unrot', `${-rotation}deg`);
+      if (paintedRotation !== rotation) {
+        paintedRotation = rotation;
+        if (positionsReady) applyPositions();
+      }
+    }
+    // Graph point to screen point, through the view as drawn.
+    const toScreen = (x, y) => viewToScreen(view, rotation, x, y);
+
     const zoom = d3.zoom().on('zoom', (event) => {
       if (event.sourceEvent) { userMovedView = true; focusActive = false; }
-      g.attr('transform', event.transform);
-      if (cardsTransform) {
-        cardsTransform.style('transform', `translate3d(${event.transform.x}px, ${event.transform.y}px, 0px) scale(${event.transform.k})`);
-      }
+      paintView(event.transform);
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
       if (edgeLabelFor) placeEdgeLabel();
@@ -412,6 +439,58 @@ export function GraphViewer({
       }
     });
     svg.call(zoom).on('dblclick.zoom', null);
+
+    // Two-finger rotate. Listening in the capture phase on the container runs
+    // before d3.zoom's own touch handlers on the svg, so the angle is known
+    // before d3 repaints the pinch.
+    const touchAngle = (e) => {
+      const a = e.touches[0], b = e.touches[1];
+      return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+    };
+    const touchMid = (e) => {
+      const r = container.getBoundingClientRect();
+      const a = e.touches[0], b = e.touches[1];
+      return [(a.clientX + b.clientX) / 2 - r.left, (a.clientY + b.clientY) / 2 - r.top];
+    };
+    const ROTATE_DEADZONE = 10; // degrees of twist before a pinch also turns
+    const onRotateStart = (e) => {
+      if (e.touches.length !== 2) return;
+      const [mx, my] = touchMid(e);
+      rotGesture = { theta0: rotation, a0: touchAngle(e), mx, my, started: false };
+    };
+    const onRotateMove = (e) => {
+      if (!rotGesture || e.touches.length !== 2) return;
+      const [mx, my] = touchMid(e);
+      rotGesture.mx = mx; rotGesture.my = my;
+      const twist = angleDelta(touchAngle(e), rotGesture.a0);
+      if (!rotGesture.started) {
+        if (Math.abs(twist) < ROTATE_DEADZONE) return;
+        rotGesture.started = true;
+        rotGesture.a0 = touchAngle(e);
+        return;
+      }
+      rotation = normalizeAngle(rotGesture.theta0 + twist);
+    };
+    const onRotateEnd = (e) => {
+      if (!rotGesture || e.touches.length >= 2) return;
+      const v = viewFor(d3.zoomTransform(svg.node()));
+      rotGesture = null;
+      svg.call(zoom.transform, d3.zoomIdentity.translate(v.x, v.y).scale(v.k));
+    };
+    container.addEventListener('touchstart', onRotateStart, { capture: true, passive: true });
+    container.addEventListener('touchmove', onRotateMove, { capture: true, passive: true });
+    container.addEventListener('touchend', onRotateEnd, { capture: true, passive: true });
+    container.addEventListener('touchcancel', onRotateEnd, { capture: true, passive: true });
+    // Back to upright, keeping the point at the centre of the screen where it is.
+    function resetRotation({ repaint = true } = {}) {
+      if (!rotation && !rotGesture) return;
+      rotGesture = null;
+      const t = d3.zoomTransform(svg.node());
+      const cx = width / 2, cy = height / 2;
+      const p = screenToView(view, rotation, cx, cy);
+      rotation = 0;
+      if (repaint) svg.call(zoom.transform, d3.zoomIdentity.translate(cx - p[0] * t.k, cy - p[1] * t.k).scale(t.k));
+    }
 
     // Restore anything the reader has already placed. Setting fx/fy pins the
     // node, so the simulation lays out only what has never been positioned and
@@ -1180,7 +1259,7 @@ export function GraphViewer({
           group.select('.container-badge').style('display', 'none');
           group.select('.container-macro-node')
             .style('display', null)
-            .attr('transform', `translate(${pos.x}, ${pos.y})`)
+            .attr('transform', `translate(${pos.x}, ${pos.y})${upright()}`)
             .select('.label-count').text(containerCountText(GS, memberNodes.length));
           return;
         }
@@ -1280,7 +1359,7 @@ export function GraphViewer({
         if (labelAt) {
           badge.select('.container-badge-text').attr('font-size', `${fs}px`);
           sizeHit(fs);
-          badge.attr('transform', `translate(${labelAt.x}, ${labelAt.y})`);
+          badge.attr('transform', `translate(${labelAt.x}, ${labelAt.y})${upright()}`);
           return;
         }
 
@@ -1295,7 +1374,7 @@ export function GraphViewer({
         sizeHit(fs2);
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : d3.mean(hull, (p) => p[0]);
-        badge.attr('transform', `translate(${cx}, ${minY + (maxY - minY) / 3})`);
+        badge.attr('transform', `translate(${cx}, ${minY + (maxY - minY) / 3})${upright()}`);
       });
     }
 
@@ -1603,7 +1682,7 @@ export function GraphViewer({
       const h = fs * 1.7;
       edgeLabelBg.attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h)
         .attr('rx', h / 2).style('stroke', color).attr('stroke-width', 1 / k);
-      edgeLabel.attr('transform', `translate(${p.x}, ${p.y})`).style('display', null);
+      edgeLabel.attr('transform', `translate(${p.x}, ${p.y})${upright()}`).style('display', null);
     }
     function showEdgeLabel(l, el) {
       clearTimeout(edgeLabelTimer);
@@ -1636,6 +1715,9 @@ export function GraphViewer({
       .attr('class', 'node');
 
     const dragHandler = d3.drag().clickDistance(5)
+        // Pointer positions in graph coordinates, through the view as drawn
+        // (zoom and rotation), for the HTML cards as much as the svg nodes.
+        .container(() => g.node())
         // Under a mouse, moving a card and scrolling its text are different
         // gestures — drag versus wheel. Under a thumb they are the same
         // gesture, and drag would win every time, so a card's text could never
@@ -1714,10 +1796,10 @@ export function GraphViewer({
             viewStateRef.current.setNodePosition(persistKey(d), event.x, event.y, { transient: true });
           }
           nodes.filter(nd => nd.id === d.id)
-            .attr('transform', 'translate(' + event.x + ',' + event.y + ')');
+            .attr('transform', 'translate(' + event.x + ',' + event.y + ')' + upright());
           if (articleNodes) {
             articleNodes.filter(nd => nd.id === d.id)
-              .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px)`);
+              .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px) rotate(var(--gv-unrot, 0deg))`);
           }
           if (connectorUpdateRef.current) connectorUpdateRef.current();
           links.each(function(l) {
@@ -2227,14 +2309,15 @@ export function GraphViewer({
     }
     function applyPositions() {
       redrawLinks();
-      nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+      nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')' + upright());
       if (articleNodes) {
-        articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px)`);
+        articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px) rotate(var(--gv-unrot, 0deg))`);
       }
       updateContainers();
     }
     let hasFitted = false;
-    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers };
+    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen };
+    positionsReady = true;
 
     // The axis is measured against the corpus extent, which keeps changing
     // while the simulation runs — so drawing it once at the start pins it to
@@ -2340,6 +2423,8 @@ export function GraphViewer({
         const transform = d3.zoomIdentity
           .translate(w / 2 - cx * k, ty)
           .scale(k);
+        // A frame is computed upright, so framing brings the view upright.
+        resetRotation({ repaint: false });
         if (animate) svg.transition().duration(750).call(zoom.transform, transform);
         else svg.call(zoom.transform, transform);
         return true;
@@ -2418,6 +2503,7 @@ export function GraphViewer({
       const tx = w / 2 - centerX * k;
       const ty = h / 2 - centerY * k;
       const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
+      resetRotation({ repaint: false });
       if (animate) {
         svg.transition().duration(750).call(zoom.transform, transform);
       } else {
@@ -2555,6 +2641,10 @@ export function GraphViewer({
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
+      container.removeEventListener('touchstart', onRotateStart, { capture: true });
+      container.removeEventListener('touchmove', onRotateMove, { capture: true });
+      container.removeEventListener('touchend', onRotateEnd, { capture: true });
+      container.removeEventListener('touchcancel', onRotateEnd, { capture: true });
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
       window.removeEventListener('graph:reset-sizes', handleResetSizes);
@@ -2650,7 +2740,7 @@ export function GraphViewer({
     function updateConnectors() {
       const t = d3.zoomTransform(g.svg.node());
       connected.forEach(({ node, anchor, line }) => {
-        const p = t.apply([node.x, node.y]);
+        const p = g.toScreen ? g.toScreen(node.x, node.y) : t.apply([node.x, node.y]);
         line.attr('x1', anchor.x).attr('y1', anchor.y).attr('x2', p[0]).attr('y2', p[1]);
       });
     }
