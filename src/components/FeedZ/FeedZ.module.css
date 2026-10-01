@@ -56,6 +56,14 @@
   }
 }
 
+/* A page of the site's top bar (settings.topBar.pages): a pill without a
+   dot that opens its item in the reader. */
+.pagePill {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .pill.hidden {
   opacity: 0.32;
 }

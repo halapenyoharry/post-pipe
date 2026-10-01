@@ -21,15 +21,20 @@ import styles from './FeedZ.module.css';
  *                    persists the reader's choice per source
  *   showCount      — optional, default true; false hides the item count
  *                    (settings.graph.containerCount)
+ *   pages          — optional; the top bar's pages (settings.topBar.pages,
+ *                    src/lib/topBar.js resolvePages): a button each, after
+ *                    the pills, that opens its item in the reader
+ *   onOpenPage     — (item) => void, for a page's button
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true }) {
-  if (!sources || sources.length === 0) return null;
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage }) {
+  const hasPages = Array.isArray(pages) && pages.length > 0;
+  if ((!sources || sources.length === 0) && !hasPages) return null;
 
   const hidden = hiddenSources || new Set();
 
   return (
     <div className={styles.bar} data-feeds>
-      {sources.map(src => (
+      {(sources || []).map(src => (
         <FeedPill
           key={src.id}
           source={src}
@@ -38,6 +43,19 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
           viewState={viewState}
           showCount={showCount}
         />
+      ))}
+      {hasPages && pages.map((pg) => (
+        <button
+          key={pg.id}
+          type="button"
+          className={`${styles.pill} ${styles.pagePill}`}
+          data-top-pages
+          data-top-page={pg.id}
+          title={pg.item && pg.item.title ? pg.item.title : pg.label}
+          onClick={() => onOpenPage && onOpenPage(pg.item)}
+        >
+          <span className={styles.title}>{pg.label}</span>
+        </button>
       ))}
       <AddPill />
     </div>

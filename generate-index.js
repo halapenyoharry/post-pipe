@@ -446,7 +446,15 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, React, ReactDOM } = window.PostPipeComponents;
+
+    // The top bar's pages (settings.topBar.pages): buttons beside the source
+    // pills that open an item in the reader. An item kept out of the graph
+    // (hideFromGraph) is still in the feed for the reader; the graph draws
+    // the rest.
+    const TOP_BAR = topBarConfig(window.SETTINGS);
+    const TOP_PAGES = resolvePages(TOP_BAR, feed.items || []);
+    const GRAPH_FEED = graphFeed(feed, TOP_BAR);
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -630,7 +638,7 @@ ${reactJs}
         // they are.
         React.createElement(Opening, { settings: window.SETTINGS, viewState: viewState },
           React.createElement(GraphViewer, {
-            feedData: feed,
+            feedData: GRAPH_FEED,
             layout: viewState.state.layout,
             timeAxis: viewState.state.timeAxis,
             graphSettings: (window.SETTINGS && window.SETTINGS.graph) || {},
@@ -650,7 +658,9 @@ ${reactJs}
             hiddenSources: hiddenSources,
             onToggleSource: toggleSource,
             viewState: viewState,
-            showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false)
+            showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false),
+            pages: TOP_PAGES,
+            onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
           }),
           React.createElement(TimeOverlay, {
             feedData: feed,

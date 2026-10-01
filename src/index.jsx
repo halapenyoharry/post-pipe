@@ -14,4 +14,5 @@ export { TimeOfDay } from './components/TimeOfDay/TimeOfDay';
 export { Theme } from './components/Theme/Theme';
 export { Opening } from './components/Opening/Opening';
 export { useContributions } from './components/Contributions/useContributions';
+export { topBarConfig, resolvePages, graphFeed } from './lib/topBar';
 export { React, ReactDOM };
