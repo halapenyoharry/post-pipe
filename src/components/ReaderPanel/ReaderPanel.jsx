@@ -3,6 +3,7 @@ import styles from './ReaderPanel.module.css';
 import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
+import { progressBarMode } from '../../lib/readerSettings';
 
 
 export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
@@ -143,8 +144,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const handleScroll = () => {
     if (bodyRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
-      const pct = (scrollTop / (scrollHeight - clientHeight)) * 100;
-      setScrollProgress(Math.min(pct, 100));
+      const room = scrollHeight - clientHeight;
+      const pct = room > 0 ? (scrollTop / room) * 100 : 100;
+      setScrollProgress(Math.max(0, Math.min(pct, 100)));
     }
   };
 
@@ -332,6 +334,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // settings.reader.header: a small line above the title, and whether the
   // byline sits under it.
   const header = readerHeader(settings, article);
+  const progressMode = progressBarMode(settings);
 
   return (
     <>
@@ -343,6 +346,22 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         className={`${styles.panel} ${isOpen && !isMinimized ? styles.open : ''} ${isMinimized ? styles.minimized : ''} ${wide ? styles.wide : ''}`}
         style={floatingPos ? { transform: `translate3d(${floatingPos.x}px, ${floatingPos.y}px, 0px)` } : undefined}
       >
+        {progressMode !== 'none' && (
+          <div
+            className={progressMode === 'side' ? styles.progressSide : styles.progress}
+            role="progressbar"
+            aria-label="Reading progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(scrollProgress)}
+          >
+            <div
+              className={styles.progressFill}
+              style={progressMode === 'side' ? { height: `${scrollProgress}%` } : { width: `${scrollProgress}%` }}
+            />
+          </div>
+        )}
+
         <div
           className={styles.toolbar}
           onMouseDown={handleToolbarMouseDown}
@@ -457,10 +476,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               dangerouslySetInnerHTML={{ __html: `${ICONS.close}<span class="${styles.tbTooltip}">Close</span>` }}
             />
           </div>
-        </div>
-
-        <div className={styles.progress}>
-          <div className={styles.progressFill} style={{ width: `${scrollProgress}%` }} />
         </div>
 
         {currentBookmark && (
