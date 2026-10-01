@@ -179,3 +179,25 @@ test('ring mode: one ring per container round its label, clear of everything', (
   }
   for (const [, info] of L.containers) for (const p of all) assert.ok(!rectsOverlap(info.label, rectOf(p)));
 });
+
+test('an inward spiral keeps the reading order and puts the first chapter on top', () => {
+  const out = book(undefined, { direction: 'outward' });
+  const inn = book(undefined, { direction: 'inward' });
+  const a1 = (L) => Array.from({ length: 11 }, (_, i) => L.nodes.get('a1-' + (i + 1)));
+  const o = a1(out);
+  const n = a1(inn);
+  // Outward: the last chapter is the highest. Inward: the first one is.
+  const topOf = (ps) => ps.reduce((best, p, i) => (p.y < ps[best].y ? i : best), 0);
+  assert.strictEqual(topOf(o), 10);
+  assert.strictEqual(topOf(n), 0);
+  // Consecutive chapters stay neighbours along the curve: each step is as
+  // short as it was outward, only walked the other way.
+  const steps = (ps) => ps.slice(1).map((p, i) => Math.round(Math.hypot(p.x - ps[i].x, p.y - ps[i].y)));
+  assert.deepStrictEqual(steps(n), steps(o).slice().reverse());
+  // Nothing overlaps: no card on another, none on the act's label.
+  const label = inn.containers.get('a1').label;
+  for (let i = 0; i < n.length; i++) {
+    assert.ok(!rectsOverlap(label, rectOf(n[i])), 'label on a1-' + (i + 1));
+    for (let j = i + 1; j < n.length; j++) assert.ok(!rectsOverlap(rectOf(n[i]), rectOf(n[j])), `a1-${i + 1} on a1-${j + 1}`);
+  }
+});

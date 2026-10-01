@@ -388,7 +388,9 @@
       "spacing": 20,
       "_spacing_note": "Gap between neighbouring cards along the spiral, in px.",
       "startRadius": null,
-      "_startRadius_note": "The spiral's radius at the first chapter. null = about two thirds of a card."
+      "_startRadius_note": "The spiral's radius at the first chapter. null = about two thirds of a card.",
+      "direction": "outward",
+      "_direction_note": "outward (default): the first chapter sits under the container's label and the spiral winds clockwise outward from it, so the last chapter is on the outer end. inward: the same reading order turned round, so the first chapter is on the outer end, at the top where a new reader looks first, and the spiral winds clockwise inward to the last one beside the label."
     },
     "initialFocus": "all",
     "_initialFocus_note": "What the first screen frames: all (default) or a container id. A container is framed so its cards are still cards (initialFocusMinScale, default 0.4); when the whole top-level container fits at that scale, it is framed instead. Zoom to Fit always frames everything.",

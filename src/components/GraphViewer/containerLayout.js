@@ -68,7 +68,8 @@ function compareUnits(a, b) {
  * @param {Function} [input.macroSize] (container) -> { w, h } of its closed form
  * @param {Set}      [input.closed]    ids of closed containers
  * @param {Object}   [input.options]   { spacing, gap, padding(container), mode, startRadius }
- *   mode: 'path' (default) | 'scatter' | 'ring'; startRadius: the spiral's radius at its first member
+ *   mode: 'path' (default) | 'scatter' | 'ring'; startRadius: the spiral's radius at its first member;
+ *   direction: 'outward' (default, the first member beside the label) | 'inward' (the first member on the outer end)
  * @returns {{ roots: string[], nodes: Map, containers: Map }}
  *   nodes:      nodeId -> { root, x, y }          position in its root container's frame
  *   containers: id -> { root, label: rect, box: rect, center: {x, y}, closed }  in the root frame
@@ -143,10 +144,19 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       if (arrangement === 'path') {
         // The curve starts at the first member, at the top of the spiral, and
         // winds clockwise and outward around a centre below it.
+        //
+        // direction 'inward' keeps the reading order and turns the walk
+        // round: the curve is laid out from the last member outward, then
+        // mirrored, so the first member sits on the outer end (where the eye
+        // lands first, at the top) and the order winds clockwise and inward
+        // to the last one beside the label.
+        const inward = options.direction === 'inward';
+        if (inward) units.reverse();
+        const sy = lab.h / 2 + gap + units[0].h / 2;
         const maxSide = Math.max(...units.map((u) => Math.max(u.w, u.h)));
         const a = options.startRadius != null ? options.startRadius : maxSide * 0.65;
         const cx0 = fx;
-        const cy0 = fy + a;
+        const cy0 = sy + a;
         const t0 = -Math.PI / 2;
         const at = (t) => {
           const r = a * Math.exp(SPIRAL_B * (t - t0));
@@ -155,7 +165,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
         spiral = { cx: cx0, cy: cy0, a, b: SPIRAL_B };
         let t = t0;
         units.forEach((u, k) => {
-          let p = { x: fx, y: fy };
+          let p = { x: fx, y: sy };
           if (k > 0) {
             // Walk along the curve, a few pixels at a time, to the first spot
             // where this unit clears the label and every unit already placed:
@@ -170,6 +180,14 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
           positions.push(p);
           placed.push(rectAt(p.x, p.y, u.w, u.h));
         });
+        if (inward) {
+          units.reverse();
+          positions.reverse();
+          placed.reverse();
+          for (const p of positions) p.x = -p.x;
+          for (const r of placed) { const x0 = -r.x1; r.x1 = -r.x0; r.x0 = x0; }
+          spiral = { ...spiral, mirrored: true, inward: true };
+        }
       } else if (arrangement === 'ring') {
         // One ring per container, its label in the middle. The radius gives
         // every member a card's diagonal plus spacing of arc, and clears the

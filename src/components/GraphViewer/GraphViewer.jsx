@@ -1131,6 +1131,7 @@ export function GraphViewer({
           spacing: graphSettings.spiral?.spacing ?? 20,
           mode: layoutRef.current === 'radial' ? 'ring' : (graphSettings.spiral?.mode || 'path'),
           startRadius: graphSettings.spiral?.startRadius,
+          direction: graphSettings.spiral?.direction,
           gap: 28,
           padding: (c) => (c.padding != null ? c.padding : (c.parent ? 42 : 75)),
         },
