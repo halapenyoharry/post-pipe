@@ -13656,7 +13656,7 @@ function Ns({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 		function pt(e) {
 			return e.badgeColor || e.color || e.stroke || "#d4af37";
 		}
-		let mt = Ye.append("g").attr("class", "container-badge").style("touch-action", "manipulation");
+		let mt = Ye.append("g").attr("class", "container-badge").attr("data-container-top", (e) => e.parent ? null : "").style("touch-action", "manipulation");
 		mt.append("rect").attr("class", "container-badge-hit").attr("fill", "transparent").attr("pointer-events", "all");
 		let ht = mt.append("text").attr("class", "container-badge-text").attr("text-anchor", "middle").attr("dominant-baseline", "central").style("user-select", "none").attr("fill", (e) => pt(e)).attr("opacity", .55).attr("font-size", (e) => e.parent ? "52px" : "64px");
 		ht.each(function(e) {
@@ -18687,8 +18687,8 @@ var vl = (/* @__PURE__ */ o(((e, t) => {
 		enabled: !1,
 		mode: "two-state",
 		art: {
-			bush: "",
-			roots: "",
+			artState: "",
+			graphState: "",
 			full: ""
 		},
 		alt: "",
@@ -18702,8 +18702,61 @@ var vl = (/* @__PURE__ */ o(((e, t) => {
 			href: ""
 		},
 		startOn: "remembered",
-		snapMs: 420
-	}, r = ["art", "graph"], i = {
+		snapMs: 420,
+		title: null
+	}, r = {
+		text: "",
+		font: "",
+		color: "",
+		opacity: 1,
+		hideGraphTitle: !0
+	}, i = "'Arial Black', Impact, sans-serif", a = ["art", "graph"];
+	function o(e) {
+		let t = e && Array.isArray(e.lines) ? e.lines : [], n = [];
+		for (let e of t) {
+			if (!e || typeof e != "object") continue;
+			let t = (Array.isArray(e.spans) ? e.spans : []).filter((e) => e && typeof e.text == "string" && e.text !== "").map((e) => ({
+				text: e.text,
+				size: Math.max(0, u(e.size, .05)),
+				rise: u(e.rise, 0)
+			}));
+			t.length && n.push({
+				x: u(e.x, 0),
+				y: u(e.y, 0),
+				spans: t
+			});
+		}
+		return { lines: n };
+	}
+	function s(e) {
+		if (!e || typeof e != "object") return null;
+		let t = o(e.art), n = o(e.graph);
+		if (!t.lines.length && !n.lines.length) return null;
+		let a = (t.lines.length ? t : n).lines.map((e) => e.spans.map((e) => e.text).join("")).join(" "), s = d(e.font).trim();
+		return {
+			text: d(e.text).trim() || a.replace(/\s+/g, " ").trim(),
+			font: s,
+			family: s ? `'${s.replace(/'/g, "")}', ${i}` : i,
+			color: d(e.color).trim(),
+			opacity: f(u(e.opacity, r.opacity)),
+			hideGraphTitle: e.hideGraphTitle !== !1,
+			art: t,
+			graph: n
+		};
+	}
+	function c(e, t) {
+		let { left: n = 0, top: r = 0, width: i = 1, height: a = 1 } = t || {};
+		return { lines: (e && e.lines || []).map((e) => ({
+			x: n + e.x * i,
+			y: r + e.y * a,
+			spans: e.spans.map((e) => ({
+				text: e.text,
+				size: e.size * i,
+				rise: e.rise * i
+			}))
+		})) };
+	}
+	var l = {
 		pad: 16,
 		bylineSpace: 52,
 		bylineSize: 20,
@@ -18718,49 +18771,53 @@ var vl = (/* @__PURE__ */ o(((e, t) => {
 		edgePx: 28,
 		reducedFadeMs: 200,
 		reducedWheelPx: 40
-	}, a = (e, t) => e !== "" && e != null && Number.isFinite(Number(e)) ? Number(e) : t, o = (e) => typeof e == "string" ? e : "", s = (e) => Math.max(0, Math.min(1, e)), c = (e, t, n) => e + (t - e) * n, l = (e) => {
-		let t = s(e);
+	}, u = (e, t) => e !== "" && e != null && Number.isFinite(Number(e)) ? Number(e) : t, d = (e) => typeof e == "string" ? e : "", f = (e) => Math.max(0, Math.min(1, e)), p = (e, t, n) => e + (t - e) * n, m = (e) => {
+		let t = f(e);
 		return t * t * (3 - 2 * t);
 	};
-	function u(e) {
+	function h(e) {
 		let t = e && e.opening;
 		if (!t || t.enabled !== !0 || t.mode !== void 0 && t.mode !== "two-state") return null;
-		let r = t.art && typeof t.art == "object" ? t.art : {}, i = o(r.bush), c = o(r.roots), l = o(r.full);
-		if (!l && !(i && c)) return null;
-		let u = t.graph && typeof t.graph == "object" ? t.graph : {}, d = t.byline && typeof t.byline == "object" ? t.byline : {};
+		let r = t.art && typeof t.art == "object" ? t.art : {}, i = d(r.artState), a = d(r.graphState), o = d(r.full);
+		if (!(i && a)) {
+			if (!o) return null;
+			i = o, a = "";
+		}
+		let c = t.graph && typeof t.graph == "object" ? t.graph : {}, l = t.byline && typeof t.byline == "object" ? t.byline : {};
 		return {
 			enabled: !0,
 			mode: "two-state",
 			art: {
-				bush: i,
-				roots: c,
-				full: l
+				artState: i,
+				graphState: a,
+				full: o
 			},
-			alt: o(t.alt),
+			alt: d(t.alt),
 			ground: t.ground === "paper" ? "paper" : "dark",
 			graph: {
-				artOffset: Math.max(0, Math.min(.95, a(u.artOffset, n.graph.artOffset))),
-				artOpacity: s(a(u.artOpacity, n.graph.artOpacity))
+				artOffset: Math.max(0, Math.min(.95, u(c.artOffset, n.graph.artOffset))),
+				artOpacity: f(u(c.artOpacity, n.graph.artOpacity))
 			},
 			byline: {
-				text: o(d.text),
-				href: o(d.href)
+				text: d(l.text),
+				href: d(l.href)
 			},
 			startOn: [
 				"remembered",
 				"art",
 				"graph"
 			].includes(t.startOn) ? t.startOn : n.startOn,
-			snapMs: Math.max(0, a(t.snapMs, n.snapMs))
+			snapMs: Math.max(0, u(t.snapMs, n.snapMs)),
+			title: s(t.title)
 		};
 	}
-	function d(e, { stored: t, hash: n } = {}) {
-		return !e || typeof n == "string" && n.startsWith("#read=") ? "graph" : e.startOn === "art" || e.startOn === "graph" ? e.startOn : r.includes(t) ? t : "art";
+	function g(e, { stored: t, hash: n } = {}) {
+		return !e || typeof n == "string" && n.startsWith("#read=") ? "graph" : e.startOn === "art" || e.startOn === "graph" ? e.startOn : a.includes(t) ? t : "art";
 	}
-	function f(e, { vw: t, vh: r, art: a, bottom: o = 0 } = {}, u = 0) {
-		let d = s(u), f = i, p = Math.max(1, a && a.w || 1), m = Math.max(1, a && a.h || 1), h = e && e.byline && e.byline.text ? f.bylineSpace : 0, g = Math.min(f.pad, r * .03), _ = Math.max(g, o), v = Math.max(1, r - g - _ - h), y = Math.max(.01, Math.min(v / m, (t - 2 * g) / p)), b = p * y, x = m * y, S = e && e.graph || n.graph, C = g + Math.max(0, (v - x) / 2), w = -S.artOffset * x, T = c(C, w, d), E = l((d - f.graphFrom) / (1 - f.graphFrom));
+	function _(e, { vw: t, vh: r, art: i, bottom: a = 0 } = {}, o = 0) {
+		let s = f(o), c = l, u = Math.max(1, i && i.w || 1), d = Math.max(1, i && i.h || 1), h = e && e.byline && e.byline.text ? c.bylineSpace : 0, g = Math.min(c.pad, r * .03), _ = Math.max(g, a), v = Math.max(1, r - g - _ - h), y = Math.max(.01, Math.min(v / d, (t - 2 * g) / u)), b = u * y, x = d * y, S = e && e.graph || n.graph, C = g + Math.max(0, (v - x) / 2), w = -S.artOffset * x, T = p(C, w, s), E = m((s - c.graphFrom) / (1 - c.graphFrom));
 		return {
-			p: d,
+			p: s,
 			vw: t,
 			vh: r,
 			art: {
@@ -18769,140 +18826,144 @@ var vl = (/* @__PURE__ */ o(((e, t) => {
 				width: b,
 				height: x,
 				scale: y,
-				opacity: c(1, S.artOpacity, d)
+				opacity: p(1, S.artOpacity, s)
+			},
+			fade: {
+				art: 1 - s,
+				graph: s
 			},
 			artTop0: C,
 			artTop1: w,
 			travel: Math.max(1, C - w),
 			graph: {
 				opacity: E,
-				shift: (1 - E) * f.rise * r
+				shift: (1 - E) * c.rise * r
 			},
-			ground: 1 - d,
+			ground: 1 - s,
 			byline: {
 				x: t / 2,
-				y: T + x + (h - f.bylineSize * 1.3) / 2,
-				size: f.bylineSize,
-				opacity: s(1 - d * 2.5)
+				y: T + x + (h - c.bylineSize * 1.3) / 2,
+				size: c.bylineSize,
+				opacity: f(1 - s * 2.5)
 			}
 		};
 	}
-	var p = (e) => 1 - (1 - e) ** 3, m = (e) => e < .5 ? 4 * e * e * e : 1 - (-2 * e + 2) ** 3 / 2;
-	function h(e, { start: t = "art", reducedMotion: a = !1, travel: o = 600, now: l = () => Date.now(), frame: u = (e) => setTimeout(() => e(), 16), cancelFrame: d = (e) => clearTimeout(e), setTimer: f = setTimeout, clearTimer: h = clearTimeout, onChange: g = () => {}, onRest: _ = () => {} } = {}) {
-		let v = e ? e.snapMs : n.snapMs, y = +(t === "graph"), b = t === "graph" ? "graph" : "art", x = b, S = null, C = null, w = 0, T = 0, E = null, D = Math.max(120, o), O = (e) => +(e === "graph"), ee = (e) => e === "graph" ? "art" : "graph";
+	var v = (e) => 1 - (1 - e) ** 3, y = (e) => e < .5 ? 4 * e * e * e : 1 - (-2 * e + 2) ** 3 / 2;
+	function b(e, { start: t = "art", reducedMotion: r = !1, travel: i = 600, now: o = () => Date.now(), frame: s = (e) => setTimeout(() => e(), 16), cancelFrame: c = (e) => clearTimeout(e), setTimer: u = setTimeout, clearTimer: d = clearTimeout, onChange: m = () => {}, onRest: h = () => {} } = {}) {
+		let g = e ? e.snapMs : n.snapMs, _ = +(t === "graph"), b = t === "graph" ? "graph" : "art", x = b, S = null, C = null, w = 0, T = 0, E = null, D = Math.max(120, i), O = (e) => +(e === "graph"), ee = (e) => e === "graph" ? "art" : "graph";
 		function te(e, t) {
-			let n = s(e);
-			n === y && !(t && t.swap) || (y = n, g(y, t || {}));
+			let n = f(e);
+			n === _ && !(t && t.swap) || (_ = n, m(_, t || {}));
 		}
 		function ne() {
-			S &&= (d(S.handle), null);
+			S &&= (c(S.handle), null);
 		}
 		function re(e) {
-			ne(), b = e, x = e, te(O(e)), T = l() + i.quietMs, _(e);
+			ne(), b = e, x = e, te(O(e)), T = o() + l.quietMs, h(e);
 		}
-		function ie(e, { ease: t = p } = {}) {
+		function ie(e, { ease: t = v } = {}) {
 			ne();
 			let n = O(e);
-			if (a) {
+			if (r) {
 				ae(e);
 				return;
 			}
-			let r = y, o = Math.abs(n - r);
-			if (o < 1e-4 || v === 0) {
+			let i = _, a = Math.abs(n - i);
+			if (a < 1e-4 || g === 0) {
 				re(e);
 				return;
 			}
-			let s = Math.max(i.minSnapMs, v * o), d = l();
+			let c = Math.max(l.minSnapMs, g * a), u = o();
 			S = {
 				target: e,
 				handle: null
 			};
-			let f = () => {
-				let i = Math.min(1, (l() - d) / s);
-				if (te(c(r, n, t(i))), i >= 1) {
+			let d = () => {
+				let r = Math.min(1, (o() - u) / c);
+				if (te(p(i, n, t(r))), r >= 1) {
 					S = null, re(e);
 					return;
 				}
-				S.handle = u(f);
+				S.handle = s(d);
 			};
-			S.handle = u(f);
+			S.handle = s(d);
 		}
 		function ae(e) {
-			ne(), !(b === e && y === O(e)) && (b = e, x = e, y = O(e), g(y, {
+			ne(), !(b === e && _ === O(e)) && (b = e, x = e, _ = O(e), m(_, {
 				swap: !0,
-				ms: i.reducedFadeMs
-			}), T = l() + i.quietMs, _(e));
+				ms: l.reducedFadeMs
+			}), T = o() + l.quietMs, h(e));
 		}
 		function oe(e = 0) {
-			let t = O(x), n = y - t, r = x, a = t === 0 ? 1 : -1;
-			n * a > i.onward && (r = ee(x)), e * a > i.flickPxPerMs && (r = ee(x)), e * a < -i.flickPxPerMs && (r = x), ie(r);
+			let t = O(x), n = _ - t, r = x, i = t === 0 ? 1 : -1;
+			n * i > l.onward && (r = ee(x)), e * i > l.flickPxPerMs && (r = ee(x)), e * i < -l.flickPxPerMs && (r = x), ie(r);
 		}
 		function k(e) {
-			S || (x = y >= 1 ? "graph" : y <= 0 ? "art" : x), ne(), te(y + e);
+			S || (x = _ >= 1 ? "graph" : _ <= 0 ? "art" : x), ne(), te(_ + e);
 		}
 		function A(e, { instant: t = !1 } = {}) {
-			return r.includes(e) ? t ? (re(e), !0) : b === e && y === O(e) && !S ? !1 : (ie(e, { ease: m }), !0) : !1;
+			return a.includes(e) ? t ? (re(e), !0) : b === e && _ === O(e) && !S ? !1 : (ie(e, { ease: y }), !0) : !1;
 		}
 		function j(e, { deltaMode: t = 0, where: n = "stage" } = {}) {
-			let r = e * (t === 1 ? i.lineHeightPx : t === 2 ? D : 1);
-			if (!r) return !1;
-			let o = !S && (y === 0 || y === 1);
-			if ((n === "graph" || n === "edge") && o && y === 1) {
-				if (l() < T) return !0;
-				if (!(n === "edge" && r < 0)) return !1;
+			let i = e * (t === 1 ? l.lineHeightPx : t === 2 ? D : 1);
+			if (!i) return !1;
+			let a = !S && (_ === 0 || _ === 1);
+			if ((n === "graph" || n === "edge") && a && _ === 1) {
+				if (o() < T) return !0;
+				if (!(n === "edge" && i < 0)) return !1;
 			}
-			if (a) {
-				if (l() < T) return !0;
-				if (w += r, Math.abs(w) >= i.reducedWheelPx) {
+			if (r) {
+				if (o() < T) return !0;
+				if (w += i, Math.abs(w) >= l.reducedWheelPx) {
 					let e = w > 0 ? "graph" : "art";
 					w = 0, e !== b && ae(e);
 				}
 				return !0;
 			}
-			return o && (y === 0 && r < 0 || y === 1 && r > 0) ? !0 : (k(r / D), C && h(C), C = f(() => {
-				C = null, y > 0 && y < 1 ? oe(0) : re(y >= 1 ? "graph" : "art");
-			}, i.wheelIdleMs), !0);
+			return a && (_ === 0 && i < 0 || _ === 1 && i > 0) ? !0 : (k(i / D), C && d(C), C = u(() => {
+				C = null, _ > 0 && _ < 1 ? oe(0) : re(_ >= 1 ? "graph" : "art");
+			}, l.wheelIdleMs), !0);
 		}
-		function se(e, t = l()) {
+		function se(e, t = o()) {
 			S && (x = S.target === "graph" ? "art" : "graph", ne()), E = {
 				y: e,
-				p: y,
+				p: _,
 				lastY: e,
 				lastT: t,
 				v: 0,
 				total: 0
 			}, w = 0;
 		}
-		function ce(e, t = l()) {
+		function ce(e, t = o()) {
 			if (!E) return !1;
-			let n = E.lastY - e, r = Math.max(1, t - E.lastT);
-			return E.v = n / r * .6 + .4 * E.v, E.lastY = e, E.lastT = t, E.total += n, a || te(E.p + (E.y - e) / D), !0;
+			let n = E.lastY - e, i = Math.max(1, t - E.lastT);
+			return E.v = n / i * .6 + .4 * E.v, E.lastY = e, E.lastT = t, E.total += n, r || te(E.p + (E.y - e) / D), !0;
 		}
-		function le(e = l()) {
+		function le(e = o()) {
 			if (!E) return !1;
-			let { v: t, total: n, lastT: r } = E;
-			if (E = null, a) {
-				if (Math.abs(n) >= i.reducedWheelPx) {
+			let { v: t, total: n, lastT: i } = E;
+			if (E = null, r) {
+				if (Math.abs(n) >= l.reducedWheelPx) {
 					let e = n > 0 ? "graph" : "art";
 					e !== b && ae(e);
 				}
 				return !0;
 			}
-			let o = e - r > 120 ? 0 : t;
-			return y === 0 || y === 1 ? (re(y === 1 ? "graph" : "art"), !0) : (oe(o), !0);
+			let a = e - i > 120 ? 0 : t;
+			return _ === 0 || _ === 1 ? (re(_ === 1 ? "graph" : "art"), !0) : (oe(a), !0);
 		}
 		function M(e) {
 			return e === "down" ? A("graph") : e === "up" ? A("art") : !1;
 		}
 		return {
 			get p() {
-				return y;
+				return _;
 			},
 			get rest() {
 				return b;
 			},
 			get moving() {
-				return !!S || y > 0 && y < 1;
+				return !!S || _ > 0 && _ < 1;
 			},
 			wheel: j,
 			touchStart: se,
@@ -18916,22 +18977,26 @@ var vl = (/* @__PURE__ */ o(((e, t) => {
 				D = Math.max(120, e);
 			},
 			dispose() {
-				ne(), C &&= (h(C), null);
+				ne(), C &&= (d(C), null);
 			}
 		};
 	}
-	function g(e) {
+	function x(e) {
 		return !e || e.altKey || e.ctrlKey || e.metaKey ? null : e.key === "ArrowDown" || e.key === "PageDown" || (e.key === " " || e.key === "Spacebar") && !e.shiftKey ? "down" : e.key === "ArrowUp" || e.key === "PageUp" ? "up" : null;
 	}
 	t.exports = {
 		DEFAULTS: n,
-		TUNING: i,
-		STATES: r,
-		openingConfig: u,
-		startState: d,
-		coverGeometry: f,
-		createCover: h,
-		pageKey: g
+		TUNING: l,
+		STATES: a,
+		TITLE_DEFAULTS: r,
+		TITLE_FALLBACK: i,
+		openingConfig: h,
+		titleConfig: s,
+		titleLayout: c,
+		startState: g,
+		coverGeometry: _,
+		createCover: b,
+		pageKey: x
 	};
 })))();
 function yl({ settings: e, viewState: t }) {
@@ -18954,17 +19019,17 @@ function yl({ settings: e, viewState: t }) {
 	]), null;
 }
 var bl = {
-	cover: "_cover_hhd7a_9",
-	ground: "_ground_hhd7a_18",
-	stage: "_stage_hhd7a_25",
-	art: "_art_hhd7a_40",
-	full: "_full_hhd7a_55",
-	part: "_part_hhd7a_56",
-	alt: "_alt_hhd7a_68",
-	byline: "_byline_hhd7a_77",
-	section: "_section_hhd7a_102",
-	handle: "_handle_hhd7a_109",
-	grip: "_grip_hhd7a_125"
+	cover: "_cover_1hcdh_9",
+	ground: "_ground_1hcdh_18",
+	stage: "_stage_1hcdh_25",
+	art: "_art_1hcdh_40",
+	image: "_image_1hcdh_54",
+	title: "_title_1hcdh_65",
+	alt: "_alt_1hcdh_85",
+	byline: "_byline_1hcdh_94",
+	section: "_section_1hcdh_119",
+	handle: "_handle_1hcdh_126",
+	grip: "_grip_1hcdh_142"
 }, xl = () => typeof window < "u" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function Sl(e) {
 	return new Promise((t) => {
@@ -19002,92 +19067,157 @@ function Tl(e) {
 	return n.height > 0 ? Math.max(0, e - n.top + 8) : 0;
 }
 var El = 8;
-function Dl({ config: e, viewState: t, children: n }) {
-	let r = (0, _.useRef)(null), i = (0, _.useRef)(null), a = (0, _.useRef)(null), o = (0, _.useRef)(null), s = (0, _.useRef)(null), c = (0, _.useRef)(null), l = (0, _.useRef)(null), u = (0, _.useRef)(null), d = (0, _.useRef)(null), f = (0, _.useRef)(() => !1), [p, m] = (0, _.useState)(null), h = (0, _.useMemo)(xl, []), g = (0, _.useMemo)(() => (0, vl.startState)(e, {
+function Dl({ layout: e, size: t, which: n, opacity: r }) {
+	let i = (0, vl.titleLayout)(e, {
+		left: 0,
+		top: 0,
+		width: t.w,
+		height: t.h
+	}).lines;
+	return i.length ? /* @__PURE__ */ (0, B.jsx)("g", {
+		"data-cover-title": n,
+		style: { opacity: r },
+		children: i.map((e, t) => {
+			let n = 0;
+			return /* @__PURE__ */ (0, B.jsx)("text", {
+				x: e.x,
+				y: e.y,
+				"data-cover-title-line": t,
+				xmlSpace: "preserve",
+				children: e.spans.map((e, t) => {
+					let r = n - e.rise;
+					return n = e.rise, /* @__PURE__ */ (0, B.jsx)("tspan", {
+						fontSize: e.size,
+						dy: r || void 0,
+						"data-cover-title-span": t,
+						children: e.text
+					}, t);
+				})
+			}, t);
+		})
+	}) : null;
+}
+function Ol({ title: e, size: t, start: n, refs: r }) {
+	return !e || !t ? null : /* @__PURE__ */ (0, B.jsxs)("svg", {
+		className: bl.title,
+		viewBox: `0 0 ${t.w} ${t.h}`,
+		preserveAspectRatio: "none",
+		role: "heading",
+		"aria-level": "1",
+		"aria-label": e.text,
+		"data-cover-title-svg": !0,
+		style: {
+			fontFamily: e.family,
+			fill: e.color || "var(--pp-accent, var(--accent))",
+			fillOpacity: e.opacity
+		},
+		children: [/* @__PURE__ */ (0, B.jsx)("g", {
+			ref: r.art,
+			children: /* @__PURE__ */ (0, B.jsx)(Dl, {
+				layout: e.art,
+				size: t,
+				which: "art",
+				opacity: +(n === "art")
+			})
+		}), /* @__PURE__ */ (0, B.jsx)("g", {
+			ref: r.graph,
+			children: /* @__PURE__ */ (0, B.jsx)(Dl, {
+				layout: e.graph,
+				size: t,
+				which: "graph",
+				opacity: n === "art" ? 0 : 1
+			})
+		})]
+	});
+}
+function kl({ config: e, viewState: t, children: n }) {
+	let r = (0, _.useRef)(null), i = (0, _.useRef)(null), a = (0, _.useRef)(null), o = (0, _.useRef)(null), s = (0, _.useRef)(null), c = (0, _.useRef)(null), l = (0, _.useRef)(null), u = (0, _.useRef)(null), d = (0, _.useRef)(null), f = (0, _.useRef)(null), p = (0, _.useRef)(null), m = (0, _.useRef)(null), h = (0, _.useRef)(null), g = (0, _.useRef)(() => !1), [v, y] = (0, _.useState)(null), b = (0, _.useMemo)(xl, []), x = (0, _.useMemo)(() => (0, vl.startState)(e, {
 		stored: t && t.openingState ? t.openingState() : null,
 		hash: typeof window < "u" ? window.location.hash : ""
 	}), [e, t]);
 	(0, _.useEffect)(() => {
-		let t = !0, { full: n, bush: r, roots: i } = e.art, a = (e) => {
-			t && m(e);
-		};
-		return n ? Sl(n).then((e) => a(e ? {
-			...e,
-			bushShare: 0
-		} : {
-			w: 1,
-			h: 2,
-			bushShare: 0
-		})) : Promise.all([Sl(r), Sl(i)]).then(([e, t]) => {
-			let n = e ? e.h : 1, r = t ? t.h : 1;
-			a({
-				w: Math.max(e ? e.w : 1, t ? t.w : 1),
-				h: n + r,
-				bushShare: n / (n + r)
+		let t = !0;
+		return Sl(e.art.artState).then((e) => {
+			t && y(e || {
+				w: 1,
+				h: 2
 			});
 		}), () => {
 			t = !1;
 		};
 	}, [e]);
-	let v = (t) => {
+	let S = (t) => {
 		let n = window.innerWidth, r = window.innerHeight;
 		return (0, vl.coverGeometry)(e, {
 			vw: n,
 			vh: r,
-			art: d.current || {
+			art: h.current || {
 				w: 1,
 				h: 2
 			},
 			bottom: Tl(r)
 		}, t);
-	}, y = (e) => {
-		let t = v(e), n = u.current, r = n && n.moving ? "moving" : e >= 1 ? "graph" : e <= 0 ? "art" : "moving", f = document.documentElement;
-		f.style.setProperty("--pp-cover-p", String(t.p)), f.setAttribute("data-pp-cover", r);
-		let p = o.current;
-		p && (p.style.width = `${t.art.width}px`, p.style.height = `${t.art.height}px`, p.style.transform = `translate3d(${t.art.left}px, ${t.art.top}px, 0)`, p.style.opacity = d.current ? String(t.art.opacity) : "0"), i.current && (i.current.style.opacity = String(t.ground));
-		let m = s.current;
-		m && (m.style.left = `${t.byline.x}px`, m.style.top = `${t.byline.y}px`, m.style.fontSize = `${t.byline.size}px`, m.style.opacity = d.current ? String(t.byline.opacity) : "0", m.style.pointerEvents = t.byline.opacity > .5 ? "auto" : "none", m.tabIndex = r === "art" ? 0 : -1);
-		let h = a.current;
-		h && (h.setAttribute("data-cover-state", r), h.tabIndex = r === "art" ? 0 : -1);
-		let g = c.current;
-		if (g) {
+	}, C = (e) => {
+		let t = S(e), n = m.current, r = n && n.moving ? "moving" : e >= 1 ? "graph" : e <= 0 ? "art" : "moving", g = document.documentElement;
+		g.style.setProperty("--pp-cover-p", String(t.p)), g.setAttribute("data-pp-cover", r);
+		let _ = o.current;
+		_ && (_.style.width = `${t.art.width}px`, _.style.height = `${t.art.height}px`, _.style.transform = `translate3d(${t.art.left}px, ${t.art.top}px, 0)`, _.style.opacity = h.current ? String(t.art.opacity) : "0"), c.current && (s.current && (s.current.style.opacity = String(t.fade.art)), c.current.style.opacity = String(t.fade.graph));
+		let v = l.current && l.current.firstChild, y = u.current && u.current.firstChild;
+		v && (v.style.opacity = String(t.fade.art)), y && (y.style.opacity = String(t.fade.graph)), i.current && (i.current.style.opacity = String(t.ground));
+		let b = d.current;
+		b && (b.style.left = `${t.byline.x}px`, b.style.top = `${t.byline.y}px`, b.style.fontSize = `${t.byline.size}px`, b.style.opacity = h.current ? String(t.byline.opacity) : "0", b.style.pointerEvents = t.byline.opacity > .5 ? "auto" : "none", b.tabIndex = r === "art" ? 0 : -1);
+		let x = a.current;
+		x && (x.setAttribute("data-cover-state", r), x.tabIndex = r === "art" ? 0 : -1);
+		let C = f.current;
+		if (C) {
 			let e = r === "graph";
-			g.style.opacity = e ? "" : String(t.graph.opacity), g.style.transform = e ? "" : `translate3d(0, ${t.graph.shift}px, 0)`, g.style.pointerEvents = e ? "" : "none", g.inert = r === "art", r === "art" ? g.setAttribute("aria-hidden", "true") : g.removeAttribute("aria-hidden");
+			C.style.opacity = e ? "" : String(t.graph.opacity), C.style.transform = e ? "" : `translate3d(0, ${t.graph.shift}px, 0)`, C.style.pointerEvents = e ? "" : "none", C.inert = r === "art", r === "art" ? C.setAttribute("aria-hidden", "true") : C.removeAttribute("aria-hidden");
 		}
-		let _ = l.current;
-		_ && (_.style.opacity = String(t.graph.opacity), _.style.pointerEvents = r === "graph" ? "auto" : "none", _.tabIndex = r === "graph" ? 0 : -1);
-	}, b = (0, _.useRef)(y);
-	b.current = y, (0, _.useLayoutEffect)(() => {
-		if (!p) return;
-		d.current = p;
-		let e = u.current;
-		e && (e.resize(v(0).travel), b.current(e.p));
-	}, [p]), (0, _.useLayoutEffect)(() => {
+		let w = p.current;
+		w && (w.style.opacity = String(t.graph.opacity), w.style.pointerEvents = r === "graph" ? "auto" : "none", w.tabIndex = r === "graph" ? 0 : -1);
+	}, w = (0, _.useRef)(C);
+	w.current = C, (0, _.useEffect)(() => {
+		if (!e.title || !e.title.hideGraphTitle) return;
+		let t = document.documentElement;
+		return t.setAttribute("data-pp-cover-title", ""), () => t.removeAttribute("data-pp-cover-title");
+	}, [e]), (0, _.useLayoutEffect)(() => {
+		if (!v) return;
+		h.current = v;
+		let e = m.current;
+		e && (e.resize(S(0).travel), w.current(e.p));
+	}, [v]), (0, _.useLayoutEffect)(() => {
 		let n = null, i = (0, vl.createCover)(e, {
-			start: g,
-			reducedMotion: h,
-			travel: v(0).travel,
+			start: x,
+			reducedMotion: b,
+			travel: S(0).travel,
 			frame: (e) => requestAnimationFrame(e),
 			cancelFrame: (e) => cancelAnimationFrame(e),
 			onChange(e, t) {
 				if (t && t.swap) {
-					let i = Math.round((t.ms || vl.TUNING.reducedFadeMs) / 2), a = [r.current, c.current].filter(Boolean);
+					let i = Math.round((t.ms || vl.TUNING.reducedFadeMs) / 2), a = [r.current, f.current].filter(Boolean);
 					for (let e of a) e.style.transition = `opacity ${i}ms linear`, e.style.opacity = "0";
-					n && clearTimeout(n), n = setTimeout(() => {
-						b.current(e), r.current && (r.current.style.opacity = "1"), n = setTimeout(() => {
+					n && clearTimeout(n);
+					let o = Date.now(), s = () => {
+						let t = r.current;
+						if ((t ? Number(getComputedStyle(t).opacity) : 0) > .02 && Date.now() - o < i * 4) {
+							n = setTimeout(s, 16);
+							return;
+						}
+						w.current(e), t && (t.style.opacity = "1"), n = setTimeout(() => {
 							for (let e of a) e.style.transition = "";
 							n = null;
 						}, i + 20);
-					}, i);
+					};
+					n = setTimeout(s, i);
 					return;
 				}
-				b.current(e);
+				w.current(e);
 			},
 			onRest(e) {
-				n || b.current(i.p), t && t.setOpeningState && (t.setOpeningState(e), t.flush && t.flush()), window.dispatchEvent(new CustomEvent("postpipe:cover", { detail: { state: e } }));
+				n || w.current(i.p), t && t.setOpeningState && (t.setOpeningState(e), t.flush && t.flush()), window.dispatchEvent(new CustomEvent("postpipe:cover", { detail: { state: e } }));
 			}
 		});
-		u.current = i, b.current(i.p), t && t.setOpeningState && t.setOpeningState(i.rest), window.PostPipeCover = {
+		m.current = i, w.current(i.p), t && t.setOpeningState && t.setOpeningState(i.rest), window.PostPipeCover = {
 			get state() {
 				return i.moving ? "moving" : i.rest;
 			},
@@ -19097,61 +19227,61 @@ function Dl({ config: e, viewState: t, children: n }) {
 			go: (e, t) => i.go(e, t)
 		};
 		let o = () => {
-			i.resize(v(0).travel), b.current(i.p);
+			i.resize(S(0).travel), w.current(i.p);
 		};
 		window.addEventListener("resize", o);
-		let s = c.current, d = a.current, p = l.current, m = (e) => {
+		let s = f.current, c = a.current, l = p.current, u = (e) => {
 			let t = e.target;
-			return !t || !t.closest ? null : p && p.contains(t) ? "edge" : d && d.contains(t) ? "stage" : !s || !s.contains(t) ? null : i.moving || i.p < 1 ? "stage" : e.clientY <= vl.TUNING.edgePx ? "edge" : "graph";
-		}, _ = (e) => {
+			return !t || !t.closest ? null : l && l.contains(t) ? "edge" : c && c.contains(t) ? "stage" : !s || !s.contains(t) ? null : i.moving || i.p < 1 ? "stage" : e.clientY <= vl.TUNING.edgePx ? "edge" : "graph";
+		}, d = (e) => {
 			if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-			let t = m(e);
+			let t = u(e);
 			t && (e.ctrlKey && t === "graph" || i.wheel(e.deltaY, {
 				deltaMode: e.deltaMode,
 				where: t
 			}) && (e.preventDefault(), e.stopPropagation()));
 		};
-		window.addEventListener("wheel", _, {
+		window.addEventListener("wheel", d, {
 			capture: !0,
 			passive: !1
 		});
-		let y = (e) => {
+		let h = (e) => {
 			let t = (0, vl.pageKey)(e);
 			!t || e.defaultPrevented || wl(e) || i.key(t) && e.preventDefault();
 		};
-		window.addEventListener("keydown", y);
-		let x = () => {
+		window.addEventListener("keydown", h);
+		let _ = () => {
 			window.location.hash.startsWith("#read=") && i.go("graph");
 		};
-		window.addEventListener("hashchange", x);
-		let S = null, C = 0;
-		f.current = () => Date.now() - C < 500;
-		let w = (e) => {
-			e.touches.length === 1 && (e.target.closest && e.target.closest("[data-cover-byline]") || (S = {
+		window.addEventListener("hashchange", _);
+		let v = null, y = 0;
+		g.current = () => Date.now() - y < 500;
+		let C = (e) => {
+			e.touches.length === 1 && (e.target.closest && e.target.closest("[data-cover-byline]") || (v = {
 				y: e.touches[0].clientY,
 				moved: 0
 			}, i.touchStart(e.touches[0].clientY, e.timeStamp || Date.now())));
 		}, T = (e) => {
-			S && (e.preventDefault(), S.moved = Math.max(S.moved, Math.abs(e.touches[0].clientY - S.y)), i.touchMove(e.touches[0].clientY, e.timeStamp || Date.now()));
+			v && (e.preventDefault(), v.moved = Math.max(v.moved, Math.abs(e.touches[0].clientY - v.y)), i.touchMove(e.touches[0].clientY, e.timeStamp || Date.now()));
 		}, E = (e) => {
-			S && (S.moved >= El && (C = Date.now()), S = null, i.touchEnd(e.timeStamp || Date.now()));
-		}, D = [d, p].filter(Boolean);
-		for (let e of D) e.addEventListener("touchstart", w, { passive: !0 }), e.addEventListener("touchmove", T, { passive: !1 }), e.addEventListener("touchend", E), e.addEventListener("touchcancel", E);
+			v && (v.moved >= El && (y = Date.now()), v = null, i.touchEnd(e.timeStamp || Date.now()));
+		}, D = [c, l].filter(Boolean);
+		for (let e of D) e.addEventListener("touchstart", C, { passive: !0 }), e.addEventListener("touchmove", T, { passive: !1 }), e.addEventListener("touchend", E), e.addEventListener("touchcancel", E);
 		return () => {
-			i.dispose(), n && clearTimeout(n), window.removeEventListener("resize", o), window.removeEventListener("wheel", _, { capture: !0 }), window.removeEventListener("keydown", y), window.removeEventListener("hashchange", x);
-			for (let e of D) e.removeEventListener("touchstart", w), e.removeEventListener("touchmove", T), e.removeEventListener("touchend", E), e.removeEventListener("touchcancel", E);
-			document.documentElement.removeAttribute("data-pp-cover"), document.documentElement.style.removeProperty("--pp-cover-p"), window.PostPipeCover && window.PostPipeCover.go && delete window.PostPipeCover, u.current = null;
+			i.dispose(), n && clearTimeout(n), window.removeEventListener("resize", o), window.removeEventListener("wheel", d, { capture: !0 }), window.removeEventListener("keydown", h), window.removeEventListener("hashchange", _);
+			for (let e of D) e.removeEventListener("touchstart", C), e.removeEventListener("touchmove", T), e.removeEventListener("touchend", E), e.removeEventListener("touchcancel", E);
+			document.documentElement.removeAttribute("data-pp-cover"), document.documentElement.style.removeProperty("--pp-cover-p"), window.PostPipeCover && window.PostPipeCover.go && delete window.PostPipeCover, m.current = null;
 		};
 	}, [
 		e,
-		h,
-		g,
+		b,
+		x,
 		t
 	]);
-	let x = (e) => {
-		let t = u.current;
-		!t || f.current() || (e === "graph" ? t.tapArt() : t.tapTop());
-	}, S = g === "art";
+	let T = (e) => {
+		let t = m.current;
+		!t || g.current() || (e === "graph" ? t.tapArt() : t.tapTop());
+	}, E = x === "art";
 	return /* @__PURE__ */ (0, B.jsxs)(B.Fragment, { children: [
 		/* @__PURE__ */ (0, B.jsxs)("div", {
 			ref: r,
@@ -19161,48 +19291,56 @@ function Dl({ config: e, viewState: t, children: n }) {
 			children: [/* @__PURE__ */ (0, B.jsx)("div", {
 				ref: i,
 				className: bl.ground,
-				style: { opacity: +!!S }
+				style: { opacity: +!!E }
 			}), /* @__PURE__ */ (0, B.jsxs)("div", {
 				ref: a,
 				className: bl.stage,
 				role: "button",
-				tabIndex: S ? 0 : -1,
+				tabIndex: E ? 0 : -1,
 				"aria-label": "Show the graph",
 				"data-cover-stage": !0,
-				"data-cover-state": g,
+				"data-cover-state": x,
 				onClick: (e) => {
-					e.target.closest && e.target.closest("[data-cover-byline]") || u.current && u.current.p < .5 && x("graph");
+					e.target.closest && e.target.closest("[data-cover-byline]") || m.current && m.current.p < .5 && T("graph");
 				},
 				onKeyDown: (e) => {
-					e.target === e.currentTarget && (e.key === "Enter" || e.key === " " || e.key === "Spacebar") && (e.preventDefault(), e.stopPropagation(), x("graph"));
+					e.target === e.currentTarget && (e.key === "Enter" || e.key === " " || e.key === "Spacebar") && (e.preventDefault(), e.stopPropagation(), T("graph"));
 				},
 				children: [
-					/* @__PURE__ */ (0, B.jsx)("div", {
+					/* @__PURE__ */ (0, B.jsxs)("div", {
 						ref: o,
 						className: bl.art,
 						"data-cover-art": !0,
 						style: { opacity: 0 },
-						children: e.art.full ? /* @__PURE__ */ (0, B.jsx)("img", {
-							className: bl.full,
-							src: e.art.full,
-							alt: "",
-							draggable: "false",
-							"data-cover-full": !0
-						}) : /* @__PURE__ */ (0, B.jsxs)(B.Fragment, { children: [/* @__PURE__ */ (0, B.jsx)("img", {
-							className: bl.part,
-							src: e.art.bush,
-							alt: "",
-							draggable: "false",
-							"data-cover-bush": !0,
-							style: { height: p ? `${p.bushShare * 100}%` : "50%" }
-						}), /* @__PURE__ */ (0, B.jsx)("img", {
-							className: bl.part,
-							src: e.art.roots,
-							alt: "",
-							draggable: "false",
-							"data-cover-roots": !0,
-							style: { height: p ? `${(1 - p.bushShare) * 100}%` : "50%" }
-						})] })
+						children: [
+							/* @__PURE__ */ (0, B.jsx)("img", {
+								ref: s,
+								className: bl.image,
+								src: e.art.artState,
+								alt: "",
+								draggable: "false",
+								"data-cover-image": "art",
+								style: e.art.graphState ? { opacity: +!!E } : void 0
+							}),
+							e.art.graphState && /* @__PURE__ */ (0, B.jsx)("img", {
+								ref: c,
+								className: bl.image,
+								src: e.art.graphState,
+								alt: "",
+								draggable: "false",
+								"data-cover-image": "graph",
+								style: { opacity: +!E }
+							}),
+							/* @__PURE__ */ (0, B.jsx)(Ol, {
+								title: e.title,
+								size: v,
+								start: x,
+								refs: {
+									art: l,
+									graph: u
+								}
+							})
+						]
 					}),
 					e.alt && /* @__PURE__ */ (0, B.jsx)("span", {
 						className: bl.alt,
@@ -19211,7 +19349,7 @@ function Dl({ config: e, viewState: t, children: n }) {
 						"data-cover-alt": !0
 					}),
 					e.byline.text && /* @__PURE__ */ (0, B.jsx)("a", {
-						ref: s,
+						ref: d,
 						className: bl.byline,
 						href: e.byline.href || void 0,
 						"data-cover-byline": !0,
@@ -19223,28 +19361,28 @@ function Dl({ config: e, viewState: t, children: n }) {
 			})]
 		}),
 		/* @__PURE__ */ (0, B.jsx)("div", {
-			ref: c,
+			ref: f,
 			className: bl.section,
 			"data-cover-section": !0,
-			style: S ? {
+			style: E ? {
 				opacity: 0,
 				pointerEvents: "none"
 			} : void 0,
 			children: n
 		}),
 		/* @__PURE__ */ (0, B.jsx)("button", {
-			ref: l,
+			ref: p,
 			type: "button",
 			className: bl.handle,
 			"aria-label": "Show the cover",
 			title: "Show the cover",
 			"data-cover-handle": !0,
-			tabIndex: S ? -1 : 0,
+			tabIndex: E ? -1 : 0,
 			style: {
-				opacity: +!S,
-				pointerEvents: S ? "none" : "auto"
+				opacity: +!E,
+				pointerEvents: E ? "none" : "auto"
 			},
-			onClick: () => x("art"),
+			onClick: () => T("art"),
 			children: /* @__PURE__ */ (0, B.jsx)("span", {
 				className: bl.grip,
 				"aria-hidden": "true"
@@ -19252,9 +19390,9 @@ function Dl({ config: e, viewState: t, children: n }) {
 		})
 	] });
 }
-function Ol({ settings: e, viewState: t, children: n }) {
+function Al({ settings: e, viewState: t, children: n }) {
 	let r = (0, _.useMemo)(() => (0, vl.openingConfig)(e), [e]);
-	return r ? /* @__PURE__ */ (0, B.jsx)(Dl, {
+	return r ? /* @__PURE__ */ (0, B.jsx)(kl, {
 		config: r,
 		viewState: t,
 		children: n
@@ -19262,7 +19400,7 @@ function Ol({ settings: e, viewState: t, children: n }) {
 }
 //#endregion
 //#region src/components/Contributions/useContributions.js
-function kl(e, t) {
+function jl(e, t) {
 	let n = JSON.stringify(e && e.contributions || null), r = (0, _.useMemo)(() => (0, Ts.contributionsConfig)(e), [n]), [i, a] = (0, _.useState)(null);
 	(0, _.useEffect)(() => {
 		if (!r) return;
@@ -19290,4 +19428,4 @@ function kl(e, t) {
 	};
 }
 //#endregion
-export { nl as ConfigPanel, Sc as FeedZ, Ns as GraphViewer, Ol as Opening, _ as React, v as ReactDOM, pc as ReaderPanel, Zc as Settings, bc as TTS, yl as Theme, _l as TimeOfDay, cl as TimeOverlay, ml as Toolbar, kl as useContributions };
+export { nl as ConfigPanel, Sc as FeedZ, Ns as GraphViewer, Al as Opening, _ as React, v as ReactDOM, pc as ReaderPanel, Zc as Settings, bc as TTS, yl as Theme, _l as TimeOfDay, cl as TimeOverlay, ml as Toolbar, jl as useContributions };
