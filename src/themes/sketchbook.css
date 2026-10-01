@@ -7,9 +7,13 @@
    the one handwriting face, for titles only, ships next to the page with its
    license (fonts/NothingYouCouldDo-*). Nothing is fetched from elsewhere.
    Component-specific touches live in each component's own stylesheet, under
-   the same html[data-pp-theme="sketchbook"] selector. */
+   the same html[data-pp-theme="sketchbook"] selector.
+   When the page is dark only because a dark cover is on (Theme.jsx), the
+   reader and the panel keep the reader's own light paper: the light values
+   are declared again on them (data-pp-reader-mode). */
 
-html[data-pp-theme="sketchbook"] {
+html[data-pp-theme="sketchbook"],
+html[data-pp-theme="sketchbook"][data-pp-mode="dark"][data-pp-reader-mode="light"] :is([data-reader-panel], [data-settings-panel]) {
   --pp-title-font: 'PP Sketch Title', 'Atkinson', cursive;
 
   --sk-paper: #f3ecdc;

@@ -92,7 +92,7 @@ function emptyState(corpusId, layoutVersion) {
     timeAxis: { on: false, x: 0, y: -1000 },
     reading: {},    // id -> { scroll, seenAt, t }
     bookmarks: [],  // array of { id, item, para, quote, note, t }
-    opening: {},    // { seenAt } once this reader has seen the opening
+    opening: {},    // { state: 'art' | 'graph' }: where this reader left the two-state page
   };
 }
 
@@ -586,13 +586,15 @@ function createViewState(opts = {}) {
       gestureBase = null;
     },
 
-    // The opening (settings.opening) is shown once per reader: seen when it
-    // has played or been skipped. Not undoable, like reading.
-    markOpeningSeen() {
-      if (state.opening && state.opening.seenAt) return;
-      updateSilent((s) => { s.opening = { seenAt: now() }; });
+    // The two-state page (settings.opening): which state the reader left it
+    // in, art or graph, so a returning reader lands there. Not undoable, like
+    // reading.
+    setOpeningState(which) {
+      if (which !== 'art' && which !== 'graph') return;
+      if (state.opening && state.opening.state === which) return;
+      updateSilent((s) => { s.opening = { state: which, t: now() }; });
     },
-    openingSeen() { return Boolean(state.opening && state.opening.seenAt); },
+    openingState() { return (state.opening && state.opening.state) || null; },
 
     isSeen(id) { return Boolean(state.reading[id] && state.reading[id].seenAt); },
     readingPosition(id) { return (state.reading[id] && state.reading[id].scroll) || 0; },

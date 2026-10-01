@@ -1,87 +1,86 @@
-/* The opening (settings.opening): one image over everything, on the theme's
-   paper (the sketchbook's grain and fibres when the site wears it). The
-   durations come from src/lib/opening.js as custom properties on the layer. */
+/* The two-state page (settings.opening). The cover is fixed behind the page,
+   at the same depth as the time-of-day light but after it, so it is drawn
+   over that light and under everything else (the paper's grain included).
+   Its ground is the theme's paper; with ground: dark the page wears the
+   theme's dark mode while the cover is on (src/components/Theme), so that is
+   the graphite paper in both modes. The moving parts are placed by
+   Opening.jsx, frame by frame. */
 
-.layer {
+.cover {
   position: fixed;
   inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--bg, #1a1a2e);
-  background-image: var(--sk-fibres, none), var(--sk-grain, none);
-  background-size: 500px 500px, 220px 220px;
-  opacity: 1;
+  z-index: -1;
   overflow: hidden;
+}
+
+/* The art state's own ground: it hides the time-of-day light behind the
+   art, and gives way to it as the page moves to the graph. */
+.ground {
+  position: absolute;
+  inset: 0;
+  background-color: var(--bg, #2a2a2e);
+  pointer-events: none;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   cursor: pointer;
+  outline: none;
 }
 
-/* The image's own box, as large as fits: the byline is placed inside it. */
-.frame {
-  position: relative;
-  width: min(100vw, calc(100vh * var(--pp-opening-ratio, 0.6667)));
-  width: min(100vw, calc(100dvh * var(--pp-opening-ratio, 0.6667)));
-  aspect-ratio: var(--pp-opening-ratio, 0.6667);
-  container-type: inline-size;
-  filter: blur(0);
+html[data-pp-cover="graph"] .stage {
+  cursor: default;
 }
 
-.image {
+.stage:focus-visible .art {
+  outline: 2px solid var(--text-bright, #ece6da);
+  outline-offset: 6px;
+}
+
+.art {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
   pointer-events: none;
 }
 
-.broken {
-  opacity: 0;
-  transition: opacity var(--pp-opening-swap, 250ms) linear;
+.full,
+.part {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
 }
 
-.layer[data-phase="broken"] .broken,
-.layer[data-phase="dissolve"] .broken {
-  opacity: 1;
+.part {
+  flex: none;
 }
 
-.layer[data-phase="dissolve"] {
-  opacity: 0;
-  transition: opacity var(--pp-opening-dissolve, 1350ms) ease-in;
+.alt {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
-.layer[data-phase="dissolve"] .frame {
-  filter: blur(var(--pp-opening-blur, 9px));
-  transition: filter var(--pp-opening-dissolve, 1350ms) ease-out;
-}
-
-/* Reduced motion: no break-up and no blur, one short fade. */
-.layer[data-phase="fade"] {
-  opacity: 0;
-  transition: opacity var(--pp-opening-fade, 300ms) linear;
-}
-
-/* The byline, centred in the image's bottom 12%, readable on the art. */
+/* The byline: a link under the art, in the title face. */
 .byline {
   position: absolute;
-  left: 50%;
-  bottom: 6%;
-  transform: translate(-50%, 50%);
-  max-width: 86%;
-  padding: 0.25em 0.8em 0.3em;
-  border-radius: 0.6em;
-  background: rgba(0, 0, 0, 0.42);
-  color: #f3ecdc;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  color: var(--text-bright, #ece6da);
   font-family: var(--pp-title-font, 'Atkinson', sans-serif);
-  font-size: clamp(15px, 5.2cqw, 30px);
-  line-height: 1.2;
-  text-align: center;
+  line-height: 1.3;
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
@@ -93,33 +92,69 @@
   text-underline-offset: 0.18em;
 }
 
-.byline:focus-visible,
-.skip:focus-visible {
-  outline: 2px solid #f3ecdc;
-  outline-offset: 2px;
+.byline:focus-visible {
+  outline: 2px solid var(--text-bright, #ece6da);
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 
-.skip {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  right: calc(12px + env(safe-area-inset-right, 0px));
-  min-height: 32px;
-  padding: 5px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(243, 236, 220, 0.35);
-  background: rgba(0, 0, 0, 0.42);
-  color: #f3ecdc;
-  font: 13px/1.2 'Atkinson', system-ui, sans-serif;
+/* The graph layer: the canvas and its controls, over the art. */
+.section {
+  position: fixed;
+  inset: 0;
+}
+
+/* In the graph state, a slim grip along the top edge, above the controls:
+   a tap brings the cover back, a drag down scrubs to it. */
+.handle {
+  position: fixed;
+  z-index: 45;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.skip:hover {
-  background: rgba(0, 0, 0, 0.6);
+.grip {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 4px auto 0;
+  border-radius: 2px;
+  background: var(--text-bright, #ece6da);
+  opacity: 0.45;
+  transition: opacity 160ms linear;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .broken,
-  .frame {
-    transition: none;
-  }
+.handle:hover .grip,
+.handle:focus-visible .grip {
+  opacity: 0.8;
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--text-bright, #ece6da);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* The panel's gear sits outside the graph layer (the reader opens the panel
+   too): it follows the layer in and out. */
+:global(html[data-pp-cover] [data-settings-gear]) {
+  opacity: var(--pp-cover-p, 1);
+}
+
+:global(html[data-pp-cover="moving"] [data-settings-gear]) {
+  pointer-events: none;
+}
+
+:global(html[data-pp-cover="art"] [data-settings-gear]) {
+  pointer-events: none;
+  visibility: hidden;
 }

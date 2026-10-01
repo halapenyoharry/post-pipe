@@ -368,8 +368,15 @@ window.SETTINGS = ${settingsJSON};
     var modes = themes[name];
     var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
     var mode = modes.indexOf(p.mode) >= 0 ? p.mode : (modes.length === 1 ? modes[0] : (dark ? 'dark' : 'light'));
+    // A cover with a dark ground (settings.opening) keeps the page dark; the
+    // reader's own mode is kept for the reader (src/components/Theme).
+    var o = S.opening || {};
+    var art = o.art || {};
+    var cover = o.enabled === true && (o.mode === undefined || o.mode === 'two-state') && (art.full || (art.bush && art.roots));
+    var page = cover && o.ground !== 'paper' ? 'dark' : mode;
     document.documentElement.setAttribute('data-pp-theme', name);
-    document.documentElement.setAttribute('data-pp-mode', mode);
+    document.documentElement.setAttribute('data-pp-mode', page);
+    document.documentElement.setAttribute('data-pp-reader-mode', mode);
   } catch (e) {}
 })();
 </script>
@@ -564,36 +571,41 @@ ${reactJs}
           settings: window.SETTINGS,
           viewState: viewState
         }),
-        React.createElement(GraphViewer, {
-          feedData: feed,
-          layout: viewState.state.layout,
-          timeAxis: viewState.state.timeAxis,
-          graphSettings: (window.SETTINGS && window.SETTINGS.graph) || {},
-          onNodeSelect: function (article) {
-            selectArticle(article && article.originalItem ? article.originalItem : article);
-          },
-          hiddenSources: hiddenSources,
-          filteredArticleIds: filteredArticleIds,
-          viewState: viewState,
-          colorOverrides: colorOverrides,
-          apiRef: graphApi,
-          onNodeFocus: setFocusedItem,
-          contributions: readers.list
-        }),
-        React.createElement(FeedZ, {
-          sources: feed._sources || [],
-          hiddenSources: hiddenSources,
-          onToggleSource: toggleSource,
-          viewState: viewState,
-          showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false)
-        }),
-        React.createElement(TimeOverlay, {
-          feedData: feed,
-          onFilterChange: handleTimeFilter
-        }),
-        // The bottom bar: history, layout, dimensions, and the view actions
-        // (the timeline layout stays out of it until it is redesigned).
-        React.createElement(Toolbar, { viewState: viewState, settings: window.SETTINGS, layers: readers.layers }),
+        // The two-state page (settings.opening): the cover art behind, and
+        // the graph with its controls over it. Without it, these render as
+        // they are.
+        React.createElement(Opening, { settings: window.SETTINGS, viewState: viewState },
+          React.createElement(GraphViewer, {
+            feedData: feed,
+            layout: viewState.state.layout,
+            timeAxis: viewState.state.timeAxis,
+            graphSettings: (window.SETTINGS && window.SETTINGS.graph) || {},
+            onNodeSelect: function (article) {
+              selectArticle(article && article.originalItem ? article.originalItem : article);
+            },
+            hiddenSources: hiddenSources,
+            filteredArticleIds: filteredArticleIds,
+            viewState: viewState,
+            colorOverrides: colorOverrides,
+            apiRef: graphApi,
+            onNodeFocus: setFocusedItem,
+            contributions: readers.list
+          }),
+          React.createElement(FeedZ, {
+            sources: feed._sources || [],
+            hiddenSources: hiddenSources,
+            onToggleSource: toggleSource,
+            viewState: viewState,
+            showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false)
+          }),
+          React.createElement(TimeOverlay, {
+            feedData: feed,
+            onFilterChange: handleTimeFilter
+          }),
+          // The bottom bar: history, layout, dimensions, and the view actions
+          // (the timeline layout stays out of it until it is redesigned).
+          React.createElement(Toolbar, { viewState: viewState, settings: window.SETTINGS, layers: readers.layers })
+        ),
         React.createElement(Settings, {
           viewState: viewState,
           feedData: feed,
@@ -610,10 +622,7 @@ ${reactJs}
           onNavigate: selectArticle,
           contributions: readers.list,
           contributionsConfig: readers.config
-        }),
-        // The opening (settings.opening), over everything while it lasts;
-        // the graph loads underneath it.
-        React.createElement(Opening, { settings: window.SETTINGS, viewState: viewState })
+        })
       );
     }
 

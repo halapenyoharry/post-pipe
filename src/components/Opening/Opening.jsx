@@ -1,174 +1,393 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, shouldShowOpening, createOpening, TIMINGS } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, TUNING } from '../../lib/opening';
 
 /**
- * Opening — the site's first screen (settings.opening; off by default): one
- * image over the whole viewport, on the theme's paper, with the graph already
- * loading underneath. A tap or click, a wheel or touch scroll, a key, or the
- * dwell plays it: the image gives way to its broken-up version, blurs and
- * fades while the roots draw in behind it, and the layer is gone. The skip
- * control (and Escape) ends it at once; the byline is a plain link.
+ * Opening — the two-state page (settings.opening; off by default). The cover
+ * art is one image fixed behind the page on a dark ground. In the art state
+ * it is scrolled so the whole plant fits, with the byline under it; in the
+ * graph state it is scrolled up until the roots fill the view, and the graph
+ * (this component's children: the canvas and its controls) is drawn over the
+ * roots. Scrolling, a touch drag, a key or a tap moves one progress value
+ * between the two: the image moves up, the graph layer fades and rises in.
+ * Every frame is written straight to the DOM from src/lib/opening.js's
+ * geometry, so scrubbing never re-renders React. The graph is mounted once
+ * and never unmounted; in the art state it is only hidden, so it is exactly
+ * as it was on return. The art does not pan or zoom with the graph.
  *
- * Shown once per reader (opening.once): a reader with anything stored here
- * goes straight to the graph. The panel's "Show the opening again" sends
- * postpipe:show-opening. While it plays the layer sends postpipe:opening
- * with detail { phase: 'play', reducedMotion } and then { phase: 'done' },
- * which the graph's roots follow.
+ * The state a reader leaves it in is kept in viewState (opening.state) and is
+ * where they land next time (startOn: 'remembered'). A #read= link opens on
+ * the graph. With reduced motion the two states swap in one short fade.
+ *
+ * Without settings.opening the children render as they are.
  */
 
 const reducedMotionNow = () => typeof window !== 'undefined' && window.matchMedia
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function announce(detail) {
-  window.dispatchEvent(new CustomEvent('postpipe:opening', { detail }));
+function loadSize(src) {
+  return new Promise((resolve) => {
+    if (!src) { resolve(null); return; }
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth > 0 ? { w: img.naturalWidth, h: img.naturalHeight } : null);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
 }
 
-// Keys that move focus or only modify another key do not play the opening:
-// a keyboard reader can still reach the byline and the skip control.
-const QUIET_KEYS = new Set(['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Fn']);
+// Keys belong to whatever is being typed in, and to the reader or a dialog
+// when one has focus or is open over the page.
+const KEYED_ROLES = new Set(['radio', 'slider', 'listbox', 'option', 'menu', 'menuitem', 'tab', 'spinbutton', 'textbox', 'combobox']);
+function keysBelongElsewhere(e) {
+  const t = e.target;
+  if (t && t.nodeType === 1) {
+    if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return true;
+    if (KEYED_ROLES.has(t.getAttribute('role'))) return true;
+    if (t.closest('[data-reader-panel], [role="dialog"], [data-settings-panel]')) return true;
+    if ((e.key === ' ' || e.key === 'Spacebar') && t.closest('button, a[href], summary, [role="button"]')) return true;
+  }
+  if (typeof window !== 'undefined' && window.location.hash.startsWith('#read=')) return true;
+  if (typeof document !== 'undefined' && document.querySelector('[data-settings-panel]')) return true;
+  return false;
+}
 
-function OpeningLayer({ config, onDone }) {
-  const layerRef = useRef(null);
-  const skipRef = useRef(null);
+// The space the page keeps at the bottom: the rights line, when there is one.
+function bottomInset(vh) {
+  const el = typeof document !== 'undefined' && document.querySelector('[data-rights]');
+  if (!el) return 0;
+  const r = el.getBoundingClientRect();
+  return r.height > 0 ? Math.max(0, vh - r.top + 8) : 0;
+}
+
+const DRAG_PX = 8; // a touch that moved this far was a drag, not a tap
+
+function Cover({ config, viewState, children }) {
+  const coverRef = useRef(null);
+  const groundRef = useRef(null);
+  const stageRef = useRef(null);
+  const artRef = useRef(null);
+  const bylineRef = useRef(null);
+  const sectionRef = useRef(null);
+  const handleRef = useRef(null);
   const machineRef = useRef(null);
-  const [phase, setPhase] = useState('idle');
-  const [ratio, setRatio] = useState(2 / 3);
+  const sizeRef = useRef(null);
+  const dragRef = useRef(() => false);
+  const [art, setArt] = useState(null); // { w, h, bushShare }
   const reduced = useMemo(reducedMotionNow, []);
+  const start = useMemo(() => startState(config, {
+    stored: viewState && viewState.openingState ? viewState.openingState() : null,
+    hash: typeof window !== 'undefined' ? window.location.hash : '',
+  }), [config, viewState]);
 
+  // The art's natural size: the full image's, or bush over roots.
   useEffect(() => {
-    let finished = false;
-    const machine = createOpening(config, {
+    let live = true;
+    const { full, bush, roots } = config.art;
+    const done = (size) => { if (live) setArt(size); };
+    if (full) {
+      loadSize(full).then((s) => done(s ? { ...s, bushShare: 0 } : { w: 1, h: 2, bushShare: 0 }));
+    } else {
+      Promise.all([loadSize(bush), loadSize(roots)]).then(([b, r]) => {
+        const bh = b ? b.h : 1, rh = r ? r.h : 1;
+        done({ w: Math.max(b ? b.w : 1, r ? r.w : 1), h: bh + rh, bushShare: bh / (bh + rh) });
+      });
+    }
+    return () => { live = false; };
+  }, [config]);
+
+  const geometry = (p) => {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    return coverGeometry(config, { vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh) }, p);
+  };
+
+  // Paint progress p: every moving part, straight to the DOM.
+  const paint = (p) => {
+    const g = geometry(p);
+    const m = machineRef.current;
+    const label = m && m.moving ? 'moving' : (p >= 1 ? 'graph' : p <= 0 ? 'art' : 'moving');
+    const root = document.documentElement;
+    root.style.setProperty('--pp-cover-p', String(g.p));
+    root.setAttribute('data-pp-cover', label);
+
+    const a = artRef.current;
+    if (a) {
+      a.style.width = `${g.art.width}px`;
+      a.style.height = `${g.art.height}px`;
+      a.style.transform = `translate3d(${g.art.left}px, ${g.art.top}px, 0)`;
+      a.style.opacity = sizeRef.current ? String(g.art.opacity) : '0';
+    }
+    if (groundRef.current) groundRef.current.style.opacity = String(g.ground);
+    const by = bylineRef.current;
+    if (by) {
+      by.style.left = `${g.byline.x}px`;
+      by.style.top = `${g.byline.y}px`;
+      by.style.fontSize = `${g.byline.size}px`;
+      by.style.opacity = sizeRef.current ? String(g.byline.opacity) : '0';
+      by.style.pointerEvents = g.byline.opacity > 0.5 ? 'auto' : 'none';
+      by.tabIndex = label === 'art' ? 0 : -1;
+    }
+    const stage = stageRef.current;
+    if (stage) {
+      stage.setAttribute('data-cover-state', label);
+      stage.tabIndex = label === 'art' ? 0 : -1;
+    }
+    const sec = sectionRef.current;
+    if (sec) {
+      const atRest = label === 'graph';
+      // At the graph rest the layer carries no opacity or transform, so it
+      // makes no stacking context and the controls inside it sit as before.
+      sec.style.opacity = atRest ? '' : String(g.graph.opacity);
+      sec.style.transform = atRest ? '' : `translate3d(0, ${g.graph.shift}px, 0)`;
+      sec.style.pointerEvents = atRest ? '' : 'none';
+      sec.inert = label === 'art';
+      if (label === 'art') sec.setAttribute('aria-hidden', 'true');
+      else sec.removeAttribute('aria-hidden');
+    }
+    const h = handleRef.current;
+    if (h) {
+      h.style.opacity = String(g.graph.opacity);
+      h.style.pointerEvents = label === 'graph' ? 'auto' : 'none';
+      h.tabIndex = label === 'graph' ? 0 : -1;
+    }
+  };
+  const paintRef = useRef(paint);
+  paintRef.current = paint;
+
+  // The art's size is known: the whole scrub is the art's move.
+  useLayoutEffect(() => {
+    if (!art) return;
+    sizeRef.current = art;
+    const m = machineRef.current;
+    if (m) {
+      m.resize(geometry(0).travel);
+      paintRef.current(m.p);
+    }
+  }, [art]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The machine, from the first frame. Its rests are remembered.
+  useLayoutEffect(() => {
+    let fadeTimer = null;
+    const machine = createCover(config, {
+      start,
       reducedMotion: reduced,
-      onState(state, info) {
-        if (state === 'playing') {
-          if (info.phase === null) announce({ phase: 'play', reducedMotion: reduced, cause: info.cause });
-          setPhase(info.phase || 'playing');
-        } else if (state === 'done' && !finished) {
-          finished = true;
-          announce({ phase: 'done', how: info.how });
-          onDone(info.how);
+      travel: geometry(0).travel,
+      frame: (fn) => requestAnimationFrame(fn),
+      cancelFrame: (h) => cancelAnimationFrame(h),
+      onChange(p, info) {
+        if (info && info.swap) {
+          // Reduced motion: out, swap, back in.
+          const half = Math.round((info.ms || TUNING.reducedFadeMs) / 2);
+          const els = [coverRef.current, sectionRef.current].filter(Boolean);
+          for (const el of els) { el.style.transition = `opacity ${half}ms linear`; el.style.opacity = '0'; }
+          if (fadeTimer) clearTimeout(fadeTimer);
+          fadeTimer = setTimeout(() => {
+            paintRef.current(p);
+            if (coverRef.current) coverRef.current.style.opacity = '1';
+            fadeTimer = setTimeout(() => { for (const el of els) el.style.transition = ''; fadeTimer = null; }, half + 20);
+          }, half);
+          return;
         }
+        paintRef.current(p);
+      },
+      onRest(state) {
+        // Mid-swap (reduced motion) the fade paints the new state at its
+        // midpoint, out of sight.
+        if (!fadeTimer) paintRef.current(machine.p);
+        // Written at once, not after the usual pause, so a reader who leaves
+        // straight after a move still lands there next time.
+        if (viewState && viewState.setOpeningState) {
+          viewState.setOpeningState(state);
+          if (viewState.flush) viewState.flush();
+        }
+        window.dispatchEvent(new CustomEvent('postpipe:cover', { detail: { state } }));
       },
     });
     machineRef.current = machine;
-    machine.start();
-    if (skipRef.current) skipRef.current.focus({ preventScroll: true });
+    paintRef.current(machine.p);
+    if (viewState && viewState.setOpeningState) viewState.setOpeningState(machine.rest);
+    // Test and page hook: where the page is.
+    window.PostPipeCover = {
+      get state() { return machine.moving ? 'moving' : machine.rest; },
+      get p() { return machine.p; },
+      go: (s, o) => machine.go(s, o),
+    };
+
+    const onResize = () => {
+      machine.resize(geometry(0).travel);
+      paintRef.current(machine.p);
+    };
+    window.addEventListener('resize', onResize);
+
+    const sec = sectionRef.current;
+    const stage = stageRef.current;
+    const handle = handleRef.current;
+    const whereOf = (e) => {
+      const t = e.target;
+      if (!t || !t.closest) return null;
+      if (handle && handle.contains(t)) return 'edge';
+      if (stage && stage.contains(t)) return 'stage';
+      if (!sec || !sec.contains(t)) return null;
+      if (machine.moving || machine.p < 1) return 'stage';
+      return e.clientY <= TUNING.edgePx ? 'edge' : 'graph';
+    };
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      const where = whereOf(e);
+      if (!where) return;
+      if (e.ctrlKey && where === 'graph') return; // a pinch is the graph's
+      if (machine.wheel(e.deltaY, { deltaMode: e.deltaMode, where })) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('wheel', onWheel, { capture: true, passive: false });
 
     const onKey = (e) => {
-      if (machine.state === 'done') return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        machine.skip();
-        return;
-      }
-      if (QUIET_KEYS.has(e.key)) return;
-      const onControl = e.target && e.target.closest && e.target.closest('[data-opening-control]');
-      if (onControl && (e.key === 'Enter' || e.key === ' ')) return;
+      const k = pageKey(e);
+      if (!k || e.defaultPrevented || keysBelongElsewhere(e)) return;
+      if (machine.key(k)) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+
+    // A link straight to a chapter goes to the graph.
+    const onHash = () => { if (window.location.hash.startsWith('#read=')) machine.go('graph'); };
+    window.addEventListener('hashchange', onHash);
+
+    // A drag on the art, or on the handle, scrubs. A tap that ends a drag
+    // does not also count as a tap.
+    let touch = null;
+    let dragged = 0;
+    dragRef.current = () => Date.now() - dragged < 500;
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 1) return;
+      if (e.target.closest && e.target.closest('[data-cover-byline]')) return;
+      touch = { y: e.touches[0].clientY, moved: 0 };
+      machine.touchStart(e.touches[0].clientY, e.timeStamp || Date.now());
+    };
+    const onTouchMove = (e) => {
+      if (!touch) return;
       e.preventDefault();
-      e.stopImmediatePropagation();
-      machine.play('key');
+      touch.moved = Math.max(touch.moved, Math.abs(e.touches[0].clientY - touch.y));
+      machine.touchMove(e.touches[0].clientY, e.timeStamp || Date.now());
     };
-    window.addEventListener('keydown', onKey, true);
+    const onTouchEnd = (e) => {
+      if (!touch) return;
+      if (touch.moved >= DRAG_PX) dragged = Date.now();
+      touch = null;
+      machine.touchEnd(e.timeStamp || Date.now());
+    };
+    const surfaces = [stage, handle].filter(Boolean);
+    for (const s of surfaces) {
+      s.addEventListener('touchstart', onTouchStart, { passive: true });
+      s.addEventListener('touchmove', onTouchMove, { passive: false });
+      s.addEventListener('touchend', onTouchEnd);
+      s.addEventListener('touchcancel', onTouchEnd);
+    }
+
     return () => {
-      window.removeEventListener('keydown', onKey, true);
       machine.dispose();
+      if (fadeTimer) clearTimeout(fadeTimer);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('wheel', onWheel, { capture: true });
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('hashchange', onHash);
+      for (const s of surfaces) {
+        s.removeEventListener('touchstart', onTouchStart);
+        s.removeEventListener('touchmove', onTouchMove);
+        s.removeEventListener('touchend', onTouchEnd);
+        s.removeEventListener('touchcancel', onTouchEnd);
+      }
+      document.documentElement.removeAttribute('data-pp-cover');
+      document.documentElement.style.removeProperty('--pp-cover-p');
+      if (window.PostPipeCover && window.PostPipeCover.go) delete window.PostPipeCover;
+      machineRef.current = null;
     };
-  }, [config, reduced, onDone]);
+  }, [config, reduced, start, viewState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const play = (cause) => (e) => {
-    if (e && e.target && e.target.closest && e.target.closest('[data-opening-control]')) return;
-    if (machineRef.current) machineRef.current.play(cause);
+  const tap = (to) => {
+    const m = machineRef.current;
+    if (!m || dragRef.current()) return;
+    if (to === 'graph') m.tapArt(); else m.tapTop();
   };
 
-  const style = {
-    '--pp-opening-ratio': ratio,
-    '--pp-opening-blur': `${config.blur}px`,
-    '--pp-opening-swap': `${TIMINGS.swapMs}ms`,
-    '--pp-opening-dissolve': `${TIMINGS.dissolveMs}ms`,
-    '--pp-opening-fade': `${TIMINGS.reducedFadeMs}ms`,
-  };
-
+  const startArt = start === 'art';
   return (
-    <div
-      ref={layerRef}
-      className={styles.layer}
-      role="dialog"
-      aria-modal="true"
-      aria-label={config.alt || undefined}
-      data-opening
-      data-phase={phase}
-      style={style}
-      onClick={play('tap')}
-      onWheel={play('wheel')}
-      onTouchMove={play('touch')}
-    >
-      <div className={styles.frame} data-opening-frame>
-        <img
-          className={styles.image}
-          src={config.image}
-          alt={config.alt}
-          draggable="false"
-          decoding="async"
-          onLoad={(e) => {
-            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-            if (w > 0 && h > 0) setRatio(w / h);
+    <>
+      <div ref={coverRef} className={styles.cover} data-cover data-ground={config.ground}>
+        <div ref={groundRef} className={styles.ground} style={{ opacity: startArt ? 1 : 0 }} />
+        <div
+          ref={stageRef}
+          className={styles.stage}
+          role="button"
+          tabIndex={startArt ? 0 : -1}
+          aria-label="Show the graph"
+          data-cover-stage
+          data-cover-state={start}
+          onClick={(e) => {
+            if (e.target.closest && e.target.closest('[data-cover-byline]')) return;
+            if (machineRef.current && machineRef.current.p < 0.5) tap('graph');
           }}
-        />
-        {config.broken && (
-          <img className={`${styles.image} ${styles.broken}`} src={config.broken} alt="" aria-hidden="true" draggable="false" decoding="async" data-opening-broken />
-        )}
-        {config.byline.text && (
-          <a
-            className={styles.byline}
-            href={config.byline.href || undefined}
-            data-opening-control
-            data-opening-byline
-            onClick={(e) => e.stopPropagation()}
-          >
-            {config.byline.text}
-          </a>
-        )}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+              e.preventDefault();
+              e.stopPropagation();
+              tap('graph');
+            }
+          }}
+        >
+          <div ref={artRef} className={styles.art} data-cover-art style={{ opacity: 0 }}>
+            {config.art.full ? (
+              <img className={styles.full} src={config.art.full} alt="" draggable="false" data-cover-full />
+            ) : (<>
+              <img className={styles.part} src={config.art.bush} alt="" draggable="false" data-cover-bush
+                style={{ height: art ? `${art.bushShare * 100}%` : '50%' }} />
+              <img className={styles.part} src={config.art.roots} alt="" draggable="false" data-cover-roots
+                style={{ height: art ? `${(1 - art.bushShare) * 100}%` : '50%' }} />
+            </>)}
+          </div>
+          {config.alt && <span className={styles.alt} role="img" aria-label={config.alt} data-cover-alt />}
+          {config.byline.text && (
+            <a
+              ref={bylineRef}
+              className={styles.byline}
+              href={config.byline.href || undefined}
+              data-cover-byline
+              style={{ opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {config.byline.text}
+            </a>
+          )}
+        </div>
+      </div>
+      <div
+        ref={sectionRef}
+        className={styles.section}
+        data-cover-section
+        style={startArt ? { opacity: 0, pointerEvents: 'none' } : undefined}
+      >
+        {children}
       </div>
       <button
-        ref={skipRef}
+        ref={handleRef}
         type="button"
-        className={styles.skip}
-        data-opening-control
-        data-opening-skip
-        onClick={(e) => { e.stopPropagation(); if (machineRef.current) machineRef.current.skip(); }}
+        className={styles.handle}
+        aria-label="Show the cover"
+        title="Show the cover"
+        data-cover-handle
+        tabIndex={startArt ? -1 : 0}
+        style={{ opacity: startArt ? 0 : 1, pointerEvents: startArt ? 'none' : 'auto' }}
+        onClick={() => tap('art')}
       >
-        {config.skipLabel}
+        <span className={styles.grip} aria-hidden="true" />
       </button>
-    </div>
+    </>
   );
 }
 
-export function Opening({ settings, viewState }) {
+export function Opening({ settings, viewState, children }) {
   const config = useMemo(() => openingConfig(settings), [settings]);
-  const [run, setRun] = useState(() => (shouldShowOpening(config, {
-    state: viewState ? viewState.state : null,
-    hash: typeof window !== 'undefined' ? window.location.hash : '',
-  }) ? 1 : 0));
-  const [shown, setShown] = useState(run > 0);
-
-  useEffect(() => {
-    if (!config) return undefined;
-    const onShow = () => { setRun((n) => n + 1); setShown(true); };
-    window.addEventListener('postpipe:show-opening', onShow);
-    return () => window.removeEventListener('postpipe:show-opening', onShow);
-  }, [config]);
-
-  const onDone = useMemo(() => () => {
-    if (viewState && viewState.markOpeningSeen) {
-      viewState.markOpeningSeen();
-      // Kept at once: a reader who skips and closes the tab has seen it.
-      if (viewState.flush) viewState.flush();
-    }
-    setShown(false);
-  }, [viewState]);
-
-  if (!config || !shown) return null;
-  return <OpeningLayer key={run} config={config} onDone={onDone} />;
+  if (!config) return <>{children}</>;
+  return <Cover config={config} viewState={viewState}>{children}</Cover>;
 }
