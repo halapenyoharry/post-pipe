@@ -32,6 +32,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
   // Derive initial state when article changes
   useEffect(() => {
+    // A save still waiting belongs to the chapter that is leaving.
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveProgress(); }
     if (article) {
       setIsOpen(true);
       setIsMinimized(false);
@@ -161,12 +163,30 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     }
   };
 
+  // How far through the chapter the reader is, kept per viewer in the
+  // browser (viewState.setReadingProgress): the graph draws it on the node.
+  // Written at most every few hundred ms while scrolling, and at once on
+  // reaching the end. Only for a chapter with text.
+  const saveTimer = useRef(null);
+  const progressFor = useRef(null);
+  const saveProgress = () => {
+    saveTimer.current = null;
+    const el = bodyRef.current;
+    const id = progressFor.current;
+    if (!el || !id || !viewState || !viewState.setReadingProgress) return;
+    const room = el.scrollHeight - el.clientHeight;
+    viewState.setReadingProgress(id, room > 0 ? el.scrollTop / room : 1);
+  };
   const handleScroll = () => {
     if (bodyRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
       const room = scrollHeight - clientHeight;
       const pct = room > 0 ? (scrollTop / room) * 100 : 100;
       setScrollProgress(Math.max(0, Math.min(pct, 100)));
+      if (progressFor.current) {
+        if (pct >= 98) { clearTimeout(saveTimer.current); saveProgress(); }
+        else if (!saveTimer.current) saveTimer.current = setTimeout(saveProgress, 350);
+      }
     }
   };
 
@@ -276,6 +296,30 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       console.error('Copy URL failed:', err);
     }
   };
+
+  // When a chapter's text arrives: go back to where this reader left it
+  // (unless a link asked for a paragraph, or they had reached the end), and
+  // start keeping its progress.
+  useEffect(() => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    progressFor.current = null;
+    if (!contentHtml || !article || article._posted === 'title' || !viewState || !viewState.readingProgress) return;
+    const id = getPersistentId(article);
+    const t = setTimeout(() => {
+      const el = bodyRef.current;
+      if (!el) return;
+      const p = viewState.readingProgress(id);
+      const room = el.scrollHeight - el.clientHeight;
+      if ((targetParagraph === undefined || targetParagraph === null) && p.at > 0.02 && p.at < 0.98 && room > 0) {
+        el.scrollTop = p.at * room;
+      }
+      progressFor.current = id;
+      handleScroll();
+      if (room <= 0) saveProgress();
+    }, 60);
+    return () => clearTimeout(t);
+  }, [contentHtml]);
 
   useEffect(() => {
     if (contentHtml && targetParagraph !== undefined && targetParagraph !== null && bodyRef.current) {

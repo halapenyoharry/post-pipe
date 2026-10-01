@@ -395,6 +395,8 @@
     ],
     "_visibleLayers_note": "Which edge layers draw lines: sequence, authored, tag, topology. Default sequence only. Containment is never a line; the hulls show it. A connected_to between two pieces that follow one another in a series is folded into that next edge.",
     "containerCount": true,
-    "_containerCount_note": "Whether a container's title shows how many items it holds: the open container's label, the closed container's blob, and the source pill at the top. Default true."
+    "_containerCount_note": "Whether a container's title shows how many items it holds: the open container's label, the closed container's blob, and the source pill at the top. Default true.",
+    "readingProgress": true,
+    "_readingProgress_note": "A thin bar along the bottom of each card shows how far this viewer has read it, filling as they go; a card read to the end keeps a full bar and a small tick. Kept in the viewer's own browser (viewState), never sent anywhere. Default true; false hides it."
   }
 }

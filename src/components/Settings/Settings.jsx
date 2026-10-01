@@ -377,6 +377,11 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
               {subject ? (
                 <div className={styles.subjectBlock} data-place-subject>
                   <div className={styles.subjectTitle}>{subject.title}</div>
+                  {readable && viewState.readingProgress && (() => {
+                    const p = viewState.readingProgress(subject.id);
+                    const text = p.done ? 'Read to the end' : p.max > 0 ? `Read ${Math.round(p.max * 100)}%` : p.seen ? 'Opened' : 'Not opened yet';
+                    return <div className={styles.hint} data-place-progress>{text}</div>;
+                  })()}
                   <div className={styles.choices}>
                     {readable && !inReader && (
                       <button className={styles.choiceBtn} onClick={() => { setOpen(false); window.location.hash = readHash(subject.id, null); }}>

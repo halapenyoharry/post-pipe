@@ -471,3 +471,22 @@ test('the text size and view preferences persist', async () => {
   b.setPreference('mode', null);
   assert.strictEqual(b.preference('mode'), null);
 });
+
+test('reading progress keeps the furthest point and stays done', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
+  assert.deepStrictEqual(a.readingProgress('x'), { at: 0, max: 0, done: false, seen: false });
+  a.markSeen('x');
+  a.setReadingProgress('x', 0.4);
+  a.setReadingProgress('x', 0.2);
+  assert.strictEqual(a.readingProgress('x').max, 0.4);
+  assert.strictEqual(a.readingProgress('x').at, 0.2);
+  assert.strictEqual(a.canUndo, false);
+  a.setReadingProgress('x', 1);
+  a.setReadingProgress('x', 0.1);
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  assert.deepStrictEqual(b.readingProgress('x'), { at: 0.1, max: 1, done: true, seen: true });
+});

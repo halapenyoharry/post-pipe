@@ -363,3 +363,43 @@
 :global(html[data-pp-font="opendyslexic"]) .scroll {
   font-family: 'OpenDyslexic', 'Atkinson', sans-serif;
 }
+
+/* Reading progress (graph.readingProgress): a thin bar along the bottom
+   edge in the card's own color, filling as the viewer reads; a read card
+   keeps a full bar, a small tick, and a slightly warmer edge. */
+.readBar {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 5px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--nv-src, var(--nv-accent)) 18%, transparent);
+  pointer-events: none;
+  overflow: hidden;
+}
+.readFill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--nv-src, var(--nv-accent));
+  opacity: 0.85;
+  transition: width 0.6s ease;
+}
+.readMark {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--nv-src, var(--nv-accent));
+  opacity: 0.8;
+  pointer-events: none;
+}
+.complete::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--nv-src, var(--nv-accent)) 32%, transparent);
+  pointer-events: none;
+}

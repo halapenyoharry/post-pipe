@@ -2142,6 +2142,9 @@ export function GraphViewer({
       const Lens = lensFor(d.kind);
       const vs = viewStateRef.current;
       const bms = vs ? vs.bookmarks(persistKey(d)) : [];
+      // How far this viewer has read it (graph.readingProgress, default on).
+      const progress = GS.readingProgress !== false && vs && vs.readingProgress
+        ? vs.readingProgress(persistKey(d)) : null;
       entry.root.render(
         React.createElement(Lens, {
           article: d,
@@ -2154,6 +2157,7 @@ export function GraphViewer({
             zoomScale: zoomScaleRef.current,
             bookmarks: bms,
             bookmarkCount: bms.length,
+            progress,
           },
           fullContent: d._fullContent || null,
           cardSettings: CARD,

@@ -417,7 +417,49 @@ async function part1(bt, name, size, record) {
   }
 }
 
-const PART_FNS = { 0: part0, 6: part6, 1: part1 };
+// ── 2. reading progress on the node ────────────────────────────────────────
+const cardProgress = (page, slug) => page.evaluate((slug) => {
+  const c = [...document.querySelectorAll('.node-card')].find((e) => e.__data__.id === slug);
+  if (!c) return null;
+  const bar = c.querySelector('[data-read-progress]');
+  const r = bar && bar.getBoundingClientRect(), cr = c.getBoundingClientRect();
+  return { value: bar ? bar.getAttribute('data-read-progress') : null, mark: !!c.querySelector('[class*="readMark"]'), atBottom: !!r && cr.bottom - r.bottom < 10 && r.height <= 4 };
+}, slug);
+
+async function part2(bt, name, size, record) {
+  const s = await open(bt, name, size, READ(FIRST));
+  const { page } = s;
+  const methods = new Set();
+  page.on('request', (r) => methods.add(r.method()));
+  try {
+    await page.evaluate(() => { const b = document.querySelector('[data-tts-target]'); b.scrollTop = (b.scrollHeight - b.clientHeight) * 0.5; b.dispatchEvent(new Event('scroll')); });
+    await page.waitForTimeout(800);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    const half = await cardProgress(page, slugOf(FIRST));
+    record('2 the node shows how far it has been read', !!half && Number(half.value) >= 45 && Number(half.value) <= 55 && half.atBottom, half ? `${half.value}% along the bottom edge` : 'card not found');
+    await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(FIRST));
+    await page.waitForTimeout(1500);
+    const back = await page.evaluate(() => { const b = document.querySelector('[data-tts-target]'); return Math.round(100 * b.scrollTop / (b.scrollHeight - b.clientHeight)); });
+    record('2 the reader goes back to where it was left', back >= 45 && back <= 55, `${back}%`);
+    await page.evaluate(() => { const b = document.querySelector('[data-tts-target]'); b.scrollTop = b.scrollHeight; b.dispatchEvent(new Event('scroll')); });
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    const done = await cardProgress(page, slugOf(FIRST));
+    record('2 a chapter read to the end is marked complete', !!done && done.value === 'done' && done.mark, done ? `${done.value}, tick ${done.mark}` : 'card not found');
+    const other = await cardProgress(page, slugOf(SECOND));
+    record('2 an unread chapter shows no bar', !!other && other.value === null, other ? String(other.value) : 'card not found');
+    const stored = await page.evaluate(() => { const v = JSON.parse(localStorage.getItem('post-pipe:viewstate') || '{}'); const st = v.state || v; const r = (st.reading || {}); return Object.values(r).some((x) => x && x.done); });
+    record('2 progress is kept in this browser only', stored && [...methods].every((m) => m === 'GET') && s.outside.length === 0, `stored ${stored}; requests ${[...methods].join(',')}; ${s.outside.length} elsewhere`);
+    if (SHOTS && name === 'chromium') await page.screenshot({ path: path.join(SHOTS, `progress-${size}.png`) });
+    record('2 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  } finally {
+    await s.browser.close();
+  }
+}
+
+const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2 };
 
 const server = http.createServer((req, res) => handler(req, res, {
   public: SITE,

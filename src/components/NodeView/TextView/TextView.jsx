@@ -83,8 +83,15 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
   const hasImage = Boolean(article.image);
   const bandHeight = 0;
 
+  // How far this viewer has read it: a thin bar along the bottom edge,
+  // filling as they go, and a quiet mark once they reach the end.
+  const progress = viewState && viewState.progress;
+  const readMax = progress ? Math.max(0, Math.min(1, progress.max || 0)) : 0;
+  const readDone = !!(progress && progress.done);
+
   const cardClassNames = [
     styles.card,
+    readDone && styles.complete,
     sourceColor && !pinned && styles.glow,
     isDraft ? styles.draft : styles.published,
     expanded && styles.expanded,
@@ -149,6 +156,22 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         fullContent={fullContent}
         cardSettings={cardSettings}
       />
+      {showHandles && (readMax > 0 || readDone) && (
+        <div
+          className={styles.readBar}
+          role="progressbar"
+          aria-label="Read"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round((readDone ? 1 : readMax) * 100)}
+          data-read-progress={readDone ? 'done' : Math.round(readMax * 100)}
+        >
+          <div className={styles.readFill} style={{ width: `${(readDone ? 1 : readMax) * 100}%` }} />
+        </div>
+      )}
+      {showHandles && readDone && (
+        <div className={styles.readMark} title="Read to the end" aria-hidden="true">✓</div>
+      )}
       {pinned && <PopoutButton />}
       {showHandles && (
         <ResizeHandles

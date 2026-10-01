@@ -475,6 +475,23 @@ function createViewState(opts = {}) {
       gestureBase = null;
     },
 
+    // How far through a piece the reader is, as a fraction 0..1 (at), the
+    // furthest they have been (max), and done once they reach the end
+    // (max >= 0.98), which then stays set. A node's progress bar draws max.
+    setReadingProgress(id, fraction) {
+      const f = Math.max(0, Math.min(1, Number(fraction) || 0));
+      updateTransient((s) => {
+        const prev = s.reading[id] || {};
+        const max = Math.max(Number(prev.max) || 0, f);
+        s.reading[id] = { ...prev, at: f, max, done: prev.done === true || max >= 0.98, t: now() };
+      });
+      gestureBase = null;
+    },
+    readingProgress(id) {
+      const r = state.reading[id] || {};
+      return { at: Number(r.at) || 0, max: Number(r.max) || 0, done: r.done === true, seen: Boolean(r.seenAt) };
+    },
+
     markSeen(id) {
       if (state.reading[id] && state.reading[id].seenAt) return;
       updateTransient((s) => {
