@@ -304,7 +304,10 @@ async function graphChecks(bt, name, size, record) {
     }
 
     // 11. closed means closed
-    const spot = await page.evaluate((prefix) => { const c = [...document.querySelectorAll('.node-card')].find((e) => e.offsetParent && e.__data__.id.startsWith(prefix)); if (!c) return null; const r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, id: c.__data__.id }; }, 'eoej-a1-0');
+    // Where a member card was, before its container closes: the drag below
+    // starts there, on bare canvas (the closed container's own blob may now
+    // cover part of that area, and dragging the blob moves the container).
+    const spot = await page.evaluate((prefix) => { const c = [...document.querySelectorAll('.node-card')].find((e) => e.offsetParent && e.__data__.id.startsWith(prefix)); if (!c) return null; const r = c.getBoundingClientRect(); return { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom, x: r.left + r.width / 2, y: r.top + r.height / 2, id: c.__data__.id }; }, 'eoej-a1-0');
     await page.evaluate((id) => window.PostPipeGraph.closeContainer(id), ACT.id);
     await page.waitForTimeout(1500);
     const closed = await page.evaluate(() => {
@@ -317,6 +320,12 @@ async function graphChecks(bt, name, size, record) {
     });
     record('11 a closed container hides its members and their edges', closed.cards === 0 && closed.edges === 0, `${closed.cards} cards, ${closed.edges} edges left`);
     if (spot) {
+      const bare = await page.evaluate((r) => {
+        const svg = document.querySelector('svg');
+        for (let y = r.y0 + 4; y < r.y1; y += 6) for (let x = r.x0 + 4; x < r.x1; x += 6) if (document.elementFromPoint(x, y) === svg) return { x, y };
+        return null;
+      }, spot);
+      if (bare) { spot.x = bare.x; spot.y = bare.y; }
       const before = await page.evaluate((id) => { const d = [...document.querySelectorAll('.node-card')].find((e) => e.__data__.id === id).__data__; return [d.x, d.y, d._size ? d._size.width : null]; }, spot.id);
       await page.mouse.move(spot.x, spot.y); await page.mouse.down(); await page.mouse.move(spot.x + 90, spot.y + 50, { steps: 6 }); await page.mouse.up();
       await page.waitForTimeout(300);
