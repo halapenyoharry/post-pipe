@@ -26,7 +26,7 @@ const DEFAULTS = {
   top: null,
   backdrop: { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 },
   reach: { enabled: false, tips: [], perContainer: 3, stopShort: 18, lagMs: 600, drawMs: 1800 },
-  byline: { text: '', href: '' },
+  byline: { text: '', href: '', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower' },
   startOn: 'remembered',
   snapMs: 420,
   title: null,
@@ -94,6 +94,55 @@ function titleLayout(layout, box) {
       y: top + l.y * height,
       spans: l.spans.map((sp) => ({ text: sp.text, size: sp.size * width, rise: sp.rise * width })),
     })),
+  };
+}
+
+// opening.byline with its defaults. With a title over the cover the byline
+// sits directly under it in each state, in the title's face and colour, at
+// `size` of the title's size (its largest span) and never under minSize px,
+// its top `gap` of the title's size under the last line's baseline, at
+// opacity.art in the art state and opacity.graph in the graph state. case
+// 'lower' (the default) draws it in lower case; 'as-written' as written.
+// Without a title it sits under the art, as before.
+function bylineConfig(b) {
+  const o = b && typeof b === 'object' ? b : {};
+  const d = DEFAULTS.byline;
+  const op = o.opacity;
+  const opacity = op && typeof op === 'object'
+    ? { art: clamp01(num(op.art, d.opacity.art)), graph: clamp01(num(op.graph, d.opacity.graph)) }
+    : Number.isFinite(Number(op)) && op !== '' && op !== null
+      ? { art: clamp01(Number(op)), graph: clamp01(Number(op)) }
+      : { ...d.opacity };
+  return {
+    text: str(o.text),
+    href: str(o.href),
+    opacity,
+    size: Math.max(0.01, Math.min(1, num(o.size, d.size))),
+    gap: Math.max(0, Math.min(2, num(o.gap, d.gap))),
+    minSize: Math.max(0, num(o.minSize, d.minSize)),
+    case: o.case === 'as-written' ? 'as-written' : 'lower',
+  };
+}
+
+// The byline's text as drawn.
+function bylineText(byline) {
+  if (!byline || !byline.text) return '';
+  return byline.case === 'as-written' ? byline.text : byline.text.toLowerCase();
+}
+
+// Where the byline sits under one layout of the title, for the art drawn in
+// box { left, top, width, height }: the last line's left edge, its top, its
+// size; null for a layout without lines.
+function bylineUnder(layout, box, byline) {
+  const lines = (layout && layout.lines) || [];
+  if (!lines.length) return null;
+  const last = lines[lines.length - 1];
+  const titleSize = Math.max(...lines.flatMap((l) => l.spans.map((sp) => sp.size))) * box.width;
+  return {
+    x: box.left + last.x * box.width,
+    y: box.top + last.y * box.height + byline.gap * titleSize,
+    size: Math.max(byline.minSize, byline.size * titleSize),
+    titleSize,
   };
 }
 
@@ -191,7 +240,6 @@ function openingConfig(settings) {
     graphState = '';
   }
   const graph = o.graph && typeof o.graph === 'object' ? o.graph : {};
-  const byline = o.byline && typeof o.byline === 'object' ? o.byline : {};
   const ground = groundConfig(o.ground);
   return {
     enabled: true,
@@ -207,7 +255,7 @@ function openingConfig(settings) {
     top: topConfig(o.top),
     backdrop: backdropConfig(o),
     reach: reachConfig(o),
-    byline: { text: str(byline.text), href: str(byline.href) },
+    byline: bylineConfig(o.byline),
     startOn: ['remembered', 'art', 'graph'].includes(o.startOn) ? o.startOn : DEFAULTS.startOn,
     snapMs: Math.max(0, num(o.snapMs, DEFAULTS.snapMs)),
     title: titleConfig(o.title),
@@ -248,7 +296,10 @@ function startState(config, { stored, hash } = {}) {
 //               roots in both states: follow px below its graph-state place
 //               (it moves with the art), at graph.artStateOpacity at the art
 //   ground      the art state's ground's opacity (1 at art, 0 at graph)
-//   byline      { x, y, size, opacity }: (x, y) is the centre of its top
+//   byline      { x, y, size, opacity, align, under }: (x, y) is the centre
+//               of its top (align 'center', under the art, without a title),
+//               or its top left corner (align 'left', under the title: under
+//               'title'), between the two layouts' places as the page moves
 function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null } = {}, p = 0) {
   const t = clamp01(p);
   const T = TUNING;
@@ -295,12 +346,34 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
       follow: top - artTop1,
     },
     ground: 1 - t,
-    byline: {
+    byline: bylineAt(config, { left: (vw - width) / 2, top, width, height }, t, {
       x: vw / 2,
       y: top + height + (below - T.bylineSize * 1.3) / 2,
       size: T.bylineSize,
       opacity: clamp01(1 - t * 2.5),
-    },
+      align: 'center',
+      under: 'art',
+    }),
+  };
+}
+
+// The byline at progress t: under the title's art layout at the art rest,
+// under its graph layout at the graph rest, between the two on the way (a
+// state without lines keeps the other's place); `fallback` without a title.
+function bylineAt(config, box, t, fallback) {
+  const title = config && config.title;
+  const byline = config && config.byline;
+  if (!title || !byline || !byline.text) return fallback;
+  const a = bylineUnder(title.art, box, byline);
+  const g = bylineUnder(title.graph, box, byline);
+  const from = a || g, to = g || a;
+  return {
+    x: lerp(from.x, to.x, t),
+    y: lerp(from.y, to.y, t),
+    size: lerp(from.size, to.size, t),
+    opacity: lerp(byline.opacity.art, byline.opacity.graph, t),
+    align: 'left',
+    under: 'title',
   };
 }
 
@@ -532,5 +605,5 @@ function pageKey(e) {
 
 module.exports = {
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
-  openingConfig, groundConfig, topConfig, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
+  openingConfig, bylineConfig, bylineText, groundConfig, topConfig, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
 };

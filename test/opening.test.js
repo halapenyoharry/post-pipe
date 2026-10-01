@@ -447,3 +447,40 @@ test('the graph hangs from the roots in both states: moved with the art, at artS
   assert.equal(odd.graph.artStateOpacity, 1);
   assert.equal(coverGeometry(openingConfig({ opening: { ...SITE.opening, graph: { artStateOpacity: 0.35 } } }), view, 0).layer.opacity, 0.35);
 });
+
+test('byline: defaults, lower case, and its opacity per state', () => {
+  const { bylineConfig, bylineText } = require('../src/lib/opening');
+  const d = bylineConfig({ text: 'by Some One', href: 'about.html' });
+  assert.deepStrictEqual(d, { text: 'by Some One', href: 'about.html', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower' });
+  assert.equal(bylineText(d), 'by some one');
+  assert.equal(bylineText(bylineConfig({ text: 'by Some One', case: 'as-written' })), 'by Some One');
+  assert.deepStrictEqual(bylineConfig({ text: 'x', opacity: 0.5 }).opacity, { art: 0.5, graph: 0.5 });
+  assert.deepStrictEqual(bylineConfig({ text: 'x', opacity: { art: 0.2 } }).opacity, { art: 0.2, graph: 0.56 });
+  assert.equal(bylineText(bylineConfig({})), '');
+});
+
+test('byline: directly under the title in both states, a quarter of its size, in between on the way', () => {
+  const title = {
+    text: 'A Title', font: 'Some Face',
+    art: { lines: [{ x: 0.2, y: 0.4, spans: [{ text: 'A', size: 0.1 }] }, { x: 0.18, y: 0.5, spans: [{ text: 'Title', size: 0.16 }] }] },
+    graph: { lines: [{ x: 0.09, y: 0.6, spans: [{ text: 'A Title', size: 0.06 }] }] },
+  };
+  const c = openingConfig({ opening: { ...SITE.opening, title } });
+  const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 } };
+  for (const [p, line, big] of [[0, title.art.lines[1], 0.16], [1, title.graph.lines[0], 0.06]]) {
+    const g = coverGeometry(c, view, p);
+    const titleSize = big * g.art.width;
+    assert.equal(g.byline.align, 'left');
+    assert.equal(g.byline.under, 'title');
+    assert.ok(Math.abs(g.byline.x - (g.art.left + line.x * g.art.width)) < 1e-9, 'at the last line\'s left edge');
+    assert.ok(Math.abs(g.byline.y - (g.art.top + line.y * g.art.height + 0.3 * titleSize)) < 1e-9, 'just under its baseline');
+    assert.ok(Math.abs(g.byline.size / titleSize - 0.25) < 1e-9, 'a quarter of the title');
+    assert.equal(g.byline.opacity, p === 0 ? 0.35 : 0.56);
+  }
+  const a = coverGeometry(c, view, 0), g = coverGeometry(c, view, 1), m = coverGeometry(c, view, 0.5);
+  assert.ok(m.byline.opacity > a.byline.opacity && m.byline.opacity < g.byline.opacity);
+  const cMin = openingConfig({ opening: { ...SITE.opening, title, byline: { ...SITE.opening.byline, minSize: 9 } } });
+  assert.equal(coverGeometry(cMin, view, 1).byline.size, 9, 'never under minSize');
+  const plain = coverGeometry(openingConfig(SITE), view, 0);
+  assert.equal(plain.byline.align, 'center', 'without a title: under the art, as before');
+});

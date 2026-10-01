@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, TUNING } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, bylineText, TUNING } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 
 /**
@@ -432,8 +432,12 @@ function Cover({ config, viewState, children }) {
       by.style.top = `${g.byline.y}px`;
       by.style.fontSize = `${g.byline.size}px`;
       by.style.opacity = sizeRef.current ? String(g.byline.opacity) : '0';
-      by.style.pointerEvents = g.byline.opacity > 0.5 ? 'auto' : 'none';
-      by.tabIndex = label === 'art' ? 0 : -1;
+      by.setAttribute('data-cover-byline', g.byline.under);
+      // Under the title it stays a link in both states; under the art (no
+      // title) it gives way as the page moves to the graph.
+      const live = g.byline.under === 'title' ? label !== 'moving' : g.byline.opacity > 0.5;
+      by.style.pointerEvents = live ? 'auto' : 'none';
+      by.tabIndex = g.byline.under === 'title' ? (live ? 0 : -1) : (label === 'art' ? 0 : -1);
     }
     const stage = stageRef.current;
     if (stage) {
@@ -618,6 +622,7 @@ function Cover({ config, viewState, children }) {
       if (!t || !t.closest) return null;
       if (handle && handle.contains(t)) return 'edge';
       if (stage && stage.contains(t)) return 'stage';
+      if (bylineRef.current && bylineRef.current.contains(t)) return machine.p < 1 || machine.moving ? 'stage' : 'graph';
       if (!sec || !sec.contains(t)) return null;
       if (machine.moving || machine.p < 1) return 'stage';
       return e.clientY <= TUNING.edgePx ? 'edge' : 'graph';
@@ -747,18 +752,6 @@ function Cover({ config, viewState, children }) {
             <CoverTitle title={config.title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
           </div>
           {config.alt && <span className={styles.alt} role="img" aria-label={config.alt} data-cover-alt />}
-          {config.byline.text && (
-            <a
-              ref={bylineRef}
-              className={styles.byline}
-              href={config.byline.href || undefined}
-              data-cover-byline
-              style={{ opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {config.byline.text}
-            </a>
-          )}
         </div>
         {config.reach && <svg ref={reachLayerRef} className={styles.reach} aria-hidden="true" data-cover-reach style={{ opacity: 0 }} />}
       </div>
@@ -770,6 +763,22 @@ function Cover({ config, viewState, children }) {
       >
         {children}
       </div>
+      {config.byline.text && (
+        // Over the graph layer, so it stays a link in the graph state too.
+        <a
+          ref={bylineRef}
+          className={`${styles.byline} ${config.title ? styles.bylineTitle : ''}`}
+          href={config.byline.href || undefined}
+          data-cover-byline={config.title ? 'title' : 'art'}
+          style={{
+            opacity: 0,
+            ...(config.title ? { fontFamily: config.title.family, color: config.title.color || undefined } : null),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {bylineText(config.byline)}
+        </a>
+      )}
       <button
         ref={handleRef}
         type="button"

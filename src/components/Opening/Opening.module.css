@@ -140,9 +140,13 @@ html[data-pp-cover="graph"] .stage {
   clip-path: inset(50%);
 }
 
-/* The byline: a link under the art, in the title face. */
+/* The byline: a link under the art, in the title face; with a title over
+   the cover, directly under it in each state, in its face and colour, its
+   left edge at the title's (bylineTitle). Fixed over the graph layer, under
+   the grip. */
 .byline {
-  position: absolute;
+  position: fixed;
+  z-index: 44;
   transform: translateX(-50%);
   max-width: calc(100vw - 32px);
   color: var(--text-bright, #ece6da);
@@ -151,6 +155,12 @@ html[data-pp-cover="graph"] .stage {
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
+}
+
+.bylineTitle {
+  transform: none;
+  color: var(--pp-accent, var(--accent));
+  line-height: 1;
 }
 
 .byline:hover,
