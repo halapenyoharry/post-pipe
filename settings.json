@@ -382,6 +382,8 @@
     "_collapseGesture_note": "tap (default) or doubletap: what opens and closes a container, on its title or its closed node. A tap is under 4px of movement; more than that drags the container. With tap, a double-tap on a title zooms like anywhere else; with doubletap, it toggles the container instead.",
     "doubleTapMs": 250,
     "_doubleTapMs_note": "A double-tap or double-click anywhere on the graph (canvas, hull, card, title) zooms in about 2x at that point and opens nothing; shift+double-click, or a double-tap with two fingers, zooms out. A single tap waits this long (ms) to be sure it is not the first of two, then opens the card or toggles the title.",
+    "layoutVersion": 1,
+    "_layoutVersion_note": "Part of the key the reader's saved positions are filed under, with the layout's name and the settings that shape it (the spiral's mode, spacing, start radius and direction, the card size, the simulation). When any of those change, positions saved for the old arrangement are no longer read back and the layout places the nodes afresh; bump this to do the same on purpose. Old positions stay in the browser until the reader uses Forget. Positions a reader dragged are retired with the rest. Default 1.",
     "spiral": {
       "mode": "path",
       "_mode_note": "path (default): a container's chapters sit one after another on a golden spiral, radius growing by the golden ratio each quarter turn, so each next edge is short. scatter: the golden-angle arrangement. Containers of containers place their children beside the first one, the label about a third of the way down.",
