@@ -93,6 +93,8 @@ const { buildEdges } = require('./src/corpus/buildEdges');
 const { readerFonts } = require('./src/lib/readerSettings');
 const { accentCss } = require('./src/lib/accent');
 const { rightsMeta, rightsFooterHtml } = require('./src/lib/rights');
+const { introConfig, introHtml } = require('./src/lib/linkNode');
+const { marked } = require('marked');
 
 // Reader faces other than the page's own ship as files next to the page,
 // with their license, and load only when chosen. No font is fetched from
@@ -407,6 +409,8 @@ ${ttsSource}
 <script>
 // ── Settings ──
 window.SETTINGS = ${settingsJSON};
+// settings.graph.intro, rendered when the site was built (src/lib/linkNode.js).
+window.PP_INTRO_HTML = ${JSON.stringify(introHtml(introConfig(SETTINGS), (md) => marked(md))).replace(/</g, '\\u003c')};
 </script>
 <script>
 // The theme and mode on <html> before anything draws, from the viewer's
@@ -446,7 +450,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
 
     // The top bar's pages (settings.topBar.pages): buttons beside the source
     // pills that open an item in the reader. An item kept out of the graph
@@ -538,7 +542,10 @@ ${reactJs}
             // The items are in feed.items (or feedData.items)
             const items = typeof feed !== 'undefined' ? (feed.items || []) : (typeof feedData !== 'undefined' ? (feedData.items || []) : []);
             const item = items.find(i => (i.id === decodeURIComponent(id)) || (i.url === decodeURIComponent(id)));
-            if (item) {
+            if (item && isLinkItem(item)) {
+              // A link node has no reader: the hash is dropped.
+              history.replaceState(null, '', window.location.pathname + window.location.search);
+            } else if (item) {
               if (viewState) {
                 viewState.markSeen(item.id);
               }
@@ -581,6 +588,8 @@ ${reactJs}
       }
       function selectArticle(item) {
         if (!item) { closeReader(); return; }
+        // A link node is followed, never read.
+        if (isLinkItem(item)) { followLink(item); return; }
         // Choosing the chapter that is already open closes it.
         if (selectedRef.current && selectedRef.current.id === item.id) { closeReader(); return; }
         viewState.markSeen(item.id);
@@ -661,6 +670,7 @@ ${reactJs}
             showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false),
             pages: TOP_PAGES,
             showAddButton: TOP_BAR.addFeed,
+            intro: window.PP_INTRO_HTML || '',
             onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
           }),
           React.createElement(TimeOverlay, {

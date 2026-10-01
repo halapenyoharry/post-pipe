@@ -58,6 +58,9 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
   const contributionCount = viewState?.contributionCount || 0;
   const bookmarkCount = viewState?.bookmarkCount ?? (Array.isArray(viewState?.bookmarks) ? viewState.bookmarks.length : (Array.isArray(article?.bookmarks) ? article.bookmarks.length : 0));
 
+  // A link node: its title, subtitle and blurb, and a ↗ for where it goes.
+  // It never expands into text: a tap follows the link (GraphViewer).
+
   // Image-kind nodes are a different visual: photo card with caption.
   if (article.kind === 'image' && article.image) {
     return (
@@ -92,6 +95,12 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
   const bgColor = isPrimary
     ? (isDraft ? '#24304a' : '#1e3a5f')   // yours: finished, and still in progress
     : '#23232f';                          // subscribed: present, quieter
+
+  // A link node: its title, subtitle and blurb, and a ↗ for where it goes.
+  // It never expands into text: a tap follows the link (GraphViewer).
+  if (article.kind === 'link' && article.link) {
+    return <LinkCard article={article} width={width} height={height} viewState={viewState} cardSettings={cardSettings} sourceColor={sourceColor} isDraft={isDraft} bgColor={bgColor} />;
+  }
 
   // A cover is worth knowing about at a glance and not worth a third of the
   // card. A band took 59px of 140 and squeezed the text that the node exists
@@ -352,6 +361,61 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
         >
           {subtitle}
         </div>
+      )}
+    </div>
+  );
+}
+
+// A link node's card: the same card as a text node's, holding its title,
+// the line under it (subtitle) and its blurb, with the ↗ in the corner. The
+// same at every size; a marker stays a dot.
+function LinkCard({ article, width, height, viewState, cardSettings, sourceColor, isDraft, bgColor }) {
+  const marker = viewState.lod === 'marker' && !viewState.hovered && !viewState.pinned;
+  const radius = cardSettings?.cornerRadius != null ? cardSettings.cornerRadius : 10;
+  const sketch = marker || !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
+  const title = article.title || article.label || '';
+  const blurb = article.description || '';
+  const subtitle = article.subtitle || '';
+  const titleFontSize = fitFontSize(title, width, Math.max(30, (height || 0) * (blurb ? 0.42 : 0.8)), {
+    min: Math.min(13, cardSettings?.labelMinFontSize ?? 13),
+    max: Math.min(20, cardSettings?.labelMaxFontSize ?? 20),
+    lineHeight: 1.1,
+    pad: 8,
+  });
+  const className = [
+    styles.card,
+    isDraft ? styles.draft : styles.published,
+    styles.linkCard,
+    sourceColor && styles.glow,
+    viewState.hovered && styles.linkHover,
+    marker && styles.marker,
+  ].filter(Boolean).join(' ');
+  return (
+    <div
+      className={className}
+      data-pp-card
+      data-link-card
+      style={{
+        width,
+        height,
+        background: bgColor,
+        ...(cardSettings?.cornerRadius != null && !marker ? { borderRadius: cardSettings.cornerRadius } : {}),
+        ...(sourceColor ? { '--nv-src': sourceColor } : {}),
+      }}
+    >
+      {sketch && (
+        <svg className={styles.sketchBorder} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+          <path className={styles.sketchGhost} d={sketch.ghost} />
+          <path className={styles.sketchMain} d={sketch.main} />
+        </svg>
+      )}
+      {!marker && (
+        <>
+          <div className={styles.linkTitle} style={{ fontSize: `${titleFontSize}px` }} data-link-title>{title}</div>
+          {subtitle && <div className={styles.linkSubtitle} data-link-subtitle>{subtitle}</div>}
+          {blurb && <div className={styles.linkBlurb} data-link-blurb>{blurb}</div>}
+          <span className={styles.linkOut} data-link-out aria-hidden="true">↗</span>
+        </>
       )}
     </div>
   );

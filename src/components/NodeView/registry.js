@@ -16,6 +16,7 @@ const defaultRegistry = {
   image:             TextView,   // future: ImageView
   'podcast-episode': TextView,   // future: AudioView
   video:             TextView,   // future: VideoView
+  link:              TextView,   // its link card
 };
 
 /**

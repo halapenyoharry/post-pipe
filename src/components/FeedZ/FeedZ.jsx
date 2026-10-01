@@ -27,10 +27,13 @@ import styles from './FeedZ.module.css';
  *   onOpenPage     — (item) => void, for a page's button
  *   showAddButton  — optional, default true; false leaves out the "+"
  *                    (settings.topBar.addFeed; the embed's addFeed feature)
+ *   intro          — optional HTML (settings.graph.intro, rendered at build
+ *                    time): one short block under the pills, for a site's
+ *                    bio line
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, showAddButton = true }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, showAddButton = true, intro = '' }) {
   const hasPages = Array.isArray(pages) && pages.length > 0;
-  if ((!sources || sources.length === 0) && !hasPages) return null;
+  if ((!sources || sources.length === 0) && !hasPages && !intro) return null;
 
   const hidden = hiddenSources || new Set();
 
@@ -60,6 +63,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
         </button>
       ))}
       {showAddButton !== false && <AddPill />}
+      {intro && <div className={styles.intro} data-graph-intro dangerouslySetInnerHTML={{ __html: intro }} />}
     </div>
   );
 }

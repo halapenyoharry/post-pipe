@@ -16,3 +16,4 @@ export { Opening } from './components/Opening/Opening';
 export { useContributions } from './components/Contributions/useContributions';
 export { topBarConfig, resolvePages, graphFeed } from './lib/topBar';
 export { React, ReactDOM };
+export { isLinkItem, followLink, linkOf } from './lib/linkNode';

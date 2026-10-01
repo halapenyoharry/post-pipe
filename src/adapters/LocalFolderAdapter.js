@@ -16,6 +16,7 @@ const { marked } = require('marked');
 
 const { ingestFolder } = require('../../ingest');
 const { stripFrontMatter, commitTimes } = require('../lib/frontMatter');
+const { redirectPage } = require('../lib/linkNode');
 
 const ID = 'local';
 
@@ -154,6 +155,10 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}) {
       companions: c.forms_companions || [],
     },
     connected_to: c.connected_to || [],
+    // A link node: the link it follows (as written; it may be relative) and
+    // the line under its title.
+    external_url: c.kind === 'link' ? c.link : undefined,
+    subtitle: c.subtitle || undefined,
     note: c.note,
     todos: c.todos || [],
     schema: c.schema,
@@ -236,6 +241,12 @@ function escapeHtml(str) {
 }
 
 function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set(), rights = null) {
+  // A link node's page sends the visitor on to its link.
+  if (pagesDir && c.kind === 'link' && c.link) {
+    if (!fs.existsSync(pagesDir)) fs.mkdirSync(pagesDir, { recursive: true });
+    fs.writeFileSync(path.join(pagesDir, `${c.id}.html`), redirectPage({ title: c.title, href: c.link, blurb: c.summary, head: rightsMeta(rights) }), 'utf8');
+    return;
+  }
   if (!pagesDir || !c.body || c.posted === 'title') return;
   try {
     const { file, format } = c.body;

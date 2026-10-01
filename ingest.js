@@ -8,6 +8,7 @@ const path   = require('path');
 const matter = require('gray-matter');
 const { sceneFrom } = require('./src/lib/scene');
 const { splitFrontMatter } = require('./src/lib/frontMatter');
+const { linkFromFrontMatter, blurbFromFrontMatter, isLinkContent } = require('./src/lib/linkNode');
 
 const AUDIO_EXTS = new Set(['.m4a', '.mp3', '.wav', '.ogg', '.flac', '.aac']);
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi']);
@@ -64,6 +65,32 @@ function readBodyFrontMatter(dir, body) {
   if (!body || body.format !== 'md') return null;
   try { return splitFrontMatter(fs.readFileSync(path.join(dir, body.file), 'utf8')).data; }
   catch (_) { return null; }
+}
+
+// The front matter and the text of a piece's own markdown file.
+function readBodyParts(dir, body) {
+  if (!body || body.format !== 'md') return { data: null, body: null };
+  try {
+    const parts = splitFrontMatter(fs.readFileSync(path.join(dir, body.file), 'utf8'));
+    return { data: parts.data, body: parts.body };
+  } catch (_) { return { data: null, body: null }; }
+}
+
+// A piece whose front matter (frontmatter.json, or its own text file's)
+// names a link and whose text is empty is a link node: kind 'link', its
+// blurb as its summary. Otherwise it is left as it is.
+function asLinkPiece(content, fm, bodyText) {
+  const link = linkFromFrontMatter(fm);
+  if (!isLinkContent({ link, body: bodyText })) return content;
+  return {
+    ...content,
+    kind: 'link',
+    substrate: 'link',
+    forms_current: 'link',
+    link,
+    summary: blurbFromFrontMatter(fm) || content.summary || '',
+    subtitle: typeof fm.subtitle === 'string' ? fm.subtitle.trim() : '',
+  };
 }
 
 // ─── Body & cover resolution ────────────────────────────────────────────────
@@ -259,6 +286,24 @@ function buildFromUnstructured(id, files, dir) {
   };
 }
 
+// A folder with only a markdown file: what its front matter says, over
+// what the folder alone gives (metadata is a gradient).
+function withFrontMatter(c, data) {
+  const pick = (k) => (typeof data[k] === 'string' && data[k].trim() ? data[k].trim() : null);
+  const out = { ...c };
+  if (pick('title')) out.title = pick('title');
+  if (pick('short_title')) out.short_title = pick('short_title');
+  if (blurbFromFrontMatter(data)) out.summary = blurbFromFrontMatter(data);
+  if (Array.isArray(data.tags)) out.tags = data.tags;
+  if (pick('series')) out.series = pick('series');
+  if (data.series_part !== undefined && data.series_part !== null) out.series_part = data.series_part;
+  if (Array.isArray(data.connected_to)) out.connected_to = data.connected_to;
+  if (data.posted !== undefined) out.posted = data.posted;
+  if (pick('status')) out.status = pick('status');
+  if (data.written || data.date) out.written = data.written || data.date;
+  return out;
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 function ingestFolder(rootPath) {
@@ -280,12 +325,19 @@ function ingestFolder(rootPath) {
     const files = fs.readdirSync(dir);
 
     const fm = readFrontmatterJson(dir);
-    if (fm) { contents.push(buildFromFrontmatterJson(entry.name, fm, files, dir)); continue; }
+    if (fm) {
+      const c = buildFromFrontmatterJson(entry.name, fm, files, dir);
+      const own = readBodyParts(dir, c.body);
+      contents.push(asLinkPiece(c, { ...(own.data || {}), ...fm }, c.body ? (own.body ?? 'text') : ''));
+      continue;
+    }
 
     const yaml = readQmdFrontmatter(dir);
     if (yaml) { contents.push(buildFromQmd(entry.name, yaml, files, dir)); continue; }
 
-    contents.push(buildFromUnstructured(entry.name, files, dir));
+    const c = buildFromUnstructured(entry.name, files, dir);
+    const own = readBodyParts(dir, c.body);
+    contents.push(own.data ? asLinkPiece(withFrontMatter(c, own.data), own.data, own.body) : c);
   }
   return { root: resolved, contents };
 }

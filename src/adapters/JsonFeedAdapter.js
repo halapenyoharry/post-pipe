@@ -31,6 +31,8 @@ async function load(config) {
   };
 }
 
+const { isLinkFeedItem } = require('../lib/linkNode');
+
 function normalizeItem(it) {
   // JSON Feed items are already in our target shape; pass through and fill
   // common fallbacks.
@@ -62,7 +64,9 @@ function normalizeItem(it) {
     tags,
     authors: it.authors || (it.author ? [it.author] : []),
     canonical_url: it.url || it.external_url || '',
-    kind: it._kind || it.kind || 'text',
+    external_url: it.external_url || undefined,
+    // An item that is only a link (external_url, no content) is a link node.
+    kind: isLinkFeedItem(it) ? 'link' : (it._kind || it.kind || 'text'),
     attachments,
     _references,
   };

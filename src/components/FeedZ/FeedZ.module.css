@@ -399,3 +399,36 @@
 /* Sketchbook theme */
 :global(html[data-pp-theme="sketchbook"]) .pill { background: var(--pp-panel-bg); border-color: var(--sk-line-soft); color: var(--sk-ink); }
 @media (hover: hover) { :global(html[data-pp-theme="sketchbook"]) .pill:hover { background: var(--sk-card); } }
+
+/* settings.graph.intro: one short block under the title pill, on its own
+   line in the bar, for a site's bio line. Its links take taps; the rest of
+   it lets the graph have them. */
+.intro {
+  flex: 0 0 100%;
+  max-width: min(36em, 100%);
+  margin: 4px 0 0 4px;
+  color: rgba(224, 224, 224, 0.82);
+  font-family: 'Atkinson', sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.intro :global(p) {
+  margin: 0 0 0.45em;
+}
+
+.intro :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.intro :global(a) {
+  color: var(--pp-accent, var(--accent, #64ffda));
+  pointer-events: auto;
+}
+
+:global(html[data-pp-theme="sketchbook"]) .intro {
+  color: var(--sk-ink);
+  text-shadow: none;
+}

@@ -16,6 +16,10 @@ import { fraction, anchorWorld, homeView } from '../../lib/reach';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
+import { isLinkItem, linkOf, followLink } from '../../lib/linkNode';
+
+// The settings a link node's newTab rule is read from.
+const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -90,6 +94,10 @@ function feedToGraph(feed, config = {}) {
       forms: item.forms || {},
       note: item.note || '',
       todos: item.todos || [],
+      // A link node (src/lib/linkNode.js): what it follows, and the line
+      // under its title.
+      link: isLinkItem(item) ? linkOf(item) : '',
+      subtitle: item.subtitle || '',
       _source: item._source || null,
       originalItem: item
     });
@@ -666,7 +674,7 @@ export function GraphViewer({
     if (viewStateRef.current) {
       for (const d of data.nodes) {
         const saved = viewStateRef.current.nodeState(persistKey(d));
-        if (d.type === 'article' && saved && saved.pinned) pinnedIdsRef.current.add(d.id);
+        if (d.type === 'article' && !d.link && saved && saved.pinned) pinnedIdsRef.current.add(d.id);
       }
     }
     if (viewStateRef.current && positionsWereDegenerate) {
@@ -2482,6 +2490,20 @@ export function GraphViewer({
       
     articleNodes = articleNodes.merge(articleNodesEnter);
 
+    // A link node is a link for the keyboard too: it takes focus, and Enter
+    // follows it.
+    articleNodesEnter.filter(d => !!d.link)
+      .attr('tabindex', 0)
+      .attr('role', 'link')
+      .attr('data-link-node', '')
+      .attr('aria-label', d => [d.title, d.subtitle, d.description].filter(Boolean).join('. '))
+      .on('keydown', (event, d) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        event.stopPropagation();
+        followLink(d.originalItem || d, { settings: settingsForLinks() });
+      });
+
     articleNodesEnter.each(function(d) {
       const root = createRoot(this);
       reactRoots.set(d.id, { root, wrapper: this, cardSelection: d3.select(this) });
@@ -2668,6 +2690,7 @@ export function GraphViewer({
         // The browser's own double-click (selecting a word) is not wanted.
         event.stopPropagation();
         event.preventDefault();
+        if (d.link) return; // a link node has no reader
         // Usually the two clicks have already been read as a double-tap and
         // opened the reader. A double-click that arrives on its own (from
         // assistive technology, or a browser that sends one for a
@@ -2679,6 +2702,14 @@ export function GraphViewer({
         readCard(d);
       })
       .on('click', (event, d) => {
+        // A link node: a tap anywhere on it, its ↗ included, follows its
+        // link. It never pins and the reader never opens for it.
+        if (d.link) {
+          event.stopPropagation();
+          tapGate.cancel();
+          followLink(d.originalItem || d, { settings: settingsForLinks() });
+          return;
+        }
         const target = event.target;
         const isPopout = target && (target.dataset?.popout === '1' ||
                                     target.closest?.('[data-popout="1"]'));
@@ -3247,8 +3278,12 @@ export function GraphViewer({
           k *= 0.85;
         }
       }
+      // Kept clear of the page's own fixed controls, as a container frame is.
+      const inset = chromeInsets(h);
+      const room = Math.max(50, h - inset.top - inset.bottom);
+      if (room < h) k = Math.max(Math.min(k, k * room / h), MIN_SCALE);
       const tx = w / 2 - centerX * k;
-      const ty = h / 2 - centerY * k;
+      const ty = inset.top + room / 2 - centerY * k;
       const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
       resetRotation({ repaint: false });
       if (animate) {
@@ -3285,7 +3320,9 @@ export function GraphViewer({
       // degenerate (shoved offscreen, over-compressed), saving it here
       // would just lock it in. The reader would never see the fresh fallback
       // layout it would then have to reject.
-      if (!userMovedView && containerExtent()) fitToViewport({ animate: true });
+      // A graph without containers is framed once it has settled too: the
+      // first frame was taken before the cards had moved apart.
+      if (!userMovedView) fitToViewport({ animate: true });
 
       if (layoutIsDegenerate(data.nodes, cardSizeFor({ hovered: false, pinned: false }))) return;
 

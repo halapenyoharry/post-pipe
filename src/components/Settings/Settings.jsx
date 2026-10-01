@@ -5,6 +5,7 @@ import { bookmarkLabel, placedParagraph } from '../../lib/bookmarkPlace';
 import { TTSSettings } from '../TTS/TTS';
 import { config as todConfig } from '../../lib/timeOfDay';
 import { THEMES, themeName } from '../../lib/theme';
+import { isLinkItem } from '../../lib/linkNode';
 
 /**
  * Settings — the panel that slides out from the right edge, from the graph's
@@ -273,6 +274,10 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
   const fields = inUse ? FIELDS.filter((f) => inUse.has(f.key)) : FIELDS;
   const hasContainers = !!(feedData && Array.isArray(feedData.containers) && feedData.containers.length);
   const hasVoice = typeof window !== 'undefined' && !!window.TTS;
+  // A site whose every item is a link node has nothing to read: no groups
+  // about reading (Reading, Listening, Your place).
+  const items = (feedData && feedData.items) || [];
+  const anyReadable = items.length === 0 || items.some((i) => !isLinkItem(i));
 
   const subjectId = subject ? subject.id : null;
   const all = viewState.bookmarks();
@@ -306,7 +311,7 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
               <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close">×</button>
             </div>
 
-            <Section id="reading" title="Reading">
+            {anyReadable && <Section id="reading" title="Reading">
               <div className={styles.fontRow} role="radiogroup" aria-label="Font">
                 {fonts.map((f) => (
                   <button
@@ -367,16 +372,16 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
                   hint="The first part of each word is bold, to lead the eye. The text itself is unchanged."
                 />
               </div>
-            </Section>
+            </Section>}
 
-            {hasVoice && (
+            {anyReadable && hasVoice && (
               <Section id="listening" title="Listening">
                 <TTSSettings />
                 <div className={styles.hint}>Play and pause are in the reader.</div>
               </Section>
             )}
 
-            <Section id="place" title="Your place">
+            {anyReadable && <Section id="place" title="Your place">
               <div className={styles.legend} data-bookmark-legend>
                 <strong>Mark here</strong>, in the reader, saves the paragraph at the top of the
                 reader; a ribbon in the margin shows it, and tapping it again removes it. Each saved
@@ -421,7 +426,7 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
                 </>
               )}
               {all.length === 0 && !subject && <div className={styles.noMarks}>No bookmarks yet.</div>}
-            </Section>
+            </Section>}
 
             <Section id="view" title="View">
               {(() => {

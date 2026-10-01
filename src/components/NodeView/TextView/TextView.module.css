@@ -462,3 +462,62 @@
 :global(html[data-pp-theme="sketchbook"]) .scroll::-webkit-scrollbar-thumb { background: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .resizeGrip { color: var(--sk-ink-soft); }
 :global(html[data-pp-theme="sketchbook"]) .popout { background: var(--sk-card); border-color: var(--sk-line); color: var(--sk-ink); }
+
+/* ─── Link node (kind 'link') ───
+   Title, the line under it and the blurb, top-down, with a ↗ in the corner:
+   a tap follows the link. */
+.linkCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 26px 10px 12px;
+  cursor: pointer;
+}
+
+.linkHover {
+  border-color: var(--nv-accent);
+}
+
+.linkTitle {
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.1;
+  overflow-wrap: break-word;
+}
+
+.linkSubtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.2;
+  font-style: italic;
+}
+
+.linkBlurb {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.32;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.linkOut {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--nv-accent);
+  pointer-events: none;
+}
+
+:global(.node-card[data-link-node]:focus-visible) {
+  outline: 2px solid var(--nv-accent, #64ffda);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+:global(html[data-pp-theme="sketchbook"]) .linkTitle,
+:global(html[data-pp-theme="sketchbook"]) .linkBlurb { color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .linkSubtitle { color: var(--sk-ink-soft, var(--sk-ink)); }
