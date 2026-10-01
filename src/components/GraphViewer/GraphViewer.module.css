@@ -225,3 +225,41 @@
 .graphContainer :global(.root[data-state="seen"] .root-fine) { stroke-width: 0.7px; stroke-opacity: 0.28; }
 .graphContainer :global(.root[data-state="done"] .root-main) { stroke-width: 2.2px; stroke-opacity: 0.62; }
 .graphContainer :global(.root[data-state="done"] .root-fine) { stroke-width: 1.1px; stroke-opacity: 0.45; }
+
+/* Sketchbook theme: pencil on paper. Hulls and edges get a second, lighter
+   pass (.container-hull-ghost, .link-ghost, drawn only in this theme), titles
+   take the handwriting face, and nothing glows. */
+.graphContainer :global(.link-ghost),
+.graphContainer :global(.container-hull-ghost) {
+  display: none;
+  fill: none;
+  pointer-events: none;
+}
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.link-ghost),
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.container-hull-ghost) { display: inline; }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.link-ghost) {
+  stroke-width: 0.9px;
+  stroke-opacity: 0.4;
+  stroke-linecap: round;
+  stroke-dasharray: 34 3 21 2 47 4 12 2;
+}
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.link-sequence) { stroke-opacity: 0.75; stroke-width: 1.4px; }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.container-hull) { fill-opacity: 0.55; }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.container-hull-ghost) {
+  stroke-width: 1px;
+  stroke-opacity: 0.4;
+  stroke-dasharray: 60 4 28 3 90 5;
+}
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.link-sequence-pulse) { filter: none !important; stroke: var(--sk-line) !important; }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.container-badge-text),
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.container-macro-text) {
+  font-family: var(--pp-title-font);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.container-macro-bg) { filter: none !important; }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.node text) { fill: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.edge-label rect) { fill: var(--sk-card); }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.time-spine rect) { fill: var(--pp-panel-bg); }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.time-spine line) { stroke: var(--sk-line); }
+:global(html[data-pp-theme="sketchbook"]) .graphContainer :global(.time-spine text) { fill: var(--sk-ink) !important; }

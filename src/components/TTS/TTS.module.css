@@ -264,3 +264,8 @@
 .paramValue {
   color: var(--pp-panel-muted, rgba(224, 224, 224, 0.55));
 }
+
+/* Sketchbook theme */
+:global(html[data-pp-theme="sketchbook"]) .ttsGroup { --tts-bg: var(--sk-card); --tts-border: var(--sk-line-soft); }
+:global(html[data-pp-theme="sketchbook"]) .tb { color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .params input[type=range] { background: var(--sk-line-soft); }

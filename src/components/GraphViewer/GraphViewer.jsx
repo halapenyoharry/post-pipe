@@ -10,6 +10,7 @@ import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } f
 import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
 import { rootShape, rootPath, rootSegments } from './roots';
+import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
@@ -730,6 +731,15 @@ export function GraphViewer({
       .attr('stroke-width', (d) => d.strokeWidth || 1.5)
       .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
 
+    // The sketchbook theme's second pencil pass round each container.
+    containerGroups.append('path')
+      .attr('class', 'container-hull-ghost')
+      .attr('stroke', (d) => d.stroke || 'rgba(212, 175, 55, 0.45)');
+
+    // Whether the page wears the sketchbook theme: the pencil passes are
+    // drawn only then.
+    let sketchOn = typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-theme') === 'sketchbook';
+
     // Containers closed from the start (settings.graph.initialCollapsed); a
     // reset returns to the same set.
     const initiallyClosed = () => (GS.initialCollapsed === 'all'
@@ -806,11 +816,17 @@ export function GraphViewer({
     const labelMeasureCtx = typeof document !== 'undefined'
       ? document.createElement('canvas').getContext('2d')
       : null;
+    function titleFamily() {
+      if (typeof document === 'undefined') return "'Atkinson', sans-serif";
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--pp-title-font').trim();
+      return v || "'Atkinson', sans-serif";
+    }
     function labelInkWidth(text, fs, weight) {
       // Letter-spacing is 0.05em in the stylesheet; canvas does not apply it.
       const spacing = text.length * fs * 0.05;
       if (!labelMeasureCtx) return text.length * fs * 0.6 + spacing;
-      labelMeasureCtx.font = `${weight} ${fs}px 'Atkinson', sans-serif`;
+      // The face titles are drawn in: the theme's (--pp-title-font), else Atkinson.
+      labelMeasureCtx.font = `${sketchOn ? 400 : weight} ${fs}px ${titleFamily()}`;
       return labelMeasureCtx.measureText(text).width * 1.06 + spacing;
     }
     // The rectangle a container's label occupies at font size fs.
@@ -870,7 +886,33 @@ export function GraphViewer({
       });
     }
     applyLabelContrast();
-    const themeObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(applyLabelContrast) : null;
+    // A change of theme or mode repaints the titles' contrast, and a change
+    // of theme re-measures them (the sketchbook draws them in another face)
+    // and lays the containers out again round them.
+    function onThemeChange() {
+      applyLabelContrast();
+      const now = document.documentElement.getAttribute('data-pp-theme') === 'sketchbook';
+      if (now === sketchOn) return;
+      sketchOn = now;
+      const relayout = () => {
+        if (!positionsReady) return;
+        relayoutContainers();
+        applyPositions();
+      };
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load(`48px ${titleFamily()}`).then(relayout, relayout);
+      } else relayout();
+    }
+    const themeObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(onThemeChange) : null;
+    // Wearing the sketchbook from the start: measure the titles again once
+    // their face has loaded.
+    if (sketchOn && typeof document !== 'undefined' && document.fonts && document.fonts.load) {
+      document.fonts.load(`48px ${titleFamily()}`).then(() => {
+        if (!positionsReady || !svgRef.current) return;
+        relayoutContainers();
+        applyPositions();
+      }, () => {});
+    }
     if (themeObserver) themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-pp-mode', 'data-pp-theme'] });
 
     // Collapsed container macro node (when container is closed, represented like a single node)
@@ -883,7 +925,7 @@ export function GraphViewer({
     // container's color rather than a card, with larger text than a chapter's.
     containerMacroNodes.append('path')
       .attr('class', 'container-macro-bg')
-      .style('fill', (d) => `color-mix(in srgb, ${getContainerColor(d)} 16%, #151826)`)
+      .style('fill', (d) => `color-mix(in srgb, ${getContainerColor(d)} 16%, var(--pp-macro-base, #151826))`)
       .attr('stroke', (d) => getContainerColor(d))
       .attr('stroke-width', 2.2)
       .style('filter', (d) => `drop-shadow(0 0 18px color-mix(in srgb, ${getContainerColor(d)} 45%, transparent))`);
@@ -1357,6 +1399,7 @@ export function GraphViewer({
           containerAnchor.set(c.id, pos);
           group.style('display', null);
           group.select('.container-hull').style('display', 'none');
+          group.select('.container-hull-ghost').attr('d', '');
           group.select('.container-badge').style('display', 'none');
           group.select('.container-macro-node')
             .style('display', null)
@@ -1439,6 +1482,7 @@ export function GraphViewer({
         }
 
         if (points.length === 0) {
+          group.select('.container-hull-ghost').attr('d', '');
           group.select('.container-hull').style('display', 'none');
           group.select('.container-badge').style('display', 'none');
           return;
@@ -1447,6 +1491,7 @@ export function GraphViewer({
         const hull = d3.polygonHull(points);
         if (!hull || hull.length < 3) return;
         group.select('.container-hull').attr('d', hullLine(hull));
+        group.select('.container-hull-ghost').attr('d', sketchOn ? hullLine(jitterPoints(hull, c.id, 3.5)) : '');
 
         const badge = group.select('.container-badge');
         badge.select('.label-count').text(containerCountText(GS, memberNodes.length));
@@ -1494,6 +1539,7 @@ export function GraphViewer({
       nodes.style('display', (d) => (closedHidden.has(d.id) ? 'none' : null));
       const off = (l) => (edgeHidden(l, closedHidden) ? 'none' : null);
       links.style('display', off);
+      linkGhosts.style('display', off);
       linkHits.style('display', off);
       sequencePulses.style('display', off);
       if (edgeLabelFor && edgeHidden(edgeLabelFor, closedHidden)) hideEdgeLabel();
@@ -1749,6 +1795,17 @@ export function GraphViewer({
       .style('stroke', (d) => (d.layer !== 'sequence' ? null : linkColor(d)))
       .style('stroke-opacity', (d) => (d.layer === 'sequence' ? 0.45 : null));
 
+    // The sketchbook theme's second pencil pass along each edge.
+    const linkGhosts = g.selectAll('.link-ghost')
+      .data(data.links)
+      .enter().insert('path', '.link-sequence-pulse')
+      .attr('class', 'link-ghost')
+      .style('stroke', (d) => linkColor(d));
+    const ghostKey = (l) => `${endId(l.source)}>${endId(l.target)}`;
+    function redrawGhosts() {
+      linkGhosts.attr('d', (l) => (sketchOn && l._path ? ghostOf(l._path, ghostKey(l)) : ''));
+    }
+
     // Traveling single bead on sequence rail (matches act color)
     const sequencePulses = g.selectAll('.link-sequence-pulse')
       .data(data.links.filter(d => d.layer === 'sequence'))
@@ -1931,6 +1988,7 @@ export function GraphViewer({
             }
           });
           linkHits.attr('d', (l) => l._path || '');
+          redrawGhosts();
           hideEdgeLabel();
           sequencePulses.each(function(l) {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
@@ -2415,6 +2473,7 @@ export function GraphViewer({
       });
       linkHits.attr('d', (l) => l._path || '');
       sequencePulses.attr('d', (l) => l._path || '');
+      redrawGhosts();
       if (edgeLabelFor) placeEdgeLabel();
     }
     function applyPositions() {

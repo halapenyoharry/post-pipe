@@ -403,3 +403,42 @@
   border: 1px solid color-mix(in srgb, var(--nv-src, var(--nv-accent)) 32%, transparent);
   pointer-events: none;
 }
+
+/* Sketchbook theme: a card is a slip of paper outlined twice in pencil (the
+   outline is drawn by .sketchBorder, so the CSS border steps aside), its
+   title in the handwriting face. */
+.sketchBorder {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+:global(html[data-pp-theme="sketchbook"]) .sketchBorder { display: block; }
+:global(html[data-pp-theme="sketchbook"]) .sketchBorder path { fill: none; stroke: var(--nv-src, var(--sk-line)); stroke-linecap: round; stroke-linejoin: round; }
+:global(html[data-pp-theme="sketchbook"]) .sketchBorder .sketchMain { stroke-width: 1.4px; stroke-opacity: 0.9; }
+:global(html[data-pp-theme="sketchbook"]) .sketchBorder .sketchGhost { stroke-width: 0.8px; stroke-opacity: 0.38; }
+:global(html[data-pp-theme="sketchbook"]) .pinned .sketchBorder .sketchMain { stroke-width: 2.2px; }
+:global(html[data-pp-theme="sketchbook"]) .card {
+  background: var(--sk-card) !important;
+  border-color: transparent !important;
+  box-shadow: 0 1px 2px var(--sk-shadow) !important;
+}
+:global(html[data-pp-theme="sketchbook"]) .glow .titleCentered,
+:global(html[data-pp-theme="sketchbook"]) .glow .titleInline,
+:global(html[data-pp-theme="sketchbook"]) .glow .cardTitle { text-shadow: none; }
+:global(html[data-pp-theme="sketchbook"]) .cardTitle,
+:global(html[data-pp-theme="sketchbook"]) .title,
+:global(html[data-pp-theme="sketchbook"]) .titleScrolling {
+  font-family: var(--pp-title-font);
+  font-weight: 400;
+  color: var(--sk-ink);
+  letter-spacing: 0.01em;
+}
+:global(html[data-pp-theme="sketchbook"]) .cardSubtitle { color: var(--sk-ink-soft); }
+:global(html[data-pp-theme="sketchbook"]) .scroll { color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .scroll::-webkit-scrollbar-thumb { background: var(--sk-line-soft); }
+:global(html[data-pp-theme="sketchbook"]) .resizeGrip { color: var(--sk-ink-soft); }
+:global(html[data-pp-theme="sketchbook"]) .popout { background: var(--sk-card); border-color: var(--sk-line); color: var(--sk-ink); }

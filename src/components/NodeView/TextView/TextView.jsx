@@ -1,4 +1,18 @@
 import React from 'react';
+import { roughRect } from '../../../lib/sketch';
+
+// Pencil outlines by card and size; a card is drawn many times at one size.
+const sketchCache = new Map();
+function sketchFor(id, w, h, r) {
+  const key = `${id}|${Math.round(w)}|${Math.round(h)}|${r}`;
+  let v = sketchCache.get(key);
+  if (!v) {
+    if (sketchCache.size > 400) sketchCache.clear();
+    v = roughRect(w, h, r, id);
+    sketchCache.set(key, v);
+  }
+  return v;
+}
 import styles from './TextView.module.css';
 import { ResizeHandles } from '../ResizeHandles';
 import { numberToLowercaseWords } from '../../../lib/readerHeader';
@@ -101,9 +115,16 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
 
   const showHandles = viewState.lod !== 'marker';
 
+  // The sketchbook theme's pencil outline: generated per card and size, so it
+  // is the same on every frame; hidden by CSS in any other theme.
+  const radius = cardSettings?.cornerRadius != null ? cardSettings.cornerRadius : 10;
+  const isMarker = viewState.lod === 'marker' && !expanded;
+  const sketch = isMarker || !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
+
   return (
     <div
       className={cardClassNames}
+      data-pp-card
       style={{
         width,
         height,
@@ -122,6 +143,12 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {})
       }}
     >
+      {sketch && (
+        <svg className={styles.sketchBorder} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+          <path className={styles.sketchGhost} d={sketch.ghost} />
+          <path className={styles.sketchMain} d={sketch.main} />
+        </svg>
+      )}
       {bookmarkCount > 0 && (
         <div
           className={styles.bookmarkMark}

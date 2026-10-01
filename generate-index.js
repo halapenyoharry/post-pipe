@@ -108,6 +108,32 @@ function copyReaderFonts() {
   }
 }
 
+// Theme faces: the sketchbook's handwriting face for titles, shipped next to
+// the page with its license and loaded only when the theme draws a title.
+const THEME_FONTS = [
+  { family: 'PP Sketch Title', file: 'NothingYouCouldDo-Regular.ttf', license: 'NothingYouCouldDo-OFL.txt', format: 'truetype' },
+];
+function copyThemeFonts() {
+  const dir = path.join(SITE_DIR, 'fonts');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  for (const f of THEME_FONTS) {
+    for (const name of [f.file, f.license]) fs.copyFileSync(path.join(__dirname, 'fonts', name), path.join(dir, name));
+  }
+}
+function themeFontFaces() {
+  return THEME_FONTS.map((f) => `
+  @font-face {
+    font-family: '${f.family}';
+    src: url(./fonts/${f.file}) format('${f.format}');
+    font-weight: normal; font-style: normal; font-display: swap;
+  }`).join('');
+}
+// The site's own theme loads its title face at once rather than on first use.
+function themeFontPreload() {
+  if (!(SETTINGS.theme && SETTINGS.theme.name === 'sketchbook')) return '';
+  return THEME_FONTS.map((f) => `<link rel="preload" href="./fonts/${f.file}" as="font" type="font/ttf" crossorigin>`).join('\n');
+}
+
 function readerFontFaces() {
   return readerFonts(SETTINGS).filter((f) => f.file).map((f) => `
   @font-face {
@@ -229,6 +255,7 @@ ${rightsMeta(SETTINGS.rights)}
 <meta property="og:type" content="website">
 <meta property="og:url" content="${PAGES_BASE}">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+${themeFontPreload()}
 <style>
   @font-face {
     font-family: 'Atkinson';
@@ -241,6 +268,7 @@ ${rightsMeta(SETTINGS.rights)}
     font-weight: bold; font-style: normal;
   }
 ${readerFontFaces()}
+${themeFontFaces()}
 
   :root {
     --bg: ${SETTINGS.theme.bg};
@@ -311,6 +339,25 @@ ${ttsSource}
 window.SETTINGS = ${settingsJSON};
 </script>
 <script>
+// The theme and mode on <html> before anything draws, from the viewer's
+// stored choice or the site's theme and the device (src/lib/theme.js says
+// the same, and keeps it up to date after this).
+(function () {
+  try {
+    var S = window.SETTINGS || {};
+    var st = JSON.parse(localStorage.getItem('post-pipe:viewstate') || 'null') || {};
+    var p = st.prefs || {};
+    var themes = { 'default': ['dark'], sketchbook: ['light', 'dark'] };
+    var name = themes[p.theme] ? p.theme : (S.theme && themes[S.theme.name] ? S.theme.name : 'default');
+    var modes = themes[name];
+    var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
+    var mode = modes.indexOf(p.mode) >= 0 ? p.mode : (modes.length === 1 ? modes[0] : (dark ? 'dark' : 'light'));
+    document.documentElement.setAttribute('data-pp-theme', name);
+    document.documentElement.setAttribute('data-pp-mode', mode);
+  } catch (e) {}
+})();
+</script>
+<script>
 // ── React Components Library ──
 ${reactJs}
 </script>
@@ -322,7 +369,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -483,6 +530,7 @@ ${reactJs}
       if (!hydrated) return null;
 
       return React.createElement(React.Fragment, null,
+        React.createElement(Theme, { settings: window.SETTINGS, viewState: viewState }),
         // The background follows the selected or open piece's time of day
         // (settings.theme.timeOfDay).
         React.createElement(TimeOfDay, {
@@ -620,6 +668,7 @@ async function main() {
     fs.writeFileSync(path.join(SITE_DIR, 'robots.txt'), robots);
   }
   copyReaderFonts();
+  copyThemeFonts();
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
 
   console.log(`Generated _site/feed.json (${feed.items.length} items, ${feed.edges.length} edges)`);

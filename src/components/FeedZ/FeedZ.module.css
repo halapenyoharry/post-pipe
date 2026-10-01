@@ -387,3 +387,7 @@
   color: rgba(224, 224, 224, 0.55);
   line-height: 1.4;
 }
+
+/* Sketchbook theme */
+:global(html[data-pp-theme="sketchbook"]) .pill { background: var(--pp-panel-bg); border-color: var(--sk-line-soft); color: var(--sk-ink); }
+@media (hover: hover) { :global(html[data-pp-theme="sketchbook"]) .pill:hover { background: var(--sk-card); } }

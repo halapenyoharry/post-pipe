@@ -174,3 +174,14 @@
     min-width: 30px;
   }
 }
+
+/* Sketchbook theme: paper chips with pencil edges. */
+:global(html[data-pp-theme="sketchbook"]) .group, :global(html[data-pp-theme="sketchbook"]) .sheet {
+  background: var(--pp-panel-bg);
+  border-color: var(--sk-line-soft);
+  box-shadow: 0 2px 8px var(--sk-shadow);
+}
+:global(html[data-pp-theme="sketchbook"]) .label, :global(html[data-pp-theme="sketchbook"]) .sectionTitle { color: var(--sk-ink-soft); }
+:global(html[data-pp-theme="sketchbook"]) .seg, :global(html[data-pp-theme="sketchbook"]) .icon, :global(html[data-pp-theme="sketchbook"]) .action { color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .action { border-color: var(--sk-line-soft); }
+:global(html[data-pp-theme="sketchbook"]) .on { background: var(--sk-accent-bg); color: var(--sk-ink); }

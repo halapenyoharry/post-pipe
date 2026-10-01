@@ -520,7 +520,97 @@ async function part3(bt, name, size, record) {
   }
 }
 
-const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2, 3: part3 };
+// ── 4. the sketchbook theme ────────────────────────────────────────────────
+const contrastOf = (page, fgSel, bgSel) => page.evaluate(([fgSel, bgSel]) => {
+  const lum = (rgb) => { const [r, g, b] = rgb.map((n) => { const c = n / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const parse = (c) => (c.match(/[\d.]+/g) || []).slice(0, 4).map(Number);
+  const fgEl = document.querySelector(fgSel), bgEl = document.querySelector(bgSel);
+  if (!fgEl || !bgEl) return null;
+  let bg = parse(getComputedStyle(bgEl).backgroundColor);
+  if (bg.length === 4 && bg[3] === 0) bg = parse(getComputedStyle(document.body).backgroundColor);
+  const fg = parse(getComputedStyle(fgEl).color);
+  const a = fg.length === 4 ? fg[3] : 1;
+  const mixed = fg.slice(0, 3).map((n, i) => n * a + bg[i] * (1 - a));
+  const x = lum(mixed), y = lum(bg.slice(0, 3));
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}, [fgSel, bgSel]);
+
+async function part4(bt, name, size, record) {
+  for (const scheme of ['light', 'dark']) {
+    const s = await open(bt, name, size, BASE, { colorScheme: scheme });
+    const { page } = s;
+    try {
+      const look = await page.evaluate(() => {
+        const html = document.documentElement;
+        const after = getComputedStyle(document.body, '::after').backgroundImage;
+        const card = document.querySelector('.node-card [data-pp-card]');
+        const title = card && card.querySelector('[class*="cardTitle"]');
+        return {
+          theme: html.getAttribute('data-pp-theme'), mode: html.getAttribute('data-pp-mode'),
+          paper: getComputedStyle(document.body).backgroundColor,
+          grain: /data:image\/svg\+xml/.test(after) && !/url\(["']?https?:/.test(after),
+          border: !!card && getComputedStyle(card.querySelector('svg[class*="sketchBorder"]')).display !== 'none' && !!card.querySelector('svg[class*="sketchBorder"] path').getAttribute('d'),
+          titleFont: title ? getComputedStyle(title).fontFamily : '',
+          hullGhost: [...document.querySelectorAll('.container-hull-ghost')].filter((p) => p.getAttribute('d')).length,
+          linkGhost: [...document.querySelectorAll('.link-ghost')].filter((p) => p.getAttribute('d')).length,
+        };
+      });
+      const tag = `${scheme} device`;
+      record(`4 the site wears the sketchbook, ${scheme} on a ${tag}`, look.theme === 'sketchbook' && look.mode === scheme, `${look.theme} / ${look.mode}`);
+      record(`4 paper drawn in the page itself (${scheme})`, look.grain, `${look.paper}, grain ${look.grain}`);
+      record(`4 card outlines, hulls and edges in pencil (${scheme})`, look.border && look.hullGhost > 0 && look.linkGhost > 0, `card ${look.border}, ${look.hullGhost} hulls, ${look.linkGhost} edges`);
+      record(`4 titles in the handwriting face (${scheme})`, /PP Sketch Title/.test(look.titleFont), look.titleFont.split(',')[0]);
+      // Stable between frames: the same paths a moment later, and after a pan.
+      const snap = () => page.evaluate(() => [...document.querySelectorAll('.container-hull-ghost, .link-ghost, .node-card svg path')].slice(0, 40).map((p) => p.getAttribute('d')).join('|'));
+      const a1 = await snap();
+      await page.waitForTimeout(800);
+      const a2 = await snap();
+      record(`4 pencil lines are still between frames (${scheme})`, a1 === a2 && a1.length > 0, a1 === a2 ? 'identical' : 'changed');
+      const fontOk = await page.evaluate(async () => { await document.fonts.ready; return document.fonts.check('48px "PP Sketch Title"'); });
+      const lic = await page.evaluate(() => fetch('./fonts/NothingYouCouldDo-OFL.txt').then((r) => r.ok && r.text()).then((t) => !!t && /Open Font License/.test(t)));
+      record(`4 the handwriting face is self-hosted with its license (${scheme})`, fontOk && lic && s.outside.length === 0, `loaded ${fontOk}, license ${lic}, ${s.outside.length} remote requests`);
+      const cardC = await contrastOf(page, '.node-card [class*="cardTitle"]', '.node-card [data-pp-card]');
+      record(`4 card titles at AA on their paper (${scheme})`, cardC >= 4.5, cardC ? cardC.toFixed(2) : 'none');
+      const rightsC = await contrastOf(page, 'body > .pp-rights', 'body');
+      record(`4 the rights line at AA on the paper (${scheme})`, rightsC >= 4.5, rightsC ? rightsC.toFixed(2) : 'none');
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `graph-${scheme}-${size}-${name}.png`) });
+
+      // The reader: same paper, body text in the reading face.
+      await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(FIRST));
+      await page.waitForTimeout(1500);
+      const r = await page.evaluate(() => {
+        const b = document.querySelector('[data-tts-target]');
+        const p = b.querySelector('p');
+        return { body: getComputedStyle(p).fontFamily, title: getComputedStyle(b.querySelector('h1')).fontFamily };
+      });
+      record(`4 the reader's text stays in the reading face, its title handwritten (${scheme})`, !/Sketch/.test(r.body) && /PP Sketch Title/.test(r.title), `${r.body.split(',')[0]} / ${r.title.split(',')[0]}`);
+      const textC = await contrastOf(page, '[data-tts-target] p', '[data-tts-target]');
+      const kickC = await contrastOf(page, '[data-tts-target] [class*="articleKicker"]', '[data-tts-target]');
+      record(`4 reader text at AA (${scheme})`, textC >= 4.5 && (kickC == null || kickC >= 4.5), `text ${textC && textC.toFixed(2)}, line above the title ${kickC && kickC.toFixed(2)}`);
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `reader-${scheme}-${size}-${name}.png`) });
+
+      // The panel chooses the theme and the mode.
+      if (s.phone) await page.tap('[data-reader-settings]'); else await page.click('[data-reader-settings]');
+      await page.waitForTimeout(400);
+      await page.click('[data-choice="theme"] [data-value="default"]');
+      await page.waitForTimeout(500);
+      const def = await page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-pp-theme'), border: getComputedStyle(document.querySelector('.node-card svg[class*="sketchBorder"]')).display }));
+      record(`4 the panel switches back to the default look (${scheme})`, def.theme === 'default' && def.border === 'none', `${def.theme}, pencil ${def.border}`);
+      await page.click('[data-choice="theme"] [data-value="sketchbook"]');
+      await page.waitForTimeout(300);
+      const other = scheme === 'light' ? 'dark' : 'light';
+      await page.click(`[data-choice="mode"] [data-value="${other}"]`);
+      await page.waitForTimeout(400);
+      const m = await page.evaluate(() => document.documentElement.getAttribute('data-pp-mode'));
+      record(`4 the panel picks light or dark (${scheme} → ${other})`, m === other, m);
+      record(`4 no page errors (${scheme})`, s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+    } finally {
+      await s.browser.close();
+    }
+  }
+}
+
+const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2, 3: part3, 4: part4 };
 
 const server = http.createServer((req, res) => handler(req, res, {
   public: SITE,

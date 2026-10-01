@@ -4,6 +4,7 @@ import { readerFonts } from '../../lib/readerSettings';
 import { bookmarkLabel, placedParagraph } from '../../lib/bookmarkPlace';
 import { TTSSettings } from '../TTS/TTS';
 import { config as todConfig } from '../../lib/timeOfDay';
+import { THEMES, themeName } from '../../lib/theme';
 
 /**
  * Settings — the panel that slides out from the right edge, from the graph's
@@ -415,6 +416,34 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
             </Section>
 
             <Section id="view" title="View">
+              {(() => {
+                const S = typeof window !== 'undefined' ? window.SETTINGS : null;
+                const name = themeName(S, viewState.preference('theme'));
+                const modes = THEMES[name].modes;
+                const modePref = viewState.preference('mode');
+                return (<>
+                  <Choice
+                    label="Theme"
+                    name="theme"
+                    options={Object.values(THEMES).map((t) => ({ id: t.id, label: t.label }))}
+                    value={name}
+                    onChange={(v) => viewState.setPreference('theme', v === themeName(S, null) ? null : v)}
+                  />
+                  {modes.length > 1 && (
+                    <Choice
+                      label="Light"
+                      name="mode"
+                      options={[
+                        { id: 'auto', label: 'Auto', title: 'Follow this device' },
+                        { id: 'light', label: 'Light' },
+                        { id: 'dark', label: 'Dark' },
+                      ]}
+                      value={modePref && modes.includes(modePref) ? modePref : 'auto'}
+                      onChange={(v) => viewState.setPreference('mode', v === 'auto' ? null : v)}
+                    />
+                  )}
+                </>);
+              })()}
               {todConfig(typeof window !== 'undefined' ? window.SETTINGS : null) && (
                 <Switch
                   on={viewState.preference('timeOfDay') !== false}

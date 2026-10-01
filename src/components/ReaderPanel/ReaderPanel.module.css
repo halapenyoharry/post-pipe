@@ -988,3 +988,27 @@
 }
 .notYetTitle { font-size: 18px; color: var(--rp-text-bright); }
 .notYetStatus { margin-top: 6px; font-style: italic; color: var(--rp-accent); }
+
+/* Sketchbook theme: the reader is a sheet of the same paper. */
+:global(html[data-pp-theme="sketchbook"]) .panel {
+  --rp-toolbar-bg: var(--sk-card);
+  box-shadow: 0 14px 40px var(--sk-shadow), 0 0 0 1px var(--sk-line-soft);
+}
+:global(html[data-pp-theme="sketchbook"]) .dragGrip { color: var(--sk-ink-soft); }
+:global(html[data-pp-theme="sketchbook"]) .tb { border-color: var(--sk-line-soft); color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .tb:hover, :global(html[data-pp-theme="sketchbook"]) .tb.active { background: var(--sk-accent-bg); border-color: var(--sk-accent); }
+:global(html[data-pp-theme="sketchbook"]) .tbTooltip { background: var(--sk-ink); color: var(--sk-paper); }
+:global(html[data-pp-theme="sketchbook"]) .toolbarSeparator { background: var(--sk-line-soft); }
+:global(html[data-pp-theme="sketchbook"]) .progress, :global(html[data-pp-theme="sketchbook"]) .progressSide { background: var(--sk-line-soft); }
+:global(html[data-pp-theme="sketchbook"]) .articleTitle {
+  font-family: var(--pp-title-font);
+  font-weight: 400;
+  color: var(--sk-ink);
+}
+:global(html[data-pp-theme="sketchbook"]) .frontmatterPanel { background: transparent; }
+:global(html[data-pp-theme="sketchbook"]) .restorePill { background: var(--sk-card); border-color: var(--sk-line); box-shadow: 0 8px 24px var(--sk-shadow); color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) ::highlight(pp-follow-sentence) { background-color: rgba(214, 170, 60, 0.24); }
+:global(html[data-pp-theme="sketchbook"]) ::highlight(pp-follow-word) { background-color: rgba(214, 150, 40, 0.42); }
+:global(html[data-pp-theme="sketchbook"]) .articleKicker, :global(html[data-pp-theme="sketchbook"]) .articleByline { color: var(--sk-accent); }
+:global(html[data-pp-theme="sketchbook"]) .articleMeta, :global(html[data-pp-theme="sketchbook"]) .rightsLine, :global(html[data-pp-theme="sketchbook"]) .noMarks { color: var(--sk-ink-soft); }
+:global(html[data-pp-theme="sketchbook"]) .copyToast { color: var(--sk-paper); }

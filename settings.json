@@ -256,6 +256,8 @@
     "include_further_reading": true
   },
   "theme": {
+    "name": "default",
+    "_name_note": "default (the original dark look) or sketchbook (paper and pencil: warm off-white paper in light mode, graphite paper in dark, hand-drawn hulls, edges and card outlines, titles in a handwriting face shipped as fonts/NothingYouCouldDo-Regular.ttf with its SIL Open Font License). A viewer can choose the other theme, and the sketchbook's light or dark mode (else it follows the device), in the panel.",
     "bg": "#1a1a2e",
     "surface": "#0a0e1a",
     "accent": "#64ffda",

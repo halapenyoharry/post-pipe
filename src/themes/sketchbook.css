@@ -1,0 +1,94 @@
+/* The sketchbook theme: paper and pencil, after Harold's own sketchbook
+   graphs. Chosen by settings.theme.name ('sketchbook') or in the panel, and
+   worn as <html data-pp-theme="sketchbook" data-pp-mode="light|dark">.
+   Warm off-white paper in light mode, graphite paper in dark. Everything
+   here is drawn by the browser: the paper's grain and fibres are SVG noise
+   in data URIs, the pencil lines are generated paths (src/lib/sketch.js), and
+   the one handwriting face, for titles only, ships next to the page with its
+   license (fonts/NothingYouCouldDo-*). Nothing is fetched from elsewhere.
+   Component-specific touches live in each component's own stylesheet, under
+   the same html[data-pp-theme="sketchbook"] selector. */
+
+html[data-pp-theme="sketchbook"] {
+  --pp-title-font: 'PP Sketch Title', 'Atkinson', cursive;
+
+  --sk-paper: #f3ecdc;
+  --sk-card: #fbf7ec;
+  --sk-ink: #2b2722;
+  --sk-ink-soft: #4d463d;
+  --sk-line: #5b554d;
+  --sk-line-soft: rgba(70, 62, 52, 0.38);
+  --sk-accent: #8a4f1d;
+  --sk-accent-bg: rgba(138, 79, 29, 0.1);
+  --sk-shadow: rgba(60, 45, 25, 0.16);
+  --sk-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.24 0 0 0 0 0.2 0 0 0 0 0.15 0 0 0 0.11 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  --sk-fibres: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='500' height='500'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.06' numOctaves='3' seed='9' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.28 0 0 0 0.09 -0.03'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
+
+  --bg: var(--sk-paper);
+  --surface: var(--sk-card);
+  --accent: var(--sk-accent);
+  --text: var(--sk-ink);
+  --text-bright: var(--sk-ink);
+  --border: var(--sk-line-soft);
+  --gv-accent: var(--sk-line);
+
+  --rp-bg: var(--sk-paper);
+  --rp-surface: var(--sk-card);
+  --rp-border: var(--sk-line-soft);
+  --rp-accent: var(--sk-accent);
+  --rp-text: var(--sk-ink);
+  --rp-text-bright: var(--sk-ink);
+  --tts-accent: var(--sk-accent);
+  --tts-text: var(--sk-ink);
+
+  --pp-panel-bg: rgba(251, 247, 236, 0.98);
+  --pp-panel-fg: var(--sk-ink);
+  --pp-panel-muted: var(--sk-ink-soft);
+  --pp-panel-border: var(--sk-line-soft);
+  --pp-panel-field: transparent;
+  --pp-panel-accent: var(--sk-accent);
+  --pp-panel-accent-bg: var(--sk-accent-bg);
+  --pp-panel-shadow: -6px 0 22px var(--sk-shadow);
+
+  --pp-quiet-text: #4d463d;
+  --pp-root-color: #6b5539;
+  --pp-macro-base: var(--sk-card);
+}
+
+html[data-pp-theme="sketchbook"][data-pp-mode="dark"] {
+  --sk-paper: #2a2a2e;
+  --sk-card: #333337;
+  --sk-ink: #ece6da;
+  --sk-ink-soft: #c2bbae;
+  --sk-line: #bdb5a8;
+  --sk-line-soft: rgba(220, 210, 195, 0.32);
+  --sk-accent: #e3b57c;
+  --sk-accent-bg: rgba(227, 181, 124, 0.12);
+  --sk-shadow: rgba(0, 0, 0, 0.4);
+  --sk-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.92 0 0 0 0 0.9 0 0 0 0 0.86 0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  --sk-fibres: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='500' height='500'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.012 0.06' numOctaves='3' seed='9' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.85 0 0 0 0 0.82 0 0 0 0 0.76 0 0 0 0.05 -0.02'/></filter><rect width='100%25' height='100%25' filter='url(%23f)'/></svg>");
+  --pp-panel-bg: rgba(51, 51, 55, 0.98);
+  --pp-quiet-text: #c2bbae;
+  --pp-root-color: #c9b48f;
+}
+
+html[data-pp-theme="sketchbook"] body {
+  background-color: var(--sk-paper);
+  color: var(--sk-ink);
+}
+
+/* The paper's grain and fibres, over the time-of-day light (which sits at
+   the same depth, earlier in the page) and under everything else. */
+html[data-pp-theme="sketchbook"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--sk-fibres), var(--sk-grain);
+  background-size: 500px 500px, 220px 220px;
+}
+
+html[data-pp-theme="sketchbook"] .pp-rights {
+  color: var(--pp-quiet-text);
+}
