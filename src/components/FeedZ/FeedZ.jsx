@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import styles from './FeedZ.module.css';
 import { Icon } from '../Icon/Icon';
+import { Subscribe } from './Subscribe';
 
 /**
  * FeedZ — pill-shaped feed list across a side of the viewport.
@@ -31,6 +32,8 @@ import { Icon } from '../Icon/Icon';
  *   links          — optional; the top bar's links (settings.topBar.links,
  *                    src/lib/topBar.js): after the pages, an icon each that
  *                    goes to its address, its label as its name
+ *   subscribe      — optional; the top bar's email sign-up
+ *                    (settings.topBar.subscribe): after the links
  *   showAddButton  — optional, default true; false leaves out the "+"
  *                    (settings.topBar.addFeed; the embed's addFeed feature)
  *   intro          — optional HTML (settings.graph.intro, rendered at build
@@ -43,7 +46,7 @@ import { Icon } from '../Icon/Icon';
  *                    the first pill's text gives way (an ellipsis; its whole
  *                    text stays its name)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], showAddButton = true, intro = '', controls = null }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, showAddButton = true, intro = '', controls = null }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
@@ -56,7 +59,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) document.fonts.ready.then(run);
     return () => window.removeEventListener('resize', run);
   }, [fit]);
-  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !intro && !controls) return null;
+  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !intro && !controls) return null;
 
   const hidden = hiddenSources || new Set();
 
@@ -103,6 +106,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
           {l.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{l.label}</span>}
         </a>
       ))}
+      {subscribe && <Subscribe config={subscribe} />}
       {showAddButton !== false && <AddPill />}
       {controls}
       {intro && <div className={styles.intro} data-graph-intro dangerouslySetInnerHTML={{ __html: intro }} />}

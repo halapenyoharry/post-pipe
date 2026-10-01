@@ -417,6 +417,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           showAddButton={features.addFeed}
           showCount={showContainerCount(settings.graph)}
           links={topBarConfig(settings).links}
+          subscribe={topBarConfig(settings).subscribe}
           controls={atTop ? graphControls : null}
         />
       )}

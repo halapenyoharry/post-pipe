@@ -13,6 +13,10 @@
 //      its label as its accessible name, and follows its href (the same tab,
 //      or a new one with newTab); a page with an icon and showLabel false
 //      shows the icon alone;
+//   5. topBar.subscribe, against a stubbed route: nothing sent on load; the
+//      sheet opens with the focus in the field; a submit posts the JSON and
+//      the thanks line shows; a 400 with { error } shows that text; Escape
+//      closes it;
 // and no page errors, nothing fetched from elsewhere. Chromium and WebKit,
 // desktop (1280x800) and phone (390x844). The site is checked as built, with
 // toolbar.position set to top where it is not (and to bottom for the
@@ -447,10 +451,74 @@ async function part3(bt, name, size, record) {
   await s.browser.close();
 }
 
+// Part 5's site: a sign-up of its own, posting to a stubbed route.
+const SUB = { action: '/api/t31-subscribe', label: 'notify me', icon: iconBody('check'), placeholder: 'your email', thanks: 'Thanks, you are on the list.', error: 'That did not work.' };
+const SUB_SITE = withSettings((s) => { s.topBar = { ...(s.topBar || {}), subscribe: SUB }; });
+
+async function part5(bt, name, size, record) {
+  const s = await open(bt, name, size, { variant: SUB_SITE });
+  const p = s.page;
+  const posts = [];
+  let reply = { status: 200, body: { success: true } };
+  await s.ctx.route(`${BASE}api/t31-subscribe`, (route) => {
+    const r = route.request();
+    posts.push({ method: r.method(), type: r.headers()['content-type'], body: r.postData() });
+    route.fulfill({ status: reply.status, contentType: 'application/json', body: JSON.stringify(reply.body) });
+  });
+  await p.waitForTimeout(400);
+  record('5 nothing is sent on load', posts.length === 0, `${posts.length} requests`);
+  const btn = await p.evaluate(() => { const b = document.querySelector('[data-top-subscribe]'); return b && { label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg[data-icon]'), h: b.getBoundingClientRect().height }; });
+  record('5 the sign-up is an icon button in the top bar, its label its name', !!btn && btn.label === SUB.label && btn.svg && btn.h === 24, JSON.stringify(btn));
+  await p.click('[data-top-subscribe]');
+  await p.waitForTimeout(250);
+  const sheet = await p.evaluate(() => {
+    const d = document.querySelector('[data-top-subscribe-sheet]');
+    if (!d) return null;
+    const i = d.querySelector('input');
+    const r = d.getBoundingClientRect();
+    const bar = document.querySelector('[data-top-subscribe]').getBoundingClientRect();
+    return { role: d.getAttribute('role'), type: i.type, required: i.required, placeholder: i.placeholder, focus: document.activeElement === i, under: r.top >= bar.bottom, inView: r.left >= 0 && r.right <= innerWidth, submit: d.querySelector('[data-top-subscribe-submit]').textContent };
+  });
+  record('5 the sheet opens under the bar: a dialog, an email field (required, its placeholder) with the focus, the submit reading the label',
+    !!sheet && sheet.role === 'dialog' && sheet.type === 'email' && sheet.required && sheet.placeholder === SUB.placeholder && sheet.focus && sheet.under && sheet.inView && sheet.submit === SUB.label,
+    JSON.stringify(sheet));
+  await p.keyboard.type('reader@example.org');
+  await p.click('[data-top-subscribe-submit]');
+  await p.waitForFunction(() => (document.querySelector('[data-top-subscribe-message]') || {}).textContent, null, { timeout: 4000 }).catch(() => {});
+  const ok = await p.evaluate(() => ({ msg: document.querySelector('[data-top-subscribe-message]').textContent, value: document.querySelector('[data-top-subscribe-sheet] input').value }));
+  const first = posts[0] || {};
+  record('5 a submit posts JSON { email } to the action', posts.length === 1 && first.method === 'POST' && /application\/json/.test(first.type || '') && first.body === JSON.stringify({ email: 'reader@example.org' }),
+    `${posts.length} posts: ${first.method} ${first.type} ${first.body}`);
+  record('5 a 2xx shows the thanks line and clears the field', ok.msg === SUB.thanks && ok.value === '', JSON.stringify(ok));
+  reply = { status: 400, body: { error: 'This email is already on the list.' } };
+  await p.fill('[data-top-subscribe-sheet] input', 'reader@example.org');
+  await p.click('[data-top-subscribe-submit]');
+  await p.waitForFunction(() => /already/.test((document.querySelector('[data-top-subscribe-message]') || {}).textContent || ''), null, { timeout: 4000 }).catch(() => {});
+  const bad = await p.evaluate(() => document.querySelector('[data-top-subscribe-message]').textContent);
+  record('5 a 400 with { error } shows that text', bad === 'This email is already on the list.', bad);
+  reply = { status: 500, body: {} };
+  await p.click('[data-top-subscribe-submit]');
+  await p.waitForFunction((t) => (document.querySelector('[data-top-subscribe-message]') || {}).textContent === t, SUB.error, { timeout: 4000 }).catch(() => {});
+  const plain = await p.evaluate(() => document.querySelector('[data-top-subscribe-message]').textContent);
+  record('5 a reply without its own error shows the site\'s error', plain === SUB.error, plain);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(200);
+  const esc = await p.evaluate(() => ({ open: !!document.querySelector('[data-top-subscribe-sheet]'), reader: location.hash, cover: window.PostPipeCover.state }));
+  record('5 Escape closes the sheet', !esc.open, JSON.stringify(esc));
+  await p.click('[data-top-subscribe]');
+  await p.waitForTimeout(200);
+  await p.mouse.click(s.W / 2, s.H - 100);
+  await p.waitForTimeout(250);
+  record('5 a tap outside closes the sheet', !(await p.$('[data-top-subscribe-sheet]')));
+  record('5 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  await s.browser.close();
+}
+
 async function run(bt, name, size, record) {
   await part1(bt, name, size, record);
   await part2(bt, name, size, record);
   await part3(bt, name, size, record);
+  await part5(bt, name, size, record);
 }
 
 (async () => {

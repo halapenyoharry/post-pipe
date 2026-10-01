@@ -107,6 +107,99 @@
   margin: 0;
 }
 
+/* The email sign-up (settings.topBar.subscribe): its button, and the sheet
+   under the bar. */
+.subscribe {
+  display: inline-flex;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.pillOn {
+  border-color: var(--pp-accent, rgba(255, 255, 255, 0.4));
+}
+
+.subscribeSheet {
+  pointer-events: auto;
+  position: fixed;
+  top: 56px;
+  left: 12px;
+  right: 12px;
+  z-index: 60;
+  max-width: 360px;
+  margin-left: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  background: rgba(17, 24, 39, 0.97);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color: rgba(224, 224, 224, 0.9);
+  font-family: 'Atkinson', sans-serif;
+  font-size: 14px;
+}
+
+.subscribeForm {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.subscribeInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font: inherit;
+  font-size: 16px; /* 16px keeps a phone from zooming in on focus */
+}
+
+.subscribeSubmit {
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--pp-accent, rgba(255, 255, 255, 0.3));
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subscribeSubmit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.subscribeMessage {
+  margin: 8px 2px 0;
+  min-height: 1.3em;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.subscribeMessage:empty {
+  display: none;
+}
+
+.subscribeOk {
+  color: var(--pp-accent, #a8e6cf);
+}
+
+.subscribeError {
+  color: #ff8b94;
+}
+
+:global(html[data-pp-theme="sketchbook"]) .subscribeSheet { background: var(--pp-panel-bg); border-color: var(--sk-line-soft); box-shadow: 0 2px 8px var(--sk-shadow); color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .subscribeInput { border-color: var(--sk-line-soft); background: var(--sk-card); }
+
 /* When the row does not fit, a page or link with an icon shows the icon
    alone (FeedZ fitRow), its label still its name. */
 .bar[data-fit-icons] [data-has-icon] .pageLabel {
