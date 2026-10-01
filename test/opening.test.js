@@ -8,6 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const {
   DEFAULTS, TUNING, openingConfig, startState, coverGeometry, createCover, pageKey,
+  groundConfig,
 } = require('../src/lib/opening');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
 
@@ -373,4 +374,21 @@ test('title: fractions of the canvas to px, at two sizes of the art', () => {
   // On the natural canvas the fractions give the canvas's own px.
   const nat = titleLayout(t.graph, { width: 1045, height: 2111 });
   assert.ok(Math.abs(nat.lines[0].x - 104.5) < 1e-9 && Math.abs(nat.lines[0].y - 1266.6) < 1e-9);
+});
+
+test('ground: dark or paper as before, or a night sky with its gradient and its texture from a height', () => {
+  assert.deepStrictEqual(groundConfig('dark'), { mode: 'dark', sky: null });
+  assert.deepStrictEqual(groundConfig('paper'), { mode: 'paper', sky: null });
+  assert.deepStrictEqual(groundConfig(undefined), { mode: 'dark', sky: null });
+  const sky = groundConfig({ top: '#050505', bottom: '', textureFrom: 0.35 });
+  assert.deepStrictEqual(sky, { mode: 'dark', sky: { top: '#050505', bottom: '', textureFrom: 0.35, colorFrom: 0.35, texture: 1 } });
+  const named = groundConfig({ top: '#000', bottom: '#2a2a2e', textureFrom: 2, colorFrom: 0.2, texture: 9 });
+  assert.equal(named.sky.textureFrom, 1, 'held to the screen');
+  assert.equal(named.sky.colorFrom, 0.2);
+  assert.equal(named.sky.texture, 3, 'held to 3');
+  assert.equal(groundConfig({ top: 'red;}' }).sky.top, '#050505', 'a colour a stylesheet would not take is not used');
+  const c = openingConfig({ opening: { enabled: true, art: { full: 'a.png' }, ground: { top: '#050505' } } });
+  assert.equal(c.ground, 'dark', 'a sky is a dark ground');
+  assert.equal(c.sky.top, '#050505');
+  assert.equal(openingConfig({ opening: { enabled: true, art: { full: 'a.png' } } }).sky, null);
 });

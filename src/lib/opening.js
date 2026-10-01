@@ -119,8 +119,36 @@ const { reachConfig, backdropConfig, backdropOpacity } = require('./reach');
 const num = (v, d) => (v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : d);
 const str = (v) => (typeof v === 'string' ? v : '');
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
+// A colour as a stylesheet takes it (#hex, rgb(), a name, var()), or ''.
+const colour = (v) => (typeof v === 'string' && v.trim() && !/[;{}<>]/.test(v) ? v.trim() : '');
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (x) => { const t = clamp01(x); return t * t * (3 - 2 * t); };
+
+// The art state's ground (opening.ground). 'dark' (the theme's dark paper,
+// and the page kept in dark mode) or 'paper' (the theme's paper), or an
+// object for a night sky: { top, bottom, textureFrom, colorFrom, texture }.
+// The base colour holds at top down to colorFrom (a share of the viewport's
+// height, textureFrom unless set), then runs to bottom at the foot (bottom
+// empty: the theme's dark paper); the paper's grain and fibres are absent
+// above textureFrom and come in toward the foot, where the ground adds its
+// own copy at `texture` strength (so they are stronger low). An object is a
+// dark ground.
+function groundConfig(g) {
+  if (g && typeof g === 'object') {
+    const textureFrom = clamp01(num(g.textureFrom, 0.35));
+    return {
+      mode: g.mode === 'paper' ? 'paper' : 'dark',
+      sky: {
+        top: colour(g.top) || '#050505',
+        bottom: colour(g.bottom),
+        textureFrom,
+        colorFrom: clamp01(num(g.colorFrom, textureFrom)),
+        texture: Math.max(0, Math.min(3, num(g.texture, 1))),
+      },
+    };
+  }
+  return { mode: g === 'paper' ? 'paper' : 'dark', sky: null };
+}
 
 // settings.opening with its defaults, or null when it is off, in another mode,
 // or has no art: artState and graphState, or full alone (one image for both
@@ -139,12 +167,14 @@ function openingConfig(settings) {
   }
   const graph = o.graph && typeof o.graph === 'object' ? o.graph : {};
   const byline = o.byline && typeof o.byline === 'object' ? o.byline : {};
+  const ground = groundConfig(o.ground);
   return {
     enabled: true,
     mode: 'two-state',
     art: { artState, graphState, full },
     alt: str(o.alt),
-    ground: o.ground === 'paper' ? 'paper' : 'dark',
+    ground: ground.mode,
+    sky: ground.sky,
     graph: {
       artOffset: Math.max(0, Math.min(0.95, num(graph.artOffset, DEFAULTS.graph.artOffset))),
     },
@@ -448,5 +478,5 @@ function pageKey(e) {
 
 module.exports = {
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
-  openingConfig, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
+  openingConfig, groundConfig, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
 };

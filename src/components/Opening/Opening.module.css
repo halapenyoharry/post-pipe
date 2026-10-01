@@ -22,6 +22,27 @@
   pointer-events: none;
 }
 
+/* A night-sky ground (opening.ground as an object): its colours are set by
+   Opening.jsx; its own copy of the paper's grain and fibres comes in toward
+   the foot, masked off above textureFrom. */
+.groundTexture {
+  position: absolute;
+  inset: 0;
+  background-image: var(--sk-fibres), var(--sk-grain);
+  background-size: 500px 500px, 220px 220px;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  pointer-events: none;
+}
+
+/* The paper's grain over the whole page (the theme's body::after) is kept
+   off the sky's top in the art state, and comes back over the whole page as
+   the page moves to the graph (--pp-cover-p, 0 at the art, 1 at the graph). */
+:global(html[data-pp-cover-sky] body::after) {
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--pp-cover-p, 1)) 0%, rgba(0, 0, 0, var(--pp-cover-p, 1)) var(--pp-sky-from, 35%), #000 100%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--pp-cover-p, 1)) 0%, rgba(0, 0, 0, var(--pp-cover-p, 1)) var(--pp-sky-from, 35%), #000 100%);
+}
+
 .stage {
   position: absolute;
   inset: 0;

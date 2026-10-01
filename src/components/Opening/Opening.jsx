@@ -219,6 +219,24 @@ function keepMask(keepAbove, part) {
   return { WebkitMaskImage: img, maskImage: img, WebkitMaskSize: '100% 100%', maskSize: '100% 100%', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat' };
 }
 
+// The art state's ground as a night sky (opening.ground as an object): the
+// base colour holds at its top down to colorFrom, then runs to the bottom
+// colour (the theme's dark paper unless named) at the foot.
+function skyStyle(sky) {
+  if (!sky) return undefined;
+  const bottom = sky.bottom || 'var(--sk-paper, var(--bg, #2a2a2e))';
+  return {
+    backgroundColor: sky.top,
+    backgroundImage: `linear-gradient(to bottom, ${sky.top} 0%, ${sky.top} ${(sky.colorFrom * 100).toFixed(1)}%, ${bottom} 100%)`,
+  };
+}
+
+// Absent above `from` (a share of the height), coming in to full at the foot.
+function fromMask(from) {
+  const img = `linear-gradient(to bottom, transparent 0%, transparent ${(from * 100).toFixed(1)}%, #000 100%)`;
+  return { WebkitMaskImage: img, maskImage: img };
+}
+
 function CoverTitle({ title, size, start, refs }) {
   if (!title || !size) return null;
   return (
@@ -405,6 +423,20 @@ function Cover({ config, viewState, children }) {
     const root = document.documentElement;
     root.setAttribute('data-pp-cover-title', '');
     return () => root.removeAttribute('data-pp-cover-title');
+  }, [config]);
+
+  // A night-sky ground: the paper's own grain and fibres, laid over the whole
+  // page, are kept off its top while the art state shows (the stylesheet
+  // masks them with the cover's progress).
+  useEffect(() => {
+    if (!config.sky) return undefined;
+    const root = document.documentElement;
+    root.setAttribute('data-pp-cover-sky', '');
+    root.style.setProperty('--pp-sky-from', `${(config.sky.textureFrom * 100).toFixed(1)}%`);
+    return () => {
+      root.removeAttribute('data-pp-cover-sky');
+      root.style.removeProperty('--pp-sky-from');
+    };
   }, [config]);
 
   // The art's size is known: the whole scrub is the art's move.
@@ -597,7 +629,12 @@ function Cover({ config, viewState, children }) {
   return (
     <>
       <div ref={coverRef} className={styles.cover} data-cover data-ground={config.ground}>
-        <div ref={groundRef} className={styles.ground} style={{ opacity: startArt ? 1 : 0 }} />
+        <div ref={groundRef} className={styles.ground} data-cover-ground data-sky={config.sky ? '' : undefined}
+          style={{ opacity: startArt ? 1 : 0, ...skyStyle(config.sky) }}>
+          {config.sky && config.sky.texture > 0 && (
+            <div className={styles.groundTexture} data-cover-ground-texture style={{ opacity: config.sky.texture, ...fromMask(config.sky.textureFrom) }} />
+          )}
+        </div>
         <div
           ref={stageRef}
           className={styles.stage}
