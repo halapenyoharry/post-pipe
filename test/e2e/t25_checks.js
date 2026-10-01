@@ -226,8 +226,18 @@ async function scrollUp(s) {
   await settle(s.page);
 }
 
-// A card opens on a tap.
+// A card opens on a tap. With every act closed (as a site may start them),
+// one is opened first, so there are cards to tap.
 async function opensCard(s) {
+  await s.page.evaluate(() => {
+    if (document.querySelector('.node-card div[data-card]:not([style*="display: none"])')) return;
+    const visible = [...document.querySelectorAll('.node-card')].some((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 40);
+    if (visible) return;
+    const g = document.querySelector('.container-group .container-macro-node:not([style*="display: none"])');
+    const id = g && g.closest('.container-group').getAttribute('data-container-id');
+    if (id) window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } }));
+  });
+  await s.page.waitForTimeout(900);
   const p = await s.page.evaluate(() => {
     const W = innerWidth, H = innerHeight;
     for (const e of document.querySelectorAll('.node-card')) {
@@ -284,7 +294,10 @@ async function run(bt, name, size, record) {
       const r = await fetch(u); const b = await r.arrayBuffer(); return { u, ok: r.ok, bytes: b.byteLength };
     })), c.imgs.map((i) => i.url));
     const files = c.imgs.map((i) => fs.statSync(path.join(SITE, i.src)).size);
-    record('both state images are the site\'s own files, stacked on one canvas', c.imgs.length === 2 && own.every((o, i) => o.ok && o.u.startsWith(BASE) && o.bytes === files[i]) && c.imgs.every((i) => i.loaded && JSON.stringify(i.box) === JSON.stringify(c.imgs[0].box) && i.natural.join('x') === c.imgs[0].natural.join('x')),
+    // Two state images; the graph state's may be drawn twice (the copy that
+    // keeps the small plant at its own strength, opening.backdrop.keepAbove).
+    const states = new Set(c.imgs.map((i) => i.src));
+    record('both state images are the site\'s own files, stacked on one canvas', states.size === 2 && c.imgs.length === 2 + (c.imgs.some((i) => i.which === 'graph-keep') ? 1 : 0) && own.every((o, i) => o.ok && o.u.startsWith(BASE) && o.bytes === files[i]) && c.imgs.every((i) => i.loaded && JSON.stringify(i.box) === JSON.stringify(c.imgs[0].box) && i.natural.join('x') === c.imgs[0].natural.join('x')),
       c.imgs.map((i, k) => `${i.src} ${i.natural.join('x')} ${own[k].bytes} bytes (file ${files[k]})`).join('; ') + `, both at ${c.imgs[0] && c.imgs[0].box.join(',')}`);
     const b = c.byline;
     record('fresh: the byline under the art, centred, in the title face', !!b && b.text === OPENING.byline.text && b.top >= c.art.bottom - 2 && Math.abs(b.cx - c.W / 2) < 3 && b.opacity === '1' && /PP Sketch Title/.test(b.font),
