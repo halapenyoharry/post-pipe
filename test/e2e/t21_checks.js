@@ -315,6 +315,8 @@ async function part6(bt, name, size, record) {
     record('6 voice and bookmarks live in one place each', !dup.voiceInReader && dup.voiceInPanel && !dup.legendInReader, JSON.stringify(dup));
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
+    const layers = await page.evaluate(() => ({ panel: !!document.querySelector('[data-settings-panel]'), reader: location.hash.startsWith('#read=') }));
+    record('6 Escape closes the panel first and leaves the reader open', !layers.panel && layers.reader, JSON.stringify(layers));
 
     // From the graph it acts on the card last opened there.
     await page.evaluate(() => { history.replaceState(null, '', location.pathname); dispatchEvent(new HashChangeEvent('hashchange')); });

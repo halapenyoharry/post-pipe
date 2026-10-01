@@ -114,7 +114,8 @@ async function readerChecks(bt, name, size, record) {
     await tap(s, '[data-bookmark-list]');
     const legend = await page.evaluate(`${shown('[data-bookmark-legend]')} && document.querySelector('[data-bookmark-legend]').innerText`);
     record('4 one tap shows the bookmark legend', !!legend && /Mark here/.test(legend), legend ? legend.slice(0, 60) + '…' : 'not shown');
-    await tap(s, '[data-bookmark-list]');
+    // The bookmarks list now lives in the settings panel (Your place).
+    await tap(s, '[role="dialog"][aria-label="Settings"] [aria-label="Close"]');
 
     // 5. no download
     const dl = await page.evaluate(() => [...document.querySelectorAll('button, a')]
