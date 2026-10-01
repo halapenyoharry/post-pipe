@@ -6,14 +6,16 @@
 //   3. the graph stays visible in the art state, hanging under the roots with
 //      the acts on their anchors, moving with the art, and a scroll up from
 //      the graph state's top edge returns to the art;
-//   4. containers start as graph.containersStart says, on their anchors;
+//   4. containers start as graph.containersStart says (or, without it, as
+//      graph.initialCollapsed says), on their anchors;
 //      opening keeps an act centred on its anchor, a drag leaves it where it
 //      was dropped (across a reload, and when it opens), Reset returns it;
 //      the other start (open) as a variant;
-//   5. the top bar's page (About) in line with the title pill and the gear in
+//   5. the top bar's page (labelled as the site says) in line with the title pill and the gear in
 //      both states, opening its item in the reader, the item out of the graph;
 //   6. no add-a-feed + in the top bar;
-//   7. the bottom bar's group of dimensions named as the site says;
+//   7. the group of dimensions named as the site says (in the bottom bar, or
+//      the top bar's menu with toolbar.position top);
 // and no page errors, nothing fetched from elsewhere. Chromium and WebKit,
 // desktop (1280x800) and phone (390x844). The leaf contrast is measured on a
 // 390x844 screenshot at an iPhone 13's pixel ratio (3). Screenshots of both
@@ -33,6 +35,7 @@ const { openingConfig } = require('../../src/lib/opening');
 const { artPoint } = require('../../src/lib/reach');
 const { topBarConfig } = require('../../src/lib/topBar');
 const { dimensionGroupLabel } = require('../../src/lib/dimensionLabels');
+const { toolbarConfig } = require('../../src/lib/toolbar');
 
 const SITE = path.resolve(process.argv[2] || path.join(process.env.HOME, 'Projects/epicofelinorjones.com/_site'));
 const PORT = 39460;
@@ -49,7 +52,14 @@ const ACTS = Object.entries(SETTINGS.containers || {})
   .filter(([id, c]) => id.startsWith('container:') && c && c.anchor)
   .map(([id, c]) => ({ id, anchor: c.anchor }));
 const BOOK = (SETTINGS.containment || []).find((c) => !c.parent).id;
-const START = (SETTINGS.graph && SETTINGS.graph.containersStart) || 'closed';
+const START = (SETTINGS.graph && SETTINGS.graph.containersStart) || '';
+// How each act starts, as the site says: graph.containersStart (closed or
+// open) for all of them, or else closed when graph.initialCollapsed names it.
+const startsClosed = (id) => (START === 'closed' ? true : START === 'open' ? false
+  : ((SETTINGS.graph && SETTINGS.graph.initialCollapsed) || []).includes(id));
+const START_TEXT = START || 'as graph.initialCollapsed says';
+// Where the graph's controls are: the bottom bar, or the top bar.
+const AT_TOP = toolbarConfig(SETTINGS).position === 'top';
 const CROWN = 1330 / 2111; // where the stem meets the roots on the cover's canvas
 const PAGE = TOP.pages[0];
 
@@ -342,8 +352,8 @@ async function run(bt, name, size, record) {
     // 3, 4. To the graph: the acts as they start, on their anchors.
     await go(s, 'graph');
     m = await measure(p);
-    const startOk = ACTS.every((a) => m.acts[a.id] && m.acts[a.id].closed === (START === 'closed'));
-    record(`4 fresh: the acts start ${START}, each on its anchor`, startOk && ACTS.every((a) => anchorOff(m, a) <= 2),
+    const startOk = ACTS.every((a) => m.acts[a.id] && m.acts[a.id].closed === startsClosed(a.id));
+    record(`4 fresh: the acts start ${START_TEXT}, each on its anchor`, startOk && ACTS.every((a) => anchorOff(m, a) <= 2),
       ACTS.map((a) => `${a.id.replace('container:', '')} ${m.acts[a.id] && (m.acts[a.id].closed ? 'closed' : 'open')} ${r1(anchorOff(m, a))} px off`).join('; '));
     const tg = await plantTop(p, 'graph');
     const ctrl2 = Math.max(m.pill ? m.pill.bottom : 0, m.gear ? m.gear.bottom : 0, m.page ? m.page.bottom : 0);
@@ -370,7 +380,14 @@ async function run(bt, name, size, record) {
     // 7. The group of dimensions.
     const grp = await p.evaluate(() => [...document.querySelectorAll('[data-group-label]')].map((e) => ({ text: e.textContent, shown: e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none' })));
     let sheet = [];
-    if (s.phone) {
+    if (AT_TOP) {
+      // The controls are in the top bar: the hourglass menu is headed with it.
+      await p.click('[data-top-menu-button]');
+      await p.waitForTimeout(300);
+      sheet = await p.evaluate(() => [...document.querySelectorAll('[data-top-menu] [data-group-label]')].map((e) => e.textContent));
+      await p.keyboard.press('Escape');
+      await p.waitForTimeout(200);
+    } else if (s.phone) {
       await p.click('[data-toolbar-more]', { timeout: 5000 }).catch(async (e) => {
         const why = await p.evaluate(() => { const m = document.querySelector('[data-toolbar-more]'); const r = m.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return `${r.top},${r.height} under ${el && el.outerHTML.slice(0, 120)} reader ${!!document.querySelector('[data-reader-panel]')} hash ${location.hash}`; });
         throw new Error(`More: ${why} ${String(e.message).split('\n')[0]}`);
@@ -381,9 +398,9 @@ async function run(bt, name, size, record) {
       await p.waitForTimeout(200);
     }
     const want = GROUP.charAt(0).toUpperCase() + GROUP.slice(1);
-    record(`7 the bottom bar names the dimensions "${GROUP}"`,
-      s.phone ? sheet.includes(want) : grp.some((g) => g.shown && g.text === GROUP),
-      s.phone ? `More sheet heading: ${sheet.join(', ') || 'none'}` : `bar label: ${grp.filter((g) => g.shown).map((g) => g.text).join(', ') || 'none'}`);
+    record(`7 the ${AT_TOP ? 'top bar\'s menu' : 'bottom bar'} names the dimensions "${GROUP}"`,
+      AT_TOP || s.phone ? sheet.includes(want) : grp.some((g) => g.shown && g.text === GROUP),
+      AT_TOP ? `menu heading: ${sheet.join(', ') || 'none'}` : s.phone ? `More sheet heading: ${sheet.join(', ') || 'none'}` : `bar label: ${grp.filter((g) => g.shown).map((g) => g.text).join(', ') || 'none'}`);
 
     // 4. Open an act: centred on its anchor, and still there once settled.
     const a1 = ACTS.find((a) => /act-1/.test(a.id)) || ACTS[0];
@@ -434,7 +451,7 @@ async function run(bt, name, size, record) {
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1800);
     const rs = await measure(p);
-    record('4 Reset: every act back on its anchor', ACTS.every((a) => anchorOff(rs, a) <= 2 && rs.acts[a.id].closed === (START === 'closed')),
+    record('4 Reset: every act back on its anchor, open or closed as it started', ACTS.every((a) => anchorOff(rs, a) <= 2 && rs.acts[a.id].closed === startsClosed(a.id)),
       ACTS.map((a) => `${r1(anchorOff(rs, a))}`).join(', ') + ' px off');
 
     // 5. The page opens from the graph state too.
@@ -449,17 +466,20 @@ async function run(bt, name, size, record) {
     // 3. Back to the art from the graph state's top edge; the graph stays,
     // following the art down, on its anchors all the way.
     const frames = [];
-    await p.evaluate(() => {
+    // Followed: an act that starts closed (its closed node), or else act 1
+    // (its title, open).
+    const a1def = ACTS.find((a) => startsClosed(a.id)) || ACTS.find((a) => /act-1/.test(a.id)) || ACTS[0];
+    await p.evaluate(({ id, closed }) => {
       window.__t30 = [];
       const tick = () => {
         const art = document.querySelector('[data-cover-art]').getBoundingClientRect();
-        const g = document.querySelector('.container-group[data-container-id="container:act-1"] .container-macro-node');
+        const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"] ${closed ? '.container-macro-node' : '.container-badge'}`);
         const m2 = g ? g.getScreenCTM() : null;
         window.__t30.push({ p: window.PostPipeCover.p, op: Number(getComputedStyle(document.querySelector('[data-graph-root]')).opacity), art: { left: art.left, top: art.top, width: art.width, height: art.height }, c: m2 ? { x: m2.e, y: m2.f } : null });
         if (window.__t30.length < 400) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-    });
+    }, { id: a1def.id, closed: startsClosed(a1def.id) });
     if (s.phone) await touchDrag(p, '[data-cover-handle]', 195, 4, 420);
     else {
       // A wheel up at the top edge, in notches, so the page is seen between.
@@ -470,7 +490,6 @@ async function run(bt, name, size, record) {
     frames.push(...(await p.evaluate(() => window.__t30.filter((f) => f.p > 0.02 && f.p < 0.98))));
     const st = await state(p);
     const back = await measure(p);
-    const a1def = ACTS.find((a) => /act-1/.test(a.id)) || ACTS[0];
     const drift = frames.filter((f) => f.c).map((f) => off(f.c, artPoint(a1def.anchor, f.art)));
     record(`3 a scroll up from the graph state's top edge (${s.phone ? 'a drag down on the grip' : 'a wheel up at the top'}) returns to the art`, st === 'art', `state ${st}`);
     record('3 on the way the graph keeps to the art (an act on its anchor in every frame) and stays visible',
@@ -514,7 +533,7 @@ async function run(bt, name, size, record) {
 
   // ── the other start: open ──
   {
-    const flip = (html) => html.replace(/"containersStart":"[a-z]+"/, '"containersStart":"open"');
+    const flip = (html) => html.replace(/"containersStart":"[a-z]*"/, '"containersStart":"open"');
     const s = await open(bt, name, size, { variant: flip });
     await s.page.evaluate(() => localStorage.clear());
     await go(s, 'graph');

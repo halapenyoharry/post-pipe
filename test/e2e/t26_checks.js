@@ -34,6 +34,7 @@ const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/s
 const OPENING = SETTINGS.opening;
 const TITLE = titleConfig(OPENING.title);
 const ACCENT = accentPalette(SETTINGS);
+const { toolbarConfig } = require('../../src/lib/toolbar');
 const FONT = (SETTINGS.fonts || [])[0];
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
 const SINGLE = process.env.PP_E2E_SINGLE_PROCESS === '1';
@@ -199,11 +200,26 @@ async function run(bt, name, size, record) {
 
     // ── the accent: the bar, the panel, the reader ──
     const want = scheme === 'light' ? ACCENT.light : ACCENT.dark;
+    // With the controls in the top bar (toolbar.position top) the active
+    // control is a row turned on in the hourglass menu.
+    const atTop = toolbarConfig(SETTINGS).position === 'top';
+    if (atTop) {
+      await s.page.click('[data-top-menu-button]');
+      await s.page.waitForTimeout(250);
+      await s.page.click('[data-top-menu] [role="menuitemcheckbox"]');
+      await s.page.waitForTimeout(400);
+    }
     const bar = await s.page.evaluate(() => {
-      const b = document.querySelector('[data-group="layout"] [role="radio"][aria-checked="true"]');
+      const b = document.querySelector('[data-top-menu] [aria-checked="true"]') || document.querySelector('[data-group="layout"] [role="radio"][aria-checked="true"]');
       return b ? { text: b.textContent.trim(), bg: getComputedStyle(b).backgroundColor } : null;
     });
-    record(`${m}: the bar's active pill wears the accent's tint`, !!bar && bar.bg === ACCENT.bg, bar ? `"${bar.text}" ${bar.bg}` : 'no active pill');
+    record(`${m}: the bar's active ${atTop ? 'menu row' : 'pill'} wears the accent's tint`, !!bar && bar.bg === ACCENT.bg, bar ? `"${bar.text}" ${bar.bg}` : 'no active pill');
+    if (atTop) {
+      await s.page.click('[data-top-menu] [aria-checked="true"]');
+      await s.page.waitForTimeout(300);
+      await s.page.keyboard.press('Escape');
+      await s.page.waitForTimeout(200);
+    }
     await s.page.click('[data-settings-gear]');
     await s.page.waitForSelector('[data-settings-panel]');
     await s.page.waitForTimeout(350);

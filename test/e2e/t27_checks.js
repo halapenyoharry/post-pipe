@@ -141,6 +141,13 @@ function gap(r, o) {
   const hit = rayHit(r.start, far, o.pts);
   return hit ? Math.hypot(hit.x - r.end.x, hit.y - r.end.y) : Infinity;
 }
+// How each act starts, as the site says: graph.containersStart (closed or
+// open) for all of them, or else closed when graph.initialCollapsed names it.
+const GSET = SETTINGS.graph || {};
+const startsClosed = (id) => (GSET.containersStart === 'closed' ? true : GSET.containersStart === 'open' ? false
+  : (GSET.initialCollapsed || []).includes(id));
+// An act's centre: its closed node, or its title when it is open.
+const centreOf = (a) => (a ? (a.closed ? a.centre : a.label) : null);
 const off = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const anchorAt = (m, a) => artPoint(a.anchor, m.art);
 const stray = (m) => Math.max(0, ...m.rootlets.map((r) => off(r.end, r.target)));
@@ -221,13 +228,13 @@ async function run(bt, name, size, record) {
     record('fresh: drawn in by drawMs', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && (r.dasharray === 'none' || r.dasharray === '')),
       `${m.rootlets.filter((r) => r.drawn === 'drawn').length} of ${m.rootlets.length} drawn`);
 
-    const anchorOff = ACTS.map((a) => ({ id: a.id, closed: m.acts[a.id] && m.acts[a.id].closed, d: m.acts[a.id] && m.acts[a.id].centre ? off(m.acts[a.id].centre, anchorAt(m, a)) : Infinity }));
-    record('fresh: the closed acts sit on their anchors', anchorOff.every((a) => a.closed && a.d <= 2),
+    const anchorOff = ACTS.map((a) => ({ id: a.id, closed: m.acts[a.id] && m.acts[a.id].closed, d: centreOf(m.acts[a.id]) ? off(centreOf(m.acts[a.id]), anchorAt(m, a)) : Infinity }));
+    record('fresh: the acts start open or closed as the site says, each on its anchor', anchorOff.every((a) => a.closed === startsClosed(a.id) && a.d <= 2),
       anchorOff.map((a) => `${a.id.replace('container:', '')} ${a.closed ? 'closed' : 'open'} ${r1(a.d)} px off`).join(', '));
     record('fresh: the graph rests at the home view', Math.abs(m.k - m.homeK) < 1e-6, `k ${m.k}, homeK ${m.homeK}`);
 
     const counts = ACTS.map((a) => m.rootlets.filter((r) => r.c === a.id).length);
-    record(`rootlets: each act reached from ${REACH.perContainer} tips`, counts.every((c) => c === REACH.perContainer),
+    record(`rootlets: each closed act reached from ${REACH.perContainer} tips, an open one from at least one`, ACTS.every((a, i) => (m.acts[a.id] && m.acts[a.id].closed ? counts[i] === REACH.perContainer : counts[i] >= 1)),
       ACTS.map((a, i) => `${a.id.replace('container:', '')} ${counts[i]} (tips ${m.rootlets.filter((r) => r.c === a.id).map((r) => r.tip).join(',')})`).join('; '));
     const starts = m.rootlets.map((r) => off(r.start, artPoint(REACH.tips[r.tip], m.art)));
     record('rootlets: each starts on its tip on the art', starts.every((d) => d < 0.6), `furthest ${r1(Math.max(...starts))} px`);
@@ -250,7 +257,7 @@ async function run(bt, name, size, record) {
 
     // A drag: the ends lag, then arrive within lagMs + 100 of the act's
     // last move. Timed in the page, frame by frame.
-    const act = ACTS[0];
+    const act = ACTS.find((x) => m.acts[x.id] && m.acts[x.id].closed) || ACTS[0];
     const c0 = m.acts[act.id].centre;
     await p.evaluate((id) => {
       const t0 = performance.now();
@@ -310,7 +317,7 @@ async function run(bt, name, size, record) {
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1300);
     const rs = (await waitSettled(p, 1500)).m;
-    const back = ACTS.map((a) => (rs.acts[a.id] && rs.acts[a.id].centre ? off(rs.acts[a.id].centre, anchorAt(rs, a)) : Infinity));
+    const back = ACTS.map((a) => (centreOf(rs.acts[a.id]) ? off(centreOf(rs.acts[a.id]), anchorAt(rs, a)) : Infinity));
     record('Reset: the acts back on their anchors, the view at home', back.every((d) => d <= 2) && Math.abs(rs.k - rs.homeK) < 1e-6, back.map(r1).join(', ') + ' px off; k ' + rs.k);
 
     // Zoom in: the roots and the rootlets fade to the floor; the plant stays.
@@ -324,8 +331,15 @@ async function run(bt, name, size, record) {
     // Open an act: in place, the rootlets reaching to its hull's near edge.
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1200);
-    const pre = await measure(p);
+    // Act 1, closed first when the site starts it open, so it opens by a tap
+    // as it did when every act started closed.
     const a1 = ACTS.find((a) => /act-1/.test(a.id)) || ACTS[0];
+    if (!(await measure(p)).acts[a1.id].closed) {
+      await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:close-container', { detail: { id } })), a1.id);
+      await p.waitForTimeout(1300);
+      await waitSettled(p, 1500);
+    }
+    const pre = await measure(p);
     await p.mouse.click(pre.acts[a1.id].centre.x, pre.acts[a1.id].centre.y);
     await p.waitForTimeout(1300);
     const op = (await waitSettled(p, 1500)).m;
@@ -350,7 +364,7 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(REACH.drawMs + 200);
     await shot(s, 'closed');
     const m = await measure(p);
-    const a3 = ACTS.find((a) => /act-3/.test(a.id)) || ACTS[ACTS.length - 1];
+    const a3 = ACTS.find((a) => /act-3/.test(a.id) && m.acts[a.id].closed) || ACTS.find((a) => m.acts[a.id].closed) || ACTS[ACTS.length - 1];
     const c0 = m.acts[a3.id].centre;
     await drag(p, c0, { x: 40, y: 30 });
     await p.waitForTimeout(800);
@@ -362,7 +376,7 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(600);
     const r = await measure(p);
     const kept = off(r.acts[a3.id].centre, dragged);
-    const others = ACTS.filter((a) => a.id !== a3.id).map((a) => off(r.acts[a.id].centre, anchorAt(r, a)));
+    const others = ACTS.filter((a) => a.id !== a3.id).map((a) => off(centreOf(r.acts[a.id]), anchorAt(r, a)));
     record('saved positions: a dragged act comes back where the reader left it, the others on their anchors', kept <= 3 && others.every((d) => d <= 3),
       `${a3.id.replace('container:', '')} ${r1(kept)} px from where it was left (${r1(off(dragged, c0))} px from its anchor); others ${others.map(r1).join(', ')} px off`);
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
@@ -383,7 +397,7 @@ async function run(bt, name, size, record) {
     const m = await measure(p);
     record('reduced motion: the rootlets are there at once, not drawn in', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && r.visible && (r.dasharray === 'none' || r.dasharray === '')),
       `${m.rootlets.length} rootlets, ${m.rootlets.filter((r) => r.drawn === 'drawn').length} drawn at once`);
-    const a = ACTS[1] || ACTS[0];
+    const a = ACTS.filter((x) => m.acts[x.id] && m.acts[x.id].closed)[1] || ACTS[1] || ACTS[0];
     await drag(p, m.acts[a.id].centre, { x: -40, y: 25 });
     await p.waitForTimeout(60);
     const j = await measure(p);

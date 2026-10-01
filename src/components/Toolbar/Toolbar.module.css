@@ -300,6 +300,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* A row that is on wears the tint the bottom bar's active pill wears. */
+.menuItem[aria-checked="true"] {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .menuCheck {
   display: inline-flex;
   align-items: center;
@@ -361,3 +366,4 @@
 :global(html[data-pp-theme="sketchbook"]) .menuItem[role="menuitemcheckbox"] .menuCheck { border-color: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .menuDivider, :global(html[data-pp-theme="sketchbook"]) .menuLayout { background: var(--sk-line-soft); border-color: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .menuLayout { background: transparent; }
+:global(html[data-pp-theme="sketchbook"]) .menuItem[aria-checked="true"], :global(html[data-pp-theme="sketchbook"]) .menuSeg.on { background: var(--sk-accent-bg); }

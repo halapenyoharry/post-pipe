@@ -166,10 +166,13 @@ const graphSnapshot = (page) => page.evaluate(() => {
 // of a pixel while the page is idle.
 const xy = (t) => (String(t).match(/-?[\d.]+(e-?\d+)?/g) || []).map(Number);
 const near = (t1, t2) => { const a = xy(t1), b = xy(t2); return a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 0.5); };
+// The same view: the translate to a hundredth of a pixel (float noise, as
+// -5.7e-14 for 0, is the same place), the rotate and scale to a millionth.
+const sameView = (t1, t2) => { const a = xy(t1), b = xy(t2); return a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < (i < 2 ? 0.01 : 1e-6)); };
 const sameGraph = (a, b) => {
   const ids = Object.keys(a.nodes);
   const moved = ids.filter((id) => !near(a.nodes[id], b.nodes[id]));
-  return { ok: a.view === b.view && moved.length === 0 && JSON.stringify(a.open) === JSON.stringify(b.open) && ids.length > 0, moved, n: ids.length };
+  return { ok: sameView(a.view, b.view) && moved.length === 0 && JSON.stringify(a.open) === JSON.stringify(b.open) && ids.length > 0, moved, n: ids.length };
 };
 
 async function tapAt(s, p) {
@@ -375,7 +378,7 @@ async function run(bt, name, size, record) {
     const after = await graphSnapshot(s.page);
     const same = sameGraph(before, after);
     record('down again: the graph exactly as it was (open card, positions, view)', same.ok && sameGraph(before, hidden).ok && (await state(s.page)) === 'graph',
-      `${same.n} nodes, ${same.moved.length} moved, open ${after.open.join(',') || 'none'}, view ${after.view === before.view ? 'same' : 'changed'}`);
+      `${same.n} nodes, ${same.moved.length} moved, open ${after.open.join(',') || 'none'}, view ${sameView(after.view, before.view) ? 'same' : `changed (${before.view} → ${after.view})`}`);
     const artAfter = (await coverInfo(s.page)).art;
     record('down again: the art back where it was', Math.abs(artAfter.top - artBefore.top) < 1, `${Math.round(artBefore.top)} / ${Math.round(artAfter.top)}`);
 
@@ -470,13 +473,21 @@ async function run(bt, name, size, record) {
     await s.browser.close();
   }
 
-  // ── a returning reader lands where they left ──
+  // ── a returning reader lands where they left (startOn remembered), or
+  // where the site says (startOn art or graph) ──
+  const startOn = openingConfig(SETTINGS).startOn;
   for (const left of ['graph', 'art']) {
     const s = await open(bt, name, size, { seed: viewstate({ opening: { state: left, t: 1 } }) });
     const ps = await s.page.evaluate(() => window.__cover.ps.map((x) => x[0]));
-    const want = left === 'graph' ? 1 : 0;
-    record(`returning reader, left on the ${left}: lands there, no animation`, (await state(s.page)) === left && ps.length > 0 && ps.every((p) => p === want), `state ${await state(s.page)}, p ${[...new Set(ps)].join(',')}`);
+    const lands = startOn === 'remembered' ? left : startOn;
+    const want = lands === 'graph' ? 1 : 0;
+    record(`returning reader, left on the ${left}: lands ${startOn === 'remembered' ? 'there' : `on the ${lands} (startOn ${startOn})`}, no animation`, (await state(s.page)) === lands && ps.length > 0 && ps.every((p) => p === want), `state ${await state(s.page)}, p ${[...new Set(ps)].join(',')}`);
     if (left === 'graph') {
+      if (lands !== 'graph') {
+        await s.page.evaluate(() => window.PostPipeCover.go('graph'));
+        await s.page.waitForFunction(() => window.PostPipeCover.state === 'graph', null, { timeout: 4000 }).catch(() => {});
+        await s.page.waitForTimeout(500);
+      }
       const card = await opensCard(s);
       record('returning reader: the graph is interactive', card.ok, card.note);
     }
