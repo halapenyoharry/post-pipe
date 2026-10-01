@@ -2306,6 +2306,9 @@ export function GraphViewer({
           const doc = new DOMParser().parseFromString(html, 'text/html');
           const h1 = doc.querySelector('h1');
           if (h1) h1.remove();
+          // The page's own rights footer is fixed to its window; inside a
+          // card it drew outside the card. The page shows the line once.
+          doc.querySelectorAll('.pp-rights').forEach((el) => el.remove());
           const bodyHtml = doc.querySelector('body')
             ? doc.querySelector('body').innerHTML
             : html;
