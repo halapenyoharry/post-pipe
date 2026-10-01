@@ -41,6 +41,7 @@ import { Toolbar } from './components/Toolbar/Toolbar';
 import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
 import { toolbarConfig } from './lib/toolbar';
+import { topBarConfig } from './lib/topBar';
 import './themes/sketchbook.css';
 
 // ── Default settings (mirrors settings.json structure) ───────────────────────
@@ -415,6 +416,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           viewState={viewState}
           showAddButton={features.addFeed}
           showCount={showContainerCount(settings.graph)}
+          links={topBarConfig(settings).links}
           controls={atTop ? graphControls : null}
         />
       )}

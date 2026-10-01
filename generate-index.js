@@ -684,6 +684,7 @@ ${reactJs}
             viewState: viewState,
             showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false),
             pages: TOP_PAGES,
+            links: TOP_BAR.links,
             showAddButton: TOP_BAR.addFeed,
             intro: window.PP_INTRO_HTML || '',
             controls: TOOLBAR.position === 'top' ? graphControls : null,

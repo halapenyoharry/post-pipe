@@ -9,6 +9,10 @@
 //   2. the grip is the whole top strip: a tap at (20, 8) and a drag down from
 //      the middle of the bar's row each bring the cover back; a tap on a
 //      pill still does the pill's thing;
+//   3. topBar.links and page icons: a link with an icon draws the SVG, has
+//      its label as its accessible name, and follows its href (the same tab,
+//      or a new one with newTab); a page with an icon and showLabel false
+//      shows the icon alone;
 // and no page errors, nothing fetched from elsewhere. Chromium and WebKit,
 // desktop (1280x800) and phone (390x844). The site is checked as built, with
 // toolbar.position set to top where it is not (and to bottom for the
@@ -26,6 +30,7 @@ const handler = require('serve-handler');
 const { chromium, webkit } = require('playwright');
 const { toolbarConfig } = require('../../src/lib/toolbar');
 const { dimensionGroupLabel, dimensionLabels } = require('../../src/lib/dimensionLabels');
+const { iconBody } = require('../../src/lib/icons');
 
 const SITE = path.resolve(process.argv[2] || path.join(process.env.HOME, 'Projects/epicofelinorjones.com/_site'));
 const PORT = 39461;
@@ -395,9 +400,57 @@ async function part2(bt, name, size, record) {
   await s.browser.close();
 }
 
+// Part 3's site: the first page as an icon alone, and two links of its own.
+const ICON = iconBody('check');
+const OUT_URL = 'https://example.org/t31-link';
+const LINKS_SITE = withSettings((s) => {
+  s.topBar = s.topBar || {};
+  s.topBar.pages = (s.topBar.pages || []).map((pg, i) => (i === 0 ? { ...pg, icon: ICON, showLabel: false } : pg));
+  s.topBar.links = [
+    { id: 't31-out', label: 'support the work', href: OUT_URL, icon: ICON, newTab: true },
+    { id: 't31-same', label: 'same tab', href: './?t31=same', icon: ICON },
+  ];
+});
+
+async function part3(bt, name, size, record) {
+  const s = await open(bt, name, size, { variant: LINKS_SITE });
+  const p = s.page;
+  await s.ctx.route(`${OUT_URL}*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>out</title>' }));
+  const pageId = (SETTINGS.topBar && SETTINGS.topBar.pages && SETTINGS.topBar.pages[0]) ? SETTINGS.topBar.pages[0].id : null;
+  const pageLabel = pageId ? (SETTINGS.topBar.pages[0].label || pageId) : null;
+  const seen = await p.evaluate(() => [...document.querySelectorAll('[data-top-link]')].map((a) => ({
+    id: a.getAttribute('data-top-link'), svg: !!a.querySelector('svg[data-icon] path'), h: a.getBoundingClientRect().height,
+    text: a.textContent.trim(), target: a.getAttribute('target'), rel: a.getAttribute('rel'), href: a.getAttribute('href'),
+  })));
+  const out = seen.find((l) => l.id === 't31-out');
+  record('3 a link with an icon draws its SVG at the pills\' height, no text', !!out && out.svg && out.h === 24 && out.text === '', out && `${out.h}px, text "${out.text}"`);
+  const named = await p.getByRole('link', { name: 'support the work', exact: true }).count();
+  record('3 the link\'s label is its accessible name', named === 1, `${named} link named so`);
+  record('3 newTab: target _blank, rel noopener', !!out && out.target === '_blank' && out.rel === 'noopener', out && `${out.target} ${out.rel}`);
+  const [popup] = await Promise.all([s.ctx.waitForEvent('page', { timeout: 5000 }).catch(() => null), p.click('[data-top-link="t31-out"]')]);
+  if (popup) await popup.waitForLoadState().catch(() => {});
+  record('3 a tap follows the link in a new tab', !!popup && popup.url().startsWith(OUT_URL) && p.url().startsWith(BASE), popup ? popup.url() : 'no new tab');
+  if (popup) await popup.close();
+  if (pageId) {
+    const pg = await p.evaluate((id) => {
+      const b = document.querySelector(`[data-top-page="${CSS.escape(id)}"]`);
+      return b && { svg: !!b.querySelector('svg[data-icon] path'), text: b.textContent.trim(), w: b.getBoundingClientRect().width, h: b.getBoundingClientRect().height };
+    }, pageId);
+    const byName = await p.getByRole('button', { name: pageLabel, exact: true }).count();
+    record('3 a page with an icon and showLabel false shows the icon alone, its label its name', !!pg && pg.svg && pg.text === '' && pg.w === 24 && byName === 1,
+      pg && `text "${pg.text}", ${pg.w}x${pg.h}, ${byName} button named "${pageLabel}"`);
+  }
+  await p.click('[data-top-link="t31-same"]');
+  await p.waitForURL(/t31=same/, { timeout: 5000 }).catch(() => {});
+  record('3 a link without newTab follows its href in the same tab', p.url().includes('t31=same'), p.url());
+  record('3 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  await s.browser.close();
+}
+
 async function run(bt, name, size, record) {
   await part1(bt, name, size, record);
   await part2(bt, name, size, record);
+  await part3(bt, name, size, record);
 }
 
 (async () => {

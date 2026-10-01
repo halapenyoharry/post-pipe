@@ -18,9 +18,38 @@ const feed = {
 };
 
 test('settings: pages with an id, a label (the id when none), hideFromGraph only when true', () => {
-  assert.deepStrictEqual(topBarConfig({}), { pages: [], addFeed: true });
+  assert.deepStrictEqual(topBarConfig({}), { pages: [], links: [], addFeed: true });
   assert.deepStrictEqual(topBarConfig({ topBar: { pages: [{ id: 'about', label: 'About', hideFromGraph: true }, { id: ' ' }, null, { id: 'x' }] } }).pages,
-    [{ id: 'about', label: 'About', hideFromGraph: true }, { id: 'x', label: 'x', hideFromGraph: false }]);
+    [{ id: 'about', label: 'About', hideFromGraph: true, icon: '', showLabel: true }, { id: 'x', label: 'x', hideFromGraph: false, icon: '', showLabel: true }]);
+});
+
+const BOOK = '<path d="M12 7v14"/>';
+
+test('settings: a page\'s icon, its label shown unless showLabel is false (and never hidden without an icon)', () => {
+  const [a, b, c] = topBarConfig({ topBar: { pages: [
+    { id: 'a', label: 'about', icon: BOOK },
+    { id: 'b', label: 'about', icon: BOOK, showLabel: false },
+    { id: 'c', label: 'about', showLabel: false },
+  ] } }).pages;
+  assert.deepStrictEqual([a.icon, a.showLabel], [BOOK, true]);
+  assert.deepStrictEqual([b.icon, b.showLabel], [BOOK, false]);
+  assert.deepStrictEqual([c.icon, c.showLabel], ['', true]);
+});
+
+test('settings: links with a label, an address and an icon; a new tab only when asked; the label shown only when asked', () => {
+  const { links } = topBarConfig({ topBar: { links: [
+    { id: 'cup', label: 'buy me a coffee', href: 'https://example.org/give', icon: BOOK, newTab: true },
+    { label: 'site', href: '/about/', showLabel: true, icon: BOOK },
+    { id: 'bare', label: 'bare', href: 'https://example.org' },
+    { id: 'bad', label: 'bad', href: 'javascript:alert(1)' },
+    { id: 'none', label: 'none' },
+    { href: 'https://example.org' },
+  ] } });
+  assert.deepStrictEqual(links, [
+    { id: 'cup', label: 'buy me a coffee', href: 'https://example.org/give', icon: BOOK, newTab: true, showLabel: false },
+    { id: 'link-2', label: 'site', href: '/about/', icon: BOOK, newTab: false, showLabel: true },
+    { id: 'bare', label: 'bare', href: 'https://example.org', icon: '', newTab: false, showLabel: true },
+  ]);
 });
 
 test('a page finds its item by id or by slug, and a page with no item is left out', () => {

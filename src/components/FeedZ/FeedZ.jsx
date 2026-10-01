@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import styles from './FeedZ.module.css';
+import { Icon } from '../Icon/Icon';
 
 /**
  * FeedZ — pill-shaped feed list across a side of the viewport.
@@ -24,7 +25,12 @@ import styles from './FeedZ.module.css';
  *   pages          — optional; the top bar's pages (settings.topBar.pages,
  *                    src/lib/topBar.js resolvePages): a button each, after
  *                    the pills, that opens its item in the reader
+ *                    (each with an optional icon, its label shown beside it
+ *                    unless showLabel is false)
  *   onOpenPage     — (item) => void, for a page's button
+ *   links          — optional; the top bar's links (settings.topBar.links,
+ *                    src/lib/topBar.js): after the pages, an icon each that
+ *                    goes to its address, its label as its name
  *   showAddButton  — optional, default true; false leaves out the "+"
  *                    (settings.topBar.addFeed; the embed's addFeed feature)
  *   intro          — optional HTML (settings.graph.intro, rendered at build
@@ -37,9 +43,10 @@ import styles from './FeedZ.module.css';
  *                    the first pill's text gives way (an ellipsis; its whole
  *                    text stays its name)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, showAddButton = true, intro = '', controls = null }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], showAddButton = true, intro = '', controls = null }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
+  const hasLinks = Array.isArray(links) && links.length > 0;
   const fit = !!controls;
   useLayoutEffect(() => { if (fit && barRef.current) fitRow(barRef.current); });
   useEffect(() => {
@@ -49,7 +56,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) document.fonts.ready.then(run);
     return () => window.removeEventListener('resize', run);
   }, [fit]);
-  if ((!sources || sources.length === 0) && !hasPages && !intro && !controls) return null;
+  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !intro && !controls) return null;
 
   const hidden = hiddenSources || new Set();
 
@@ -69,14 +76,32 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
         <button
           key={pg.id}
           type="button"
-          className={`${styles.pill} ${styles.pagePill}`}
+          className={`${styles.pill} ${styles.pagePill} ${pg.icon && !pg.showLabel ? styles.iconOnly : ''}`}
           data-top-pages
           data-top-page={pg.id}
+          data-has-icon={pg.icon ? '' : undefined}
+          aria-label={pg.icon ? pg.label : undefined}
           title={pg.item && pg.item.title ? pg.item.title : pg.label}
           onClick={() => onOpenPage && onOpenPage(pg.item)}
         >
-          <span className={styles.title}>{pg.label}</span>
+          {pg.icon && <Icon body={pg.icon} size={15} className={styles.pillIcon} />}
+          {pg.showLabel !== false && <span className={`${styles.title} ${styles.pageLabel}`}>{pg.label}</span>}
         </button>
+      ))}
+      {hasLinks && links.map((l) => (
+        <a
+          key={l.id}
+          href={l.href}
+          className={`${styles.pill} ${styles.pagePill} ${styles.linkPill} ${l.icon && !l.showLabel ? styles.iconOnly : ''}`}
+          data-top-link={l.id}
+          data-has-icon={l.icon ? '' : undefined}
+          aria-label={l.label}
+          title={l.label}
+          {...(l.newTab ? { target: '_blank', rel: 'noopener' } : {})}
+        >
+          {l.icon && <Icon body={l.icon} size={15} className={styles.pillIcon} />}
+          {l.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{l.label}</span>}
+        </a>
       ))}
       {showAddButton !== false && <AddPill />}
       {controls}

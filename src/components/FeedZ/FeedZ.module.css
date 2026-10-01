@@ -85,6 +85,42 @@
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+/* A page or link with an icon (settings.topBar): the icon at the pill's
+   height, its label beside it unless the site leaves it off; an icon alone
+   is a round button. */
+.pillIcon {
+  flex-shrink: 0;
+  margin-left: -2px;
+}
+
+.iconOnly {
+  width: 24px;
+  padding: 0;
+  justify-content: center;
+}
+
+.iconOnly .pillIcon {
+  margin: 0;
+}
+
+/* When the row does not fit, a page or link with an icon shows the icon
+   alone (FeedZ fitRow), its label still its name. */
+.bar[data-fit-icons] [data-has-icon] .pageLabel {
+  display: none;
+}
+
+.bar[data-fit-icons] [data-has-icon] {
+  width: 24px;
+  padding: 0;
+  justify-content: center;
+}
+
+.bar[data-fit-icons] [data-has-icon] .pillIcon {
+  margin: 0;
 }
 
 .pill.hidden {
