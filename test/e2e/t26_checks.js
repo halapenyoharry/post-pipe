@@ -95,7 +95,7 @@ const titleInfo = (page) => page.evaluate(() => {
   const cs = getComputedStyle(svg);
   const top = [...document.querySelectorAll('[data-container-top]')].map((b) => ({ vis: getComputedStyle(b).visibility, hit: getComputedStyle(b.querySelector('.container-badge-hit') || b).pointerEvents, text: b.textContent.trim() }));
   return {
-    W: innerWidth, H: innerHeight,
+    W: innerWidth, H: innerHeight, p: window.PostPipeCover ? window.PostPipeCover.p : null,
     art: { left: art.left, top: art.top, width: art.width, height: art.height },
     layouts, family: cs.fontFamily, fill: cs.fill, fillOpacity: cs.fillOpacity,
     loaded: document.fonts.check(`20px "${cs.fontFamily.split(',')[0].replace(/["']/g, '')}"`),
@@ -170,13 +170,13 @@ async function run(bt, name, size, record) {
         el.dispatchEvent(mk('touchmove', 520));
       });
       await s.page.waitForTimeout(120);
-      mid = { p: await s.page.evaluate(() => window.PostPipeCover.p), t: await titleInfo(s.page) };
+      mid = { t: await titleInfo(s.page) }; mid.p = mid.t.p;
       await s.page.evaluate(() => window.__end());
     } else {
       await s.page.mouse.move(640, 400);
       await s.page.mouse.wheel(0, 80);
       await s.page.waitForTimeout(40);
-      mid = { p: await s.page.evaluate(() => window.PostPipeCover.p), t: await titleInfo(s.page) };
+      mid = { t: await titleInfo(s.page) }; mid.p = mid.t.p;
     }
     const fa = mid.t.layouts.art.opacity, fg = mid.t.layouts.graph.opacity;
     record(`${m}: scrub: the two layouts crossfade with the images`, mid.p > 0.03 && mid.p < 0.97 && Math.abs(fa - (1 - mid.p)) < 0.03 && Math.abs(fg - mid.p) < 0.03 && placed(mid.t, 'art').ok,
