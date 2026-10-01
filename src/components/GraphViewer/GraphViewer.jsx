@@ -7,6 +7,7 @@ import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dime
 import { containerLayout } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
+import { closedMemberSet, edgeHidden } from './closedState';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -1378,16 +1379,22 @@ export function GraphViewer({
       });
     }
 
-    // Members of a closed container are not drawn; the container's node is.
+    // Closed means closed: a closed container's members, and every edge with
+    // an end among them, are not drawn and cannot be touched. Only the
+    // container's blob is.
+    let closedHidden = new Set();
     function applyClosedDisplay() {
-      const hiddenSlugs = new Set();
-      for (const cId of closedContainers) {
-        for (const s of getAllMemberSlugs(cId)) hiddenSlugs.add(s);
-      }
+      closedHidden = closedMemberSet(closedContainers, getAllMemberSlugs);
+      for (const d of data.nodes) d._closedHidden = closedHidden.has(d.id);
       if (articleNodes) {
-        articleNodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
+        articleNodes.style('display', (d) => (closedHidden.has(d.id) ? 'none' : null));
       }
-      nodes.style('display', (d) => (hiddenSlugs.has(d.id) ? 'none' : null));
+      nodes.style('display', (d) => (closedHidden.has(d.id) ? 'none' : null));
+      const off = (l) => (edgeHidden(l, closedHidden) ? 'none' : null);
+      links.style('display', off);
+      linkHits.style('display', off);
+      sequencePulses.style('display', off);
+      if (edgeLabelFor && edgeHidden(edgeLabelFor, closedHidden)) hideEdgeLabel();
     }
 
     function applyContainerVisibility() {
@@ -1480,6 +1487,9 @@ export function GraphViewer({
 
       const sid = typeof l.source === 'object' ? l.source.id : l.source;
       const tid = typeof l.target === 'object' ? l.target.id : l.target;
+
+      // An edge touching a closed container's member is not drawn at all.
+      if (edgeHidden(l, closedHidden)) return { x1: 0, y1: 0, x2: 0, y2: 0, hidden: true };
 
       let srcClosed = null;
       let tgtClosed = null;
@@ -2740,6 +2750,8 @@ export function GraphViewer({
     function updateConnectors() {
       const t = d3.zoomTransform(g.svg.node());
       connected.forEach(({ node, anchor, line }) => {
+        // A node inside a closed container has no connector either.
+        line.style('display', node._closedHidden ? 'none' : null);
         const p = g.toScreen ? g.toScreen(node.x, node.y) : t.apply([node.x, node.y]);
         line.attr('x1', anchor.x).attr('y1', anchor.y).attr('x2', p[0]).attr('y2', p[1]);
       });
