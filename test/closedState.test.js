@@ -20,3 +20,21 @@ test('an edge with either end hidden is hidden, whether its ends are ids or node
   assert.strictEqual(edgeHidden({ source: { id: 'a2' }, target: { id: 'b1' } }, hidden), true);
   assert.strictEqual(edgeHidden({ source: 'b1', target: 'x' }, hidden), false);
 });
+
+test('containers start closed or open as the site says, initialCollapsed otherwise', () => {
+  const { initiallyClosed } = require('../src/components/GraphViewer/closedState');
+  const book = [
+    { id: 'container:book', parent: null },
+    { id: 'container:act-1', parent: 'container:book' },
+    { id: 'container:act-2', parent: 'container:book' },
+  ];
+  assert.deepStrictEqual(initiallyClosed(book, { containersStart: 'closed' }), ['container:act-1', 'container:act-2'], 'the acts, not the book');
+  assert.deepStrictEqual(initiallyClosed(book, { containersStart: 'open' }), []);
+  assert.deepStrictEqual(initiallyClosed(book, { containersStart: 'open', initialCollapsed: 'all' }), [], 'containersStart wins');
+  const flat = [{ id: 'a' }, { id: 'b' }];
+  assert.deepStrictEqual(initiallyClosed(flat, { containersStart: 'closed' }), ['a', 'b'], 'none inside another: all of them');
+  assert.deepStrictEqual(initiallyClosed(book, {}), [], 'nothing set: none closed');
+  assert.deepStrictEqual(initiallyClosed(book, { initialCollapsed: 'all' }).length, 3);
+  assert.deepStrictEqual(initiallyClosed(book, { initialCollapsed: ['container:act-2'] }), ['container:act-2']);
+  assert.deepStrictEqual(initiallyClosed(undefined, { containersStart: 'closed' }), []);
+});

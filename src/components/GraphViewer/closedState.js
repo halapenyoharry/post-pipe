@@ -19,4 +19,20 @@ function edgeHidden(edge, hidden) {
   return hidden.has(endId(edge.source)) || hidden.has(endId(edge.target));
 }
 
-module.exports = { closedMemberSet, edgeHidden };
+// The containers closed from the start (and where Reset returns them).
+// graph.containersStart: 'closed' closes every container inside another (a
+// book's acts; every container when none is inside another), 'open' none.
+// Without it, graph.initialCollapsed: 'all' or a list of container ids.
+function initiallyClosed(containers, graph) {
+  const all = containers || [];
+  const G = graph || {};
+  if (G.containersStart === 'open') return [];
+  if (G.containersStart === 'closed') {
+    const inner = all.filter((c) => c.parent);
+    return (inner.length ? inner : all).map((c) => c.id);
+  }
+  if (G.initialCollapsed === 'all') return all.map((c) => c.id);
+  return Array.isArray(G.initialCollapsed) ? G.initialCollapsed.slice() : [];
+}
+
+module.exports = { closedMemberSet, edgeHidden, initiallyClosed };

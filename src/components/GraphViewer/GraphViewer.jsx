@@ -7,7 +7,7 @@ import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dime
 import { containerLayout } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
-import { closedMemberSet, edgeHidden } from './closedState';
+import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
@@ -790,11 +790,9 @@ export function GraphViewer({
     // drawn only then.
     let sketchOn = typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-theme') === 'sketchbook';
 
-    // Containers closed from the start (settings.graph.initialCollapsed); a
-    // reset returns to the same set.
-    const initiallyClosed = () => (GS.initialCollapsed === 'all'
-      ? (feedData.containers || []).map((c) => c.id)
-      : (Array.isArray(GS.initialCollapsed) ? GS.initialCollapsed : []));
+    // Containers closed from the start (graph.containersStart, or else
+    // graph.initialCollapsed; closedState.js); a reset returns to the same set.
+    const initiallyClosed = () => initiallyClosedIds(feedData.containers || [], GS);
     const closedContainers = new Set(initiallyClosed());
     const containerCentroids = new Map();
     // Where each container's title (or, closed, its blob) is drawn: the
@@ -1085,6 +1083,14 @@ export function GraphViewer({
           if (totalMove >= 4) {
             anchorsAuto = false;
             const memberSlugs = getAllMemberSlugs(c.id);
+            // The anchored containers it carried leave their anchors.
+            if (anchoredOffsetsReady) {
+              const carried = new Set(memberSlugs);
+              for (const cId of ANCHORS.keys()) {
+                const own = getAllMemberSlugs(cId);
+                if (own.length && own.every((sl) => carried.has(sl))) detach(cId);
+              }
+            }
             const vs = viewStateRef.current;
             for (const slug of memberSlugs) {
               const node = nodeBySlug.get(slug);
@@ -1279,12 +1285,33 @@ export function GraphViewer({
     // its anchor; they stay there (pinned) until the reader moves them.
     const anchorsPending = new Set(); // fresh: placed when the art is known
     let anchorsAuto = false;          // placed by the layout and not moved since
-    // Saved positions hold an anchored container where the reader left it:
-    // pinned, so nothing pulls it off. One with none saved is fresh.
+    // An anchored container stays pinned to its anchor (the anchor is its
+    // centre, closed or open, through every opening and closing) until the
+    // reader drags it; then it stays where it was dropped, until Reset. The
+    // drag is kept with the reader's arrangement, as the container's own
+    // entry (layout key + its id), so it lasts across visits and Reset,
+    // Forget and Undo take it back with the rest.
+    const detachKey = (cId) => placeOf(layoutRef.current) + cId;
+    const detachedHere = new Set(); // without a store
+    function isDetached(cId) {
+      const vs = viewStateRef.current;
+      if (!vs) return detachedHere.has(cId);
+      const st = vs.nodeState(detachKey(cId));
+      return Boolean(st && !st.auto && Number.isFinite(st.x));
+    }
+    function detach(cId) {
+      const c = centreOf(cId);
+      const vs = viewStateRef.current;
+      if (vs && c) vs.setNodePosition(detachKey(cId), c.x, c.y, { transient: true });
+      else detachedHere.add(cId);
+    }
+    // A dragged container's saved positions hold it where the reader left
+    // it: pinned, so nothing pulls it off. Every other one goes onto its
+    // anchor, its members keeping their arrangement round it.
     for (const cId of ANCHORS.keys()) {
       const vs = viewStateRef.current;
       let saved = false;
-      if (vs && !positionsWereDegenerate) {
+      if (vs && !positionsWereDegenerate && isDetached(cId)) {
         for (const slug of getAllMemberSlugs(cId)) {
           if (anchoredOf.get(slug) !== cId) continue;
           const n = nodeBySlug.get(slug);
@@ -1822,9 +1849,16 @@ export function GraphViewer({
     function relayoutContainers() {
       if (!data.containers || data.containers.length === 0) return;
       const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
-      // An anchored container keeps its centre where it is.
+      // An anchored container keeps its anchor as its centre, or, once the
+      // reader has dragged it, its centre where it is.
       const centres = new Map();
-      if (anchorsOn()) for (const cId of ANCHORS.keys()) { const c = centreOf(cId); if (c) centres.set(cId, c); }
+      if (anchorsOn()) {
+        const targets = anchorTargets();
+        for (const cId of ANCHORS.keys()) {
+          const c = isDetached(cId) ? centreOf(cId) : (targets.get(cId) || centreOf(cId));
+          if (c) centres.set(cId, c);
+        }
+      }
       updateMacroBounds();
       computeContainerLayout();
       refreshContainerForces();
@@ -2911,8 +2945,8 @@ export function GraphViewer({
       // The anchors say where things are; centring the whole on the frame
       // would only drag whatever is not pinned away after the pinned mass.
       simulation.force('center', null);
-      if (anchorsAuto && !userMovedView) { placeAnchors(); applyPositions(); }
-      else if (anchorsPending.size) { placeAnchors([...anchorsPending]); applyPositions(); }
+      const pinned = [...ANCHORS.keys()].filter((cId) => anchorsPending.has(cId) || !isDetached(cId));
+      if (pinned.length) { placeAnchors(pinned); applyPositions(); }
       if (!userMovedView) applyHomeView(false);
     }
     window.addEventListener('postpipe:cover-frame', onCoverFrame);
@@ -3345,6 +3379,7 @@ export function GraphViewer({
       });
       closedContainers.clear();
       for (const id of initiallyClosed()) closedContainers.add(id);
+      detachedHere.clear();
       resetRotation({ repaint: false });
       userMovedView = false;
       focusActive = !!GS.initialFocus && GS.initialFocus !== 'all';
