@@ -6650,15 +6650,28 @@ function vs({ feedData: e, onNodeSelect: n, hiddenSources: i, filteredArticleIds
 				y0: r.y + t.box.y0,
 				x1: r.x + t.box.x1,
 				y1: r.y + t.box.y1
-			}, a = z.containers.get(t.root), o = a && kt(t.root);
+			}, a = z.containers.get(t.root), o = a && kt(t.root), s = o ? {
+				x0: o.x + a.box.x0,
+				y0: o.y + a.box.y0,
+				x1: o.x + a.box.x1,
+				y1: o.y + a.box.y1
+			} : null, c = (e, t) => {
+				if (!e) return e;
+				let n = { ...e };
+				for (let e of Ue(t)) {
+					let t = R.get(e);
+					if (!t || t.type !== "article" || t._closedHidden || !Number.isFinite(t.x) || !Number.isFinite(t.y)) continue;
+					let r = t._size || ee({
+						hovered: !1,
+						pinned: F.current.has(t.id)
+					});
+					n.x0 = Math.min(n.x0, t.x - r.width / 2), n.x1 = Math.max(n.x1, t.x + r.width / 2), n.y0 = Math.min(n.y0, t.y - r.height / 2), n.y1 = Math.max(n.y1, t.y + r.height / 2);
+				}
+				return n;
+			};
 			return {
-				box: i,
-				root: o ? {
-					x0: o.x + a.box.x0,
-					y0: o.y + a.box.y0,
-					x1: o.x + a.box.x1,
-					y1: o.y + a.box.y1
-				} : null
+				box: c(i, e),
+				root: c(s, t.root)
 			};
 		}
 		function cr(e) {
