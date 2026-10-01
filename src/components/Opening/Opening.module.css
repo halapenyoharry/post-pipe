@@ -212,16 +212,4 @@ html[data-pp-cover="graph"] .stage {
 }
 
 /* The panel's gear sits outside the graph layer (the reader opens the panel
-   too): it follows the layer in and out. */
-:global(html[data-pp-cover] [data-settings-gear]) {
-  opacity: var(--pp-cover-p, 1);
-}
-
-:global(html[data-pp-cover="moving"] [data-settings-gear]) {
-  pointer-events: none;
-}
-
-:global(html[data-pp-cover="art"] [data-settings-gear]) {
-  pointer-events: none;
-  visibility: hidden;
-}
+   too). Like the top bar inside the layer, it stays in both states. */

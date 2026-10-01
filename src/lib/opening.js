@@ -22,7 +22,7 @@ const DEFAULTS = {
   art: { artState: '', graphState: '', full: '' },
   alt: '',
   ground: 'dark',
-  graph: { artOffset: 0.33 },
+  graph: { artOffset: 0.33, artStateOpacity: 0.6 },
   top: null,
   backdrop: { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 },
   reach: { enabled: false, tips: [], perContainer: 3, stopShort: 18, lagMs: 600, drawMs: 1800 },
@@ -202,6 +202,7 @@ function openingConfig(settings) {
     sky: ground.sky,
     graph: {
       artOffset: Math.max(0, Math.min(0.95, num(graph.artOffset, DEFAULTS.graph.artOffset))),
+      artStateOpacity: clamp01(num(graph.artStateOpacity, DEFAULTS.graph.artStateOpacity)),
     },
     top: topConfig(o.top),
     backdrop: backdropConfig(o),
@@ -241,7 +242,11 @@ function startState(config, { stored, hash } = {}) {
 //   artTop0, artTop1   its top at the two rests (artTop1 = -artOffset of its
 //               height, or from opening.top.graph)
 //   travel      px the art moves between the rests (a whole scrub)
-//   graph       { opacity, shift }: the graph layer, shift px below its rest
+//   graph       { opacity, shift }: the graph's controls (the bottom bar and
+//               the like), coming in over the art, shift px below their rest
+//   layer       { opacity, follow }: the graph itself, which hangs from the
+//               roots in both states: follow px below its graph-state place
+//               (it moves with the art), at graph.artStateOpacity at the art
 //   ground      the art state's ground's opacity (1 at art, 0 at graph)
 //   byline      { x, y, size, opacity }: (x, y) is the centre of its top
 function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null } = {}, p = 0) {
@@ -282,6 +287,13 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
     artTop0, artTop1,
     travel: Math.max(1, artTop0 - artTop1),
     graph: { opacity: show, shift: (1 - show) * T.rise * vh },
+    // The graph itself is never hidden: it hangs from the roots in both
+    // states, moved with the art (follow: px below where it rests in the
+    // graph state) and at artStateOpacity in the art state.
+    layer: {
+      opacity: lerp(num(g.artStateOpacity, DEFAULTS.graph.artStateOpacity), 1, t),
+      follow: top - artTop1,
+    },
     ground: 1 - t,
     byline: {
       x: vw / 2,

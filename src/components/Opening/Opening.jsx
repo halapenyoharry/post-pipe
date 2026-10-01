@@ -76,17 +76,15 @@ function loadInkTop(src) {
 }
 
 // The bottom edge of the page's own controls along the top (the source
-// pills, the top bar's pages, the settings gear), where they rest, or 0
-// without them. Those inside the graph layer are measured less the layer's
-// own shift (it is drawn lower while the page moves).
-function topControls(vh, shift = 0) {
+// pills, the top bar's pages, the settings gear), or 0 without them. They
+// stay where they are in both states.
+function topControls(vh) {
   if (typeof document === 'undefined') return 0;
   let bottom = 0;
   for (const el of document.querySelectorAll('[data-feeds] > *, [data-top-pages], [data-settings-gear]')) {
     const r = el.getBoundingClientRect();
-    const dy = el.closest('[data-cover-section]') ? shift : 0;
-    if (!r.width || !r.height || r.top - dy > vh * 0.2) continue;
-    bottom = Math.max(bottom, r.bottom - dy);
+    if (!r.width || !r.height || r.top > vh * 0.2) continue;
+    bottom = Math.max(bottom, r.bottom);
   }
   return bottom;
 }
@@ -370,7 +368,7 @@ function Cover({ config, viewState, children }) {
     if (!reach || !sizeRef.current) return;
     const zoomed = zoomRef.current ? backdropOpacity(config.backdrop, zoomRef.current.k, zoomRef.current.homeK) : config.backdrop.opacity;
     const moving = reach.draw(performance.now(), {
-      box: g.art, world, opacity: g.graph.opacity * zoomed, settledCover: m.p >= 1 && !m.moving,
+      box: g.art, world, opacity: g.layer.opacity * zoomed, settledCover: m.p >= 1 && !m.moving,
     });
     if (moving) requestFrame();
   };
@@ -444,15 +442,25 @@ function Cover({ config, viewState, children }) {
     const sec = sectionRef.current;
     if (sec) {
       const atRest = label === 'graph';
-      shiftRef.current = atRest ? 0 : g.graph.shift;
-      // At the graph rest the layer carries no opacity or transform, so it
-      // makes no stacking context and the controls inside it sit as before.
-      sec.style.opacity = atRest ? '' : String(g.graph.opacity);
-      sec.style.transform = atRest ? '' : `translate3d(0, ${g.graph.shift}px, 0)`;
+      shiftRef.current = atRest ? 0 : g.layer.follow;
+      // The layer itself carries no opacity or transform, so it makes no
+      // stacking context and the controls inside it sit as before; at the
+      // graph rest nothing in it carries any. Away from it: the top bar
+      // stays as it is, in both states; the graph hangs from the roots,
+      // moved with the art, at its art-state strength; the other controls
+      // fade out below. Only the top bar takes taps until the graph rests.
       sec.style.pointerEvents = atRest ? '' : 'none';
-      sec.inert = label === 'art';
-      if (label === 'art') sec.setAttribute('aria-hidden', 'true');
-      else sec.removeAttribute('aria-hidden');
+      for (const el of sec.children) {
+        if (el.matches('[data-feeds], [data-top-bar]')) continue;
+        const graph = el.matches('[data-graph-root]');
+        el.style.opacity = atRest ? '' : String(graph ? g.layer.opacity : g.graph.opacity);
+        el.style.transform = atRest ? '' : (graph
+          ? `translate3d(0, ${g.layer.follow}px, 0)`
+          : `translate3d(0, ${g.graph.shift}px, 0)`);
+        el.inert = label === 'art';
+        if (label === 'art') el.setAttribute('aria-hidden', 'true');
+        else el.removeAttribute('aria-hidden');
+      }
     }
     const h = handleRef.current;
     if (h) {
@@ -492,7 +500,7 @@ function Cover({ config, viewState, children }) {
   useLayoutEffect(() => {
     if (!art) return;
     sizeRef.current = art;
-    controlsRef.current = config.top ? topControls(window.innerHeight, shiftRef.current) : 0;
+    controlsRef.current = config.top ? topControls(window.innerHeight) : 0;
     const m = machineRef.current;
     if (m) {
       m.resize(geometry(0).travel);
@@ -503,7 +511,7 @@ function Cover({ config, viewState, children }) {
     let live = true;
     if (config.top && document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        const c = topControls(window.innerHeight, shiftRef.current);
+        const c = topControls(window.innerHeight);
         if (!live || Math.abs(c - controlsRef.current) < 0.5) return;
         controlsRef.current = c;
         const mm = machineRef.current;
@@ -557,8 +565,12 @@ function Cover({ config, viewState, children }) {
             const o = el ? Number(getComputedStyle(el).opacity) : 0;
             if (o > 0.02 && Date.now() - t0 < half * 4) { fadeTimer = setTimeout(outOfSight, 16); return; }
             paintRef.current(p);
-            if (el) el.style.opacity = '1';
-            fadeTimer = setTimeout(() => { for (const x of els) x.style.transition = ''; fadeTimer = null; }, half + 20);
+            for (const x of els) x.style.opacity = '1';
+            fadeTimer = setTimeout(() => {
+              for (const x of els) x.style.transition = '';
+              if (sectionRef.current) sectionRef.current.style.opacity = '';
+              fadeTimer = null;
+            }, half + 20);
           };
           fadeTimer = setTimeout(outOfSight, half);
           return;
@@ -590,7 +602,7 @@ function Cover({ config, viewState, children }) {
     };
 
     const onResize = () => {
-      if (config.top) controlsRef.current = topControls(window.innerHeight, shiftRef.current);
+      if (config.top) controlsRef.current = topControls(window.innerHeight);
       machine.resize(geometry(0).travel);
       paintRef.current(machine.p);
       publishFrameRef.current();
@@ -753,7 +765,7 @@ function Cover({ config, viewState, children }) {
         ref={sectionRef}
         className={styles.section}
         data-cover-section
-        style={startArt ? { opacity: 0, pointerEvents: 'none' } : undefined}
+        style={startArt ? { pointerEvents: 'none' } : undefined}
       >
         {children}
       </div>

@@ -76,7 +76,7 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.ok(onlyFull, 'full alone is enough');
   assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png' }, 'full stands for both states');
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
-  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33 });
+  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6 });
   assert.deepStrictEqual(onlyFull.backdrop, { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 });
   assert.equal(onlyFull.reach, null, 'no reach unless it is on and names tips');
   assert.equal(onlyFull.ground, 'dark');
@@ -428,4 +428,22 @@ test('top: the plant comes up to a margin under the top controls in each state, 
   const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48 };
   assert.deepStrictEqual(coverGeometry({ ...base, top: null }, view, 1).art, coverGeometry(base, view, 1).art);
   assert.equal(coverGeometry(c, view, 1).art.top, -0.33 * coverGeometry(c, view, 1).art.height, 'no ink for the graph state: artOffset');
+});
+
+test('the graph hangs from the roots in both states: moved with the art, at artStateOpacity in the art state', () => {
+  const c = openingConfig(SITE);
+  const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100 };
+  const a = coverGeometry(c, view, 0);
+  const g = coverGeometry(c, view, 1);
+  assert.equal(a.layer.opacity, 0.6, 'visible in the art state');
+  assert.equal(g.layer.opacity, 1);
+  assert.equal(g.layer.follow, 0, 'at its own place in the graph state');
+  assert.ok(Math.abs(a.layer.follow - a.travel) < 1e-9, 'moved down with the art in the art state');
+  for (let i = 0; i <= 10; i += 1) {
+    const m = coverGeometry(c, view, i / 10);
+    assert.ok(Math.abs(m.layer.follow - (m.art.top - g.art.top)) < 1e-9, 'it keeps its place on the art all the way');
+  }
+  const odd = openingConfig({ opening: { ...SITE.opening, graph: { artOffset: 0.33, artStateOpacity: 4 } } });
+  assert.equal(odd.graph.artStateOpacity, 1);
+  assert.equal(coverGeometry(openingConfig({ opening: { ...SITE.opening, graph: { artStateOpacity: 0.35 } } }), view, 0).layer.opacity, 0.35);
 });
