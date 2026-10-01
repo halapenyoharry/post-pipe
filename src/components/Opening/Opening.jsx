@@ -191,7 +191,12 @@ function Cover({ config, viewState, children }) {
       },
       onRest(state) {
         paintRef.current(machine.p);
-        if (viewState && viewState.setOpeningState) viewState.setOpeningState(state);
+        // Written at once, not after the usual pause, so a reader who leaves
+        // straight after a move still lands there next time.
+        if (viewState && viewState.setOpeningState) {
+          viewState.setOpeningState(state);
+          if (viewState.flush) viewState.flush();
+        }
         window.dispatchEvent(new CustomEvent('postpipe:cover', { detail: { state } }));
       },
     });
