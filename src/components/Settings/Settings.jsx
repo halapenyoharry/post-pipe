@@ -244,14 +244,20 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
+    // Escape closes the panel first, and only the panel: caught before the
+    // page's own Escape (which closes the reader under it).
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      setOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
     if (wantSection.current && panelRef.current) {
       const el = panelRef.current.querySelector(`[data-section="${wantSection.current}"]`);
       if (el) panelRef.current.scrollTop = el.offsetTop - 8;
       wantSection.current = null;
     }
-    return () => window.removeEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [open]);
 
   if (!viewState) return null;
