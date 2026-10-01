@@ -212,6 +212,19 @@ function topConfig(t) {
   return art === null && graph === null ? null : { art, graph };
 }
 
+// The grip that brings the cover back, in the graph state: the whole top
+// strip, from the screen's top to the bottom of the top bar's row (the
+// controls in it keep their taps) and extra px below it (default 16).
+function gripConfig(g) {
+  const v = g && typeof g === 'object' ? g.extra : undefined;
+  const extra = v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? 16 : Math.max(0, Number(v));
+  return { extra };
+}
+
+// How tall the grip is: down to the bottom of the top bar's row (0 without
+// one) and extra below it, and never less than the slim strip it was.
+const gripHeight = (rowBottom, grip) => Math.max(12, Math.ceil((Number(rowBottom) || 0) + ((grip && grip.extra) ?? 16)));
+
 // The first row, as a share of the image's height, where the image has ink:
 // any pixel at least `threshold` opaque (0..255). Rows of RGBA bytes, w x h.
 // 0 for an image with ink on its first row, 1 for one with none.
@@ -253,6 +266,7 @@ function openingConfig(settings) {
       artStateOpacity: clamp01(num(graph.artStateOpacity, DEFAULTS.graph.artStateOpacity)),
     },
     top: topConfig(o.top),
+    grip: gripConfig(o.grip),
     backdrop: backdropConfig(o),
     reach: reachConfig(o),
     byline: bylineConfig(o.byline),
@@ -605,5 +619,5 @@ function pageKey(e) {
 
 module.exports = {
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
-  openingConfig, bylineConfig, bylineText, groundConfig, topConfig, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
+  openingConfig, bylineConfig, bylineText, groundConfig, topConfig, gripConfig, gripHeight, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
 };

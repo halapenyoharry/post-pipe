@@ -6,6 +6,9 @@
 //      drag, Escape and a tap outside close it; no emoji in the bar; the
 //      graph's visible height on a phone with the bar at the bottom and at
 //      the top;
+//   2. the grip is the whole top strip: a tap at (20, 8) and a drag down from
+//      the middle of the bar's row each bring the cover back; a tap on a
+//      pill still does the pill's thing;
 // and no page errors, nothing fetched from elsewhere. Chromium and WebKit,
 // desktop (1280x800) and phone (390x844). The site is checked as built, with
 // toolbar.position set to top where it is not (and to bottom for the
@@ -108,6 +111,17 @@ function touchEvents() {
       return ev;
     }
   };
+}
+async function touchDrag(page, selector, x, y0, y1, steps = 8) {
+  await page.evaluate(async ({ selector, x, y0, y1, steps }) => {
+    const el = document.querySelector(selector);
+    el.dispatchEvent(window.__touchEvent('touchstart', el, x, y0));
+    for (let i = 1; i <= steps; i += 1) {
+      await new Promise((r) => setTimeout(r, 30));
+      el.dispatchEvent(window.__touchEvent('touchmove', el, x, y0 + ((y1 - y0) * i) / steps));
+    }
+    el.dispatchEvent(window.__touchEvent('touchend', el, x, y1, true));
+  }, { selector, x, y0, y1, steps });
 }
 async function drag(page, from, by, steps = 8) {
   await page.mouse.move(from.x, from.y);
@@ -319,8 +333,71 @@ async function part1(bt, name, size, record) {
   }
 }
 
+async function part2(bt, name, size, record) {
+  const s = await open(bt, name, size);
+  const p = s.page;
+  await go(s, 'graph');
+  const strip = await p.evaluate(() => {
+    const h = document.querySelector('[data-cover-handle]').getBoundingClientRect();
+    let row = 0;
+    for (const el of document.querySelectorAll('[data-feeds] > *:not([data-graph-intro]), [data-settings-gear]')) {
+      const r = el.getBoundingClientRect();
+      if (r.width && r.top < innerHeight * 0.2) row = Math.max(row, r.bottom);
+    }
+    const grip = document.querySelector('[data-cover-handle] > span').getBoundingClientRect();
+    return { left: h.left, top: h.top, w: h.width, h: h.height, row, gripX: grip.left + grip.width / 2, gripY: grip.top };
+  });
+  record('2 the grip spans the width, from the top to 16 px under the bar\'s row',
+    strip.left === 0 && Math.abs(strip.w - s.W) <= 0.5 && strip.top === 0 && Math.abs(strip.h - (Math.ceil(strip.row) + 16)) <= 1,
+    `${r1(strip.w)} x ${r1(strip.h)} px, row ends at ${r1(strip.row)}`);
+  record('2 the grip mark stays at the top centre', Math.abs(strip.gripX - s.W / 2) <= 1 && strip.gripY <= 6, `mark at ${r1(strip.gripX)}, ${r1(strip.gripY)}`);
+
+  // A tap at 20 px from the left, 8 from the top.
+  await tapAt(s, { x: 20, y: 8 });
+  await settle(p);
+  record('2 a tap at (20, 8) brings the cover back', (await state(p)) === 'art', await state(p));
+  await go(s, 'graph');
+
+  // A drag down from the middle of the bar's row, in a gap between controls.
+  const at = await p.evaluate(() => {
+    const feeds = document.querySelector('[data-feeds] > *');
+    const y = feeds ? feeds.getBoundingClientRect().top + feeds.getBoundingClientRect().height / 2 : 24;
+    const W = innerWidth;
+    for (let d = 0; d < W / 2; d += 2) {
+      for (const x of [W / 2 + d, W / 2 - d]) {
+        const e = document.elementFromPoint(x, y);
+        if (e && e.closest('[data-cover-handle]')) return { x, y };
+      }
+    }
+    return null;
+  });
+  if (at) {
+    if (s.phone) await touchDrag(p, '[data-cover-handle]', at.x, at.y, at.y + 320, 10);
+    else await drag(p, at, { x: 0, y: 320 }, 10);
+    await settle(p);
+  }
+  record('2 a drag down from the middle of the bar\'s row brings the cover back', !!at && (await state(p)) === 'art', at ? `from (${r1(at.x)}, ${r1(at.y)}): ${await state(p)}` : 'no gap in the row');
+  await go(s, 'graph');
+
+  // A tap on a pill still does the pill's thing.
+  const pill = await p.evaluate(() => {
+    const el = document.querySelector('[data-top-pages]') || document.querySelector('[data-source-pill]');
+    const r = el.getBoundingClientRect();
+    return { x: r.left + Math.min(16, r.width / 2), y: r.top + r.height / 2, page: el.matches('[data-top-pages]') };
+  });
+  await tapAt(s, pill);
+  await p.waitForTimeout(600);
+  const after = await p.evaluate(() => ({ hash: location.hash, hidden: !!document.querySelector('[data-source-pill][class*="hidden"]') }));
+  record('2 a tap on a pill still does its thing, the page staying on the graph',
+    (pill.page ? after.hash.startsWith('#read=') : after.hidden) && (await state(p)) === 'graph',
+    `${pill.page ? 'page: ' + after.hash : 'source hidden ' + after.hidden}; ${await state(p)}`);
+  record('2 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  await s.browser.close();
+}
+
 async function run(bt, name, size, record) {
   await part1(bt, name, size, record);
+  await part2(bt, name, size, record);
 }
 
 (async () => {

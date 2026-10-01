@@ -484,3 +484,17 @@ test('byline: directly under the title in both states, a quarter of its size, in
   const plain = coverGeometry(openingConfig(SITE), view, 0);
   assert.equal(plain.byline.align, 'center', 'without a title: under the art, as before');
 });
+
+test('grip: extra px below the top bar\'s row, 16 by default; the strip reaches the row\'s foot plus that', () => {
+  const { gripConfig, gripHeight } = require('../src/lib/opening');
+  assert.deepEqual(gripConfig(undefined), { extra: 16 });
+  assert.deepEqual(gripConfig({ extra: 24 }), { extra: 24 });
+  assert.deepEqual(gripConfig({ extra: -3 }), { extra: 0 });
+  assert.deepEqual(gripConfig({ extra: 'x' }), { extra: 16 });
+  const base = { opening: { enabled: true, art: { full: 'a.png' } } };
+  assert.deepEqual(openingConfig(base).grip, { extra: 16 });
+  assert.deepEqual(openingConfig({ opening: { ...base.opening, grip: { extra: 8 } } }).grip, { extra: 8 });
+  assert.equal(gripHeight(48, { extra: 16 }), 64);
+  assert.equal(gripHeight(36.4, { extra: 0 }), 37);
+  assert.equal(gripHeight(0, { extra: 0 }), 12);
+});

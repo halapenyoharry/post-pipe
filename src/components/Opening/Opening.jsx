@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, bylineText, TUNING } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, bylineText, gripHeight, TUNING } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 
 /**
@@ -85,6 +85,20 @@ function topControls(vh) {
   for (const el of document.querySelectorAll('[data-feeds] > *, [data-top-pages], [data-settings-gear]')) {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height || r.top > vh * 0.2) continue;
+    bottom = Math.max(bottom, r.bottom);
+  }
+  return bottom;
+}
+
+// The bottom of the top bar's row: the source pills, the pages and the
+// controls in line with them, and the gear (not the intro on its own line
+// under them). 0 without them.
+function topRowBottom(vh) {
+  if (typeof document === 'undefined') return 0;
+  let bottom = 0;
+  for (const el of document.querySelectorAll('[data-feeds] > *:not([data-graph-intro]), [data-settings-gear]')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || r.top > vh * 0.2 || getComputedStyle(el).position === 'fixed' && !el.matches('[data-settings-gear]')) continue;
     bottom = Math.max(bottom, r.bottom);
   }
   return bottom;
@@ -456,7 +470,7 @@ function Cover({ config, viewState, children }) {
       // fade out below. Only the top bar takes taps until the graph rests.
       sec.style.pointerEvents = atRest ? '' : 'none';
       for (const el of sec.children) {
-        if (el.matches('[data-feeds], [data-top-bar]')) continue;
+        if (el.matches('[data-feeds], [data-top-bar], [data-cover-handle]')) continue;
         const graph = el.matches('[data-graph-root]');
         el.style.opacity = atRest ? '' : String(graph ? g.layer.opacity : g.graph.opacity);
         el.style.transform = atRest ? '' : (graph
@@ -609,7 +623,16 @@ function Cover({ config, viewState, children }) {
       go: (s, o) => machine.go(s, o),
     };
 
+    // The grip reaches down to the top bar's row and a little below it.
+    const sizeGrip = () => {
+      const h = handleRef.current;
+      if (h) h.style.height = `calc(env(safe-area-inset-top, 0px) + ${gripHeight(topRowBottom(window.innerHeight), config.grip)}px)`;
+    };
+    sizeGrip();
+    const gripFrame = requestAnimationFrame(sizeGrip);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(sizeGrip);
     const onResize = () => {
+      sizeGrip();
       if (config.top) controlsRef.current = topControls(window.innerHeight);
       machine.resize(geometry(0).travel);
       paintRef.current(machine.p);
@@ -676,6 +699,31 @@ function Cover({ config, viewState, children }) {
       touch = null;
       machine.touchEnd(e.timeStamp || Date.now());
     };
+    // A mouse drag down from the grip scrubs too (touch has its own above).
+    let mouse = null;
+    const onPointerDown = (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      mouse = { y: e.clientY, moved: 0 };
+      try { handle.setPointerCapture(e.pointerId); } catch (_) { /* not captured */ }
+      machine.touchStart(e.clientY, e.timeStamp || Date.now());
+    };
+    const onPointerMove = (e) => {
+      if (!mouse) return;
+      mouse.moved = Math.max(mouse.moved, Math.abs(e.clientY - mouse.y));
+      if (mouse.moved >= DRAG_PX) machine.touchMove(e.clientY, e.timeStamp || Date.now());
+    };
+    const onPointerUp = (e) => {
+      if (!mouse) return;
+      if (mouse.moved >= DRAG_PX) dragged = Date.now();
+      mouse = null;
+      machine.touchEnd(e.timeStamp || Date.now());
+    };
+    if (handle) {
+      handle.addEventListener('pointerdown', onPointerDown);
+      handle.addEventListener('pointermove', onPointerMove);
+      handle.addEventListener('pointerup', onPointerUp);
+      handle.addEventListener('pointercancel', onPointerUp);
+    }
     const surfaces = [stage, handle].filter(Boolean);
     for (const s of surfaces) {
       s.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -686,6 +734,13 @@ function Cover({ config, viewState, children }) {
 
     return () => {
       machine.dispose();
+      cancelAnimationFrame(gripFrame);
+      if (handle) {
+        handle.removeEventListener('pointerdown', onPointerDown);
+        handle.removeEventListener('pointermove', onPointerMove);
+        handle.removeEventListener('pointerup', onPointerUp);
+        handle.removeEventListener('pointercancel', onPointerUp);
+      }
       if (fadeTimer) clearTimeout(fadeTimer);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('wheel', onWheel, { capture: true });
@@ -765,6 +820,21 @@ function Cover({ config, viewState, children }) {
         style={startArt ? { pointerEvents: 'none' } : undefined}
       >
         {children}
+        {/* The grip: the whole top strip, under the top bar's controls (they
+            keep their taps) and over the graph; the mark is the hint. */}
+        <button
+          ref={handleRef}
+          type="button"
+          className={styles.handle}
+          aria-label="Show the cover"
+          title="Show the cover"
+          data-cover-handle
+          tabIndex={startArt ? -1 : 0}
+          style={{ opacity: startArt ? 0 : 1, pointerEvents: startArt ? 'none' : 'auto' }}
+          onClick={() => tap('art')}
+        >
+          <span className={styles.grip} aria-hidden="true" />
+        </button>
       </div>
       {config.byline.text && (
         // Over the graph layer, so it stays a link in the graph state too.
@@ -782,19 +852,6 @@ function Cover({ config, viewState, children }) {
           {bylineText(config.byline)}
         </a>
       )}
-      <button
-        ref={handleRef}
-        type="button"
-        className={styles.handle}
-        aria-label="Show the cover"
-        title="Show the cover"
-        data-cover-handle
-        tabIndex={startArt ? -1 : 0}
-        style={{ opacity: startArt ? 0 : 1, pointerEvents: startArt ? 'none' : 'auto' }}
-        onClick={() => tap('art')}
-      >
-        <span className={styles.grip} aria-hidden="true" />
-      </button>
     </>
   );
 }

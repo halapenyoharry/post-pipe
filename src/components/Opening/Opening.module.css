@@ -181,17 +181,24 @@ html[data-pp-cover="graph"] .stage {
   inset: 0;
 }
 
-/* In the graph state, a slim grip along the top edge, above the controls:
-   a tap brings the cover back, a drag down scrubs to it. */
+/* In the graph state, the grip: the whole top strip, from the screen's top
+   to a little below the top bar's row (its height is set by Opening.jsx,
+   opening.grip.extra). It sits under the bar's controls, which keep their
+   taps, and over the graph: a tap in the gaps brings the cover back, a drag
+   down scrubs to it. The mark at the top centre is the hint. */
 .handle {
   position: fixed;
-  z-index: 45;
+  z-index: 44; /* under the time overlay's header (45) where they meet */
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 120px;
+  left: 0;
+  right: 0;
+  width: 100%;
   height: calc(env(safe-area-inset-top, 0px) + 12px);
+  margin: 0;
+  display: block;
   padding: env(safe-area-inset-top, 0px) 0 0;
+  text-align: center;
+  vertical-align: top;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -200,10 +207,14 @@ html[data-pp-cover="graph"] .stage {
 }
 
 .grip {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
   display: block;
   width: 40px;
   height: 4px;
-  margin: 4px auto 0;
+  margin: 0;
   border-radius: 2px;
   background: var(--text-bright, #ece6da);
   opacity: 0.45;
