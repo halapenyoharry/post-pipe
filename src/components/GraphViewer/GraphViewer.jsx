@@ -11,6 +11,7 @@ import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
+import { layoutKey } from './layoutKey';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
@@ -290,9 +291,18 @@ export function GraphViewer({
   const persistKey = (d) => (d.originalItem && d.originalItem.id) || d.id;
 
   // Where a node sits depends on the layout — a node has one place in a ring
-  // and another on a timeline — so positions are filed per layout. How big the
-  // reader made it does not, so size is filed against the item alone.
-  const positionKey = (d) => layoutRef.current + '::' + persistKey(d);
+  // and another on a timeline — so positions are filed per layout, and per
+  // the settings that shape it (layoutKey.js: a changed spiral, or a bumped
+  // graph.layoutVersion, retires the old positions). How big the reader made
+  // it does not, so size is filed against the item alone.
+  const layoutKeys = useRef({ settings: null, keys: new Map() });
+  const placeOf = (name) => {
+    const c = layoutKeys.current;
+    if (c.settings !== graphSettings) { c.settings = graphSettings; c.keys = new Map(); }
+    if (!c.keys.has(name)) c.keys.set(name, layoutKey(name, graphSettings) + '::');
+    return c.keys.get(name);
+  };
+  const positionKey = (d) => placeOf(layoutRef.current) + persistKey(d);
 
   // View state lives in refs because it must not trigger React re-renders or
   // re-run the useEffect that owns the simulation.
@@ -2971,7 +2981,7 @@ export function GraphViewer({
         // a fresh layout that is now worth saving.
         for (const d of data.nodes) {
           if (!d.pinned && d._forcePos) {
-            vs.setNodePosition('force::' + persistKey(d), d.x, d.y, { silent: true });
+            vs.setNodePosition(placeOf('force') + persistKey(d), d.x, d.y, { silent: true });
           }
         }
       }
@@ -3318,12 +3328,12 @@ export function GraphViewer({
     // If there is no cluster arrangement to return to, run one.
     if (layout === 'force') {
       const placed = g.data.nodes.filter((d) => {
-        const saved = vs && vs.nodeState('force::' + persistKey(d));
+        const saved = vs && vs.nodeState(placeOf('force') + persistKey(d));
         return (saved && !saved.auto) || d._forcePos;
       });
       if (placed.length < g.data.nodes.length * 0.5) {
         g.data.nodes.forEach((d) => {
-          const saved = vs && vs.nodeState('force::' + persistKey(d));
+          const saved = vs && vs.nodeState(placeOf('force') + persistKey(d));
           if (saved && !saved.auto) { d.fx = saved.x; d.fy = saved.y; }
           else { d.fx = null; d.fy = null; }
         });
@@ -3335,7 +3345,7 @@ export function GraphViewer({
     const computed = layout === 'force'
       ? Object.fromEntries(g.data.nodes.map(d => [
           d.id,
-          d._forcePos || (vs && vs.nodeState('force::' + persistKey(d))) || { x: d.x, y: d.y },
+          d._forcePos || (vs && vs.nodeState(placeOf('force') + persistKey(d))) || { x: d.x, y: d.y },
         ]))
       : (layout === 'radial' && g.ringTargets && g.ringTargets())
         || computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
@@ -3344,7 +3354,7 @@ export function GraphViewer({
     const startPositions = new Map(g.data.nodes.map(d => [d.id, { x: d.x, y: d.y }]));
 
     g.data.nodes.forEach((d) => {
-      const saved = vs && vs.nodeState(layout + '::' + persistKey(d));
+      const saved = vs && vs.nodeState(placeOf(layout) + persistKey(d));
       const target = (saved && typeof saved.x === 'number' && !saved.auto)
         ? { x: saved.x, y: saved.y }
         : computed[d.id];
@@ -3354,7 +3364,7 @@ export function GraphViewer({
       d.fx = target.x;
       d.fy = target.y;
       if (vs && !(saved && !saved.auto)) {
-        vs.setNodePosition(layout + '::' + persistKey(d), target.x, target.y, { silent: true });
+        vs.setNodePosition(placeOf(layout) + persistKey(d), target.x, target.y, { silent: true });
       }
     });
 
