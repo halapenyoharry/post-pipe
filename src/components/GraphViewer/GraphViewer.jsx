@@ -8,6 +8,7 @@ import { containerLayout } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { closedMemberSet, edgeHidden } from './closedState';
+import { createTapGate } from './tapGate';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -493,6 +494,63 @@ export function GraphViewer({
       if (repaint) svg.call(zoom.transform, d3.zoomIdentity.translate(cx - p[0] * t.k, cy - p[1] * t.k).scale(t.k));
     }
 
+    // One tap or two. A double-tap (or double-click) zooms in about 2x at the
+    // point tapped, wherever it lands: empty canvas, a hull, a card, a title.
+    // Shift+double-click, or a double-tap with two fingers, zooms out. Because
+    // a double-tap must not also open or toggle anything, a single tap waits
+    // DOUBLE_TAP_MS to be sure no second tap is coming, and only then acts.
+    const DOUBLE_TAP_MS = Number.isFinite(GS.doubleTapMs) ? GS.doubleTapMs : 250;
+    const DOUBLE_TAP_PX = 32;
+    const tapGate = createTapGate({ ms: DOUBLE_TAP_MS, px: DOUBLE_TAP_PX });
+    function screenPoint(ev) {
+      const src = ev && ev.changedTouches && ev.changedTouches.length ? ev.changedTouches[0] : ev;
+      const r = container.getBoundingClientRect();
+      if (!src || !Number.isFinite(src.clientX)) return [width / 2, height / 2];
+      return [src.clientX - r.left, src.clientY - r.top];
+    }
+    function zoomAtPoint(x, y, factor) {
+      userMovedView = true;
+      focusActive = false;
+      svg.transition('tap-zoom').duration(320).ease(d3.easeCubicOut).call(zoom.scaleBy, factor, [x, y]);
+    }
+    function tapOrDouble(ev, single, double) {
+      const [x, y] = screenPoint(ev);
+      const shift = !!(ev && ev.shiftKey);
+      tapGate.tap(x, y, single, double || (() => zoomAtPoint(x, y, shift ? 0.5 : 2)));
+    }
+
+    // Two fingers down and up again without moving is a two-finger tap; two
+    // of those in quick succession zoom out at their midpoint.
+    let twoTap = null; // { t, x, y, moved }
+    let lastTwoTap = null; // { t, x, y }
+    const onTwoTapStart = (e) => {
+      if (e.touches.length === 2) {
+        const [mx, my] = touchMid(e);
+        twoTap = { t: Date.now(), x: mx, y: my, moved: false };
+      } else if (e.touches.length > 2) twoTap = null;
+    };
+    const onTwoTapMove = (e) => {
+      if (!twoTap || e.touches.length !== 2) return;
+      const [mx, my] = touchMid(e);
+      if (Math.hypot(mx - twoTap.x, my - twoTap.y) > 14) twoTap.moved = true;
+    };
+    const onTwoTapEnd = (e) => {
+      if (!twoTap || e.touches.length > 0) return;
+      const tap = twoTap;
+      twoTap = null;
+      const now = Date.now();
+      if (tap.moved || now - tap.t > 350) return;
+      if (lastTwoTap && now - lastTwoTap.t <= 450 && Math.hypot(tap.x - lastTwoTap.x, tap.y - lastTwoTap.y) <= 60) {
+        lastTwoTap = null;
+        zoomAtPoint(tap.x, tap.y, 0.5);
+      } else {
+        lastTwoTap = { t: now, x: tap.x, y: tap.y };
+      }
+    };
+    container.addEventListener('touchstart', onTwoTapStart, { capture: true, passive: true });
+    container.addEventListener('touchmove', onTwoTapMove, { capture: true, passive: true });
+    container.addEventListener('touchend', onTwoTapEnd, { capture: true, passive: true });
+
     // Restore anything the reader has already placed. Setting fx/fy pins the
     // node, so the simulation lays out only what has never been positioned and
     // arranges the rest around the reader's choices rather than over them.
@@ -904,17 +962,15 @@ export function GraphViewer({
             applyPositions();
           } else {
             // A tap (under 4px of movement) on the title or the closed node
-            // toggles it. collapseGesture 'tap' (default) or 'doubletap'.
-            const now = Date.now();
-            const lastTap = c._lastTap || 0;
+            // toggles it; a double-tap zooms, like anywhere else. With
+            // collapseGesture 'doubletap' it is the other way round.
+            const toggle = () => {
+              if (isCollapsed) setContainersOpen([c.id], true);
+              else setContainersOpen([c.id], closedContainers.has(c.id));
+            };
             const gesture = graphSettings.collapseGesture || 'tap';
-            if (gesture === 'doubletap' && now - lastTap >= 400) {
-              c._lastTap = now;
-              return;
-            }
-            c._lastTap = 0;
-            if (isCollapsed) setContainersOpen([c.id], true);
-            else setContainersOpen([c.id], closedContainers.has(c.id));
+            if (gesture === 'doubletap') tapOrDouble(event.sourceEvent, () => {}, toggle);
+            else tapOrDouble(event.sourceEvent, toggle);
           }
         });
     }
@@ -1719,8 +1775,11 @@ export function GraphViewer({
       .on('click', function (event, l) {
         // A tap names the edge; it does not count as a tap on the canvas.
         event.stopPropagation();
-        showEdgeLabel(l, this);
-        edgeLabelTimer = setTimeout(() => { edgeLabelTimer = null; hideEdgeLabel(); }, 2500);
+        const el = this;
+        tapOrDouble(event, () => {
+          showEdgeLabel(l, el);
+          edgeLabelTimer = setTimeout(() => { edgeLabelTimer = null; hideEdgeLabel(); }, 2500);
+        });
       });
 
 
@@ -2016,6 +2075,8 @@ export function GraphViewer({
       .style('top', '0')
       .style('will-change', 'transform')
       .style('pointer-events', 'auto')
+      // No browser double-tap zoom on a card: two taps zoom the graph.
+      .style('touch-action', 'manipulation')
       .call(dragHandler);
       
     articleNodes = articleNodes.merge(articleNodesEnter);
@@ -2181,22 +2242,11 @@ export function GraphViewer({
           event.currentTarget.style.zIndex = '';
         }
       })
-      .on('dblclick', (event, d) => {
-        // Double-click opens the reader. It used to land as two single clicks,
-        // which pinned and then unpinned the node — a visible twitch and no
-        // result. Same destination as the popout button: reader open, node
-        // back to its resting size.
+      .on('dblclick', (event) => {
+        // The two clicks have already been read as a double-tap (it zooms);
+        // the browser's own double-click (selecting a word) is not wanted.
         event.stopPropagation();
         event.preventDefault();
-        clearTimeout(d._pinTimer);
-        d._pinTimer = null;
-        if (onNodeSelectRef.current) {
-          onNodeSelectRef.current(d.originalItem || d);
-        }
-        pinnedIdsRef.current.delete(d.id);
-        if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
-        hoveredIdRef.current = null;
-        renderArticleBody(d);
       })
       .on('click', (event, d) => {
         const target = event.target;
@@ -2217,20 +2267,10 @@ export function GraphViewer({
           return;
         }
         event.stopPropagation();
-        // A click opens or closes the node a moment later, so the second click
-        // of a double-click can cancel it. Changing the card between the two
-        // clicks (an open node re-renders with its text) replaced the element
-        // under the pointer, and browsers drop a dblclick whose target changed.
+        // A tap opens or closes the node once it is clear no second tap is
+        // coming; two taps zoom instead and leave the node as it was.
         const cardEl = event.currentTarget;
-        if (d._pinTimer) {
-          clearTimeout(d._pinTimer);
-          d._pinTimer = null;
-          return;
-        }
-        d._pinTimer = setTimeout(() => {
-          d._pinTimer = null;
-          togglePinned(d, cardEl);
-        }, 260);
+        tapOrDouble(event, () => togglePinned(d, cardEl));
       });
 
     function togglePinned(d, cardEl) {
@@ -2263,37 +2303,40 @@ export function GraphViewer({
     nodes.filter(d => d.type !== 'article')
       .on('click', (event, d) => {
         event.stopPropagation();
-        if (activeTag === d.id) {
-          activeTag = null;
-          nodes.classed('dimmed', false).classed('tag-active', false);
-          articleNodes.classed('dimmed', false);
-          links.classed('highlighted', false);
-        } else {
-          activeTag = d.id;
-          const connected = new Set(
-            data.links.filter(l => {
-              const sid = typeof l.source === 'object' ? l.source.id : l.source;
-              const tid = typeof l.target === 'object' ? l.target.id : l.target;
-              return sid === d.id || tid === d.id;
-            }).map(l => {
-              const sid = typeof l.source === 'object' ? l.source.id : l.source;
-              const tid = typeof l.target === 'object' ? l.target.id : l.target;
-              return sid === d.id ? tid : sid;
-            })
-          );
-          connected.add(d.id);
-          nodes.classed('dimmed', nd => !connected.has(nd.id));
-          nodes.classed('tag-active', nd => nd.id === d.id);
-          articleNodes.classed('dimmed', nd => !connected.has(nd.id));
-          links.classed('highlighted', l => {
+        tapOrDouble(event, () => toggleTagHighlight(d));
+      });
+    function toggleTagHighlight(d) {
+      if (activeTag === d.id) {
+        activeTag = null;
+        nodes.classed('dimmed', false).classed('tag-active', false);
+        articleNodes.classed('dimmed', false);
+        links.classed('highlighted', false);
+      } else {
+        activeTag = d.id;
+        const connected = new Set(
+          data.links.filter(l => {
             const sid = typeof l.source === 'object' ? l.source.id : l.source;
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
             return sid === d.id || tid === d.id;
-          });
-        }
-      });
+          }).map(l => {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            return sid === d.id ? tid : sid;
+          })
+        );
+        connected.add(d.id);
+        nodes.classed('dimmed', nd => !connected.has(nd.id));
+        nodes.classed('tag-active', nd => nd.id === d.id);
+        articleNodes.classed('dimmed', nd => !connected.has(nd.id));
+        links.classed('highlighted', l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          return sid === d.id || tid === d.id;
+        });
+      }
+    }
 
-    svg.on('click', () => {
+    svg.on('click', (event) => tapOrDouble(event, () => {
       hideEdgeLabel();
       if (activeTag) {
         activeTag = null;
@@ -2302,7 +2345,7 @@ export function GraphViewer({
         links.classed('highlighted', false);
       }
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
-    });
+    }));
 
     // Simulation tick → position nodes. When alpha falls below alphaMin,
     // D3 stops automatically. We never call .restart() anywhere — once
@@ -2702,6 +2745,10 @@ export function GraphViewer({
       container.removeEventListener('touchmove', onRotateMove, { capture: true });
       container.removeEventListener('touchend', onRotateEnd, { capture: true });
       container.removeEventListener('touchcancel', onRotateEnd, { capture: true });
+      container.removeEventListener('touchstart', onTwoTapStart, { capture: true });
+      container.removeEventListener('touchmove', onTwoTapMove, { capture: true });
+      container.removeEventListener('touchend', onTwoTapEnd, { capture: true });
+      tapGate.cancel();
       window.removeEventListener('graph:reset-all', handleResetAll);
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
