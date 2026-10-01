@@ -4,7 +4,10 @@
 // without .html), and optionally taken out of the graph (hideFromGraph: the
 // button is then the way to it).
 //
-//   "topBar": { "pages": [ { "id": "<item id or slug>", "label": "About", "hideFromGraph": true } ] }
+// addFeed (default true) shows the "+" after them, for adding a feed; a site
+// whose readers have no use for it sets it false.
+//
+//   "topBar": { "pages": [ { "id": "<item id or slug>", "label": "About", "hideFromGraph": true } ], "addFeed": false }
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
@@ -14,7 +17,7 @@ function topBarConfig(settings) {
   const pages = (Array.isArray(t.pages) ? t.pages : [])
     .filter((p) => p && typeof p === 'object' && str(p.id))
     .map((p) => ({ id: str(p.id), label: str(p.label) || str(p.id), hideFromGraph: p.hideFromGraph === true }));
-  return { pages };
+  return { pages, addFeed: t.addFeed !== false };
 }
 
 // An item's slug: the last part of its url (or id), without .html.

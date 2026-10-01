@@ -18,7 +18,7 @@ const feed = {
 };
 
 test('settings: pages with an id, a label (the id when none), hideFromGraph only when true', () => {
-  assert.deepStrictEqual(topBarConfig({}), { pages: [] });
+  assert.deepStrictEqual(topBarConfig({}), { pages: [], addFeed: true });
   assert.deepStrictEqual(topBarConfig({ topBar: { pages: [{ id: 'about', label: 'About', hideFromGraph: true }, { id: ' ' }, null, { id: 'x' }] } }).pages,
     [{ id: 'about', label: 'About', hideFromGraph: true }, { id: 'x', label: 'x', hideFromGraph: false }]);
 });
@@ -40,4 +40,11 @@ test('hideFromGraph: the graph is drawn without the item and its edges; nothing 
   assert.equal(g.edges.length, 1);
   assert.equal(g.edges[0].target, 'http://x/ch1.html');
   assert.equal(feed.items.length, 2, 'the feed itself is untouched (the reader still opens the item)');
+});
+
+test('addFeed: the "+" is shown unless a site turns it off', () => {
+  assert.equal(topBarConfig({}).addFeed, true);
+  assert.equal(topBarConfig({ topBar: {} }).addFeed, true);
+  assert.equal(topBarConfig({ topBar: { addFeed: false } }).addFeed, false);
+  assert.equal(topBarConfig({ topBar: { addFeed: 'no' } }).addFeed, true, 'only false turns it off');
 });

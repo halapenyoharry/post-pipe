@@ -660,6 +660,7 @@ ${reactJs}
             viewState: viewState,
             showCount: !(window.SETTINGS && window.SETTINGS.graph && window.SETTINGS.graph.containerCount === false),
             pages: TOP_PAGES,
+            showAddButton: TOP_BAR.addFeed,
             onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
           }),
           React.createElement(TimeOverlay, {

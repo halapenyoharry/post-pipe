@@ -25,8 +25,10 @@ import styles from './FeedZ.module.css';
  *                    src/lib/topBar.js resolvePages): a button each, after
  *                    the pills, that opens its item in the reader
  *   onOpenPage     — (item) => void, for a page's button
+ *   showAddButton  — optional, default true; false leaves out the "+"
+ *                    (settings.topBar.addFeed; the embed's addFeed feature)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, showAddButton = true }) {
   const hasPages = Array.isArray(pages) && pages.length > 0;
   if ((!sources || sources.length === 0) && !hasPages) return null;
 
@@ -57,7 +59,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
           <span className={styles.title}>{pg.label}</span>
         </button>
       ))}
-      <AddPill />
+      {showAddButton !== false && <AddPill />}
     </div>
   );
 }
