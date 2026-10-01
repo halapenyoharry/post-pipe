@@ -11,7 +11,7 @@ import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
-import { TIMINGS as OPENING_TIMINGS } from '../../lib/opening';
+import { TIMINGS as OPENING_TIMINGS, VIEWPORT_ORIGIN } from '../../lib/opening';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
@@ -436,6 +436,8 @@ export function GraphViewer({
     let paintedRotation = 0;
     let positionsReady = false;
     let view = { x: 0, y: 0, k: 1 };
+    // While the opening's taproot shows (graph.rootsOrigin), it follows the view.
+    let onViewForTaproot = null;
     const upright = () => (rotation ? ` rotate(${-rotation})` : '');
     const viewFor = (t) => rotatedView(t, rotGesture, rotation);
     function paintView(t) {
@@ -456,6 +458,7 @@ export function GraphViewer({
     const zoom = d3.zoom().on('zoom', (event) => {
       if (event.sourceEvent) { userMovedView = true; focusActive = false; }
       paintView(event.transform);
+      if (onViewForTaproot) onViewForTaproot();
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
       if (edgeLabelFor) placeEdgeLabel();
@@ -2665,6 +2668,7 @@ export function GraphViewer({
         }
         r.state = state;
       }
+      paintTaproot();
       rootsPainted = true;
     }
     function scheduleRoots() {
@@ -2687,9 +2691,32 @@ export function GraphViewer({
     function undrawn(p) {
       p.attr('pathLength', null).style('stroke-dasharray', null).style('stroke-dashoffset', null).style('transition', null);
     }
-    function openingOrigin() {
+    function bookAnchor() {
       const top = (data.containers || []).find((c) => !c.parent);
       return (top && containerAnchor.get(top.id)) || null;
+    }
+    // graph.rootsOrigin: where the opening's roots start. 'book' (default) is
+    // the book's title; 'viewport-bottom' is the lower middle of the screen,
+    // where a cover's roots sit, joined to the book's title by one more root
+    // (the taproot) that stays pinned to the screen while it lasts.
+    const fromViewport = GS.rootsOrigin === 'viewport-bottom';
+    let taproot = null;
+    function viewportOrigin() {
+      const p = screenToView(view, rotation, width * VIEWPORT_ORIGIN.x, height * VIEWPORT_ORIGIN.y);
+      return { x: p[0], y: p[1] };
+    }
+    function openingOrigin() {
+      return fromViewport ? viewportOrigin() : bookAnchor();
+    }
+    function paintTaproot() {
+      if (!taproot) return;
+      const b = bookAnchor();
+      if (!glimpse || !b) { taproot.el.style('display', 'none'); onViewForTaproot = null; return; }
+      onViewForTaproot = scheduleRoots;
+      const d = rootPath(viewportOrigin(), b, taproot.shape);
+      taproot.main.attr('d', d.main);
+      taproot.fine.attr('d', d.fine);
+      taproot.el.style('display', null);
     }
     function onOpening(e) {
       const d = (e && e.detail) || {};
@@ -2699,8 +2726,20 @@ export function GraphViewer({
         while (glimpseTimers.length) clearTimeout(glimpseTimers.pop());
         glimpse = { reduced: Boolean(d.reducedMotion) };
         for (const r of rootsList) r.el.style('opacity', null).style('transition', null);
+        if (fromViewport && !taproot) {
+          const top = (data.containers || []).find((c) => !c.parent);
+          const el = rootsLayer.insert('g', ':first-child').attr('class', 'root').attr('data-root', 'opening').attr('data-state', 'glimpse');
+          taproot = {
+            el,
+            shape: rootShape(String(ROOTS.seed || (top && top.id) || 'roots') + '|opening'),
+            main: el.append('path').attr('class', 'root-main').attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke'),
+            fine: el.append('path').attr('class', 'root-fine').attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke'),
+          };
+        }
+        if (taproot) taproot.el.style('opacity', null).style('transition', null);
         paintRoots();
         if (glimpse.reduced) return;
+        if (taproot) for (const p of [taproot.main, taproot.fine]) drawIn(p, 0, T.rootsDrawMs);
         const origin = openingOrigin();
         const near = (r) => {
           if (!origin) return 0;
@@ -2716,11 +2755,12 @@ export function GraphViewer({
         });
         glimpseTimers.push(setTimeout(() => {
           for (const r of rootsList) for (const p of [r.main, r.fine]) undrawn(p);
+          if (taproot) for (const p of [taproot.main, taproot.fine]) undrawn(p);
         }, T.rootsSpreadMs + T.rootsDrawMs + 100));
       } else if (d.phase === 'done' && glimpse) {
         const reduced = glimpse.reduced;
         glimpseTimers.push(setTimeout(() => {
-          const going = rootsList.filter((r) => r.state === 'glimpse');
+          const going = rootsList.filter((r) => r.state === 'glimpse').concat(taproot ? [taproot] : []);
           const end = () => {
             glimpse = null;
             for (const r of going) r.el.style('opacity', null).style('transition', null);

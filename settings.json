@@ -403,7 +403,9 @@
     "readingProgress": true,
     "_readingProgress_note": "A thin bar along the bottom of each card shows how far this viewer has read it, filling as they go; a card read to the end keeps a full bar and a small tick. Kept in the viewer's own browser (viewState), never sent anywhere. Default true; false hides it.",
     "roots": false,
-    "_roots_note": "true, or { seed }, to grow roots behind the graph: thin branching lines along the reading path, from the top container's title to each child's, to the first piece of each run and on along the sequence edges. A root reaching a piece draws in once the viewer opens it and thickens once they finish it (from their own reading progress). Seeded by seed, else the top container's id, so a book always grows the same roots. Drawn under the hulls, never takes a pointer; colour from --pp-root-color. Default false."
+    "_roots_note": "true, or { seed }, to grow roots behind the graph: thin branching lines along the reading path, from the top container's title to each child's, to the first piece of each run and on along the sequence edges. A root reaching a piece draws in once the viewer opens it and thickens once they finish it (from their own reading progress). Seeded by seed, else the top container's id, so a book always grows the same roots. Drawn under the hulls, never takes a pointer; colour from --pp-root-color. Default false.",
+    "rootsOrigin": "book",
+    "_rootsOrigin_note": "Where the roots draw in from while the opening (settings.opening) plays: book (default), the book's title, outward; or viewport-bottom, the lower middle of the screen, where a cover's roots sit, joined to the book's title by one more root that recedes afterwards. Outside the opening, a root draws in from its own end as before."
   },
   "dimensions": {
     "labels": {},
