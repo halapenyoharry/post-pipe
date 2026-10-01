@@ -833,6 +833,27 @@
   .articleByline { color: #555 !important; }
 }
 
+/* Follow along (Settings → Reading). A horizontal drag marks the text; a
+   vertical one still scrolls. The marks are painted, not inserted. */
+.body.following {
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  cursor: text;
+}
+:global(::highlight(pp-follow-sentence)) {
+  background-color: rgba(100, 255, 218, 0.13);
+}
+:global(::highlight(pp-follow-word)) {
+  background-color: rgba(100, 255, 218, 0.34);
+  color: #fff;
+}
+:global(.pp-follow-block) {
+  background-color: rgba(100, 255, 218, 0.1);
+  border-radius: 4px;
+}
+
 /* Paragraph style (Settings → Paragraphs).
    Indent on: p { text-indent: 1.5em }, with first paragraph and any paragraph
    right after a heading, hr, or blockquote at text-indent: 0.

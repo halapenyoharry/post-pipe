@@ -4,6 +4,7 @@ import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
 import { progressBarMode, allowDownload } from '../../lib/readerSettings';
+import { attachFollowAlong } from './followHighlighter';
 
 
 export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
@@ -317,6 +318,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     }
   }, [contentHtml, viewState ? viewState.bookmarks() : null, article]);
 
+  // Follow along (Settings → Reading): tap or drag through the text and the
+  // sentence and word under the finger are marked, with or without the voice.
+  const followOn = Boolean(viewState && viewState.readerAid && viewState.readerAid('followAlong'));
+  useEffect(() => {
+    if (!followOn || !bodyRef.current) return;
+    return attachFollowAlong(bodyRef.current);
+  }, [followOn, contentHtml, article]);
+
   if (!article) return null;
 
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
@@ -559,8 +568,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         )}
 
         <div
-          className={styles.body}
+          className={`${styles.body} ${followOn ? styles.following : ''}`}
           data-tts-target
+          data-follow-along={followOn ? 'on' : 'off'}
           ref={bodyRef}
           onScroll={handleScroll}
         >

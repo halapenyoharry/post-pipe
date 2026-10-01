@@ -75,6 +75,23 @@ const FIELDS = [
   { key: 'placeholder', label: 'Placeholder' },
 ];
 
+// One reading aid: an on/off switch with a line saying what it does.
+function ReadingAid({ viewState, aid, label, hint }) {
+  const on = Boolean(viewState.readerAid && viewState.readerAid(aid));
+  return (
+    <button
+      className={`${styles.aidBtn} ${on ? styles.aidOn : ''}`}
+      role="switch"
+      aria-checked={on}
+      data-aid={aid}
+      onClick={() => viewState.setReaderAid && viewState.setReaderAid(aid, !on)}
+    >
+      <span className={styles.aidLabel}>{label}<span className={styles.aidState}>{on ? 'on' : 'off'}</span></span>
+      <span className={styles.aidHint}>{hint}</span>
+    </button>
+  );
+}
+
 export function Settings({ viewState, feedData }) {
   const [open, setOpen] = useState(false);
   const [, bump] = useState(0);
@@ -214,6 +231,16 @@ export function Settings({ viewState, feedData }) {
               >
                 Space between
               </button>
+            </div>
+
+            <div className={styles.hint} style={{ marginTop: '14px' }}>Reading</div>
+            <div className={styles.aidList}>
+              <ReadingAid
+                viewState={viewState}
+                aid="followAlong"
+                label="Follow along"
+                hint="Tap or drag through the text to mark the sentence and word you are on."
+              />
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>

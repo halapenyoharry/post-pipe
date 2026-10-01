@@ -30,6 +30,7 @@ function emptyState(corpusId, layoutVersion) {
     colorProfileId: null, // which preset (if any) graphColors currently matches
     paragraphIndent: false,
     paragraphSpace: true,
+    readerAids: {},    // reading aids the reader turned on: followAlong, boldStart, font
     nodes: {},      // id -> { x, y, w, h, pinned, t }
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
@@ -427,6 +428,21 @@ function createViewState(opts = {}) {
       update((s) => {
         s.paragraphIndent = v === 'indent';
         s.paragraphSpace = v === 'space';
+      });
+    },
+
+    // Reading aids, chosen in the panel and kept across visits: followAlong
+    // (a highlighter that follows the finger), boldStart (bold word
+    // beginnings), font ('default' or another face the page ships).
+    readerAid(key) {
+      const aids = state.readerAids || {};
+      if (key === 'font') return typeof aids.font === 'string' ? aids.font : 'default';
+      return aids[key] === true;
+    },
+    setReaderAid(key, value) {
+      update((s) => {
+        if (!s.readerAids || typeof s.readerAids !== 'object') s.readerAids = {};
+        s.readerAids[key] = key === 'font' ? String(value || 'default') : Boolean(value);
       });
     },
 

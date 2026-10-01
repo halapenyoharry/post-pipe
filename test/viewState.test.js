@@ -435,3 +435,20 @@ test('bookmarks accept and store optional version', async () => {
   const marks = s.bookmarks('ch1');
   assert.strictEqual(marks[0].version, 'abc123def456');
 });
+
+test('reading aids default off, persist, and keep a font name', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
+  assert.strictEqual(a.readerAid('followAlong'), false);
+  assert.strictEqual(a.readerAid('boldStart'), false);
+  assert.strictEqual(a.readerAid('font'), 'default');
+  a.setReaderAid('followAlong', true);
+  a.setReaderAid('font', 'opendyslexic');
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  assert.strictEqual(b.readerAid('followAlong'), true);
+  assert.strictEqual(b.readerAid('boldStart'), false);
+  assert.strictEqual(b.readerAid('font'), 'opendyslexic');
+});
