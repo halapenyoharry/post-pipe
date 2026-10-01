@@ -1,0 +1,92 @@
+/* From readers: under the chapter, framed apart from it, in the interface's
+   face rather than the book's, so it never reads as part of the text. */
+.section {
+  margin: 36px 0 12px;
+  padding: 18px 16px 8px;
+  border: 1px dashed var(--gv-readers, #e58fb4);
+  border-radius: 10px;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--rp-text, #a8b2d1);
+  background: color-mix(in srgb, var(--gv-readers, #e58fb4) 5%, transparent);
+}
+
+.head { margin-bottom: 10px; }
+.title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gv-readers, #e58fb4);
+}
+.note, .empty { font-size: 12px; opacity: 0.85; }
+
+.section .list { list-style: none; margin: 0; padding: 0; }
+.section .item {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--rp-border, rgba(255, 255, 255, 0.12));
+}
+.kind {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.itemTitle { font-weight: 700; color: var(--rp-text-bright, #ccd6f6); margin-top: 2px; }
+.byline { font-size: 12px; margin: 2px 0 6px; }
+.author { font-weight: 700; color: var(--rp-text-bright, #ccd6f6); }
+.date, .testTag { opacity: 0.8; }
+
+.para {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.quote {
+  margin: 4px 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--gv-readers, #e58fb4);
+  font-size: 13px;
+}
+.quoteText { font-style: italic; margin-right: 8px; }
+
+.fallback {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.linkBtn {
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--rp-accent, #64ffda);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.art { margin: 4px 0 8px; }
+.art img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+/* A passage a reader wrote about, shown for a moment when asked for. */
+:global([data-contrib-passage]) {
+  outline: 1px dashed var(--gv-readers, #e58fb4);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+:global(::highlight(pp-contrib-passage)) {
+  background-color: color-mix(in srgb, var(--gv-readers, #e58fb4) 28%, transparent);
+}

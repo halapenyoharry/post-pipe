@@ -30,6 +30,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { GraphViewer } from './components/GraphViewer/GraphViewer';
 import { ReaderPanel } from './components/ReaderPanel/ReaderPanel';
+import { useContributions } from './components/Contributions/useContributions';
 import { TTS } from './components/TTS/TTS';
 import { FeedZ } from './components/FeedZ';
 import { showContainerCount } from './components/GraphViewer/containerCount';
@@ -344,6 +345,9 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
     return () => observer.disconnect();
   }, [features.tts]);
 
+  // Readers' contributions, when settings.contributions names a file.
+  const readers = useContributions(settings, feedData);
+
   if (!hydrated) return null;
 
   return (
@@ -383,6 +387,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         colorOverrides={colorOverrides}
         apiRef={graphApiRef}
         onNodeFocus={setFocusedItem}
+        contributions={readers.list}
       />
 
       {/* Feed sources bar */}
@@ -402,6 +407,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         <Toolbar
           viewState={viewState}
           settings={settings}
+          layers={readers.layers}
           show={{ history: !!features.undoRedo, layout: !!features.layoutControls, dimensions: !!features.dimensions }}
         />
       )}
@@ -440,6 +446,8 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           viewState={viewState}
           targetParagraph={targetParagraph}
           feedData={feedData}
+          contributions={readers.list}
+          contributionsConfig={readers.config}
           onNavigate={(item) => {
             if (!item) return;
             if (viewState) viewState.markSeen(item.id);

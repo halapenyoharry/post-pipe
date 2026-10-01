@@ -185,3 +185,9 @@
 :global(html[data-pp-theme="sketchbook"]) .seg, :global(html[data-pp-theme="sketchbook"]) .icon, :global(html[data-pp-theme="sketchbook"]) .action { color: var(--sk-ink); }
 :global(html[data-pp-theme="sketchbook"]) .action { border-color: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .on { background: var(--sk-accent-bg); color: var(--sk-ink); }
+
+/* An edge-layer dimension (readers): its own switch, marked by the dashed
+   line its edges are drawn with. */
+.layer {
+  border-bottom: 1px dashed var(--gv-readers, #e58fb4);
+}

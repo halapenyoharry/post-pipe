@@ -12,6 +12,7 @@ import { createTapGate } from './tapGate';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
+import { countsByChapter, connectionEdges } from '../../lib/contributions';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
 // feed.edges — the authored connected_to edges, the tag/topology reifications,
@@ -223,7 +224,7 @@ function makeCardSizeFor(CARD) {
 
 export function GraphViewer({
   feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout = 'force', timeAxis, graphSettings,
-  colorOverrides, apiRef, onNodeFocus,
+  colorOverrides, apiRef, onNodeFocus, contributions,
 }) {
   // Visual parameters come from settings.json so they can be tuned without a
   // rebuild. The defaults here are the values they replaced, so a missing or
@@ -275,6 +276,11 @@ export function GraphViewer({
   const connectorUpdateRef = useRef(null);
   const renderAllArticleBodiesRef = useRef(null);
   const rootsUpdateRef = useRef(null);
+  // Readers' contributions (settings.contributions): counted on the cards,
+  // and their connections drawn as their own edge layer, the readers
+  // dimension, off until the reader turns it on.
+  const contributionsRef = useRef(contributions || []);
+  const readersUpdateRef = useRef(null);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -322,8 +328,15 @@ export function GraphViewer({
         renderAllArticleBodiesRef.current();
       }
       if (rootsUpdateRef.current) rootsUpdateRef.current();
+      if (readersUpdateRef.current) readersUpdateRef.current();
     });
   }, [viewState]);
+
+  useEffect(() => {
+    contributionsRef.current = contributions || [];
+    if (renderAllArticleBodiesRef.current) renderAllArticleBodiesRef.current();
+    if (readersUpdateRef.current) readersUpdateRef.current({ rebuild: true });
+  }, [contributions]);
 
   // Apply time filter dimming
   useEffect(() => {
@@ -1795,6 +1808,10 @@ export function GraphViewer({
       .style('stroke', (d) => (d.layer !== 'sequence' ? null : linkColor(d)))
       .style('stroke-opacity', (d) => (d.layer === 'sequence' ? 0.45 : null));
 
+    // The readers' layer (see Readers below): over the book's edges, under
+    // the cards.
+    const readersLayer = g.append('g').attr('class', 'readers-layer').style('display', 'none');
+
     // The sketchbook theme's second pencil pass along each edge.
     const linkGhosts = g.selectAll('.link-ghost')
       .data(data.links)
@@ -2190,6 +2207,18 @@ export function GraphViewer({
       reactRoots.set(d.id, { root, wrapper: this, cardSelection: d3.select(this) });
     });
 
+    // How many contributions each card carries, by its slug; recounted only
+    // when the list changes.
+    let countsOf = null;
+    let counts = new Map();
+    function contributionCountsFor() {
+      if (countsOf !== contributionsRef.current) {
+        countsOf = contributionsRef.current;
+        counts = countsByChapter(countsOf);
+      }
+      return counts;
+    }
+
     function renderArticleBody(d) {
       if (d.type !== 'article') return;
       const entry = reactRoots.get(d.id);
@@ -2219,6 +2248,7 @@ export function GraphViewer({
       // How far this viewer has read it (graph.readingProgress, default on).
       const progress = GS.readingProgress !== false && vs && vs.readingProgress
         ? vs.readingProgress(persistKey(d)) : null;
+      const contributionCount = contributionCountsFor().get(d.id) || 0;
       entry.root.render(
         React.createElement(Lens, {
           article: d,
@@ -2232,6 +2262,7 @@ export function GraphViewer({
             bookmarks: bms,
             bookmarkCount: bms.length,
             progress,
+            contributionCount,
           },
           fullContent: d._fullContent || null,
           cardSettings: CARD,
@@ -2487,7 +2518,48 @@ export function GraphViewer({
       }
       updateContainers();
       if (rootsUpdateRef.current) rootsUpdateRef.current();
+      if (readersUpdateRef.current) readersUpdateRef.current();
     }
+    // ── Readers ───────────────────────────────────────────────────────────
+    // Connections readers drew between chapters: a layer of its own, dashed
+    // and in its own colour so it never passes for one of the book's edges,
+    // drawn only while the readers dimension is on. Each says what it is,
+    // and whose, on hover.
+    function readersOn() {
+      const vs = viewStateRef.current;
+      return !!(vs && vs.preference && vs.preference('readers') === true);
+    }
+    let readersList = [];
+    function buildReaders() {
+      readersLayer.selectAll('*').remove();
+      readersList = connectionEdges(contributionsRef.current).map((e) => {
+        const src = nodeBySlug.get(e.source);
+        const tgt = nodeBySlug.get(e.target);
+        if (!src || !tgt) return null;
+        const el = readersLayer.append('g').attr('class', 'readers-edge').attr('data-readers-edge', e.id);
+        el.append('title').text(`From a reader, ${e.author}: ${e.label}`);
+        return {
+          ...e,
+          l: { source: src, target: tgt, layer: 'contribution' },
+          el,
+          line: el.append('path').attr('class', 'readers-line link-contribution').attr('fill', 'none').attr('data-label', e.label),
+        };
+      }).filter(Boolean);
+    }
+    function paintReaders({ rebuild = false } = {}) {
+      if (rebuild) buildReaders();
+      const on = readersOn();
+      readersLayer.style('display', on && readersList.length ? null : 'none').attr('data-on', on ? 'true' : 'false');
+      if (!on) return;
+      for (const r of readersList) {
+        const ep = linkEndpoints(r.l);
+        const d = ep.hidden ? '' : `M ${ep.x1} ${ep.y1} L ${ep.x2} ${ep.y2}`;
+        r.line.attr('d', d);
+      }
+    }
+    readersUpdateRef.current = paintReaders;
+    buildReaders();
+
     // ── Roots ─────────────────────────────────────────────────────────────
     // graph.roots (default off): thin branching roots grow along the reading
     // path, from the book's title to each act's, to each first chapter and
@@ -2945,6 +3017,7 @@ export function GraphViewer({
     return () => {
       renderAllArticleBodiesRef.current = null;
       rootsUpdateRef.current = null;
+      readersUpdateRef.current = null;
       if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
       if (themeObserver) themeObserver.disconnect();
       simulation.stop();

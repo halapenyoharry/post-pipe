@@ -53,6 +53,9 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     !!(article.syndication && article.syndication.canonical)
   );
   const sourceColor = article.containerColor || article.color || (article._source && article._source.color);
+  // Readers' contributions attached to this piece (settings.contributions):
+  // a quiet count, apart from the reader's own bookmarks.
+  const contributionCount = viewState?.contributionCount || 0;
   const bookmarkCount = viewState?.bookmarkCount ?? (Array.isArray(viewState?.bookmarks) ? viewState.bookmarks.length : (Array.isArray(article?.bookmarks) ? article.bookmarks.length : 0));
 
   // Image-kind nodes are a different visual: photo card with caption.
@@ -160,6 +163,19 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
           {bookmarkCount > 1 && (
             <span className={styles.bookmarkCount}>{bookmarkCount}</span>
           )}
+        </div>
+      )}
+      {contributionCount > 0 && showHandles && (
+        <div
+          className={styles.readersMark}
+          title={contributionCount === 1 ? '1 from readers' : `${contributionCount} from readers`}
+          aria-label={contributionCount === 1 ? '1 from readers' : `${contributionCount} from readers`}
+          data-contrib-count={contributionCount}
+        >
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+            <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" />
+          </svg>
+          <span>{contributionCount}</span>
         </div>
       )}
       {hasImage && (

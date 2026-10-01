@@ -12,4 +12,5 @@ export { TimeOverlay } from './components/TimeOverlay';
 export { Toolbar } from './components/Toolbar/Toolbar';
 export { TimeOfDay } from './components/TimeOfDay/TimeOfDay';
 export { Theme } from './components/Theme/Theme';
+export { useContributions } from './components/Contributions/useContributions';
 export { React, ReactDOM };

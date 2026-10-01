@@ -8,9 +8,12 @@ import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
 import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
+import { Contributions } from './Contributions';
 
 
-export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph, feedData, onNavigate }) {
+// contributions: what readers brought (settings.contributions), already
+// filtered to what this page shows; contributionsConfig its settings.
+export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph, feedData, onNavigate, contributions, contributionsConfig }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [floatingPos, setFloatingPos] = useState(null);
@@ -22,6 +25,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // narrow (540px) and wide (760px).
   const [wide, setWide] = useState(false);
   const bodyRef = useRef(null);
+  // The chapter's own text, apart from everything drawn around it.
+  const textRef = useRef(null);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
   // A page turn: 'next' or 'prev' while the old chapter leaves and the new
@@ -63,6 +68,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // only; contentHtml stays the text as published.
   const boldOn = Boolean(viewState && viewState.readerAid && viewState.readerAid('boldStart'));
   const displayHtml = useMemo(() => (boldOn ? boldStartHtml(contentHtml) : contentHtml), [contentHtml, boldOn]);
+  // One object per text: React resets innerHTML whenever this object is new,
+  // which on every scroll wiped anything drawn into the text (a passage a
+  // reader's comment points at, the follow-along marks).
+  const textInner = useMemo(() => ({ __html: displayHtml }), [displayHtml]);
 
   const handleToolbarMouseDown = (e) => {
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
@@ -730,7 +739,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               </div>
             )}
           </div>
-          <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+          <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
           {contentHtml && (nav.next.length > 0 || nav.prev.length > 0) && (
             <nav className={styles.navBottom} aria-label="Next chapter" data-reader-nav-bottom>
               {nav.next.map((item) => navLink(item, 'next', true))}
@@ -739,6 +748,17 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           )}
           {rights && contentHtml && (
             <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
+          )}
+          {contributionsConfig && contentHtml && article._posted !== 'title' && (
+            <Contributions
+              article={article}
+              contributions={contributions || []}
+              config={contributionsConfig}
+              feedData={feedData}
+              textRef={textRef}
+              textKey={displayHtml}
+              onOpenChapter={(item) => goTo(item, 'next')}
+            />
           )}
         </div>
       </div>

@@ -143,6 +143,22 @@ function readerFontFaces() {
   }`).join('');
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
+const { contributionsConfig } = require('./src/lib/contributions');
+
+// Readers' contributions (settings.contributions) are the site's own file,
+// served beside the page as it is: src names it relative to the page, and
+// the same path under the site root is copied when it is there. A site that
+// copies it itself (or serves it from elsewhere) loses nothing.
+function copyContributions() {
+  const cfg = contributionsConfig(SETTINGS);
+  if (!cfg || /^[a-z]+:|^\/\//i.test(cfg.src)) return;
+  const rel = cfg.src.replace(/^\.\//, '').split('?')[0];
+  const from = path.join(SITE_ROOT, rel);
+  if (!fs.existsSync(from)) return;
+  const to = path.join(SITE_DIR, rel);
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.copyFileSync(from, to);
+}
 
 // ─── TTS exposure ────────────────────────────────────────────────────────────
 // settings.json distinguishes an engine being *available* (it ships, it works)
@@ -369,7 +385,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, useContributions, React, ReactDOM } = window.PostPipeComponents;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -527,6 +543,10 @@ ${reactJs}
         return out;
       }, [viewState.state.graphColors]);
 
+      // Readers' contributions (settings.contributions): their own file,
+      // their own marks, never part of the feed or the text.
+      const readers = useContributions(window.SETTINGS, feed);
+
       if (!hydrated) return null;
 
       return React.createElement(React.Fragment, null,
@@ -551,7 +571,8 @@ ${reactJs}
           viewState: viewState,
           colorOverrides: colorOverrides,
           apiRef: graphApi,
-          onNodeFocus: setFocusedItem
+          onNodeFocus: setFocusedItem,
+          contributions: readers.list
         }),
         React.createElement(FeedZ, {
           sources: feed._sources || [],
@@ -566,7 +587,7 @@ ${reactJs}
         }),
         // The bottom bar: history, layout, dimensions, and the view actions
         // (the timeline layout stays out of it until it is redesigned).
-        React.createElement(Toolbar, { viewState: viewState, settings: window.SETTINGS }),
+        React.createElement(Toolbar, { viewState: viewState, settings: window.SETTINGS, layers: readers.layers }),
         React.createElement(Settings, {
           viewState: viewState,
           feedData: feed,
@@ -580,7 +601,9 @@ ${reactJs}
           viewState: viewState,
           targetParagraph: targetParagraph,
           feedData: feed,
-          onNavigate: selectArticle
+          onNavigate: selectArticle,
+          contributions: readers.list,
+          contributionsConfig: readers.config
         })
       );
     }
@@ -669,6 +692,7 @@ async function main() {
   }
   copyReaderFonts();
   copyThemeFonts();
+  copyContributions();
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
 
   console.log(`Generated _site/feed.json (${feed.items.length} items, ${feed.edges.length} edges)`);

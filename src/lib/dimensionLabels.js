@@ -10,17 +10,24 @@ const DIMENSIONS = [
   { id: 'chronology', label: 'chronology', title: 'Chronological position in story-world time' },
 ];
 
+// Dimensions that lay an edge layer over the graph rather than a rail beside
+// it. Each turns on and off by itself, and is off until the reader turns it on.
+const LAYERS = [
+  { id: 'readers', label: 'readers', title: "Readers' connections: links readers drew between chapters (not the book's own)" },
+];
+
 // The tooltip a renamed dimension gets when only its name was given.
 const RENAMED_TITLE = {
+  readers: (l) => `${l}: links readers drew between chapters (not the book's own)`,
   time: (l) => `${l}: the date each piece was published`,
   commits: (l) => `Edit history: one link per bucket of ${l}`,
   narrative: (l) => `${l}: reading order, 0 to 1`,
   chronology: (l) => `${l}: position in story-world time`,
 };
 
-function dimensionLabels(settings) {
+function dimensionLabels(settings, list = DIMENSIONS) {
   const over = (settings && settings.dimensions && settings.dimensions.labels) || {};
-  return DIMENSIONS.map((d) => {
+  return list.map((d) => {
     const o = over[d.id];
     if (typeof o === 'string' && o.trim()) {
       const label = o.trim();
@@ -35,4 +42,6 @@ function dimensionLabels(settings) {
   });
 }
 
-module.exports = { dimensionLabels, DIMENSIONS };
+const layerLabels = (settings) => dimensionLabels(settings, LAYERS);
+
+module.exports = { dimensionLabels, layerLabels, DIMENSIONS, LAYERS };

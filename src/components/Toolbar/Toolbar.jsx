@@ -1,6 +1,6 @@
 import React, { useEffect, useReducer, useState } from 'react';
 import styles from './Toolbar.module.css';
-import { dimensionLabels } from '../../lib/dimensionLabels';
+import { dimensionLabels, layerLabels } from '../../lib/dimensionLabels';
 
 /**
  * Toolbar — the one bar along the bottom of the graph.
@@ -34,8 +34,12 @@ const VIEW_ACTIONS = [
 
 const fire = (name) => window.dispatchEvent(new CustomEvent(name));
 
-export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings }) {
-  const DIMENSIONS = dimensionLabels(settings || (typeof window !== 'undefined' ? window.SETTINGS : null));
+// layers: the edge-layer dimensions that have something to draw, e.g.
+// ['readers'] when readers have connected chapters. Each is its own switch.
+export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, layers = [] }) {
+  const S = settings || (typeof window !== 'undefined' ? window.SETTINGS : null);
+  const DIMENSIONS = dimensionLabels(S);
+  const LAYER_DIMS = layerLabels(S).filter((d) => layers.includes(d.id));
   const [, bump] = useReducer((n) => n + 1, 0);
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => (viewState ? viewState.subscribe(bump) : undefined), [viewState]);
@@ -75,6 +79,21 @@ export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings }) {
             aria-pressed={on}
             title={d.title}
             onClick={() => pickDimension(d.id)}
+          >
+            {d.label}
+          </button>
+        );
+      })}
+      {LAYER_DIMS.map((d) => {
+        const on = viewState.preference(d.id) === true;
+        return (
+          <button
+            key={d.id}
+            className={`${styles.seg} ${styles.layer} ${on ? styles.on : ''}`}
+            aria-pressed={on}
+            title={d.title}
+            data-dimension={d.id}
+            onClick={() => viewState.setPreference(d.id, on ? null : true)}
           >
             {d.label}
           </button>

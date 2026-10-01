@@ -405,6 +405,7 @@
   },
   "dimensions": {
     "labels": {},
-    "_labels_note": "Rename any dimension wherever a reader sees it (the bottom bar and its tooltips): { \"commits\": \"revisions\" }, or { \"commits\": { \"label\": \"revisions\", \"title\": \"...\" } }. Ids: time, commits, narrative, chronology. Engine names unchanged by default."
-  }
+    "_labels_note": "Rename any dimension wherever a reader sees it (the bottom bar and its tooltips): { \"commits\": \"revisions\" }, or { \"commits\": { \"label\": \"revisions\", \"title\": \"...\" } }. Ids: time, commits, narrative, chronology, and readers (the edge layer of readers\u2019 connections, its own switch, off until turned on, shown only when there are any). Engine names unchanged by default."
+  },
+  "_contributions_note": "Readers' contributions, off unless a site sets \"contributions\": { ... }. Kept in their own file, never in feed.json or the text. src: the file, relative to the page (default ./contributions.json; copied from the site root when there). Each item: id, type (essay | comment | art | connection), author (a display name), created, status (only \"approved\" is shown), anchor { chapter (the piece's slug), and optionally exact, prefix, suffix: the passage it is about }, body (plain text, never HTML), title (an essay's), asset and alt (art: a png/jpg/webp/gif/avif path inside assetBase, default ./contributions/assets/), to (a connection's other chapter), test (true for test items). showTest (default false): show test items. Shown as a count on each card, a From readers section under the text, and connections as the readers dimension: a dashed edge layer, off until the reader turns it on. A passage that can't be found in the current text, or can't be told apart from a repeat, falls back to the chapter and says so. submit (default false): a form in that section to send one; endpoint (default ./api/contributions) is where it posts; limits { name 60, body 8000, exact 400 }."
 }

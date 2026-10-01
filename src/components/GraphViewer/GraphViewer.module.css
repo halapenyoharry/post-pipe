@@ -209,6 +209,20 @@
 }
 
 
+/* Readers' connections (the readers dimension): dashed, in their own colour,
+   unlike any of the book's edges, and never touched, like every edge. */
+.graphContainer :global(.readers-layer) {
+  pointer-events: none;
+}
+.graphContainer :global(.readers-line) {
+  stroke: var(--gv-readers, #e58fb4);
+  stroke-width: 1.6px;
+  stroke-opacity: 0.85;
+  stroke-dasharray: 7 5;
+  stroke-linecap: round;
+  fill: none;
+}
+
 /* Roots (graph.roots): thin and quiet, behind everything, never touched.
    --pp-root-color comes from the theme. */
 .graphContainer :global(.roots-layer) {
