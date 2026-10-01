@@ -6,6 +6,7 @@ import { readerHeader } from '../../lib/readerHeader';
 import { progressBarMode, allowDownload } from '../../lib/readerSettings';
 import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
+import { rightsLine } from '../../lib/rights';
 
 
 export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
@@ -133,6 +134,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const h1 = doc.querySelector('h1');
         if (h1) h1.remove();
+        // The page's own rights footer; the reader draws its own line.
+        doc.querySelectorAll('.pp-rights').forEach((el) => el.remove());
         let bodyHtml = doc.querySelector('body') ? doc.querySelector('body').innerHTML : html;
         setContentHtml(bodyHtml + renderCompanions(item));
       } catch (e) {
@@ -353,6 +356,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const header = readerHeader(settings, article);
   const progressMode = progressBarMode(settings);
   const canDownload = allowDownload(settings);
+  const rights = rightsLine(settings && settings.rights);
 
   return (
     <>
@@ -604,6 +608,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             )}
           </div>
           <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+          {rights && contentHtml && (
+            <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
+          )}
         </div>
       </div>
 

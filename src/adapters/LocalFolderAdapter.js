@@ -9,6 +9,7 @@
 // This adapter is the local source. It's a peer of RssAdapter, AtomAdapter,
 // etc. — the aggregator treats them all the same.
 
+const { rightsMeta, rightsFooterHtml } = require('../lib/rights');
 const fs   = require('fs');
 const path = require('path');
 const { marked } = require('marked');
@@ -26,6 +27,7 @@ const ID = 'local';
  *   pagesBase: string,     // canonical site URL (for generating per-item URLs)
  *   coversDir: string,     // where to copy cover images for the static site
  *   pagesDir?: string      // where to write per-item HTML pages
+ *   rights?: object        // settings.rights, shown on every page
  * }} config
  * @returns {Promise<{items, feedMeta}>}
  */
@@ -56,7 +58,7 @@ async function load(config) {
     if (c.connected_to && Array.isArray(c.connected_to)) {
       c.connected_to = c.connected_to.filter(slug => !hiddenSlugs.has(slug));
     }
-    generateItemPage(c, rootPath, pagesDir, hiddenSlugs);
+    generateItemPage(c, rootPath, pagesDir, hiddenSlugs, config.rights);
     return contentToItem(c, rootPath, pagesBase, coversDir, config.commits || {});
   });
 
@@ -231,7 +233,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set()) {
+function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set(), rights = null) {
   if (!pagesDir || !c.body || c.posted === 'title') return;
   try {
     const { file, format } = c.body;
@@ -269,7 +271,10 @@ function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set()) {
       }
       const rendered = marked(rawMd);
       const escapedTitle = escapeHtml(c.title);
-      const doc = `<!doctype html>\n<html><head><meta charset="utf-8"><title>${escapedTitle}</title></head><body><h1>${escapedTitle}</h1>\n${rendered}</body></html>\n`;
+      // settings.rights: the copyright and no-AI lines go in the head, and
+      // the rights line follows the text.
+      const meta = rightsMeta(rights);
+      const doc = `<!doctype html>\n<html><head><meta charset="utf-8"><title>${escapedTitle}</title>${meta ? '\n' + meta : ''}</head><body><h1>${escapedTitle}</h1>\n${rendered}${rightsFooterHtml(rights)}</body></html>\n`;
       fs.writeFileSync(outPath, doc, 'utf8');
     }
   } catch (err) {

@@ -523,6 +523,15 @@
   color: #666;
 }
 
+.rightsLine {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(204, 214, 246, 0.55);
+}
+
 .copyToast {
   position: fixed;
   bottom: calc(24px + env(safe-area-inset-bottom, 0px));

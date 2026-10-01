@@ -78,6 +78,7 @@ function configFor(entry) {
       ...base,
       visibilityDefault: SETTINGS.visibility?.default || 'public',
       commits: { hideMeta: SETTINGS.commits?.hideMeta !== false },
+      rights: SETTINGS.rights || null,
 
       path: localPath,
       pagesBase: PAGES_BASE,
@@ -90,6 +91,7 @@ function configFor(entry) {
 
 const { buildEdges } = require('./src/corpus/buildEdges');
 const { readerFonts } = require('./src/lib/readerSettings');
+const { rightsMeta, rightsFooterHtml } = require('./src/lib/rights');
 
 // Reader faces other than the page's own ship as files next to the page,
 // with their license, and load only when chosen. No font is fetched from
@@ -221,8 +223,7 @@ function buildIndexHTML() {
 <meta name="generator" content="post-pipe ${new Date().toISOString()}">
 <title>${SETTINGS.site.title}</title>
 <meta name="description" content="${SETTINGS.site.description}">
-${SETTINGS.rights ? `<meta name="copyright" content="${SETTINGS.rights.holder} ${SETTINGS.rights.year}">` : ''}
-${SETTINGS.rights && SETTINGS.rights.noAiTraining ? '<meta name="robots" content="noai, noimageai">' : ''}
+${rightsMeta(SETTINGS.rights)}
 <meta property="og:title" content="${SETTINGS.site.title}">
 <meta property="og:description" content="${SETTINGS.site.description}">
 <meta property="og:type" content="website">
@@ -269,6 +270,16 @@ ${readerFontFaces()}
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: var(--bg); color: var(--text); font-family: 'Atkinson', sans-serif; overflow: hidden; }
 
+  /* settings.rights: one quiet line above the bottom bar, under everything
+     else; the reader shows its own under the text. */
+  .pp-rights {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    z-index: 30; width: max-content; max-width: calc(100vw - 32px);
+    font: 10px/1.35 system-ui, -apple-system, sans-serif; text-align: center;
+    color: rgba(255, 255, 255, 0.38); pointer-events: none;
+  }
+
   #error { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #e74c3c; font-size: 18px; }
 
   /* Injected React Components CSS */
@@ -278,6 +289,7 @@ ${readerFontFaces()}
 <body>
 <div id="error"></div>
 <div id="app-root"></div>
+${rightsFooterHtml(SETTINGS.rights)}
 
 <script>
 // ── TTS Config ──
