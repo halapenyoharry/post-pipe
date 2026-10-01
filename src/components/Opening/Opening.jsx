@@ -55,14 +55,15 @@ function loadSize(src) {
 }
 
 // Where an image's plant starts: the first row with ink, as a share of its
-// height (read off a small copy). null when the image cannot be read.
+// height, read at the image's own size (a small copy loses the thin tips).
+// null when the image cannot be read.
 function loadInkTop(src) {
   return new Promise((resolve) => {
     if (!src) { resolve(null); return; }
     const img = new Image();
     img.onload = () => {
       try {
-        const w = Math.min(260, img.naturalWidth), h = Math.max(1, Math.round((img.naturalHeight * w) / img.naturalWidth));
+        const w = Math.min(2048, img.naturalWidth), h = Math.max(1, Math.round((img.naturalHeight * w) / img.naturalWidth));
         const c = document.createElement('canvas');
         c.width = w; c.height = h;
         const ctx = c.getContext('2d');

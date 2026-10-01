@@ -1305,30 +1305,32 @@ export function GraphViewer({
       if (vs && c) vs.setNodePosition(detachKey(cId), c.x, c.y, { transient: true });
       else detachedHere.add(cId);
     }
-    // A dragged container's saved positions hold it where the reader left
-    // it: pinned, so nothing pulls it off. Every other one goes onto its
-    // anchor, its members keeping their arrangement round it.
+    // A dragged container goes back where the reader dropped it (its own
+    // entry says where its centre was), its members pinned in their saved
+    // arrangement round it, or the layout's when theirs was not kept. Every
+    // other one goes onto its anchor, its members keeping their arrangement
+    // round it.
+    const dropsPending = new Map(); // cId -> where its centre was dropped
     for (const cId of ANCHORS.keys()) {
       const vs = viewStateRef.current;
-      let saved = false;
-      if (vs && !positionsWereDegenerate && isDetached(cId)) {
+      if (vs && isDetached(cId)) {
+        const st = vs.nodeState(detachKey(cId));
         for (const slug of getAllMemberSlugs(cId)) {
           if (anchoredOf.get(slug) !== cId) continue;
           const n = nodeBySlug.get(slug);
-          const st = n && vs.nodeState(positionKey(n));
-          if (st && Number.isFinite(st.x) && Number.isFinite(st.y)) { saved = true; n.fx = n.x; n.fy = n.y; }
+          if (n && Number.isFinite(n.x) && Number.isFinite(n.y)) { n.fx = n.x; n.fy = n.y; }
         }
+        dropsPending.set(cId, { x: st.x, y: st.y });
+      } else {
+        anchorsPending.add(cId);
       }
-      if (!saved) anchorsPending.add(cId);
     }
-    function placeAnchors(ids = [...ANCHORS.keys()]) {
-      if (!anchorsOn()) return false;
-      const targets = anchorTargets();
-      for (const cId of ids) {
-        const w = targets.get(cId);
+    // Move each container in `targets` (cId -> a world point), members and
+    // all, so its centre is there, pinned.
+    function moveCentres(targets) {
+      for (const [cId, w] of targets) {
         const c = centreOf(cId);
-        if (!w) continue;
-        if (!c) continue;
+        if (!w || !c) continue;
         const dx = w.x - c.x, dy = w.y - c.y;
         for (const slug of getAllMemberSlugs(cId)) {
           const n = nodeBySlug.get(slug);
@@ -1338,8 +1340,19 @@ export function GraphViewer({
           n.vx = 0; n.vy = 0;
         }
       }
+    }
+    function placeAnchors(ids = [...ANCHORS.keys()]) {
+      if (!anchorsOn()) return false;
+      const targets = anchorTargets();
+      moveCentres(ids.map((cId) => [cId, targets.get(cId)]));
       for (const cId of ids) anchorsPending.delete(cId);
       anchorsAuto = ids.length === ANCHORS.size;
+      return true;
+    }
+    function placeDrops() {
+      if (!dropsPending.size) return false;
+      moveCentres([...dropsPending]);
+      dropsPending.clear();
       return true;
     }
 
@@ -2946,7 +2959,9 @@ export function GraphViewer({
       // would only drag whatever is not pinned away after the pinned mass.
       simulation.force('center', null);
       const pinned = [...ANCHORS.keys()].filter((cId) => anchorsPending.has(cId) || !isDetached(cId));
-      if (pinned.length) { placeAnchors(pinned); applyPositions(); }
+      const dropped = placeDrops();
+      if (pinned.length) placeAnchors(pinned);
+      if (pinned.length || dropped) applyPositions();
       if (!userMovedView) applyHomeView(false);
     }
     window.addEventListener('postpipe:cover-frame', onCoverFrame);

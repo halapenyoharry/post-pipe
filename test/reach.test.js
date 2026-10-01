@@ -53,6 +53,10 @@ test('the stop-short point: aimed at the centre, stopShort px before the hull', 
   assert.ok(Math.abs(Math.hypot(slant.hit.x - slant.end.x, slant.hit.y - slant.end.y) - 18) < 1e-9, 'stopShort measured along the way');
   assert.equal(reachEnd({ x: 210, y: 190 }, { x: 200, y: 200 }, hull, 18), null, 'a tip inside the hull grows nothing');
   assert.equal(reachEnd({ x: 200, y: 140 }, { x: 200, y: 200 }, hull, 18), null, 'too close to grow');
+  assert.equal(reachEnd({ x: 200, y: 129 }, { x: 200, y: 200 }, hull, 18), null, 'a rootlet of 3 px would draw nothing: passed over');
+  const short = reachEnd({ x: 200, y: 127 }, { x: 200, y: 200 }, hull, 18);
+  assert.ok(short && Math.abs(short.length - 5) < 1e-9, 'one of 5 px grows');
+  assert.ok(reachPath({ x: 200, y: 127 }, short.end, reachShape('s')).main, 'and is drawn');
   assert.ok(insidePolygon({ x: 200, y: 200 }, hull));
   assert.ok(!insidePolygon({ x: 0, y: 0 }, hull));
   assert.equal(rayHit({ x: 0, y: 0 }, { x: 10, y: 0 }, hull), null, 'a ray that misses');

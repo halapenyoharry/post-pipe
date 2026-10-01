@@ -144,13 +144,17 @@ function rayHit(from, to, poly) {
 // A rootlet's end: aimed from the tip at the container's centre, it stops
 // stopShort px before the hull's edge. null when the tip is inside the hull
 // or too close to it to grow at all.
+const MIN_REACH = 4; // px: the shortest rootlet reachPath draws
+
 function reachEnd(tip, centre, hull, stopShort) {
   if (!hull || hull.length < 3) return null;
   if (insidePolygon(tip, hull)) return null;
   const hit = rayHit(tip, centre, hull);
   if (!hit) return null;
   const len = Math.hypot(hit.x - tip.x, hit.y - tip.y);
-  if (len <= stopShort + 2) return null;
+  // Too close to grow: a rootlet shorter than reachPath draws (4 px) would
+  // take a tip's place and show nothing.
+  if (len - stopShort < MIN_REACH) return null;
   const k = (len - stopShort) / len;
   return { end: { x: tip.x + (hit.x - tip.x) * k, y: tip.y + (hit.y - tip.y) * k }, hit, length: len - stopShort };
 }
@@ -263,7 +267,7 @@ function bent(origin, heading, angle, length, bend, steps) {
 function reachPath(p0, p1, shape) {
   if (!p0 || !p1 || !Number.isFinite(p0.x) || !Number.isFinite(p1.x)) return { main: '', fine: '' };
   const len = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-  if (len < 4) return { main: '', fine: '' };
+  if (len < MIN_REACH) return { main: '', fine: '' };
   const steps = Math.max(8, Math.min(40, Math.round(len / 12)));
   const pts = wander(p0, p1, shape, steps);
   const heading = Math.atan2(p1.y - p0.y, p1.x - p0.x);
