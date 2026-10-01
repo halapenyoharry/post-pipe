@@ -35,3 +35,4 @@ scrap.md
 # library build output — produced by `npm run build:lib`
 dist-lib/
 node_modules
+_local/
