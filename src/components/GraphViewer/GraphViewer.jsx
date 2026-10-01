@@ -2742,12 +2742,33 @@ export function GraphViewer({
       return { box, root };
     }
 
+    // How much of the graph's top and bottom the page's own fixed controls
+    // cover, measured where they are drawn: the source pills and the settings
+    // gear above (data-feeds, data-settings-gear), the rights line and the
+    // toolbar below (data-rights, data-toolbar). A frame keeps clear of them,
+    // so on the first screen they cover nothing.
+    function chromeInsets(h) {
+      const none = { top: 0, bottom: 0 };
+      if (typeof document === 'undefined' || !containerRef.current) return none;
+      const box = containerRef.current.getBoundingClientRect();
+      let top = 0, bottom = 0;
+      for (const el of document.querySelectorAll('[data-feeds], [data-settings-gear], [data-rights], [data-toolbar]')) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        if (r.top >= box.top + h / 2) bottom = Math.max(bottom, box.top + h - r.top);
+        else if (r.bottom <= box.top + h / 2) top = Math.max(top, r.bottom - box.top);
+      }
+      return { top: Math.max(0, Math.min(h / 4, top)), bottom: Math.max(0, Math.min(h / 3, bottom)) };
+    }
+
     function fitToViewport({ animate = false, initialZoomOut = false, focus = true } = {}) {
       const ext = containerExtent();
       if (ext) {
         let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
         let h = containerRef.current ? containerRef.current.clientHeight : window.innerHeight;
         if (w < 50 || h < 50) return false;
+        const inset = chromeInsets(h);
+        h -= inset.top + inset.bottom;
         const margin = 24;
         const fitScale = (r) => Math.min((w - margin * 2) / Math.max(r.x1 - r.x0, 1), (h - margin * 2) / Math.max(r.y1 - r.y0, 1), 1);
         const ff = focus ? focusFrame() : null;
@@ -2770,8 +2791,8 @@ export function GraphViewer({
         k = Math.max(k, 0.04);
         const cx = (frame.x0 + frame.x1) / 2;
         const ty = topAligned
-          ? margin + 32 - frame.y0 * k
-          : h / 2 - ((frame.y0 + frame.y1) / 2) * k;
+          ? Math.max(inset.top + margin, margin + 32) - frame.y0 * k
+          : inset.top + h / 2 - ((frame.y0 + frame.y1) / 2) * k;
         const transform = d3.zoomIdentity
           .translate(w / 2 - cx * k, ty)
           .scale(k);

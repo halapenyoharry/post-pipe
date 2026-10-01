@@ -28,7 +28,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
   const hidden = hiddenSources || new Set();
 
   return (
-    <div className={styles.bar}>
+    <div className={styles.bar} data-feeds>
       {sources.map(src => (
         <FeedPill
           key={src.id}
