@@ -190,7 +190,9 @@ function Cover({ config, viewState, children }) {
         paintRef.current(p);
       },
       onRest(state) {
-        paintRef.current(machine.p);
+        // Mid-swap (reduced motion) the fade paints the new state at its
+        // midpoint, out of sight.
+        if (!fadeTimer) paintRef.current(machine.p);
         // Written at once, not after the usual pause, so a reader who leaves
         // straight after a move still lands there next time.
         if (viewState && viewState.setOpeningState) {
