@@ -11065,7 +11065,7 @@ function hl({ config: e, viewState: t, children: n }) {
 				D.current(e);
 			},
 			onRest(e) {
-				D.current(r.p), t && t.setOpeningState && t.setOpeningState(e), window.dispatchEvent(new CustomEvent("postpipe:cover", { detail: { state: e } }));
+				D.current(r.p), t && t.setOpeningState && (t.setOpeningState(e), t.flush && t.flush()), window.dispatchEvent(new CustomEvent("postpipe:cover", { detail: { state: e } }));
 			}
 		});
 		v.current = r, D.current(r.p), t && t.setOpeningState && t.setOpeningState(r.rest), window.PostPipeCover = {
