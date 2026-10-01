@@ -158,7 +158,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       marks.forEach(b => viewState.removeBookmark(b.id));
     } else {
       const topP = findTopVisibleParagraph();
-      viewState.addBookmark({ item: pId, para: topP !== null ? topP : undefined, version: article.version });
+      const ps = bodyRef.current ? bodyRef.current.querySelectorAll('p') : [];
+      const words = topP !== null && ps[topP] ? ps[topP].innerText.trim().split(/\s+/).slice(0, 8).join(' ') : '';
+      viewState.addBookmark({ item: pId, para: topP !== null ? topP : undefined, quote: words, version: article.version });
     }
   };
 
@@ -378,17 +380,23 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <div className={styles.toolbarSeparator}></div>
 
           <div className={styles.toolbarGroup}>
+            {/* Each bookmark control says what it does in words, not only on
+                hover: a phone has no hover. */}
             <button
-              className={`${styles.tb} ${viewState && viewState.bookmarks(getPersistentId(article)).length > 0 ? styles.active : ''}`}
+              className={`${styles.tb} ${styles.tbLabeled} ${itemBookmarks.length > 0 ? styles.active : ''}`}
               onClick={toggleBookmark}
-              title="Bookmark this position"
-              dangerouslySetInnerHTML={{ __html: `${viewState && viewState.bookmarks(getPersistentId(article)).length > 0 ? ICONS.bookmark : ICONS.bookmark}<span class="${styles.tbTooltip}">Bookmark</span>` }}
+              aria-pressed={itemBookmarks.length > 0}
+              title={itemBookmarks.length > 0 ? 'Remove the bookmark in this chapter' : 'Save the paragraph at the top of the reader'}
+              data-bookmark-toggle
+              dangerouslySetInnerHTML={{ __html: `${ICONS.bookmark}<span class="${styles.tbText}">${itemBookmarks.length > 0 ? 'Marked' : 'Mark here'}</span>` }}
             />
             <button
-              className={`${styles.tb} ${showMarksList ? styles.active : ''}`}
+              className={`${styles.tb} ${styles.tbLabeled} ${showMarksList ? styles.active : ''}`}
               onClick={() => setShowMarksList(!showMarksList)}
-              title="View marks list"
-              dangerouslySetInnerHTML={{ __html: `${ICONS.bookmarkList}<span class="${styles.tbTooltip}">Marks list</span>` }}
+              aria-expanded={showMarksList}
+              title="Every place you have bookmarked"
+              data-bookmark-list
+              dangerouslySetInnerHTML={{ __html: `${ICONS.bookmarkList}<span class="${styles.tbText}">Bookmarks</span>` }}
             />
           </div>
 
@@ -500,13 +508,19 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
         {showMarksList && (
           <div className={styles.marksListPanel}>
+            <div className={styles.marksLegend} data-bookmark-legend>
+              <strong>Mark here</strong> saves the paragraph at the top of the reader; a ribbon
+              in the margin shows it, and tapping it again removes it. <strong>Bookmarks</strong> lists
+              every saved place: <em>Jump</em> goes back to it, the copy button copies a link to it,
+              and the bin deletes it. Tap a note to write one.
+            </div>
             {allBookmarks.length === 0 ? (
               <div className={styles.noMarks}>No bookmarks yet.</div>
             ) : (
               allBookmarks.map(b => (
                 <div key={b.id} className={styles.markItem}>
                   <div className={styles.markMain}>
-                    <div className={styles.markTitle}>{b.id}</div>
+                    <div className={styles.markTitle}>{bookmarkLabel(b, article, pId)}</div>
                     {editingNoteFor === b.id ? (
                       <input
                         type="text"
@@ -596,6 +610,17 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 }
 
 // Helpers
+
+// What a bookmark is called in the list: its chapter and its first words.
+function bookmarkLabel(b, article, pId) {
+  const chapter = b.item === pId
+    ? (article.title || article.label)
+    : decodeURIComponent(String(b.item || '').split('/').pop().replace(/\.html$/, '')).replace(/[-_]+/g, ' ');
+  const para = b.para !== undefined ? b.para : b.paragraph;
+  const where = b.quote ? `“${b.quote}…”` : (para != null ? `paragraph ${Number(para) + 1}` : '');
+  return [chapter, where].filter(Boolean).join(' · ');
+}
+
 function renderPlaceholder(article, reason) {
   const r = reason || `This substrate ("${article.kind || 'unknown'}") is not yet renderable in the viewer.`;
   let html = `<div style="padding:24px;border:1px dashed var(--rp-border);border-radius:6px;background:rgba(17,24,39,0.4);">`;

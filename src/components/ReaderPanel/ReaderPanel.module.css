@@ -257,6 +257,19 @@
   border-color: var(--rp-accent);
 }
 
+/* A control with its name written beside the icon. */
+.tb.tbLabeled {
+  width: auto;
+  padding: 0 10px 0 8px;
+  gap: 6px;
+}
+
+.tbText {
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .tb.active {
   background: rgba(100, 255, 218, 0.15);
   border-color: var(--rp-accent);
@@ -716,6 +729,81 @@
   background: rgba(239, 68, 68, 0.15);
   border-color: #ef4444;
   color: #ef4444;
+}
+
+.marksListPanel {
+  padding: 12px 20px;
+  background: rgba(17, 24, 39, 0.85);
+  border-bottom: 1px solid var(--rp-border);
+  font-size: 13px;
+  max-height: 45vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.inlineNotePanel {
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--rp-border);
+  flex-shrink: 0;
+}
+
+.noteInput {
+  width: 100%;
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(100, 255, 218, 0.25);
+  color: var(--rp-text-bright, #fff);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  border-radius: 4px;
+  outline: none;
+}
+
+.noteInput:focus {
+  border-color: var(--rp-accent);
+}
+
+.marksLegend {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(204, 214, 246, 0.75);
+  margin-bottom: 10px;
+}
+
+.marksLegend strong {
+  color: var(--rp-accent);
+  font-weight: 600;
+}
+
+.markMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.markTitle {
+  font-size: 12px;
+  color: var(--rp-text-bright, #fff);
+  overflow-wrap: anywhere;
+}
+
+.markActions button {
+  background: transparent;
+  border: 1px solid rgba(100, 255, 218, 0.2);
+  color: var(--rp-text);
+  border-radius: 4px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.markActions button :global(svg) {
+  width: 14px;
+  height: 14px;
 }
 
 .noMarks {
