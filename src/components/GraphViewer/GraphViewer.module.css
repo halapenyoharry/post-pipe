@@ -208,3 +208,20 @@
   stroke-width: 2.5;
 }
 
+
+/* Roots (graph.roots): thin and quiet, behind everything, never touched.
+   --pp-root-color comes from the theme. */
+.graphContainer :global(.roots-layer) {
+  pointer-events: none;
+}
+.graphContainer :global(.root-main),
+.graphContainer :global(.root-fine) {
+  stroke: var(--pp-root-color, #b08850);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke-width 1.2s ease, stroke-opacity 1.2s ease;
+}
+.graphContainer :global(.root[data-state="seen"] .root-main) { stroke-width: 1.1px; stroke-opacity: 0.38; }
+.graphContainer :global(.root[data-state="seen"] .root-fine) { stroke-width: 0.7px; stroke-opacity: 0.28; }
+.graphContainer :global(.root[data-state="done"] .root-main) { stroke-width: 2.2px; stroke-opacity: 0.62; }
+.graphContainer :global(.root[data-state="done"] .root-fine) { stroke-width: 1.1px; stroke-opacity: 0.45; }

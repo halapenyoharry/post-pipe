@@ -459,7 +459,68 @@ async function part2(bt, name, size, record) {
   }
 }
 
-const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2 };
+// ── 3. roots ───────────────────────────────────────────────────────────────
+const rootsNow = (page) => page.evaluate(() => [...document.querySelectorAll('.roots-layer .root')].map((r) => ({
+  key: r.getAttribute('data-root'),
+  shown: r.style.display !== 'none',
+  state: r.getAttribute('data-state'),
+  d: (r.querySelector('.root-main') || {}).getAttribute ? r.querySelector('.root-main').getAttribute('d') : '',
+  w: parseFloat(getComputedStyle(r.querySelector('.root-main')).strokeWidth),
+  dash: r.querySelector('.root-main').style.strokeDasharray,
+})));
+
+async function readTo(page, item, f) {
+  await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(item));
+  await page.waitForTimeout(1300);
+  await page.evaluate((f) => { const b = document.querySelector('[data-tts-target]'); b.scrollTop = (b.scrollHeight - b.clientHeight) * f; b.dispatchEvent(new Event('scroll')); }, f);
+  await page.waitForTimeout(600);
+}
+
+async function part3(bt, name, size, record) {
+  const s = await open(bt, name, size, BASE);
+  const { page } = s;
+  try {
+    const none = await rootsNow(page);
+    record('3 roots are seeded from the book: one per step of the reading path', none.length > 10, `${none.length} roots, ${none.length * 2} paths`);
+    record('3 nothing read, no roots showing', none.every((r) => !r.shown), `${none.filter((r) => r.shown).length} showing`);
+    const key = `e:${slugOf(FIRST)}>${slugOf(SECOND)}`;
+    await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(SECOND));
+    await page.waitForTimeout(250);
+    const drawing = (await rootsNow(page)).find((r) => r.key === key);
+    await page.waitForTimeout(1100);
+    const opened = (await rootsNow(page)).find((r) => r.key === key);
+    record('3 opening a chapter draws in the root that reaches it', !!opened && opened.shown && opened.state === 'seen' && !!drawing && /1/.test(drawing.dash || ''), opened ? `${opened.state}, drawn in with dash "${drawing && drawing.dash}"` : 'missing');
+    await readTo(page, SECOND, 1);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1600);
+    const done = (await rootsNow(page)).find((r) => r.key === key);
+    record('3 finishing it thickens its root', !!done && done.state === 'done' && done.w > opened.w, done ? `${opened.w}px → ${done.w}px` : 'missing');
+    // Never in the way of a pointer.
+    const hit = await page.evaluate(() => {
+      const path = [...document.querySelectorAll('.roots-layer .root-main')].find((p) => p.getAttribute('d') && p.closest('.root').style.display !== 'none');
+      if (!path) return null;
+      const len = path.getTotalLength(); const pt = path.getPointAtLength(len / 2); const m = path.getScreenCTM();
+      const x = m.a * pt.x + m.c * pt.y + m.e, y = m.b * pt.x + m.d * pt.y + m.f;
+      const el = document.elementFromPoint(x, y);
+      return { onRoot: !!(el && el.closest && el.closest('.roots-layer')), pe: getComputedStyle(path.closest('.roots-layer')).pointerEvents };
+    });
+    record('3 roots never take a tap', !!hit && !hit.onRoot && hit.pe === 'none', hit ? `pointer-events ${hit.pe}` : 'no root to test');
+    const under = await page.evaluate(() => { const g = document.querySelector('svg > g:not(.time-axis-layer)'); const kids = [...g.children].map((c) => c.getAttribute('class')); return kids.indexOf('roots-layer') < kids.indexOf('containers-layer'); });
+    record('3 roots sit under the hulls and titles', under, under ? 'under' : 'above');
+    const before = (await rootsNow(page)).find((r) => r.key === key);
+    if (SHOTS && name === 'chromium') await page.screenshot({ path: path.join(SHOTS, `roots-${size}.png`) });
+    await page.reload();
+    await page.waitForSelector('.container-group', { state: 'attached' });
+    await page.waitForTimeout(4500);
+    const again = (await rootsNow(page)).find((r) => r.key === key);
+    record('3 the same book grows the same roots after a reload', !!again && again.d === before.d && again.state === 'done' && !again.dash, again ? (again.d === before.d ? 'identical, no redraw' : 'different') : 'missing');
+    record('3 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  } finally {
+    await s.browser.close();
+  }
+}
+
+const PART_FNS = { 0: part0, 6: part6, 1: part1, 2: part2, 3: part3 };
 
 const server = http.createServer((req, res) => handler(req, res, {
   public: SITE,

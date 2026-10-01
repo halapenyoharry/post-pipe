@@ -9,6 +9,7 @@ import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { closedMemberSet, edgeHidden } from './closedState';
 import { createTapGate } from './tapGate';
+import { rootShape, rootPath, rootSegments } from './roots';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 
 // Transform the raw feed JSON into graph nodes and links. Links come from
@@ -272,6 +273,7 @@ export function GraphViewer({
   // Set by the axis draw so pan and zoom can re-project the connectors.
   const connectorUpdateRef = useRef(null);
   const renderAllArticleBodiesRef = useRef(null);
+  const rootsUpdateRef = useRef(null);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -318,6 +320,7 @@ export function GraphViewer({
       if (renderAllArticleBodiesRef.current) {
         renderAllArticleBodiesRef.current();
       }
+      if (rootsUpdateRef.current) rootsUpdateRef.current();
     });
   }, [viewState]);
 
@@ -667,6 +670,12 @@ export function GraphViewer({
     // up bisecting it.
     const axisLayer = svg.append('g').attr('class', 'time-axis-layer');
 
+    // Roots (graph.roots): under everything else, hulls included, and never
+    // touched by a pointer.
+    const rootsLayer = g.append('g').attr('class', 'roots-layer')
+      .attr('aria-hidden', 'true')
+      .style('pointer-events', 'none');
+
     // Hierarchical containment layer (rendered underneath links and cards).
     const containersLayer = g.append('g').attr('class', 'containers-layer');
 
@@ -728,6 +737,9 @@ export function GraphViewer({
       : (Array.isArray(GS.initialCollapsed) ? GS.initialCollapsed : []));
     const closedContainers = new Set(initiallyClosed());
     const containerCentroids = new Map();
+    // Where each container's title (or, closed, its blob) is drawn: the
+    // roots start there.
+    const containerAnchor = new Map();
 
 
     // A container's label: its title wrapped to a few lines, the member count
@@ -1331,6 +1343,7 @@ export function GraphViewer({
 
         if (memberNodes.length === 0 || hasClosedAncestor(c)) {
           group.style('display', 'none');
+          containerAnchor.delete(c.id);
           return;
         }
 
@@ -1341,6 +1354,7 @@ export function GraphViewer({
         if (isClosed) {
           const pos = macroPos(c);
           containerCentroids.set(c.id, pos);
+          containerAnchor.set(c.id, pos);
           group.style('display', null);
           group.select('.container-hull').style('display', 'none');
           group.select('.container-badge').style('display', 'none');
@@ -1447,6 +1461,7 @@ export function GraphViewer({
           badge.select('.container-badge-text').attr('font-size', `${fs}px`);
           sizeHit(fs);
           badge.attr('transform', `translate(${labelAt.x}, ${labelAt.y})${upright()}`);
+          containerAnchor.set(c.id, labelAt);
           return;
         }
 
@@ -1462,6 +1477,7 @@ export function GraphViewer({
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : d3.mean(hull, (p) => p[0]);
         badge.attr('transform', `translate(${cx}, ${minY + (maxY - minY) / 3})${upright()}`);
+        containerAnchor.set(c.id, { x: cx, y: minY + (maxY - minY) / 3 });
       });
     }
 
@@ -2408,7 +2424,98 @@ export function GraphViewer({
         articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px) rotate(var(--gv-unrot, 0deg))`);
       }
       updateContainers();
+      if (rootsUpdateRef.current) rootsUpdateRef.current();
     }
+    // ── Roots ─────────────────────────────────────────────────────────────
+    // graph.roots (default off): thin branching roots grow along the reading
+    // path, from the book's title to each act's, to each first chapter and
+    // on from chapter to chapter. A root reaching a chapter draws in once
+    // this reader opens it, and thickens and brightens once they finish it,
+    // so their reading becomes a root system. Seeded per book, so the same
+    // book grows the same roots. One small group per root, under the hulls.
+    const ROOTS = GS.roots ? (GS.roots === true ? {} : GS.roots) : null;
+    let rootsList = [];
+    let rootsFrame = null;
+    let rootsPainted = false;
+    if (ROOTS) {
+      const memberOf = new Map();
+      for (const [cId, members] of containerMembers) for (const slug of members) memberOf.set(slug, cId);
+      const seq = data.links.filter((l) => l.layer === 'sequence').map((l) => ({ source: endId(l.source), target: endId(l.target) }));
+      const top = (data.containers || []).find((c) => !c.parent);
+      const seed = String(ROOTS.seed || (top && top.id) || 'roots');
+      rootsList = rootSegments({ containers: data.containers || [], memberOf, sequence: seq }).map((seg) => {
+        const el = rootsLayer.append('g').attr('class', 'root').attr('data-root', seg.key).style('display', 'none');
+        return {
+          ...seg,
+          shape: rootShape(seed + '|' + seg.key),
+          el,
+          main: el.append('path').attr('class', 'root-main').attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke'),
+          fine: el.append('path').attr('class', 'root-fine').attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke'),
+          state: 'hidden',
+        };
+      });
+    }
+    function rootEnd(end) {
+      if (end.node) {
+        const n = nodeBySlug.get(end.node);
+        if (!n || !Number.isFinite(n.x) || closedHidden.has(n.id)) return null;
+        if (n._source && hiddenSourcesRef.current.has(n._source.id)) return null;
+        return { x: n.x, y: n.y };
+      }
+      return containerAnchor.get(end.container) || null;
+    }
+    // Opened (seen) and finished (done), for a chapter or, for a container,
+    // any of its chapters opened and all of them finished.
+    function reachState(reach) {
+      const vs = viewStateRef.current;
+      if (!vs || !vs.readingProgress) return 'hidden';
+      const of = (slug) => { const n = nodeBySlug.get(slug); return n ? vs.readingProgress(persistKey(n)) : { seen: false, done: false }; };
+      if (reach.node) {
+        const p = of(reach.node);
+        return p.done ? 'done' : (p.seen || p.max > 0) ? 'seen' : 'hidden';
+      }
+      const ps = getAllMemberSlugs(reach.container).map(of);
+      if (!ps.length || !ps.some((p) => p.seen || p.max > 0)) return 'hidden';
+      return ps.every((p) => p.done) ? 'done' : 'seen';
+    }
+    function paintRoots() {
+      rootsFrame = null;
+      if (!rootsList.length) return;
+      for (const r of rootsList) {
+        const state = reachState(r.reach);
+        const a = rootEnd(r.from), b = rootEnd(r.to);
+        if (state === 'hidden' || !a || !b) {
+          r.el.style('display', 'none');
+          if (state === 'hidden') r.state = 'hidden';
+          continue;
+        }
+        const d = rootPath(a, b, r.shape);
+        r.main.attr('d', d.main);
+        r.fine.attr('d', d.fine);
+        r.el.style('display', null).attr('data-state', state);
+        // A root this reader has just reached draws in; one already there
+        // when the page opened is simply there.
+        if (r.state === 'hidden' && rootsPainted) {
+          for (const p of [r.main, r.fine]) {
+            p.attr('pathLength', 1).style('stroke-dasharray', '1 1').style('stroke-dashoffset', 1).style('transition', 'none');
+            const node = p.node();
+            if (node) node.getBoundingClientRect();
+            p.style('transition', 'stroke-dashoffset 1.8s ease-out').style('stroke-dashoffset', 0);
+          }
+          setTimeout(() => {
+            for (const p of [r.main, r.fine]) p.attr('pathLength', null).style('stroke-dasharray', null).style('stroke-dashoffset', null).style('transition', null);
+          }, 1900);
+        }
+        r.state = state;
+      }
+      rootsPainted = true;
+    }
+    function scheduleRoots() {
+      if (!rootsList.length || rootsFrame) return;
+      rootsFrame = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame(paintRoots) : setTimeout(paintRoots, 16);
+    }
+    rootsUpdateRef.current = ROOTS ? scheduleRoots : null;
+
     let hasFitted = false;
     graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen };
     positionsReady = true;
@@ -2775,6 +2882,8 @@ export function GraphViewer({
 
     return () => {
       renderAllArticleBodiesRef.current = null;
+      rootsUpdateRef.current = null;
+      if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
       if (themeObserver) themeObserver.disconnect();
       simulation.stop();
       document.removeEventListener('visibilitychange', handleVisibility);
