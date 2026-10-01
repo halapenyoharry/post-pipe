@@ -245,6 +245,8 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
   }, [features.keyboardShortcuts, viewState]);
 
   const [selectedArticle, setSelectedArticle] = React.useState(null);
+
+  const [focusedItem, setFocusedItem] = React.useState(null);
       const [targetParagraph, setTargetParagraph] = React.useState(null);
 
   // Computed derived state
@@ -371,6 +373,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         viewState={viewState}
         colorOverrides={colorOverrides}
         apiRef={graphApiRef}
+        onNodeFocus={setFocusedItem}
       />
 
       {/* Feed sources bar */}
@@ -395,7 +398,12 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
 
       {/* Color settings */}
       {features.colorSettings && viewState && (
-        <Settings viewState={viewState} feedData={feedData} />
+        <Settings
+          viewState={viewState}
+          feedData={feedData}
+          subject={selectedArticle || focusedItem}
+          readerOpen={selectedArticle ? selectedArticle.id : null}
+        />
       )}
 
       {/* Config panel */}
@@ -421,6 +429,13 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           settings={settings}
           viewState={viewState}
           targetParagraph={targetParagraph}
+          feedData={feedData}
+          onNavigate={(item) => {
+            if (!item) return;
+            if (viewState) viewState.markSeen(item.id);
+            history.pushState(null, '', '#read=' + encodeURIComponent(item.id));
+            window.dispatchEvent(new Event('hashchange'));
+          }}
         />
       )}
     </>

@@ -221,3 +221,46 @@
   0%, 100% { opacity: 0.8; }
   50% { opacity: 1; }
 }
+
+/* The Listening group in the settings panel: one row per choice, wrapping. */
+.ttsSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ttsSettings .params {
+  flex-direction: column;
+  align-items: stretch;
+}
+.settingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--pp-panel-fg, #e0e0e0);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ttsSettings .params label.settingRow {
+  font-size: 12px;
+  color: var(--pp-panel-fg, #e0e0e0);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.settingRow .select {
+  max-width: none;
+  flex: 1 1 160px;
+  min-height: 32px;
+  color: var(--pp-panel-fg, #e0e0e0);
+  background: var(--pp-panel-field, rgba(255, 255, 255, 0.05));
+  border-color: var(--pp-panel-border, rgba(255, 255, 255, 0.14));
+}
+.settingRow input[type=range] {
+  flex: 1 1 160px;
+  width: auto;
+}
+.paramValue {
+  color: var(--pp-panel-muted, rgba(224, 224, 224, 0.55));
+}

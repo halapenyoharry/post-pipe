@@ -441,7 +441,7 @@
   scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
   padding: 32px 40px 48px;
   line-height: 1.9;
-  font-size: 15px;
+  font-size: calc(15px * var(--pp-text-scale, 1));
   color: var(--rp-text);
 }
 
@@ -845,7 +845,7 @@
 /* Font (Settings → Reading). The face file sits next to the page. */
 :global(html[data-pp-font="opendyslexic"]) .body {
   font-family: 'OpenDyslexic', 'Atkinson', sans-serif;
-  font-size: 14px;
+  font-size: calc(14px * var(--pp-text-scale, 1));
   line-height: 1.85;
 }
 
@@ -903,3 +903,88 @@
 :global(html[data-pp-space="off"]) .body :global(p) {
   margin: 0;
 }
+
+/* Text size (Settings → Reading → Size). Medium is the size it always was. */
+:global(html[data-pp-size="s"]) { --pp-text-scale: 0.9; }
+:global(html[data-pp-size="l"]) { --pp-text-scale: 1.17; }
+:global(html[data-pp-size="xl"]) { --pp-text-scale: 1.34; }
+
+/* Previous and next, so the reader works like a book: a quiet link above the
+   chapter, a clear one under it. A chapter that cannot be read yet shows its
+   status instead of a link. */
+.navTop,
+.navBottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.navTop { margin: -12px 0 14px; }
+.navBottom { margin: 40px 0 8px; justify-content: flex-end; }
+
+.navItem {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--rp-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.navItem:hover { border-color: var(--rp-border); }
+.navDir {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.navTitle {
+  font-size: 14px;
+  color: var(--rp-text-bright);
+}
+.navBig {
+  flex: 1 1 240px;
+  align-items: flex-end;
+  text-align: right;
+  padding: 14px 16px;
+  border-color: var(--rp-border);
+}
+.navBig .navTitle { font-size: 20px; font-weight: 600; }
+.navLocked { cursor: default; opacity: 0.8; }
+.navLocked:hover { border-color: var(--rp-border); }
+.navStatus {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--rp-accent);
+}
+
+/* A page turn: the chapter leaves toward the side it was turned to and the
+   next arrives from the other. Short, and none at all for reduced motion. */
+.turnOut_next { animation: ppTurnOutNext 0.17s ease-in forwards; }
+.turnOut_prev { animation: ppTurnOutPrev 0.17s ease-in forwards; }
+.turnIn_next { animation: ppTurnInNext 0.42s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.turnIn_prev { animation: ppTurnInPrev 0.42s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes ppTurnOutNext { to { opacity: 0; transform: perspective(1400px) translateX(-6%) rotateY(14deg); } }
+@keyframes ppTurnOutPrev { to { opacity: 0; transform: perspective(1400px) translateX(6%) rotateY(-14deg); } }
+@keyframes ppTurnInNext { from { opacity: 0; transform: perspective(1400px) translateX(8%) rotateY(-12deg); } to { opacity: 1; transform: none; } }
+@keyframes ppTurnInPrev { from { opacity: 0; transform: perspective(1400px) translateX(-8%) rotateY(12deg); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .turnOut_next, .turnOut_prev, .turnIn_next, .turnIn_prev { animation: none; }
+}
+
+/* A chapter with only a title so far: its status, where the text will be. */
+.notYet {
+  margin-top: 24px;
+  padding: 36px 20px;
+  text-align: center;
+  border: 1px dashed var(--rp-border);
+  border-radius: 12px;
+}
+.notYetTitle { font-size: 18px; color: var(--rp-text-bright); }
+.notYetStatus { margin-top: 6px; font-style: italic; color: var(--rp-accent); }

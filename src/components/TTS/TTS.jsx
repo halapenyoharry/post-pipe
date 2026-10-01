@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import styles from './TTS.module.css';
 import { ICONS } from '../../utils/icons';
 
-export function TTS({ targetRef }) {
+// The voice, shared by two views of it: the transport in the reader (play,
+// pause, stop, and what it is doing) and the choices in the settings panel's
+// Listening group (engine, voice, speed). Both read and write window.TTS, so
+// a voice chosen in the panel is the one the reader plays.
+function useTTS() {
   const [T, setT] = useState(null);
   const [state, setState] = useState('stopped'); // 'playing', 'paused', 'loading', 'stopped'
   const [engines, setEngines] = useState([]);
@@ -136,6 +140,17 @@ export function TTS({ targetRef }) {
     setParams(prev => ({ ...prev, [key]: value }));
   };
 
+  return {
+    T, state, engines, selectedEngine, voices, selectedVoice, capabilities, params, engineProgress,
+    errorMsg, statusMessage, isError, setStatusMessage, setIsError,
+    handleEngineChange, handleVoiceChange, handleParamChange,
+  };
+}
+
+// The transport, in the reader's toolbar.
+export function TTS({ targetRef }) {
+  const { T, state, engineProgress, errorMsg, statusMessage, isError, setStatusMessage, setIsError } = useTTS();
+
   const handlePlay = () => {
     if (!T || !targetRef.current) return;
     setStatusMessage(null);
@@ -155,12 +170,6 @@ export function TTS({ targetRef }) {
 
   if (!T) return null; // Wait until global is mounted
 
-  // The engine already curates the list: a handful of voices, best first.
-  const renderVoiceOptions = () => {
-    if (!voices.length) return <option>Loading...</option>;
-    return voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>);
-  };
-
   return (
     <div className={styles.ttsGroup} style={{ position: 'relative' }}>
       {state !== 'playing' && (
@@ -172,7 +181,7 @@ export function TTS({ targetRef }) {
       {(state === 'playing' || state === 'paused' || state === 'loading') && (
         <button className={styles.tb} onClick={handleStop} title="Stop" dangerouslySetInnerHTML={{ __html: `${ICONS.stop}<span class="${styles.tbTooltip}">Stop</span>` }} />
       )}
-      
+
       {state === 'loading' && engineProgress > 0 && (
         <div className={styles.loadingBarContainer}>
           <div className={styles.loadingBarFill} style={{ width: `${engineProgress}%` }} />
@@ -197,7 +206,26 @@ export function TTS({ targetRef }) {
           {statusMessage}
         </span>
       )}
+    </div>
+  );
+}
 
+// The choices, in the settings panel's Listening group.
+export function TTSSettings() {
+  const {
+    T, engines, selectedEngine, voices, selectedVoice, capabilities, params,
+    handleEngineChange, handleVoiceChange, handleParamChange,
+  } = useTTS();
+  if (!T) return null;
+
+  // The engine already curates the list: a handful of voices, best first.
+  const renderVoiceOptions = () => {
+    if (!voices.length) return <option>Loading...</option>;
+    return voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>);
+  };
+
+  return (
+    <div className={styles.ttsSettings} data-tts-settings>
       {engines.length > 1 && (
         <select
           className={styles.select}
@@ -212,24 +240,30 @@ export function TTS({ targetRef }) {
         </select>
       )}
 
-      <select
-        className={styles.select}
-        value={selectedVoice}
-        onChange={handleVoiceChange}
-        title="Voice"
-      >
-        {renderVoiceOptions()}
-      </select>
+      <label className={styles.settingRow}>
+        <span>Voice</span>
+        <select
+          className={styles.select}
+          value={selectedVoice}
+          onChange={handleVoiceChange}
+          data-tts-voice
+        >
+          {renderVoiceOptions()}
+        </select>
+      </label>
 
       <div className={styles.params}>
         {Object.entries(capabilities).map(([key, spec]) => {
-          if (!spec || key === 'voice') return null;
+          // Voice and speed. Pitch and volume would only repeat what the
+          // device already does well.
+          if (!spec || key === 'voice' || key === 'pitch' || key === 'volume') return null;
 
           if (spec.type === 'range') {
             return (
-              <label key={key} title={`${spec.label}: ${params[key]}`}>
-                {spec.label}
+              <label key={key} className={styles.settingRow} title={`${spec.label}: ${params[key]}`}>
+                <span>{spec.label} <span className={styles.paramValue}>{Number(params[key] ?? spec.default).toFixed(1)}×</span></span>
                 <input
+                  data-tts-param={key}
                   type="range"
                   min={spec.min}
                   max={spec.max}
@@ -241,8 +275,8 @@ export function TTS({ targetRef }) {
             );
           } else if (spec.type === 'select') {
             return (
-              <label key={key}>
-                {spec.label}
+              <label key={key} className={styles.settingRow}>
+                <span>{spec.label}</span>
                 <select
                   value={params[key] ?? spec.default}
                   onChange={(e) => handleParamChange(key, e.target.value)}

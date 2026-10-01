@@ -452,3 +452,22 @@ test('reading aids default off, persist, and keep a font name', async () => {
   assert.strictEqual(b.readerAid('boldStart'), false);
   assert.strictEqual(b.readerAid('font'), 'opendyslexic');
 });
+
+test('the text size and view preferences persist', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
+  assert.strictEqual(a.readerAid('size'), 'm');
+  assert.strictEqual(a.preference('theme'), null);
+  a.setReaderAid('size', 'xl');
+  a.setPreference('theme', 'sketchbook');
+  a.setPreference('mode', 'light');
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  assert.strictEqual(b.readerAid('size'), 'xl');
+  assert.strictEqual(b.preference('theme'), 'sketchbook');
+  assert.strictEqual(b.preference('mode'), 'light');
+  b.setPreference('mode', null);
+  assert.strictEqual(b.preference('mode'), null);
+});

@@ -220,7 +220,7 @@ function makeCardSizeFor(CARD) {
 
 export function GraphViewer({
   feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout = 'force', timeAxis, graphSettings,
-  colorOverrides, apiRef,
+  colorOverrides, apiRef, onNodeFocus,
 }) {
   // Visual parameters come from settings.json so they can be tuned without a
   // rebuild. The defaults here are the values they replaced, so a missing or
@@ -243,6 +243,15 @@ export function GraphViewer({
   // Stable refs for callbacks so the simulation never rebuilds on prop change.
   const onNodeSelectRef = useRef(onNodeSelect);
   useEffect(() => { onNodeSelectRef.current = onNodeSelect; }, [onNodeSelect]);
+  // The card the reader last opened on the graph: the node the settings
+  // panel acts on when the reader is closed.
+  const onNodeFocusRef = useRef(onNodeFocus);
+  useEffect(() => { onNodeFocusRef.current = onNodeFocus; }, [onNodeFocus]);
+  const focusedIdRef = useRef(null);
+  const focusNode = (d) => {
+    focusedIdRef.current = d ? d.id : null;
+    if (onNodeFocusRef.current) onNodeFocusRef.current(d ? (d.originalItem || d) : null);
+  };
 
   // Same reason as onNodeSelect: the store must be reachable from D3 handlers
   // without becoming a dependency that rebuilds the simulation.
@@ -2281,8 +2290,10 @@ export function GraphViewer({
         if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), false);
         renderArticleBody(d);
         cardEl.style.zIndex = '';
+        if (focusedIdRef.current === d.id) focusNode(null);
       } else {
         pinnedIdsRef.current.add(d.id);
+        focusNode(d);
         if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), true);
         renderArticleBody(d);
         nodes.filter(nd => nd.id === d.id).raise();
@@ -2688,6 +2699,7 @@ export function GraphViewer({
       const vs = viewStateRef.current;
       if (vs && vs.resetLayout) vs.resetLayout();
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
+      focusNode(null);
       hideEdgeLabel();
       activeTag = null;
       hoveredIdRef.current = null;

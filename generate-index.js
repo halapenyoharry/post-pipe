@@ -352,6 +352,9 @@ ${reactJs}
 
     function App() {
       const [selectedArticle, setSelectedArticle] = React.useState(null);
+      // The card last opened on the graph; the settings panel acts on the
+      // open chapter, or else on this.
+      const [focusedItem, setFocusedItem] = React.useState(null);
       const [targetParagraph, setTargetParagraph] = React.useState(null);
       const [filteredArticleIds, setFilteredArticleIds] = React.useState(null);
       const [hydrated, setHydrated] = React.useState(false);
@@ -492,7 +495,8 @@ ${reactJs}
           filteredArticleIds: filteredArticleIds,
           viewState: viewState,
           colorOverrides: colorOverrides,
-          apiRef: graphApi
+          apiRef: graphApi,
+          onNodeFocus: setFocusedItem
         }),
         React.createElement(FeedZ, {
           sources: feed._sources || [],
@@ -508,13 +512,20 @@ ${reactJs}
         // The bottom bar: history, layout, dimensions, and the view actions
         // (the timeline layout stays out of it until it is redesigned).
         React.createElement(Toolbar, { viewState: viewState }),
-        React.createElement(Settings, { viewState: viewState, feedData: feed }),
+        React.createElement(Settings, {
+          viewState: viewState,
+          feedData: feed,
+          subject: selectedArticle || focusedItem,
+          readerOpen: selectedArticle ? selectedArticle.id : null
+        }),
         React.createElement(ReaderPanel, {
           article: selectedArticle,
           onClose: closeReader,
           settings: window.SETTINGS,
           viewState: viewState,
-          targetParagraph: targetParagraph
+          targetParagraph: targetParagraph,
+          feedData: feed,
+          onNavigate: selectArticle
         })
       );
     }

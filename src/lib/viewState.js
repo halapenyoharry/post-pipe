@@ -30,7 +30,8 @@ function emptyState(corpusId, layoutVersion) {
     colorProfileId: null, // which preset (if any) graphColors currently matches
     paragraphIndent: false,
     paragraphSpace: true,
-    readerAids: {},    // reading aids the reader turned on: followAlong, boldStart, font
+    readerAids: {},    // reading aids the reader turned on: followAlong, boldStart, font, size
+    prefs: {},         // how the page looks: theme, mode, timeOfDay
     nodes: {},      // id -> { x, y, w, h, pinned, t }
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
@@ -434,15 +435,34 @@ function createViewState(opts = {}) {
     // Reading aids, chosen in the panel and kept across visits: followAlong
     // (a highlighter that follows the finger), boldStart (bold word
     // beginnings), font ('default' or another face the page ships).
+    // size: the reader's text size, 'm' unless chosen ('s', 'm', 'l', 'xl').
     readerAid(key) {
       const aids = state.readerAids || {};
       if (key === 'font') return typeof aids.font === 'string' ? aids.font : 'default';
+      if (key === 'size') return typeof aids.size === 'string' ? aids.size : 'm';
       return aids[key] === true;
     },
     setReaderAid(key, value) {
       update((s) => {
         if (!s.readerAids || typeof s.readerAids !== 'object') s.readerAids = {};
-        s.readerAids[key] = key === 'font' ? String(value || 'default') : Boolean(value);
+        s.readerAids[key] = key === 'font' ? String(value || 'default')
+          : key === 'size' ? String(value || 'm') : Boolean(value);
+      });
+    },
+
+    // How the page looks, chosen in the panel's View group and kept across
+    // visits: theme (a theme name, or null for the site's own), mode
+    // ('auto', 'light', 'dark'), timeOfDay (the background follows the
+    // chapter's time of day; null means the site's default).
+    preference(key) {
+      const p = state.prefs || {};
+      return p[key] === undefined ? null : p[key];
+    },
+    setPreference(key, value) {
+      update((s) => {
+        if (!s.prefs || typeof s.prefs !== 'object') s.prefs = {};
+        if (value === null || value === undefined) delete s.prefs[key];
+        else s.prefs[key] = value;
       });
     },
 

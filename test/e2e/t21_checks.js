@@ -194,7 +194,152 @@ async function part0(bt, name, size, record) {
   }
 }
 
-const PART_FNS = { 0: part0 };
+
+// ── 6. reader navigation and the panel ─────────────────────────────────────
+const A2 = FEED.items.filter((i) => /a2-/.test(i.id)).sort((a, b) => a.series_part - b.series_part);
+
+async function swipe(s, dx, { from } = {}) {
+  // One finger across the reader's text, sent as touch events from inside
+  // the page (Playwright's touchscreen only taps).
+  return s.page.evaluate(([dx, from]) => {
+    const body = document.querySelector('[data-tts-target]');
+    const r = body.getBoundingClientRect();
+    let target = body;
+    if (from === 'text') target = body.querySelector('p') || body;
+    if (from === 'header') target = body.querySelector('h1') || body;
+    const tr = target.getBoundingClientRect();
+    const x0 = Math.min(tr.left + tr.width / 2 + (dx < 0 ? 60 : -60), r.right - 20), y0 = tr.top + Math.min(tr.height / 2, 12);
+    const mk = (x, y) => new Touch({ identifier: 7, target, clientX: x, clientY: y, pageX: x, pageY: y });
+    try {
+      target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [mk(x0, y0)], changedTouches: [mk(x0, y0)] }));
+      target.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: [mk(x0 + dx, y0 + 4)] }));
+      return true;
+    } catch (e) { return 'no touch events: ' + e.message; }
+  }, [dx, from || 'header']);
+}
+
+const openId = (page) => page.evaluate(() => decodeURIComponent((location.hash.match(/#read=([^&]+)/) || [])[1] || ''));
+
+async function part6(bt, name, size, record) {
+  const s = await open(bt, name, size, READ(SECOND));
+  const { page } = s;
+  try {
+    const navs = await page.evaluate(() => ({
+      top: [...document.querySelectorAll('nav[aria-label="Previous chapter"] [data-reader-nav="prev"]')].map((e) => e.textContent),
+      bottom: [...document.querySelectorAll('[data-reader-nav-bottom] [data-reader-nav="next"]')].map((e) => e.textContent),
+    }));
+    record('6 previous at the top of the reader, with its title', navs.top.length === 1 && navs.top[0].includes(FIRST.title), navs.top.join(' / '));
+    record('6 next at the bottom of the reader, with its title', navs.bottom.length === 1 && navs.bottom[0].includes(byPart(3).title), navs.bottom.join(' / '));
+    await page.evaluate(() => { const b = document.querySelector('[data-tts-target]'); b.scrollTop = b.scrollHeight; });
+    await page.waitForTimeout(300);
+    if (s.phone) await page.tap('[data-reader-nav-bottom] [data-reader-nav="next"]'); else await page.click('[data-reader-nav-bottom] [data-reader-nav="next"]');
+    await page.waitForTimeout(1200);
+    const after = await openId(page);
+    const top = await page.evaluate(() => document.querySelector('[data-tts-target]').scrollTop);
+    record('6 next opens the next chapter at its start', after === byPart(3).id && top < 40, `${after.split('/').pop()} at ${Math.round(top)}px`);
+
+    // Title-only chapters show their status instead of a link.
+    await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(A2[0]));
+    await page.waitForTimeout(1500);
+    const locked = await page.evaluate(() => { const e = document.querySelector('[data-reader-nav="next"]'); return e ? { tag: e.tagName, text: e.textContent, status: !!e.querySelector('[class*="navStatus"]') } : null; });
+    const want = (FEED.containers.find((c) => /act-2/.test(c.id)) || {}).status;
+    record('6 a chapter not yet published shows its status, not a link', !!locked && locked.tag !== 'BUTTON' && locked.status && (!want || locked.text.includes(want)), locked ? locked.text : 'none');
+
+    if (!s.phone) {
+      await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(FIRST));
+      await page.waitForTimeout(1500);
+      await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(1200);
+      const r = await openId(page);
+      await page.keyboard.press('ArrowLeft');
+      await page.waitForTimeout(1200);
+      const l = await openId(page);
+      record('6 arrow keys turn to the next and previous chapter', r === SECOND.id && l === FIRST.id, `→ ${r.split('/').pop()}, ← ${l.split('/').pop()}`);
+    } else {
+      await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(FIRST));
+      await page.waitForTimeout(1500);
+      const sw = await swipe(s, -160);
+      await page.waitForTimeout(1200);
+      const r = await openId(page);
+      if (sw !== true) record('6 a swipe turns to the next chapter', null, sw);
+      else {
+        record('6 a swipe left turns to the next chapter', r === SECOND.id, r.split('/').pop());
+        const turned = await page.evaluate(() => getComputedStyle(document.querySelector('[data-tts-target]')).animationName);
+        await swipe(s, 160);
+        await page.waitForTimeout(1200);
+        const l = await openId(page);
+        record('6 a swipe right turns back', l === FIRST.id, l.split('/').pop());
+        // A selection, or the highlighter's own drag, is not a page turn.
+        await page.evaluate(() => { const p = document.querySelector('[data-tts-target] p'); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+        await swipe(s, -160, { from: 'text' });
+        await page.waitForTimeout(900);
+        const sel = await openId(page);
+        await page.evaluate(() => getSelection().removeAllRanges());
+        record('6 a swipe with text selected does not turn the page', sel === FIRST.id, sel.split('/').pop());
+      }
+    }
+
+    // The panel: from the reader it acts on the open chapter.
+    await page.evaluate((u) => { location.hash = u.split('#')[1]; }, READ(FIRST));
+    await page.waitForTimeout(1500);
+    if (s.phone) await page.tap('[data-reader-settings]'); else await page.click('[data-reader-settings]');
+    await page.waitForTimeout(500);
+    const panel = await page.evaluate(() => {
+      const d = document.querySelector('[data-settings-panel]');
+      if (!d) return null;
+      const r = d.getBoundingClientRect();
+      const over = [...d.querySelectorAll('button, select, input, label')].filter((e) => { const q = e.getBoundingClientRect(); return q.width && (q.right > r.right + 1 || q.left < r.left - 1); }).length;
+      return {
+        subject: (d.querySelector('[data-settings-subject]') || {}).textContent,
+        sections: [...d.querySelectorAll('[data-section]')].map((e) => e.getAttribute('data-section')),
+        inView: r.left >= 0 && r.right <= innerWidth + 0.5 && d.scrollWidth <= d.clientWidth + 1,
+        over,
+        w: Math.round(r.width),
+      };
+    });
+    record('6 the panel opens from the reader, for the open chapter', !!panel && panel.subject === FIRST.title, panel ? panel.subject : 'did not open');
+    record('6 the panel groups Reading, Listening, Your place, View', !!panel && panel.sections.join() === 'reading,listening,place,view', panel ? panel.sections.join(', ') : '');
+    record('6 the panel fits the screen and its rows wrap', !!panel && panel.inView && panel.over === 0, panel ? `${panel.w}px wide, ${panel.over} controls past its edge` : '');
+    const marks0 = await page.evaluate(() => document.querySelectorAll('[data-place-subject] [data-bookmark-row]').length);
+    if (s.phone) await page.tap('[data-place-mark]'); else await page.click('[data-place-mark]');
+    await page.waitForTimeout(500);
+    const marks1 = await page.evaluate(() => document.querySelectorAll('[data-place-subject] [data-bookmark-row]').length);
+    const ribbon = await page.evaluate(() => !!document.querySelector('[data-tts-target] .bookmarkRibbon'));
+    record('6 Mark here in the panel bookmarks the open chapter', marks1 === marks0 + 1 && ribbon, `${marks0} → ${marks1}, ribbon ${ribbon}`);
+    const legend = await page.evaluate(() => (document.querySelector('[data-bookmark-legend]') || {}).textContent || '');
+    record('6 Your place explains its bookmark controls', /Jump/.test(legend) && /Mark here/.test(legend), legend.slice(0, 50) + '…');
+    const dup = await page.evaluate(() => ({ voiceInReader: !!document.querySelector('#tts-mount-point select'), voiceInPanel: !!document.querySelector('[data-settings-panel] [data-tts-voice]'), legendInReader: !!document.querySelector('[data-tts-target] [data-bookmark-legend]') }));
+    record('6 voice and bookmarks live in one place each', !dup.voiceInReader && dup.voiceInPanel && !dup.legendInReader, JSON.stringify(dup));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // From the graph it acts on the card last opened there.
+    await page.evaluate(() => { history.replaceState(null, '', location.pathname); dispatchEvent(new HashChangeEvent('hashchange')); });
+    await page.waitForTimeout(800);
+    const c = await findPoint(page, 'card', slugOf(SECOND));
+    if (c) {
+      if (s.phone) await page.touchscreen.tap(c.x, c.y); else { await page.mouse.move(c.x, c.y); await page.waitForTimeout(300); await page.mouse.click(c.x, c.y); }
+      await page.waitForTimeout(800);
+      if (s.phone) await page.tap('[data-settings-gear]'); else await page.click('[data-settings-gear]');
+      await page.waitForTimeout(500);
+      const subj = await page.evaluate(() => (document.querySelector('[data-settings-subject]') || {}).textContent);
+      record('6 the panel opens from the graph, for the selected card', subj === SECOND.title, subj || 'no subject');
+    } else {
+      record('6 the panel opens from the graph, for the selected card', false, 'no card on screen');
+    }
+    for (const w of s.phone ? [320, 430] : []) {
+      await page.setViewportSize({ width: w, height: 844 });
+      await page.waitForTimeout(400);
+      const fit = await page.evaluate(() => { const d = document.querySelector('[data-settings-panel]'); if (!d) return null; const r = d.getBoundingClientRect(); const over = [...d.querySelectorAll('button, select, input, label')].filter((e) => { const q = e.getBoundingClientRect(); return q.width && q.right > r.right + 1; }).length; return { ok: r.left >= 0 && r.right <= innerWidth + 0.5 && d.scrollWidth <= d.clientWidth + 1, over }; });
+      record(`6 the panel fits at ${w}px`, !!fit && fit.ok && fit.over === 0, fit ? `${fit.over} past the edge` : 'closed');
+    }
+    record('6 no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
+  } finally {
+    await s.browser.close();
+  }
+}
+
+const PART_FNS = { 0: part0, 6: part6 };
 
 const server = http.createServer((req, res) => handler(req, res, {
   public: SITE,

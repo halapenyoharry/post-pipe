@@ -7,9 +7,10 @@ import { progressBarMode, allowDownload } from '../../lib/readerSettings';
 import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
+import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
 
 
-export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph }) {
+export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph, feedData, onNavigate }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [floatingPos, setFloatingPos] = useState(null);
@@ -23,16 +24,20 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const bodyRef = useRef(null);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
-  const [showMarksList, setShowMarksList] = useState(false);
-  const [editingNoteFor, setEditingNoteFor] = useState(null); // id of bookmark being edited
+  // A page turn: 'next' or 'prev' while the old chapter leaves and the new
+  // one arrives, null otherwise.
+  const [turnOut, setTurnOut] = useState(null);
+  const [turnIn, setTurnIn] = useState(null);
+  const turnTimers = useRef([]);
 
   // Derive initial state when article changes
   useEffect(() => {
     if (article) {
       setIsOpen(true);
       setIsMinimized(false);
-      setShowMarksList(false);
-      setEditingNoteFor(null);
+      setTurnOut(null);
+      if (bodyRef.current) bodyRef.current.scrollTop = 0;
+      setScrollProgress(0);
       fetchContent(article);
     } else {
       setIsOpen(false);
@@ -51,8 +56,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // A bookmark belongs to an item (b.item); its own id is separate.
   const pId = getPersistentId(article);
   const itemBookmarks = viewState && pId ? viewState.bookmarks(pId) : [];
-  const currentBookmark = itemBookmarks.length ? itemBookmarks[itemBookmarks.length - 1] : null;
-  const allBookmarks = viewState ? viewState.bookmarks() : [];
 
   // Bold word beginnings (Settings → Reading): applied to the drawn copy
   // only; contentHtml stays the text as published.
@@ -101,6 +104,13 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <div style="font-size: 13px; color: var(--rp-text, #a8b2d1); opacity: 0.8; letter-spacing: 0.5px;">Act ${actNum} · In Progress</div>
         </div>
       `);
+      return;
+    }
+
+    // A title-only piece has no page to fetch: say what is coming instead.
+    if (item._posted === 'title') {
+      const status = navStatus(feedData, item) || '';
+      setContentHtml(`<div class="${styles.notYet}" data-not-yet><div class="${styles.notYetTitle}">${escapeHtml(item.title || '')}</div><div class="${styles.notYetStatus}">${escapeHtml(status)}</div></div>`);
       return;
     }
 
@@ -335,7 +345,128 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     return attachFollowAlong(bodyRef.current);
   }, [followOn, displayHtml, article]);
 
+  // Where the reader can go from here, along the sequence edges.
+  const nav = useMemo(() => (article && feedData ? neighbours(feedData, article.id) : { prev: [], next: [] }), [article, feedData]);
+
+  const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Turn the page: the old chapter slides away, the new one comes in from
+  // the side it was turned toward.
+  const goTo = (item, dir) => {
+    if (!item || !onNavigate || !isReadable(item)) return;
+    turnTimers.current.forEach(clearTimeout);
+    turnTimers.current = [];
+    if (reduceMotion()) { onNavigate(item); return; }
+    setTurnOut(dir);
+    turnTimers.current.push(setTimeout(() => {
+      setTurnIn(dir);
+      onNavigate(item);
+      turnTimers.current.push(setTimeout(() => setTurnIn(null), 520));
+    }, 170));
+  };
+  const goStep = (dir) => {
+    if (!article || !feedData) return;
+    const item = step(feedData, article.id, dir);
+    if (item) goTo(item, dir);
+  };
+  const goStepRef = useRef(goStep);
+  goStepRef.current = goStep;
+  useEffect(() => () => turnTimers.current.forEach(clearTimeout), []);
+
+  // Arrow keys on a keyboard: right for the next chapter, left for the one
+  // before. Not while typing, and not with a modifier held.
+  const live = !!article && isOpen && !isMinimized;
+  useEffect(() => {
+    if (!live) return;
+    const onKey = (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); goStepRef.current('next'); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goStepRef.current('prev'); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [live]);
+
+  // A horizontal swipe on a touch screen turns the page. It stands aside for
+  // text selection (a long press, or any selection made), for a mostly
+  // vertical drag (that is scrolling), and, while the follow-along
+  // highlighter is on, for a drag that starts on the text, which is the
+  // highlighter's own gesture.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!live || !el) return;
+    let start = null;
+    const onStart = (e) => {
+      if (e.touches.length !== 1) { start = null; return; }
+      const t = e.touches[0];
+      const onText = !!(e.target && e.target.closest && e.target.closest('p, li, blockquote'));
+      start = { x: t.clientX, y: t.clientY, t: Date.now(), onText };
+    };
+    const onEnd = (e) => {
+      if (!start) return;
+      const s0 = start;
+      start = null;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - s0.x;
+      const dy = t.clientY - s0.y;
+      const dt = Date.now() - s0.t;
+      if (dt > 700 || Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.5) return;
+      const sel = window.getSelection && window.getSelection();
+      if (sel && !sel.isCollapsed && String(sel).trim()) return;
+      if (followOn && s0.onText) return;
+      goStepRef.current(dx < 0 ? 'next' : 'prev');
+    };
+    const onCancel = () => { start = null; };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchcancel', onCancel, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onCancel);
+    };
+  }, [live, followOn]);
+
+  // The panel's "Mark here" acts on the open chapter.
+  const toggleRef = useRef(null);
+  toggleRef.current = toggleBookmark;
+  useEffect(() => {
+    const onMark = () => { if (toggleRef.current) toggleRef.current(); };
+    window.addEventListener('postpipe:reader-mark', onMark);
+    return () => window.removeEventListener('postpipe:reader-mark', onMark);
+  }, []);
+
   if (!article) return null;
+
+  const navLink = (item, dir, big) => {
+    const status = navStatus(feedData, item);
+    const label = dir === 'next' ? 'Next' : 'Previous';
+    if (status) {
+      return (
+        <div key={item.id} className={`${styles.navItem} ${styles.navLocked} ${big ? styles.navBig : ''}`} data-reader-nav={dir} data-nav-status>
+          <span className={styles.navDir}>{label}</span>
+          <span className={styles.navTitle}>{item.title}</span>
+          <span className={styles.navStatus}>{status}</span>
+        </div>
+      );
+    }
+    return (
+      <button
+        key={item.id}
+        className={`${styles.navItem} ${big ? styles.navBig : ''}`}
+        data-reader-nav={dir}
+        onClick={() => goTo(item, dir)}
+        title={`${label}: ${item.title}`}
+      >
+        <span className={styles.navDir}>{dir === 'prev' ? '← ' : ''}{label}{dir === 'next' ? ' →' : ''}</span>
+        <span className={styles.navTitle}>{item.title}</span>
+      </button>
+    );
+  };
 
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
@@ -411,10 +542,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               dangerouslySetInnerHTML={{ __html: `${ICONS.bookmark}<span class="${styles.tbText}">${itemBookmarks.length > 0 ? 'Marked' : 'Mark here'}</span>` }}
             />
             <button
-              className={`${styles.tb} ${styles.tbLabeled} ${showMarksList ? styles.active : ''}`}
-              onClick={() => setShowMarksList(!showMarksList)}
-              aria-expanded={showMarksList}
-              title="Every place you have bookmarked"
+              className={`${styles.tb} ${styles.tbLabeled}`}
+              onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { section: 'place', open: true } }))}
+              title="Every place you have bookmarked, in the settings panel under Your place"
               data-bookmark-list
               dangerouslySetInnerHTML={{ __html: `${ICONS.bookmarkList}<span class="${styles.tbText}">Bookmarks</span>` }}
             />
@@ -517,73 +647,22 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           </div>
         </div>
 
-        {currentBookmark && (
-          <div className={styles.inlineNotePanel}>
-            <input
-              type="text"
-              placeholder="Add an optional note to this bookmark..."
-              value={currentBookmark.note || ''}
-              onChange={(e) => viewState.setBookmarkNote(currentBookmark.id, e.target.value)}
-              className={styles.noteInput}
-            />
-          </div>
-        )}
-
-        {showMarksList && (
-          <div className={styles.marksListPanel}>
-            <div className={styles.marksLegend} data-bookmark-legend>
-              <strong>Mark here</strong> saves the paragraph at the top of the reader; a ribbon
-              in the margin shows it, and tapping it again removes it. <strong>Bookmarks</strong> lists
-              every saved place: <em>Jump</em> goes back to it, the copy button copies a link to it,
-              and the bin deletes it. Tap a note to write one.
-            </div>
-            {allBookmarks.length === 0 ? (
-              <div className={styles.noMarks}>No bookmarks yet.</div>
-            ) : (
-              allBookmarks.map(b => (
-                <div key={b.id} className={styles.markItem}>
-                  <div className={styles.markMain}>
-                    <div className={styles.markTitle}>{bookmarkLabel(b, article, pId)}</div>
-                    {editingNoteFor === b.id ? (
-                      <input
-                        type="text"
-                        value={b.note || ''}
-                        onChange={(e) => viewState.setBookmarkNote(b.id, e.target.value)}
-                        onBlur={() => setEditingNoteFor(null)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') setEditingNoteFor(null); }}
-                        className={styles.noteInput}
-                        autoFocus
-                      />
-                    ) : (
-                      <div className={styles.markNote} onClick={() => setEditingNoteFor(b.id)}>
-                        {b.note || <em>No note (click to add)</em>}
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.markActions}>
-                    {b.item === pId && (b.para ?? b.paragraph) !== undefined && (
-                      <button onClick={() => { const ps = bodyRef.current?.querySelectorAll('p'); const p = ps ? getPlacedBookmarkParagraph(b, article, ps) : b.para !== undefined ? b.para : b.paragraph; jumpToParagraph(p); }} title="Jump to paragraph">Jump</button>
-                    )}
-                    <button onClick={() => { const ps = bodyRef.current?.querySelectorAll('p'); const p = ps ? getPlacedBookmarkParagraph(b, article, ps) : b.para !== undefined ? b.para : b.paragraph; handleCopyBookmarkLink(b.id, p); }} title="Copy link" dangerouslySetInnerHTML={{ __html: ICONS.copy }} />
-                    <button onClick={() => viewState.removeBookmark(b.id)} title="Remove bookmark" dangerouslySetInnerHTML={{ __html: ICONS.trash }} />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
         {showFrontmatter && (
           <FrontmatterPanel article={article} settings={settings} />
         )}
 
         <div
-          className={`${styles.body} ${followOn ? styles.following : ''}`}
+          className={`${styles.body} ${followOn ? styles.following : ''} ${turnOut ? styles['turnOut_' + turnOut] : ''} ${turnIn ? styles['turnIn_' + turnIn] : ''}`}
           data-tts-target
           data-follow-along={followOn ? 'on' : 'off'}
           ref={bodyRef}
           onScroll={handleScroll}
         >
+          {nav.prev.length > 0 && (
+            <nav className={styles.navTop} aria-label="Previous chapter">
+              {nav.prev.map((item) => navLink(item, 'prev', false))}
+            </nav>
+          )}
           <div className={styles.articleHeader}>
             {header.kicker && (
               <div className={styles.articleKicker}>{header.kicker}</div>
@@ -608,6 +687,12 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             )}
           </div>
           <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+          {contentHtml && (nav.next.length > 0 || nav.prev.length > 0) && (
+            <nav className={styles.navBottom} aria-label="Next chapter" data-reader-nav-bottom>
+              {nav.next.map((item) => navLink(item, 'next', true))}
+              {nav.next.length === 0 && nav.prev.map((item) => navLink(item, 'prev', false))}
+            </nav>
+          )}
           {rights && contentHtml && (
             <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
           )}
@@ -638,14 +723,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
 // Helpers
 
-// What a bookmark is called in the list: its chapter and its first words.
-function bookmarkLabel(b, article, pId) {
-  const chapter = b.item === pId
-    ? (article.title || article.label)
-    : decodeURIComponent(String(b.item || '').split('/').pop().replace(/\.html$/, '')).replace(/[-_]+/g, ' ');
-  const para = b.para !== undefined ? b.para : b.paragraph;
-  const where = b.quote ? `“${b.quote}…”` : (para != null ? `paragraph ${Number(para) + 1}` : '');
-  return [chapter, where].filter(Boolean).join(' · ');
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function renderPlaceholder(article, reason) {
