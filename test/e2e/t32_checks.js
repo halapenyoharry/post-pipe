@@ -553,8 +553,13 @@ async function part4(bt, name, size, record) {
   record('4 a fresh load: no hull or pill drawn (the graph and the rootlets at 0)', fresh.state === 'art' && fresh.opacity === 0 && (fresh.reach === null || fresh.reach === 0) && fresh.attr === 'hidden',
     `${fresh.state}, graph ${fresh.opacity}, rootlets ${fresh.reach}, ${fresh.hulls} containers in the DOM`);
 
-  // A tap on a top-bar control is not a move.
-  if (await p.$('[data-top-subscribe]')) {
+  // A tap on a top-bar control is not a move. Since T35 the top bar is in
+  // the graph state alone (opening.topBarInArt false): there is none to tap.
+  const barInArt = !!(SETTINGS.opening && SETTINGS.opening.topBarInArt);
+  if (!barInArt) {
+    const vis = await p.evaluate(() => { const b = document.querySelector('[data-top-subscribe]'); return b ? getComputedStyle(b).visibility : 'none'; });
+    record('4 no top bar in the art state, so no control there to tap', vis !== 'visible', vis);
+  } else if (await p.$('[data-top-subscribe]')) {
     await (s.phone ? p.tap('[data-top-subscribe]') : p.click('[data-top-subscribe]'));
     await p.waitForTimeout(450);
     const t = await actsShown(p);

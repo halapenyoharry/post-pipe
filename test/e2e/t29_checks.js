@@ -135,7 +135,17 @@ async function checkByline(s, record) {
       m.under === 'title' && Math.abs(m.left - e.x) <= 1.5 && below >= 0 && below <= 0.5 * e.titleSize,
       `left ${r1(m.left)} vs ${r1(e.x)}; top ${r1(below)} px under the baseline (title ${r1(e.titleSize)} px)`);
     record(`0 ${st} state: in the title's face`, m.font === m.titleFont && m.font.includes(OPENING.title.font), m.font);
-    record(`0 ${st} state: about a quarter of the title's size`, Math.abs(ratio - 0.25) <= 0.02, `${r1(m.size)} px / ${r1(e.titleSize)} px = ${r3(ratio)}`);
+    if (OPENING.title.fit === 'width') {
+      // Since T35 the byline is set to the width of the title's last line
+      // (title.fit width), not to a quarter of its size.
+      const w = await s.page.evaluate((st) => {
+        const lines = [...document.querySelectorAll(`[data-cover-title="${st}"] [data-cover-title-line]`)];
+        return { line: lines[lines.length - 1].getBoundingClientRect().width, by: document.querySelector('[data-cover-byline]').getBoundingClientRect().width };
+      }, st);
+      record(`0 ${st} state: as wide as the title's last line (title.fit width)`, Math.abs(w.by / w.line - 1) <= 0.1, `${r1(w.by)} px against ${r1(w.line)} px`);
+    } else {
+      record(`0 ${st} state: about a quarter of the title's size`, Math.abs(ratio - 0.25) <= 0.02, `${r1(m.size)} px / ${r1(e.titleSize)} px = ${r3(ratio)}`);
+    }
     record(`0 ${st} state: opacity ${op}`, Math.abs(m.opacity - op) <= 0.005, r3(m.opacity));
     record(`0 ${st} state: lower case, a link to the jacket, on top and taking taps`,
       m.text === want && m.text === m.text.toLowerCase() && m.href === href && m.onTop && m.pointer === 'auto',

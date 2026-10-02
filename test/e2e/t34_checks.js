@@ -194,6 +194,19 @@ const pivotView = (page, pivot) => page.evaluate((pivot) => {
 // How far (screen px) the world point that was under the pivot has moved.
 const drift = (before, after) => Math.hypot(after.r.left + after.v.x + before.w.x * after.v.k - before.s.x, after.r.top + after.v.y + before.w.y * after.v.k - before.s.y);
 
+// A point moved from `at` only along the way an act opens (within 2 px of
+// that line, and forward).
+function pushedAlong(p, at, towards) {
+  const d = { down: [0, 1], 'down-right': [Math.SQRT1_2, Math.SQRT1_2], 'down-left': [-Math.SQRT1_2, Math.SQRT1_2] }[towards] || [0, 1];
+  const dx = p.x - at.x, dy = p.y - at.y;
+  return Math.abs(dx * d[1] - dy * d[0]) <= 2 && dx * d[0] + dy * d[1] > 0;
+}
+// Since T35 the acts sit where Harold's iPhone mockup draws them, and it
+// draws Act Two cut by the screen's left edge and Act Three at its right:
+// a closed pill at rest counts as on the screen with at most a third of
+// its width past an edge. (Zooming in keeps the stricter rule.)
+const pillOnScreen = (o, m) => { const w = o.x1 - o.x0; return o.x0 >= -w / 3 && o.y0 >= -0.5 && o.x1 <= m.W + w / 3 && o.y1 <= m.H + 0.5; };
+
 const r1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : String(n));
 const boxesMeet = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 const onScreen = (o, m) => o.x0 >= -0.5 && o.y0 >= -0.5 && o.x1 <= m.W + 0.5 && o.y1 <= m.H + 0.5;
@@ -240,8 +253,11 @@ function checkOpen(record, tag, m, act) {
   if (!a || !a.hull) { record(`${tag}: ${act.name} open with its hull`, false, 'no hull'); return null; }
   const cards = m.cards.filter((c) => actOfCard(c.id) === act.id).sort((p, q) => p.order - q.order);
   const first = cards[0], last = cards[cards.length - 1];
-  record(`${tag}: ${act.name}'s last chapter within 8 px of its tip`, Math.hypot(last.x - at.x, last.y - at.y) <= 8,
-    `last (${last.order}) at ${r1(last.x)}, ${r1(last.y)}; tip ${r1(at.x)}, ${r1(at.y)}; off ${r1(Math.hypot(last.x - at.x, last.y - at.y))}`);
+  // Since T35 an open act that would meet a closed one is pushed the way it
+  // opens until clear (open acts never overlap).
+  const pushed = pushedAlong(last, at, act.towards);
+  record(`${tag}: ${act.name}'s last chapter within 8 px of its tip, or pushed the way it opens`, Math.hypot(last.x - at.x, last.y - at.y) <= 8 || pushed,
+    `last (${last.order}) at ${r1(last.x)}, ${r1(last.y)}; tip ${r1(at.x)}, ${r1(at.y)}; off ${r1(Math.hypot(last.x - at.x, last.y - at.y))}${pushed ? ', along its way' : ''}`);
   record(`${tag}: ${act.name}'s chapter one below its last`, first.y > last.y + first.h / 2, `chapter one at ${r1(first.y)}, last at ${r1(last.y)}`);
   const angle = deg(last, first);
   record(`${tag}: ${act.name}'s spiral opens ${act.towards} (chapter one from the last within 10 degrees of ${ANGLE[act.towards]})`,
@@ -274,7 +290,7 @@ async function run(bt, name, size, record, shots) {
   let tag = tagOf('default');
   checkAll(record, tag, m);
   for (const a of ACTS) checkPill(record, tag, m, a);
-  const offPills = ACTS.filter((a) => !(m.acts[a.id] && m.acts[a.id].pill && onScreen(m.acts[a.id].pill, m)));
+  const offPills = ACTS.filter((a) => !(m.acts[a.id] && m.acts[a.id].pill && pillOnScreen(m.acts[a.id].pill, m)));
   record(`${tag}: the three pills on the screen`, offPills.length === 0, offPills.map((a) => a.name).join(', '));
   record(`${tag}: no chapter cards`, m.cards.length === 0, `${m.cards.length} shown`);
   shots.closed = await shot(s, 'default-closed');
@@ -289,7 +305,7 @@ async function run(bt, name, size, record, shots) {
     checkAll(record, tag, m);
     const res = checkOpen(record, tag, m, act);
     for (const other of ACTS) if (other !== act) checkPill(record, tag, m, other);
-    const pillsOn = ACTS.filter((o) => o !== act).every((o) => m.acts[o.id] && m.acts[o.id].pill && onScreen(m.acts[o.id].pill, m));
+    const pillsOn = ACTS.filter((o) => o !== act).every((o) => m.acts[o.id] && m.acts[o.id].pill && pillOnScreen(m.acts[o.id].pill, m));
     if (res && act === MIDDLE) {
       const ratio = (res.a.hull.x1 - res.a.hull.x0) / roots(m);
       record(`${tag}: Act 1's hull 0.45 to 0.65 of the roots' width`, ratio >= 0.45 && ratio <= 0.65,
@@ -329,8 +345,12 @@ async function run(bt, name, size, record, shots) {
     const cards = m.cards.filter((c) => actOfCard(c.id) === act.id).sort((q, r) => q.order - r.order);
     const at = artPoint(act.anchor, m.art);
     const last = cards[cards.length - 1];
-    record(`${tag}: ${act.name}'s last chapter within 8 px of its tip`, !!(a && a.hull && last) && Math.hypot(last.x - at.x, last.y - at.y) <= 8,
-      last ? `off ${r1(Math.hypot(last.x - at.x, last.y - at.y))}` : 'no cards');
+    // Since T35 open acts never overlap: with every act open, one that
+    // would meet another is pushed the way it opens, so its last chapter is
+    // on its tip or straight along openTowards from it.
+    const pushed = last && pushedAlong(last, at, act.towards);
+    record(`${tag}: ${act.name}'s last chapter within 8 px of its tip, or pushed the way it opens`, !!(a && a.hull && last) && (Math.hypot(last.x - at.x, last.y - at.y) <= 8 || pushed),
+      last ? `off ${r1(Math.hypot(last.x - at.x, last.y - at.y))}${pushed ? ', along its way' : ''}` : 'no cards');
   }
   shots.open = await shot(s, 'all-open');
   shots.openArt = m.art;

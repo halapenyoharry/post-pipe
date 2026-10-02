@@ -240,7 +240,11 @@ async function opensCard(s) {
     if (document.querySelector('.node-card div[data-card]:not([style*="display: none"])')) return;
     const visible = [...document.querySelectorAll('.node-card')].some((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 40);
     if (visible) return;
-    const g = document.querySelector('.container-group .container-macro-node:not([style*="display: none"])');
+    // The highest closed act on the screen, so its cards have room under it
+    // (since T35 Act One sits at the screen's foot on a desktop).
+    const macros = [...document.querySelectorAll('.container-group .container-macro-node:not([style*="display: none"])')]
+      .map((m) => ({ m, y: m.getBoundingClientRect().top })).sort((a, b) => a.y - b.y);
+    const g = macros.length ? macros[0].m : null;
     const id = g && g.closest('.container-group').getAttribute('data-container-id');
     if (id) window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } }));
   });
@@ -298,7 +302,15 @@ async function run(bt, name, size, record) {
     record('fresh: the art state first, the graph under the roots taking no taps', st === 'art' && c.onTop === 'art' && Math.abs(c.graph.opacity - freshOpacity) < 0.01 && c.graph.inert, `state ${st}, on top ${c.onTop}, graph opacity ${c.graph.opacity} (want ${freshOpacity}), inert ${c.graph.inert}`);
     const artImg = c.imgs.find((i) => i.which === 'art');
     const graphImg = c.imgs.find((i) => i.which === 'graph');
-    record('fresh: the whole plant fits, loaded, with its alt', !!artImg && artImg.loaded && artImg.src === OPENING.art.artState && c.art.top >= 0 && c.art.bottom <= c.H && c.art.left >= 0 && c.art.right <= c.W && c.alt === OPENING.alt,
+    // Since T35 a site can set the art to the screen's width (opening.fit
+    // width): the roots run off the bottom, and the T35 checks measure the
+    // plant's width; here, that it is loaded, as wide as the screen allows
+    // or running off the foot.
+    const side = Number(OPENING.sideMargin) || 0;
+    const placed = OPENING.fit === 'width'
+      ? c.art.top >= 0 && (c.art.right - c.art.left >= c.W - 2 * side - 1 || c.art.bottom >= c.H - 1)
+      : c.art.top >= 0 && c.art.bottom <= c.H && c.art.left >= 0 && c.art.right <= c.W;
+    record(OPENING.fit === 'width' ? 'fresh: the art at the screen\'s width, its roots off the foot, loaded, with its alt' : 'fresh: the whole plant fits, loaded, with its alt', !!artImg && artImg.loaded && artImg.src === OPENING.art.artState && placed && c.alt === OPENING.alt,
       `${artImg && artImg.src} ${artImg && artImg.natural.join('x')} at ${Math.round(c.art.left)},${Math.round(c.art.top)}–${Math.round(c.art.right)},${Math.round(c.art.bottom)}, alt "${c.alt}"`);
     record('art state: the full-bush image is the visible one', !!artImg && !!graphImg && artImg.opacity === 1 && graphImg.opacity === 0,
       `${artImg && artImg.src} at ${artImg && artImg.opacity}, ${graphImg && graphImg.src} at ${graphImg && graphImg.opacity}`);
@@ -322,8 +334,10 @@ async function run(bt, name, size, record) {
       b ? `"${b.text}" ${Math.round(b.top)}–${Math.round(b.bottom)}, art ending ${Math.round(c.art.bottom)}, opacity ${b.opacity}, ${b.font.split(',')[0]}` : 'none');
     const dark = (rgb) => { const m = rgb.match(/\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3 < 80; };
     record('fresh: on the dark ground in light mode', dark(c.groundBg) && dark(c.body) && c.mode === 'dark' && c.readerMode === 'light', `ground ${c.groundBg}, page ${c.body}, mode ${c.mode}, reader's mode ${c.readerMode}`);
-    // Since T30 the top bar (the gear with it) stays in both states.
-    record('fresh: the top bar stays, the grip waits for the graph', c.gear === 'visible' && c.handle.events === 'none', `gear ${c.gear}, grip ${c.handle.events}`);
+    // Since T30 the top bar (the gear with it) stayed in both states; since
+    // T35 it is in the graph state alone unless opening.topBarInArt.
+    if (OPENING.topBarInArt) record('fresh: the top bar stays, the grip waits for the graph', c.gear === 'visible' && c.handle.events === 'none', `gear ${c.gear}, grip ${c.handle.events}`);
+    else record('fresh: no top bar in the art state, the grip waits for the graph', c.gear !== 'visible' && c.handle.events === 'none', `gear ${c.gear}, grip ${c.handle.events}`);
     record('fresh: nothing stored yet but the state', (await stored(s.page)) === 'art', String(await stored(s.page)));
     await shot(s, 'art-light');
 
@@ -336,13 +350,19 @@ async function run(bt, name, size, record) {
       await touchRelease(s.page, '[data-cover-stage]');
     } else {
       await s.page.mouse.move(640, 400);
-      await s.page.mouse.wheel(0, 40);
+      // 80 px: since T35 the art is larger on a desktop, so the whole move
+      // is longer, and 40 px was only 3% of it.
+      await s.page.mouse.wheel(0, 80);
       await s.page.waitForTimeout(40);
       mid = { p: await progress(s.page), c: await coverInfo(s.page) };
     }
     record('scrub: partway shows the in-between', between(mid.p, 0.05, 0.95) && mid.c.art.top < c.art.top - 5 && mid.c.graph.opacity < 1 && mid.c.graph.opacity > c.graph.opacity,
       `p ${mid.p.toFixed(2)}, art top ${Math.round(c.art.top)} → ${Math.round(mid.c.art.top)}, graph opacity ${mid.c.graph.opacity.toFixed(2)}`);
-    const mA = mid.c.imgs.find((i) => i.which === 'art'), mG = mid.c.imgs.find((i) => i.which === 'graph');
+    // With the roots drawn as vectors (opening.art.rootsVector, T35) the
+    // graph state's image shows its small plant alone (the graph-keep copy);
+    // its roots are the vectors'.
+    const VEC = !!(OPENING.art && OPENING.art.rootsVector);
+    const mA = mid.c.imgs.find((i) => i.which === 'art'), mG = mid.c.imgs.find((i) => i.which === (VEC ? 'graph-keep' : 'graph'));
     record('scrub: partway the two images crossfade with p', !!mA && !!mG && Math.abs(mA.opacity - (1 - mid.p)) < 0.03 && Math.abs(mG.opacity - mid.p) < 0.03 && mG.opacity > 0,
       `p ${mid.p.toFixed(2)}: art-state image ${mA && mA.opacity.toFixed(2)}, graph-state image ${mG && mG.opacity.toFixed(2)}`);
     await settle(s.page);
@@ -353,7 +373,7 @@ async function run(bt, name, size, record) {
     // Where the plant meets the roots: row 1330 of the 2111-row canvas.
     const crown = (g.art.top + g.art.height * (1330 / 2111)) / g.H;
     const gArt = g.imgs.find((i) => i.which === 'art');
-    const gGraph = g.imgs.find((i) => i.which === 'graph');
+    const gGraph = g.imgs.find((i) => i.which === (VEC ? 'graph-keep' : 'graph'));
     record('graph state: the small-plant image is the visible one', !!gArt && !!gGraph && gGraph.opacity === 1 && gArt.opacity === 0 && gGraph.src === OPENING.art.graphState,
       `${gGraph && gGraph.src} at ${gGraph && gGraph.opacity}, ${gArt && gArt.src} at ${gArt && gArt.opacity}`);
     record('scroll down: reaches the graph', (await state(s.page)) === 'graph' && g.onTop === 'graph' && g.section.opacity === '1' && !g.section.inert, `state ${await state(s.page)}, on top ${g.onTop}`);

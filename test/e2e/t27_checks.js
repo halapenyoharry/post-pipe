@@ -144,7 +144,7 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
     book: outline(book),
     bookLabel: top ? { display: getComputedStyle(top).display, vis: getComputedStyle(top).visibility, pos: top.getAttribute('data-label-position'), box: (() => { const r = top.querySelector('.container-badge-text').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })() } : null,
     rootlets, k: w.k, homeK: w.homeK,
-    roots: op('[data-cover-image="graph"]'), keep: op('[data-cover-image="graph-keep"]'), layer: op('[data-cover-reach]'),
+    roots: op(document.querySelector('[data-roots-vector="ready"]') ? '[data-roots-vector]' : '[data-cover-image="graph"]'), keep: op('[data-cover-image="graph-keep"]'), layer: op('[data-cover-reach]'),
     title: tl ? { x: tl.left, y: tl.bottom } : null,
   };
 }, { acts: ACTS, book: BOOK });
@@ -246,6 +246,17 @@ function checkStopShort(m, ids) {
   return { ok: gaps.length > 0 && gaps.every((g) => Math.abs(g - REACH.stopShort) <= 2), gaps };
 }
 
+// Since T35 a site can draw the roots as vectors (opening.art.rootsVector):
+// an act with its own roots is reached by them, not by rootlets, so the
+// rootlet checks become one: no rootlet is drawn (the T35 checks measure the
+// vector roots and how they follow their act).
+const VECTOR_ROOTS = !!(SETTINGS.opening && SETTINGS.opening.art && SETTINGS.opening.art.rootsVector);
+async function reachRecord(s, record, label, ok, detail) {
+  if (!VECTOR_ROOTS) { record(label, ok, detail); return; }
+  const n = await s.page.evaluate(() => document.querySelectorAll('[data-reach]').length);
+  record(`${label.split(':')[0]}: no rootlets, each act reached by its own roots (opening.art.rootsVector)`, n === 0, `${n} rootlets`);
+}
+
 async function run(bt, name, size, record) {
   // ── light, fresh: anchors, draw-in, counts, stop short, zoom, pan, drag, reset, open ──
   {
@@ -263,12 +274,12 @@ async function run(bt, name, size, record) {
     const first = await measure(p);
     const drawing = first.rootlets.filter((r) => r.visible);
     const dashes = drawing.map((r) => Number.parseFloat(r.dash)).filter(Number.isFinite);
-    record('fresh: the rootlets draw in when they first show (in the art state, with the graph under the roots)', drawing.length > 0 && drawing.every((r) => r.drawn === 'drawing') && dashes.length > 0 && dashes.every((d) => d > 0.02 && d < 0.98),
+    await reachRecord(s, record, 'fresh: the rootlets draw in when they first show (in the art state, with the graph under the roots)', drawing.length > 0 && drawing.every((r) => r.drawn === 'drawing') && dashes.length > 0 && dashes.every((d) => d > 0.02 && d < 0.98),
       `${drawing.length} drawing, dash offsets ${Math.min(...dashes).toFixed(2)}–${Math.max(...dashes).toFixed(2)} of 1, ${REACH.drawMs} ms`);
     await toGraph(s);
     await p.waitForTimeout(REACH.drawMs + 250);
     const m = await measure(p);
-    record('fresh: drawn in by drawMs', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && (r.dasharray === 'none' || r.dasharray === '')),
+    await reachRecord(s, record, 'fresh: drawn in by drawMs', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && (r.dasharray === 'none' || r.dasharray === '')),
       `${m.rootlets.filter((r) => r.drawn === 'drawn').length} of ${m.rootlets.length} drawn`);
 
     const anchorOff = ACTS.map((a) => ({ id: a.id, closed: m.acts[a.id] && m.acts[a.id].closed, d: offAnchor(m.acts[a.id], anchorAt(m, a)) }));
@@ -277,20 +288,20 @@ async function run(bt, name, size, record) {
     record('fresh: the graph rests at the home view', Math.abs(m.k - m.homeK) < 1e-6, `k ${m.k}, homeK ${m.homeK}`);
 
     const counts = ACTS.map((a) => m.rootlets.filter((r) => r.c === a.id).length);
-    record(`rootlets: each closed act reached from ${REACH.perContainer} tips, an open one from at least one`, ACTS.every((a, i) => (m.acts[a.id] && m.acts[a.id].closed ? counts[i] === REACH.perContainer : counts[i] >= 1)),
+    await reachRecord(s, record, `rootlets: each closed act reached from ${REACH.perContainer} tips, an open one from at least one`, ACTS.every((a, i) => (m.acts[a.id] && m.acts[a.id].closed ? counts[i] === REACH.perContainer : counts[i] >= 1)),
       ACTS.map((a, i) => `${a.id.replace('container:', '')} ${counts[i]} (tips ${m.rootlets.filter((r) => r.c === a.id).map((r) => r.tip).join(',')})`).join('; '));
     const starts = m.rootlets.map((r) => off(r.start, artPoint(REACH.tips[r.tip], m.art)));
-    record('rootlets: each starts on its tip on the art', starts.every((d) => d < 0.6), `furthest ${r1(Math.max(...starts))} px`);
+    await reachRecord(s, record, 'rootlets: each starts on its tip on the art', starts.every((d) => d < 0.6), `furthest ${r1(Math.max(...starts))} px`);
     const forked = m.rootlets.filter((r) => r.fine > 0).length;
     const wander = m.rootlets.map((r) => r.wander);
     // A fork needs room (reachPath leaves out one under 6 px), so a rootlet
     // of 60 px or more always forks; a shorter one may not. The wander is a
     // share of the length, so one under 20 px may stay within 0.5 px.
     const long = m.rootlets.filter((r) => off(r.start, r.end) >= 60);
-    record('rootlets: seeded, forking, wandering lines, not straight strokes', m.rootlets.every((r) => r.pts > 8 && (r.wander > 0.5 || off(r.start, r.end) < 20)) && long.length > 0 && long.every((r) => r.fine > 0),
+    await reachRecord(s, record, 'rootlets: seeded, forking, wandering lines, not straight strokes', m.rootlets.every((r) => r.pts > 8 && (r.wander > 0.5 || off(r.start, r.end) < 20)) && long.length > 0 && long.every((r) => r.fine > 0),
       `${Math.min(...m.rootlets.map((r) => r.pts))}+ points on each main line, off the straight line by ${r1(Math.min(...wander))}–${r1(Math.max(...wander))} px; ${forked} of ${m.rootlets.length} forked, every one of the ${long.length} of 60 px or more; lengths ${m.rootlets.map((r) => Math.round(off(r.start, r.end))).sort((a, b) => a - b).join(', ')} px`);
     const ss = checkStopShort(m);
-    record(`rootlets: end ${REACH.stopShort} ± 2 px short of the act's outline`, ss.ok, `${ss.gaps.length} rootlets, gaps ${r1(Math.min(...ss.gaps))}–${r1(Math.max(...ss.gaps))} px`);
+    await reachRecord(s, record, `rootlets: end ${REACH.stopShort} ± 2 px short of the act's outline`, ss.ok, `${ss.gaps.length} rootlets, gaps ${r1(Math.min(...ss.gaps))}–${r1(Math.max(...ss.gaps))} px`);
     record('the book\'s own title: hidden as set', m.bookLabel && m.bookLabel.pos === 'hidden' && m.bookLabel.display === 'none', m.bookLabel ? `labelPosition ${m.bookLabel.pos}, display ${m.bookLabel.display}` : 'no badge');
     const crown = m.art.top + CROWN * m.art.height;
     record('the cover\'s title at the crown', m.title && m.title.y < crown + 4 && crown - m.title.y < m.art.height * 0.08, m.title ? `title line bottom ${r1(m.title.y)}, crown ${r1(crown)}` : 'none');
@@ -333,7 +344,7 @@ async function run(bt, name, size, record) {
     const moved = done.acts[act.id].centre;
     const took = lag.settled !== null && lag.lastMove !== null ? lag.settled - lag.lastMove : Infinity;
     const ssd = checkStopShort(done, [act.id]);
-    record(`drag: the rootlets re-aim with a lag, arriving within lagMs + 100 (${REACH.lagMs + 100} ms) of the act's last move`, off(moved, c0) > 40 && lag.behind > 2 && took <= REACH.lagMs + 100 && ssd.ok,
+    await reachRecord(s, record, `drag: the rootlets re-aim with a lag, arriving within lagMs + 100 (${REACH.lagMs + 100} ms) of the act's last move`, off(moved, c0) > 40 && lag.behind > 2 && took <= REACH.lagMs + 100 && ssd.ok,
       `${act.id.replace('container:', '')} moved ${r1(off(moved, c0))} px; the ends up to ${r1(lag.behind)} px behind as it stopped; on target ${Math.round(took)} ms after its last move; gaps ${ssd.gaps.map(r1).join(', ')}`);
 
     // A zoom: the targets move, the ends follow and stop short again.
@@ -342,7 +353,7 @@ async function run(bt, name, size, record) {
     const zs = await waitSettled(p, 1500);
     const ssz = checkStopShort(zs.m);
     const targetsMoved = Math.max(...zs.m.rootlets.map((r) => { const b = before.rootlets.find((x) => x.key === r.key); return b ? off(b.target, r.target) : 0; }));
-    record('zoom: the rootlets follow, still short of each act', z.k / z.homeK > 1.3 && targetsMoved > 5 && ssz.ok,
+    await reachRecord(s, record, 'zoom: the rootlets follow, still short of each act', z.k / z.homeK > 1.3 && targetsMoved > 5 && ssz.ok,
       `zoom ${r1(z.k / z.homeK)}x, targets moved up to ${r1(targetsMoved)} px, settled in ${zs.ms} ms, gaps ${r1(Math.min(...ssz.gaps))}–${r1(Math.max(...ssz.gaps))}`);
 
     // A pan on empty canvas.
@@ -353,7 +364,7 @@ async function run(bt, name, size, record) {
     const ps = await waitSettled(p, 1500);
     const ssp = checkStopShort(ps.m);
     const panned = Math.max(...ps.m.rootlets.map((r) => { const b = bp.rootlets.find((x) => x.key === r.key); return b ? off(b.target, r.target) : 0; }));
-    record('pan: the rootlets follow, still short of each act', panned > 20 && ssp.ok,
+    await reachRecord(s, record, 'pan: the rootlets follow, still short of each act', panned > 20 && ssp.ok,
       `targets moved up to ${r1(panned)} px, settled in ${ps.ms} ms, gaps ${r1(Math.min(...ssp.gaps))}–${r1(Math.max(...ssp.gaps))}`);
     record('pan and zoom: the cover\'s title has not moved', ps.m.title && Math.abs(ps.m.title.y - m.title.y) < 0.5 && Math.abs(ps.m.title.x - m.title.x) < 0.5,
       `${r1(m.title.x)},${r1(m.title.y)} → ${r1(ps.m.title.x)},${r1(ps.m.title.y)}`);
@@ -393,7 +404,7 @@ async function run(bt, name, size, record) {
     const sso = checkStopShort(op, [a1.id]);
     const n1 = op.rootlets.filter((r) => r.c === a1.id).length;
     record(`open: the act opens in place, its ${OPEN_ON} on its anchor`, inPlace <= (OUTER ? 8 : 3), `${a1.id.replace('container:', '')} ${OPEN_ON} ${r1(inPlace)} px from its anchor`);
-    record('open: the rootlets reach to the open hull\'s near edge, stopping short', n1 >= 1 && sso.ok, `${n1} rootlets, gaps ${sso.gaps.map(r1).join(', ')}`);
+    await reachRecord(s, record, 'open: the rootlets reach to the open hull\'s near edge, stopping short', n1 >= 1 && sso.ok, `${n1} rootlets, gaps ${sso.gaps.map(r1).join(', ')}`);
     for (const a of ACTS) if (a.id !== a1.id) await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } })), a.id);
     await p.waitForTimeout(1500);
     await shot(s, 'open');
@@ -440,13 +451,13 @@ async function run(bt, name, size, record) {
     await p.keyboard.press('ArrowDown');
     await p.waitForTimeout(450);
     const m = await measure(p);
-    record('reduced motion: the rootlets are there at once, not drawn in', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && r.visible && (r.dasharray === 'none' || r.dasharray === '')),
+    await reachRecord(s, record, 'reduced motion: the rootlets are there at once, not drawn in', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && r.visible && (r.dasharray === 'none' || r.dasharray === '')),
       `${m.rootlets.length} rootlets, ${m.rootlets.filter((r) => r.drawn === 'drawn').length} drawn at once`);
     const a = ACTS.filter((x) => m.acts[x.id] && m.acts[x.id].closed)[1] || ACTS[1] || ACTS[0];
     await drag(p, m.acts[a.id].centre, { x: -40, y: 25 });
     await p.waitForTimeout(60);
     const j = await measure(p);
-    record('reduced motion: the rootlets re-aim with no lag', stray(j) <= 1 && checkStopShort(j, [a.id]).ok, `60 ms after the drag, ends ${r1(stray(j))} px from their targets`);
+    await reachRecord(s, record, 'reduced motion: the rootlets re-aim with no lag', stray(j) <= 1 && checkStopShort(j, [a.id]).ok, `60 ms after the drag, ends ${r1(stray(j))} px from their targets`);
     record('reduced motion: no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
     await s.browser.close();
   }

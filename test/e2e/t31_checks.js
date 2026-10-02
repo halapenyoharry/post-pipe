@@ -299,7 +299,8 @@ async function part1(bt, name, size, record) {
   record('1 Escape closes the menu, the focus back on the hourglass', !esc.menu && esc.focus);
   await p.click('[data-top-menu-button]');
   await p.waitForTimeout(200);
-  await p.mouse.click(s.W / 2, s.H - 120);
+  // Clear of the acts (since T35 Act One sits at the bottom centre).
+  await p.mouse.click(40, s.H - 120);
   await p.waitForTimeout(250);
   record('1 a tap outside closes the menu', !(await p.$('[data-top-menu]')));
 
@@ -326,7 +327,7 @@ async function part1(bt, name, size, record) {
   // Cmd+Z and Cmd+Shift+Z.
   await drag(p, reset, by);
   await p.waitForTimeout(1200);
-  await p.mouse.click(s.W / 2, s.H - 60);
+  await p.mouse.click(40, s.H - 60);
   await p.keyboard.press(name === 'webkit' ? 'Meta+z' : 'Control+z');
   await p.waitForTimeout(1500);
   const kz = await actCentre(p, id);
@@ -366,11 +367,17 @@ async function part2(bt, name, size, record) {
       if (r.width && r.top < innerHeight * 0.2) row = Math.max(row, r.bottom);
     }
     const grip = document.querySelector('[data-cover-handle] > span').getBoundingClientRect();
-    return { left: h.left, top: h.top, w: h.width, h: h.height, row, gripX: grip.left + grip.width / 2, gripY: grip.top };
+    const f = window.PostPipeCoverFrame;
+    const crown = f && Number.isFinite(f.crownY) ? f.art.top + f.crownY * f.art.height : 0;
+    return { left: h.left, top: h.top, w: h.width, h: h.height, row, gripX: grip.left + grip.width / 2, gripY: grip.top, crown };
   });
-  record('2 the grip spans the width, from the top to 16 px under the bar\'s row',
-    strip.left === 0 && Math.abs(strip.w - s.W) <= 0.5 && strip.top === 0 && Math.abs(strip.h - (Math.ceil(strip.row) + 16)) <= 1,
-    `${r1(strip.w)} x ${r1(strip.h)} px, row ends at ${r1(strip.row)}`);
+  // Since T35, with opening.returnAbove crown, the grip reaches down to the
+  // roots' crown, so a scroll up anywhere above it brings the art back.
+  const toCrown = SETTINGS.opening && SETTINGS.opening.returnAbove === 'crown';
+  const wantH = toCrown ? Math.max(Math.ceil(strip.row) + 16, Math.round(strip.crown)) : Math.ceil(strip.row) + 16;
+  record(toCrown ? '2 the grip spans the width, from the top down to the roots\' crown' : '2 the grip spans the width, from the top to 16 px under the bar\'s row',
+    strip.left === 0 && Math.abs(strip.w - s.W) <= 0.5 && strip.top === 0 && Math.abs(strip.h - wantH) <= 1,
+    `${r1(strip.w)} x ${r1(strip.h)} px, row ends at ${r1(strip.row)}, crown at ${r1(strip.crown)}`);
   record('2 the grip mark stays at the top centre', Math.abs(strip.gripX - s.W / 2) <= 1 && strip.gripY <= 6, `mark at ${r1(strip.gripX)}, ${r1(strip.gripY)}`);
 
   // A tap at 20 px from the left, 8 from the top.
@@ -431,6 +438,8 @@ const LINKS_SITE = withSettings((s) => {
 async function part3(bt, name, size, record) {
   const s = await open(bt, name, size, { variant: LINKS_SITE });
   const p = s.page;
+  // Since T35 the top bar is in the graph state alone (opening.topBarInArt).
+  if (!(SETTINGS.opening && SETTINGS.opening.topBarInArt)) await go(s, 'graph');
   await s.ctx.route(`${OUT_URL}*`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>out</title>' }));
   const pageId = (SETTINGS.topBar && SETTINGS.topBar.pages && SETTINGS.topBar.pages[0]) ? SETTINGS.topBar.pages[0].id : null;
   const pageLabel = pageId ? (SETTINGS.topBar.pages[0].label || pageId) : null;
@@ -470,6 +479,7 @@ const SUB_SITE = withSettings((s) => { s.topBar = { ...(s.topBar || {}), subscri
 async function part5(bt, name, size, record) {
   const s = await open(bt, name, size, { variant: SUB_SITE });
   const p = s.page;
+  if (!(SETTINGS.opening && SETTINGS.opening.topBarInArt)) await go(s, 'graph');
   const posts = [];
   let reply = { status: 200, body: { success: true } };
   await s.ctx.route(`${BASE}api/t31-subscribe`, (route) => {

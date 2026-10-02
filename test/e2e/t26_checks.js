@@ -141,7 +141,10 @@ async function run(bt, name, size, record) {
       `first baseline at ${firstY.toFixed(3)} of the art's height, ink from ${inkL.toFixed(2)} to ${inkR.toFixed(2)} of its width`);
     const ratio = (l) => l.sizes.map((h) => h / l.sizes[l.sizes.length - 1]);
     const spans = artLines[0].sizes;
-    record(`${m}: art state: span sizes as set ("The" smaller, "Epic" larger, "of" between; "Elinor" and "Jones" largest)`, spans.length === 3 && spans[0] < spans[2] && spans[2] < spans[1] && artLines[1].sizes[0] > spans[1] && Math.abs(artLines[1].sizes[0] - artLines[2].sizes[0]) < 1,
+    // Since T35 (title.fit width) each line is set to its width, so Elinor
+    // and Jones are each as large as their width asks, a few % apart, as
+    // the mockup draws them.
+    record(`${m}: art state: span sizes as set ("The" smaller, "Epic" larger, "of" between; "Elinor" and "Jones" largest)`, spans.length === 3 && spans[0] < spans[2] && spans[2] < spans[1] && artLines[1].sizes[0] > spans[1] && Math.abs(artLines[1].sizes[0] - artLines[2].sizes[0]) < (OPENING.title.fit === 'width' ? 0.06 * artLines[1].sizes[0] : 1),
       `line heights ${artLines.map((l) => l.sizes.map((h) => Math.round(h)).join('/')).join(', ')} px (${ratio(artLines[0]).map((r) => r.toFixed(2)).join(', ')})`);
     record(`${m}: the title's face, colour and opacity`, new RegExp(`^["']?${TITLE.font}["']?,`).test(a.family) && a.loaded && hex(a.fill) === TITLE.color && Math.abs(Number(a.fillOpacity) - TITLE.opacity) < 0.005 && a.label === TITLE.text,
       `${a.family.split(',')[0]} loaded ${a.loaded}, fill ${hex(a.fill)} at ${a.fillOpacity}, name "${a.label}"`);

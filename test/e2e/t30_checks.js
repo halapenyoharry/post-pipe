@@ -226,6 +226,16 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
 }, { acts: ACTS, book: BOOK });
 
 const anchorAt = (m, a) => artPoint(a.anchor, m.art);
+// Moved from its anchor only the way it opens (openTowards), forward.
+function pushedAway(m, a) {
+  const c = m.acts[a.id];
+  if (!c) return false;
+  const at = anchorAt(m, a);
+  const t = ((SETTINGS.containers[a.id] || {}).spiral || {}).openTowards || 'down';
+  const d = { down: [0, 1], 'down-left': [-Math.SQRT1_2, Math.SQRT1_2], 'down-right': [Math.SQRT1_2, Math.SQRT1_2] }[t];
+  const dx = c.x - at.x, dy = c.y - at.y;
+  return Math.abs(dx * d[1] - dy * d[0]) <= 2 && dx * d[0] + dy * d[1] > 0;
+}
 const anchorOff = (m, a) => (m.acts[a.id] ? off(m.acts[a.id], anchorAt(m, a)) : Infinity);
 const crownY = (m) => m.art.top + CROWN * m.art.height;
 
@@ -332,6 +342,9 @@ async function shot(s, name) {
 
 const hexLum = (rgb) => { const m = (rgb.match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number); return m.length === 3 ? (m[0] + m[1] + m[2]) / 3 : NaN; };
 
+const HIDDEN_IN_ART = openingConfig(SETTINGS).graph.artStateOpacity === 0;
+const BAR_IN_ART = openingConfig(SETTINGS).topBarInArt;
+
 async function run(bt, name, size, record) {
   // ── light, fresh ──
   {
@@ -364,27 +377,44 @@ async function run(bt, name, size, record) {
     }
     const below = ACTS.map((a) => ({ a, c: m.acts[a.id] })).filter((x) => x.c);
     const onAnchors = ACTS.map((a) => anchorOff(m, a));
+    if (HIDDEN_IN_ART) {
+      // Since T35 a site can show nothing of the graph in the art state
+      // (graph.artStateOpacity 0): its layers are display none there.
+      const layers = await p.evaluate(() => [...document.querySelector('[data-graph-root]').children].map((c) => getComputedStyle(c).display));
+      record('3 art state: nothing of the graph drawn (graph.artStateOpacity 0)', layers.length > 0 && layers.every((d) => d === 'none') && m.graph.inert, `${layers.join(',')}, inert ${m.graph.inert}`);
+    } else {
     record('3 art state: the graph is there, visible (opacity > 0.3)', m.graph.opacity > 0.3 && m.graph.containers > 0,
       `graph opacity ${r2(m.graph.opacity)}, ${m.graph.containers} containers drawn, inert ${m.graph.inert}`);
     record('3 art state: the graph hangs under the roots, each act on its anchor on the art, below the crown',
       below.length === ACTS.length && below.every((x) => x.c.y > crownY(m)) && onAnchors.every((d) => d <= 2),
       `crown at y ${r1(crownY(m))}; ${below.map((x) => `${x.a.id.replace('container:', '')} y ${r1(x.c.y)}, ${r1(anchorOff(m, x.a))} px off its anchor`).join('; ')}`);
+    }
 
     // 5, 6. The top bar in the art state.
     const inLine = (mm) => mm.page && mm.pill && mm.gear && Math.abs(mm.page.cy - mm.pill.cy) <= 1 && mm.page.top < mm.gear.bottom && mm.page.bottom > mm.gear.top;
-    record(`5 art state: "${PAGE.label}" at the top, in line with the title pill and the gear`, !!inLine(m) && m.pageLabel === PAGE.label && m.gearVis === 'visible',
+    // Since T35 the top bar is in the graph state alone unless
+    // opening.topBarInArt: "about" is then checked there.
+    if (BAR_IN_ART) record(`5 art state: "${PAGE.label}" at the top, in line with the title pill and the gear`, !!inLine(m) && m.pageLabel === PAGE.label && m.gearVis === 'visible',
       m.page ? `${m.pageLabel} ${r1(m.page.left)},${r1(m.page.top)}–${r1(m.page.right)},${r1(m.page.bottom)}; pill ${r1(m.pill.top)}–${r1(m.pill.bottom)}; gear ${r1(m.gear.top)}–${r1(m.gear.bottom)} ${m.gearVis}` : 'no button');
+    else {
+      const hid = await p.evaluate(() => { const b = document.querySelector('[data-feeds]'); return getComputedStyle(b).visibility; });
+      record(`5 art state: no top bar, so no "${PAGE.label}" (opening.topBarInArt false)`, hid === 'hidden', hid);
+    }
     record('6 no add-a-feed + in the top bar', m.add === 0 && !TOP.addFeed, `top bar: ${m.feedsChildren.join(' | ')}`);
     await shot(s, 'art');
 
-    // 5. The page opens in the reader from the art state, and comes back.
-    await tapAt(s, { x: (m.page.left + m.page.right) / 2, y: m.page.cy });
-    await p.waitForTimeout(900);
-    const rd = await p.evaluate(() => ({ hash: decodeURIComponent(location.hash), shown: !!document.querySelector('[data-reader-panel]'), title: (document.querySelector('[data-reader-panel] h1, [data-reader-panel] h2') || {}).textContent || '' }));
-    record(`5 art state: a tap on "${PAGE.label}" opens its item in the reader`, rd.shown && rd.hash.includes(PAGE.id),
-      `${rd.hash}, reader ${rd.shown ? 'open' : 'closed'}, heading "${rd.title}"`);
-    await p.keyboard.press('Escape');
-    await p.waitForTimeout(500);
+    // 5. The page opens in the reader from the art state (or, without the
+    // top bar there, from the graph state), and comes back.
+    const tapAbout = async (where) => {
+      await tapAt(s, { x: (m.page.left + m.page.right) / 2, y: m.page.cy });
+      await p.waitForTimeout(900);
+      const rd = await p.evaluate(() => ({ hash: decodeURIComponent(location.hash), shown: !!document.querySelector('[data-reader-panel]'), title: (document.querySelector('[data-reader-panel] h1, [data-reader-panel] h2') || {}).textContent || '' }));
+      record(`5 ${where}: a tap on "${PAGE.label}" opens its item in the reader`, rd.shown && rd.hash.includes(PAGE.id),
+        `${rd.hash}, reader ${rd.shown ? 'open' : 'closed'}, heading "${rd.title}"`);
+      await p.keyboard.press('Escape');
+      await p.waitForTimeout(500);
+    };
+    if (BAR_IN_ART) await tapAbout('art state');
 
     // 3, 4. To the graph: the acts as they start, on their anchors.
     await go(s, 'graph');
@@ -399,8 +429,13 @@ async function run(bt, name, size, record) {
       `plant top ${r1(tg.y)} px (${r2(tg.y / s.H)} of ${s.H}), ${r1(tg.y - ctrl2)} px under the controls ending at ${r1(ctrl2)}`);
     record('3 graph state: the graph at full strength, interactive', m.graph.opacity === 1 && !m.graph.inert && m.graph.transform === 'none',
       `opacity ${m.graph.opacity}, inert ${m.graph.inert}, transform ${m.graph.transform}`);
-    record(`5 graph state: "${PAGE.label}" still at the top, in line with the title pill and the gear`, !!inLine(m),
+    record(`5 graph state: "${PAGE.label}" ${BAR_IN_ART ? 'still ' : ''}at the top, in line with the title pill and the gear`, !!inLine(m),
       m.page ? `${r1(m.page.top)}–${r1(m.page.bottom)}, pill ${r1(m.pill.top)}–${r1(m.pill.bottom)}` : 'no button');
+    if (!BAR_IN_ART) {
+      await tapAbout('graph state');
+      if ((await state(p)) !== 'graph') await go(s, 'graph');
+      m = await measure(p);
+    }
     const world = await p.evaluate(() => fetch('./feed.json').then((r) => r.json()).then((f) => f.items.map((i) => i.url.split('/').pop().replace('.html', ''))));
     const drawn = await p.evaluate(() => {
       const ids = new Set();
@@ -440,22 +475,32 @@ async function run(bt, name, size, record) {
       AT_TOP ? `menu heading: ${sheet.join(', ') || 'none'}` : s.phone ? `More sheet heading: ${sheet.join(', ') || 'none'}` : `bar label: ${grp.filter((g) => g.shown).map((g) => g.text).join(', ') || 'none'}`);
 
     // 4. Open an act: centred on its anchor, and still there once settled.
-    const a1 = ACTS.find((a) => /act-1/.test(a.id)) || ACTS[0];
+    // The highest act but the one dragged below: since T35 Act One sits at
+    // the screen's foot on a desktop, where its open title is below it.
     const a2 = ACTS.find((a) => /act-2/.test(a.id)) || ACTS[1];
+    const a1 = ACTS.filter((a) => a !== a2).sort((p, q) => p.anchor.y - q.anchor.y)[0];
     if (m.acts[a1.id].closed) await tapAt(s, m.acts[a1.id]);
     await p.waitForTimeout(900);
     const o1 = await measure(p);
     await p.waitForTimeout(2200);
     const o2 = await measure(p);
     record('4 open an act: it opens centred on its anchor and stays there',
-      !o2.acts[a1.id].closed && anchorOff(o1, a1) <= 2 && anchorOff(o2, a1) <= 2,
+      // Since T35 an open act that would meet another is pushed the way it
+      // opens until clear (open acts never overlap).
+      !o2.acts[a1.id].closed && (anchorOff(o1, a1) <= 2 || pushedAway(o1, a1)) && (anchorOff(o2, a1) <= 2 || pushedAway(o2, a1)),
       `${a1.id.replace('container:', '')} ${a1.outer ? 'last chapter' : 'title'} ${r1(anchorOff(o1, a1))} px from its anchor after 0.9 s, ${r1(anchorOff(o2, a1))} px after 3.1 s`);
     // A tap on its title closes it (an open act that hangs is measured at
     // its hull's top, which is not its title).
-    await tapAt(s, o2.acts[a1.id].title || o2.acts[a1.id]);
+    // Since T35 Act Three sits near a phone's right edge and opens down-right,
+    // so its open title can fall off the screen: then it is closed through
+    // the graph's own call, and the detail says so.
+    const tgt = o2.acts[a1.id].title || o2.acts[a1.id];
+    const tappable = tgt.x >= 0 && tgt.x <= s.W && tgt.y >= 0 && tgt.y <= s.H;
+    if (tappable) await tapAt(s, tgt);
+    else await p.evaluate((id) => window.PostPipeGraph.closeContainer(id), a1.id);
     await p.waitForTimeout(1500);
     const c1 = await measure(p);
-    record('4 close it again: back on its anchor', c1.acts[a1.id].closed && anchorOff(c1, a1) <= 2, `${r1(anchorOff(c1, a1))} px off`);
+    record('4 close it again: back on its anchor', c1.acts[a1.id].closed && anchorOff(c1, a1) <= 2, `${c1.acts[a1.id].closed ? 'closed' : 'still open'}, ${r1(anchorOff(c1, a1))} px off; ${tappable ? 'its title tapped' : `its title off the screen (${r1(tgt.x)}, ${r1(tgt.y)}), closed by PostPipeGraph.closeContainer`}`);
     await shot(s, 'graph');
 
     // 4. Drag one: it stays where dropped, opens there, and comes back there.
@@ -531,11 +576,21 @@ async function run(bt, name, size, record) {
     const back = await measure(p);
     const drift = frames.filter((f) => f.c).map((f) => off(f.c, artPoint(a1def.anchor, f.art)));
     record(`3 a scroll up from the graph state's top edge (${s.phone ? 'a drag down on the grip' : 'a wheel up at the top'}) returns to the art`, st === 'art', `state ${st}`);
+    if (HIDDEN_IN_ART) {
+      // With graph.artStateOpacity 0 the graph fades out on the way, and
+      // the art scales between the states (T35), so an act need not ride
+      // its anchor while it fades.
+      record('3 on the way the graph fades out with the page', frames.length > 3 && frames[frames.length - 1].op < frames[0].op,
+        `${frames.length} frames, graph opacity ${r2(frames[0].op)} to ${r2(frames[frames.length - 1].op)}`);
+      const layers = await p.evaluate(() => [...document.querySelector('[data-graph-root]').children].map((c) => getComputedStyle(c).display));
+      record('3 back in the art state: nothing of the graph drawn', layers.every((d) => d === 'none'), layers.join(','));
+    } else {
     record('3 on the way the graph keeps to the art (an act on its anchor in every frame) and stays visible',
       frames.length > 3 && drift.length > 3 && Math.max(...drift) <= 2 && frames.every((f) => f.op > 0.3),
       `${frames.length} frames between the states, act off its anchor at most ${r1(Math.max(...drift))} px, graph opacity ${r2(Math.min(...frames.map((f) => f.op)))}–${r2(Math.max(...frames.map((f) => f.op)))}`);
     record('3 back in the art state: the graph still there, under the roots', back.graph.opacity > 0.3 && ACTS.every((a) => back.acts[a.id] && back.acts[a.id].y > crownY(back) && anchorOff(back, a) <= 2),
       `opacity ${r2(back.graph.opacity)}, acts ${ACTS.map((a) => r1(anchorOff(back, a))).join(', ')} px off their anchors`);
+    }
     record('light run: nothing fetched from elsewhere, no page errors', s.outside.length === 0 && s.errors.length === 0,
       `${s.outside.length} outside, ${s.errors.length} errors${s.errors.length ? ': ' + s.errors.slice(0, 2).join(' | ') : ''}`);
     await s.browser.close();
@@ -578,8 +633,18 @@ async function run(bt, name, size, record) {
     await go(s, 'graph');
     await s.page.waitForTimeout(1500);
     const m = await measure(s.page);
-    record('4 variant containersStart open: the acts start open, each centred on its anchor',
-      ACTS.every((a) => m.acts[a.id] && !m.acts[a.id].closed && anchorOff(m, a) <= 2),
+    // Since T35 open acts never overlap: one that would meet another is
+    // pushed straight along the way it opens (openTowards), so it is on its
+    // anchor or moved only that way.
+    const along = (a) => {
+      const c = m.acts[a.id], at = anchorAt(m, a);
+      const t = ((SETTINGS.containers[a.id] || {}).spiral || {}).openTowards || 'down';
+      const dir = { down: [0, 1], 'down-left': [-Math.SQRT1_2, Math.SQRT1_2], 'down-right': [Math.SQRT1_2, Math.SQRT1_2] }[t];
+      const dx = c.x - at.x, dy = c.y - at.y;
+      return Math.abs(dx * dir[1] - dy * dir[0]) <= 2 && dx * dir[0] + dy * dir[1] > 0;
+    };
+    record('4 variant containersStart open: the acts start open, each on its anchor or pushed the way it opens',
+      ACTS.every((a) => m.acts[a.id] && !m.acts[a.id].closed && (anchorOff(m, a) <= 2 || along(a))),
       ACTS.map((a) => `${a.id.replace('container:', '')} ${m.acts[a.id] && (m.acts[a.id].closed ? 'closed' : 'open')} ${r1(anchorOff(m, a))} px off`).join('; '));
     record('variant: no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
     await s.browser.close();
