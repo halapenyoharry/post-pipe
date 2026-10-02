@@ -18,8 +18,8 @@
 //   - no node, hull or label above the crown line.
 // Chromium and WebKit, desktop (1280x800) and phone (390x844). A screenshot
 // per state, size and engine goes to PP_E2E_SHOTS when set, with a composite
-// per size of each mockup beside the preview at the same scale (the roots
-// the same width).
+// per size of each mockup beside the preview at the same scale (see
+// MOCK_SIDE_GAP).
 //
 //   node test/e2e/t33_checks.js [path/to/_site]
 //
@@ -327,9 +327,15 @@ async function run(bt, name, size, record, shots) {
   await s.browser.close();
 }
 
-// Each mockup beside the preview, scaled so the roots are the same width.
-// The mockup's roots are found by their colour (near-white grey, brighter
-// than the ground) in the rows from the top to 70% down.
+// Each mockup beside the preview at the same scale. The closed mockup's side
+// pills sit on the outer tips, their centres 370.5 px apart (x 153.5 and
+// 524 of its 708); the preview's side anchors are (x2 - x3) of the art's
+// width apart, so the preview is scaled to make those the same. The open
+// mockup is drawn larger than the closed one: its widest row of bright root
+// (near-white grey, every channel over 95) is 489 px against the closed one's
+// 399, so it takes 1.226 times that scale.
+const MOCK_SIDE_GAP = 370.5;
+const MOCK_OPEN_OVER_CLOSED = 489 / 399;
 async function composite(size, shots) {
   if (!SHOTS) return;
   const browser = await chromium.launch();
@@ -341,26 +347,13 @@ async function composite(size, shots) {
   ]) {
     if (!file || !art) continue;
     const out = path.join(SHOTS, `composite-${state}-${size}.png`);
-    const info = await page.evaluate(async ({ mock, prev, art }) => {
+    const sides = SIDES.map((x) => x.anchor.x);
+    const gapPx = Math.abs(sides[0] - sides[1]) * art.width;
+    const scale = (MOCK_SIDE_GAP / gapPx) * (state === 'open' ? MOCK_OPEN_OVER_CLOSED : 1);
+    const info = await page.evaluate(async ({ mock, prev, scale, note }) => {
       const load = async (src) => { const i = new Image(); i.src = src; await i.decode(); return i; };
       const mi = await load('data:image/png;base64,' + mock);
       const pi = await load('data:image/png;base64,' + prev);
-      const c0 = document.createElement('canvas'); c0.width = mi.width; c0.height = mi.height;
-      const x0 = c0.getContext('2d'); x0.drawImage(mi, 0, 0);
-      const d = x0.getImageData(0, 0, mi.width, mi.height).data;
-      let L = Infinity, R = -Infinity;
-      for (let y = 0; y < mi.height * 0.7; y++) {
-        for (let x = 0; x < mi.width; x++) {
-          const i = (y * mi.width + x) * 4;
-          const lo = Math.min(d[i], d[i + 1], d[i + 2]), hi = Math.max(d[i], d[i + 1], d[i + 2]);
-          if (lo > 150 && hi - lo < 20) { L = Math.min(L, x); R = Math.max(R, x); }
-        }
-      }
-      const mockRoots = R - L;
-      // The preview's roots: the art's width (they run across nearly all of it).
-      const dpr = pi.width / innerWidth >= 1 ? 1 : 1;
-      const prevRoots = art.width * 0.975 * dpr;
-      const scale = mockRoots / prevRoots;
       const ph = pi.height * scale, pw = pi.width * scale;
       const H = Math.max(mi.height, ph) + 40;
       const c = document.createElement('canvas'); c.width = mi.width + pw + 60; c.height = H;
@@ -370,11 +363,12 @@ async function composite(size, shots) {
       x.drawImage(pi, mi.width + 40, 30, pw, ph);
       x.fillStyle = '#ddd'; x.font = '14px sans-serif';
       x.fillText('mockup', 20, 20);
-      x.fillText(`preview, scaled ${scale.toFixed(3)} so the roots are ${Math.round(mockRoots)} px wide in both`, mi.width + 40, 20);
-      return { url: c.toDataURL('image/png'), mockRoots, prevRoots, scale };
-    }, { mock: b64(path.join(MOCKUPS, mock)), prev: b64(file), art });
+      x.fillText(note, mi.width + 40, 20);
+      return { url: c.toDataURL('image/png') };
+    }, { mock: b64(path.join(MOCKUPS, mock)), prev: b64(file), scale, note: `preview, scaled ${scale.toFixed(3)} to the mockup's scale` });
+    info.scale = scale; info.gapPx = gapPx;
     fs.writeFileSync(out, Buffer.from(info.url.split(',')[1], 'base64'));
-    console.log(`composite ${state} ${size}: mockup roots ${Math.round(info.mockRoots)} px, preview roots ${Math.round(info.prevRoots)} px, scale ${info.scale.toFixed(3)} -> ${path.relative(process.cwd(), out)}`);
+    console.log(`composite ${state} ${size}: the preview's side anchors ${info.gapPx.toFixed(1)} px apart, scaled ${info.scale.toFixed(3)} -> ${path.relative(process.cwd(), out)}`);
   }
   await browser.close();
 }
