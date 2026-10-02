@@ -264,6 +264,7 @@ function openingConfig(settings) {
     graph: {
       artOffset: Math.max(0, Math.min(0.95, num(graph.artOffset, DEFAULTS.graph.artOffset))),
       artStateOpacity: clamp01(num(graph.artStateOpacity, DEFAULTS.graph.artStateOpacity)),
+      hiddenUntilMove: graph.hiddenUntilMove === true,
     },
     top: topConfig(o.top),
     grip: gripConfig(o.grip),
@@ -274,6 +275,18 @@ function openingConfig(settings) {
     snapMs: Math.max(0, num(o.snapMs, DEFAULTS.snapMs)),
     title: titleConfig(o.title),
   };
+}
+
+// opening.graph.hiddenUntilMove: on a load that starts on the art, the graph
+// (the acts' hulls and pills) and the rootlets are not drawn until the
+// reader first moves: a scroll or swipe down, a drag, or a tap anywhere that
+// is not a top-bar control. They fade in over REVEAL_MS and stay, in both
+// states, for the rest of the visit. revealFactor is how far in they are.
+const REVEAL_MS = 300;
+function revealFactor(hidden, at, now) {
+  if (!hidden) return 1;
+  if (at === null || at === undefined) return 0;
+  return Math.max(0, Math.min(1, (now - at) / REVEAL_MS));
 }
 
 // The state the page opens on. A link straight to a chapter (#read=) opens
@@ -617,7 +630,7 @@ function pageKey(e) {
   return null;
 }
 
-module.exports = {
+module.exports = { REVEAL_MS, revealFactor,
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
   openingConfig, bylineConfig, bylineText, groundConfig, topConfig, gripConfig, gripHeight, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
 };

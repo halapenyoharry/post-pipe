@@ -76,7 +76,7 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.ok(onlyFull, 'full alone is enough');
   assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png' }, 'full stands for both states');
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
-  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6 });
+  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false });
   assert.deepStrictEqual(onlyFull.backdrop, { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 });
   assert.equal(onlyFull.reach, null, 'no reach unless it is on and names tips');
   assert.equal(onlyFull.ground, 'dark');
@@ -497,4 +497,16 @@ test('grip: extra px below the top bar\'s row, 16 by default; the strip reaches 
   assert.equal(gripHeight(48, { extra: 16 }), 64);
   assert.equal(gripHeight(36.4, { extra: 0 }), 37);
   assert.equal(gripHeight(0, { extra: 0 }), 12);
+});
+
+test('hiddenUntilMove: off by default; on, the graph waits for a move and fades in over 300 ms', () => {
+  const { revealFactor, REVEAL_MS } = require('../src/lib/opening');
+  assert.strictEqual(openingConfig({ opening: { ...SITE.opening } }).graph.hiddenUntilMove, false);
+  assert.strictEqual(openingConfig({ opening: { ...SITE.opening, graph: { hiddenUntilMove: true } } }).graph.hiddenUntilMove, true);
+  assert.strictEqual(openingConfig({ opening: { ...SITE.opening, graph: { hiddenUntilMove: 'yes' } } }).graph.hiddenUntilMove, false);
+  assert.strictEqual(REVEAL_MS, 300);
+  assert.strictEqual(revealFactor(false, null, 0), 1);
+  assert.strictEqual(revealFactor(true, null, 1000), 0);
+  assert.strictEqual(revealFactor(true, 1000, 1150), 0.5);
+  assert.strictEqual(revealFactor(true, 1000, 1400), 1);
 });

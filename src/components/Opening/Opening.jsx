@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, bylineText, gripHeight, TUNING } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, bylineText, gripHeight, TUNING, revealFactor } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 
 /**
@@ -344,6 +344,24 @@ function Cover({ config, viewState, children }) {
     stored: viewState && viewState.openingState ? viewState.openingState() : null,
     hash: typeof window !== 'undefined' ? window.location.hash : '',
   }), [config, viewState]);
+  // opening.graph.hiddenUntilMove: on a load that starts on the art, the
+  // graph and the rootlets wait for the reader's first move, then fade in
+  // (revealFactor) and stay. revealRef.current.at: when they began to.
+  const hideUntilMove = !!(config.graph && config.graph.hiddenUntilMove) && start === 'art';
+  const revealRef = useRef({ at: null });
+  const revealNow = () => revealFactor(hideUntilMove, revealRef.current.at, performance.now());
+  const reveal = () => {
+    if (!hideUntilMove || revealRef.current.at !== null) return;
+    revealRef.current.at = performance.now();
+    document.documentElement.setAttribute('data-pp-cover-acts', 'shown');
+    const step = () => {
+      if (machineRef.current) paintRef.current(machineRef.current.p);
+      if (revealNow() < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  const revealRef2 = useRef(reveal);
+  revealRef2.current = reveal;
 
   // The canvas's natural size: the art state's image (the graph state's is
   // drawn on the same canvas).
@@ -383,7 +401,7 @@ function Cover({ config, viewState, children }) {
     if (!reach || !sizeRef.current) return;
     const zoomed = zoomRef.current ? backdropOpacity(config.backdrop, zoomRef.current.k, zoomRef.current.homeK) : config.backdrop.opacity;
     const moving = reach.draw(performance.now(), {
-      box: g.art, world, opacity: g.layer.opacity * zoomed, settledCover: m.p >= 1 && !m.moving,
+      box: g.art, world, opacity: g.layer.opacity * zoomed * revealNow(), settledCover: m.p >= 1 && !m.moving,
     });
     if (moving) requestFrame();
   };
@@ -472,7 +490,8 @@ function Cover({ config, viewState, children }) {
       for (const el of sec.children) {
         if (el.matches('[data-feeds], [data-top-bar], [data-cover-handle]')) continue;
         const graph = el.matches('[data-graph-root]');
-        el.style.opacity = atRest ? '' : String(graph ? g.layer.opacity : g.graph.opacity);
+        const shown = graph ? revealNow() : 1;
+        el.style.opacity = atRest && shown >= 1 ? '' : String(atRest ? shown : (graph ? g.layer.opacity * shown : g.graph.opacity));
         el.style.transform = atRest ? '' : (graph
           ? `translate3d(0, ${g.layer.follow}px, 0)`
           : `translate3d(0, ${g.graph.shift}px, 0)`);
@@ -597,6 +616,7 @@ function Cover({ config, viewState, children }) {
           fadeTimer = setTimeout(outOfSight, half);
           return;
         }
+        if (p > 0) revealRef2.current();
         paintRef.current(p);
       },
       onRest(state) {
@@ -620,6 +640,8 @@ function Cover({ config, viewState, children }) {
       get state() { return machine.moving ? 'moving' : machine.rest; },
       get p() { return machine.p; },
       get shift() { return shiftRef.current; },
+      // How far the graph is shown, 0 to 1 (opening.graph.hiddenUntilMove).
+      get acts() { return revealNow(); },
       go: (s, o) => machine.go(s, o),
     };
 
@@ -664,6 +686,19 @@ function Cover({ config, viewState, children }) {
       }
     };
     window.addEventListener('wheel', onWheel, { capture: true, passive: false });
+
+    // The first move shows the graph (opening.graph.hiddenUntilMove): a
+    // scroll or swipe down, a drag, or a tap anywhere but on a top-bar control.
+    const topControl = (t) => !!(t && t.closest && t.closest('[data-feeds], [data-top-bar]') && t.closest('button, a, input, select, [role="button"], [role="menu"], [role="menuitem"], [role="menuitemcheckbox"]'));
+    const onFirstWheel = (e) => { if (e.deltaY > 0) revealRef2.current(); };
+    const onFirstTouchMove = () => revealRef2.current();
+    const onFirstDown = (e) => { if (!topControl(e.target)) revealRef2.current(); };
+    if (hideUntilMove) {
+      window.addEventListener('wheel', onFirstWheel, { capture: true, passive: true });
+      window.addEventListener('touchmove', onFirstTouchMove, { capture: true, passive: true });
+      window.addEventListener('pointerdown', onFirstDown, { capture: true, passive: true });
+      document.documentElement.setAttribute('data-pp-cover-acts', 'hidden');
+    }
 
     const onKey = (e) => {
       const k = pageKey(e);
@@ -744,6 +779,10 @@ function Cover({ config, viewState, children }) {
       if (fadeTimer) clearTimeout(fadeTimer);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('wheel', onWheel, { capture: true });
+      window.removeEventListener('wheel', onFirstWheel, { capture: true });
+      window.removeEventListener('touchmove', onFirstTouchMove, { capture: true });
+      window.removeEventListener('pointerdown', onFirstDown, { capture: true });
+      document.documentElement.removeAttribute('data-pp-cover-acts');
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('hashchange', onHash);
       for (const s of surfaces) {
