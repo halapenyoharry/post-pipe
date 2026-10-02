@@ -12,7 +12,7 @@ In `fonts/`:
 
 ## Icons
 
-`src/lib/icons.js` carries SVG bodies copied from Lucide (https://lucide.dev): undo-2, redo-2, rotate-ccw, hourglass, settings, check. Drawn inline; no icon font, nothing fetched.
+`src/lib/icons.js` carries SVG bodies copied from Lucide (https://lucide.dev): undo-2, redo-2, rotate-ccw, hourglass, settings, check, sliders-horizontal, x, link, arrow-left, arrow-right, bookmark, maximize-2, minimize-2, minus, move-horizontal, list, info, download. Drawn inline; no icon font, nothing fetched.
 
 ```
 ISC License

@@ -698,7 +698,18 @@ ${reactJs}
           // The bottom bar, unless the controls are in the top bar.
           TOOLBAR.position === 'top' ? null : graphControls
         ),
+        // Two panels from one surface (src/lib/panels.js): the main view's,
+        // from the sliders in the top bar, and the reader's, from the sliders
+        // in its header.
         React.createElement(Settings, {
+          where: 'graph',
+          viewState: viewState,
+          feedData: feed,
+          subject: selectedArticle || focusedItem,
+          readerOpen: selectedArticle ? selectedArticle.id : null
+        }),
+        React.createElement(Settings, {
+          where: 'reader',
           viewState: viewState,
           feedData: feed,
           subject: selectedArticle || focusedItem,

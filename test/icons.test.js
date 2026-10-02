@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const { ICONS, iconBody, siteIcon } = require('../src/lib/icons');
 
 test('the engine has the icons its controls draw, as SVG bodies with no emoji', () => {
-  for (const n of ['undo-2', 'redo-2', 'rotate-ccw', 'hourglass', 'settings', 'check']) {
+  for (const n of ['undo-2', 'redo-2', 'rotate-ccw', 'hourglass', 'settings', 'check', 'sliders-horizontal', 'x', 'link', 'arrow-left', 'arrow-right', 'bookmark', 'maximize-2', 'minimize-2', 'minus', 'move-horizontal', 'list', 'info', 'download']) {
     assert.match(iconBody(n), /^<g [^>]*stroke="currentColor"[^>]*>.*<\/g>$/, n);
   }
   assert.strictEqual(iconBody('nope'), '');

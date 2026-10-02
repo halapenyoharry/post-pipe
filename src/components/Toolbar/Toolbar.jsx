@@ -4,6 +4,7 @@ import { dimensionLabels, layerLabels, dimensionGroupLabel } from '../../lib/dim
 import { VIEW_ACTIONS, RESET_TITLE, hasGranularity as axisHasGranularity, toggleDimension, nextGranularity, menuModel, menuMove } from '../../lib/toolbar';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
+import { SettingsButton } from '../Settings/Settings';
 
 /**
  * Toolbar — the one bar along the bottom of the graph.
@@ -20,8 +21,9 @@ import { Icon } from '../Icon/Icon';
  * so the generated page and the embed share it unchanged.
  *
  * placement 'top' (settings.toolbar.position, src/lib/toolbar.js): no bottom
- * bar; the same controls as four icon buttons for the top bar (undo, redo,
- * Reset, and a menu of the dimensions, the view actions and the layout).
+ * bar; the same controls as icon buttons for the top bar (undo, redo, Reset,
+ * a menu of the dimensions), then the sliders that open the main view's
+ * panel, which has the view actions and the layout.
  */
 
 export const LAYOUTS = [
@@ -203,11 +205,11 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
 }
 
 // The controls in the top bar (settings.toolbar.position top): undo, redo,
-// Reset and the dimensions menu, as icon buttons the height of the pills.
-// The menu (role menu) opens under its button: the dimensions as checkbox
-// rows (one on at a time), the bucket size when the one on has it, the view
-// actions, and the layout when it is shown. Escape or a tap outside closes
-// it; the arrow keys, Home and End move through it.
+// Reset, the dimensions menu and the sliders, as icon buttons the height of
+// the pills. The menu (role menu) opens under its button: the dimensions as
+// checkbox rows (one on at a time) and the bucket size when the one on has
+// it. Escape or a tap outside closes it; the arrow keys, Home and End move
+// through it. The sliders open the main view's panel (src/components/Settings).
 function TopControls({ viewState, show, layouts, settings, layers }) {
   const S = settings || (typeof window !== 'undefined' ? window.SETTINGS : null);
   const [, bump] = useReducer((n) => n + 1, 0);
@@ -257,10 +259,9 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
     axis,
     preferences: Object.fromEntries(layerLabels(S).map((d) => [d.id, viewState.preference(d.id)])),
     show,
-    layouts,
-    layout: viewState.state.layout,
     group: GROUP,
   });
+  const hasMenu = model.rows.length > 0;
   const heading = cap(model.heading);
 
   const onMenuKey = (e) => {
@@ -275,7 +276,6 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
   };
 
   const row = (r, i) => {
-    if (r.kind === 'divider') return <div key={`d${i}`} role="separator" className={styles.menuDivider} />;
     if (r.kind === 'dimension' || r.kind === 'layer') {
       const toggle = r.kind === 'dimension'
         ? () => viewState.setTimeAxis(toggleDimension(axis, r.id))
@@ -299,28 +299,6 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
         </button>
       );
     }
-    if (r.kind === 'action') {
-      return (
-        <button key={r.event} type="button" role="menuitem" className={styles.menuItem} title={r.title}
-          data-menu-item data-view-action={r.event} onClick={() => { fire(r.event); close(true); }}>
-          <span className={styles.menuCheck} aria-hidden="true" />
-          {r.label}
-        </button>
-      );
-    }
-    if (r.kind === 'layout') {
-      return (
-        <div key="layout" role="group" aria-label="Layout" className={styles.menuLayout} data-group="layout">
-          {r.options.map((l) => (
-            <button key={l.id} type="button" role="menuitemradio" aria-checked={l.checked} title={l.title}
-              className={`${styles.menuSeg} ${l.checked ? styles.on : ''}`} data-menu-item data-layout={l.id}
-              onClick={() => { if (!l.checked) viewState.setLayout(l.id); }}>
-              {l.label}
-            </button>
-          ))}
-        </div>
-      );
-    }
     return null;
   };
 
@@ -342,20 +320,23 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
         onClick={() => { setOpen(false); fire('graph:reset-all'); }}>
         <Icon body={iconBody('rotate-ccw')} size={15} />
       </button>
-      <button ref={buttonRef} type="button" className={`${styles.topIcon} ${open ? styles.on : ''}`}
-        title={`${heading}: ${model.heading === 'view' ? 'view actions' : 'which to show, and the view actions'}`}
-        aria-label={heading} aria-haspopup="menu" aria-expanded={open} aria-controls="pp-top-menu" data-top-menu-button
-        onClick={() => setOpen((o) => !o)}
-        onKeyDown={(e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); setOpen(true); } }}>
-        <Icon body={iconBody('hourglass')} size={15} />
-      </button>
-      {open && (
-        <div ref={menuRef} id="pp-top-menu" className={styles.menu} role="menu" aria-labelledby="pp-top-menu-heading"
-          data-top-menu onKeyDown={onMenuKey}>
-          <div id="pp-top-menu-heading" role="presentation" className={styles.menuHeading} data-group-label>{heading}</div>
-          {model.rows.map(row)}
-        </div>
-      )}
+      {hasMenu && (<>
+        <button ref={buttonRef} type="button" className={`${styles.topIcon} ${open ? styles.on : ''}`}
+          title={`${heading}: which to show`}
+          aria-label={heading} aria-haspopup="menu" aria-expanded={open} aria-controls="pp-top-menu" data-top-menu-button
+          onClick={() => setOpen((o) => !o)}
+          onKeyDown={(e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); setOpen(true); } }}>
+          <Icon body={iconBody('hourglass')} size={15} />
+        </button>
+        {open && (
+          <div ref={menuRef} id="pp-top-menu" className={styles.menu} role="menu" aria-labelledby="pp-top-menu-heading"
+            data-top-menu onKeyDown={onMenuKey}>
+            <div id="pp-top-menu-heading" role="presentation" className={styles.menuHeading} data-group-label>{heading}</div>
+            {model.rows.map(row)}
+          </div>
+        )}
+      </>)}
+      <SettingsButton className={styles.topIcon} data-settings-open />
     </div>
   );
 }

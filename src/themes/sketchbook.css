@@ -100,3 +100,11 @@ html[data-pp-theme="sketchbook"] body::after {
 html[data-pp-theme="sketchbook"] .pp-rights {
   color: var(--pp-quiet-text);
 }
+
+/* Both panels (the main view's and the reader's) are the same drawer on the
+   same paper, its grain and fibres included, wherever they open. */
+html[data-pp-theme="sketchbook"] [data-settings-panel] {
+  background-color: var(--sk-card);
+  background-image: var(--sk-fibres), var(--sk-grain);
+  background-size: 500px 500px, 220px 220px;
+}

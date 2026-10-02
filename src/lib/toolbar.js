@@ -6,8 +6,9 @@
 //
 // position bottom (default): the bar along the bottom (src/components/Toolbar).
 // position top: no bottom bar; undo, redo, Reset and the dimensions menu join
-// the top bar as icon buttons, and the layout (when shown) is a row in that
-// menu. show: each group on unless set false.
+// the top bar as icon buttons, then the sliders that open the main view's
+// panel, where the view actions and the layout (when shown) are. show: each
+// group on unless set false.
 
 const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
 
@@ -51,28 +52,23 @@ function nextGranularity(g) {
   return GRANULARITIES[(i + 1) % GRANULARITIES.length];
 }
 
-// The menu's rows, top to bottom:
+// The menu's rows, top to bottom (the timelines and their bucket size; the
+// view actions and the layout are in the main view's panel,
+// src/components/Settings):
 //   { kind: 'dimension', id, label, title, checked }   one per dimension
 //   { kind: 'layer', id, label, title, checked }        an edge layer's switch
 //   { kind: 'granularity', value }                      when the dimension on has one
-//   { kind: 'divider' }
-//   { kind: 'action', event, label, title }            the view actions
-//   { kind: 'layout', options: [{ id, label, title, checked }] }   when show.layout
-// heading is the group label with dimensions, else "View".
-function menuModel({ dimensions = [], layers = [], axis = {}, preferences = {}, show = {}, layouts = [], layout, group = 'dimensions' }) {
+// heading is the group label. No rows without dimensions: then the menu and
+// its button are left out.
+function menuModel({ dimensions = [], layers = [], axis = {}, preferences = {}, show = {}, group = 'dimensions' }) {
   const rows = [];
   const current = axis.dimension || 'time';
   if (show.dimensions !== false) {
     for (const d of dimensions) rows.push({ kind: 'dimension', id: d.id, label: d.label, title: d.title, checked: !!axis.on && current === d.id });
     for (const d of layers) rows.push({ kind: 'layer', id: d.id, label: d.label, title: d.title, checked: preferences[d.id] === true });
     if (hasGranularity(axis)) rows.push({ kind: 'granularity', value: axis.granularity || 'auto' });
-    rows.push({ kind: 'divider' });
   }
-  for (const a of VIEW_ACTIONS) rows.push({ kind: 'action', ...a });
-  if (show.layout !== false && layouts.length) {
-    rows.push({ kind: 'layout', options: layouts.map((l) => ({ id: l.id, label: l.label, title: l.title, checked: layout === l.id })) });
-  }
-  return { heading: show.dimensions !== false ? group : 'view', rows };
+  return { heading: group, rows };
 }
 
 // The menu's focus after a key: ArrowDown and ArrowUp move (and wrap), Home

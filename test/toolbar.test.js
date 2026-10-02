@@ -34,33 +34,30 @@ const DIMS = [
 ];
 const LAYOUTS = [{ id: 'force', label: 'cluster', title: 'a' }, { id: 'radial', label: 'ring', title: 'b' }];
 
-test('menu: a checkbox row per dimension, checked when its axis is on; then the view actions; the layout when shown', () => {
-  const m = menuModel({ dimensions: DIMS, axis: { on: true, dimension: 'commits', granularity: 'week' }, show: {}, layouts: LAYOUTS, layout: 'radial', group: 'timelines' });
+test('menu: a checkbox row per dimension, checked when its axis is on, and the bucket size; nothing else', () => {
+  const m = menuModel({ dimensions: DIMS, axis: { on: true, dimension: 'commits', granularity: 'week' }, show: {}, group: 'timelines' });
   assert.strictEqual(m.heading, 'timelines');
-  assert.deepStrictEqual(m.rows.map((r) => r.kind), ['dimension', 'dimension', 'dimension', 'granularity', 'divider', 'action', 'action', 'action', 'layout']);
+  assert.deepStrictEqual(m.rows.map((r) => r.kind), ['dimension', 'dimension', 'dimension', 'granularity']);
   assert.deepStrictEqual(m.rows.filter((r) => r.kind === 'dimension').map((r) => r.checked), [false, true, false]);
   assert.strictEqual(m.rows[3].value, 'week');
-  assert.deepStrictEqual(m.rows.filter((r) => r.kind === 'action').map((r) => r.event), VIEW_ACTIONS.map((a) => a.event));
-  assert.deepStrictEqual(m.rows[8].options.map((o) => [o.label, o.checked]), [['cluster', false], ['ring', true]]);
 });
 
-test('menu: no bucket size for a dimension without one, nor with the axis off; no layout row when it is hidden', () => {
-  const off = menuModel({ dimensions: DIMS, axis: { on: false, dimension: 'commits' }, show: { layout: false }, layouts: LAYOUTS });
+test('menu: no bucket size for a dimension without one, nor with the axis off', () => {
+  const off = menuModel({ dimensions: DIMS, axis: { on: false, dimension: 'commits' }, show: {} });
   assert.ok(!off.rows.some((r) => r.kind === 'granularity'));
-  assert.ok(!off.rows.some((r) => r.kind === 'layout'));
   assert.ok(off.rows.filter((r) => r.kind === 'dimension').every((r) => !r.checked));
   const time = menuModel({ dimensions: DIMS, axis: { on: true, dimension: 'time' }, show: {} });
   assert.ok(!time.rows.some((r) => r.kind === 'granularity'));
   assert.strictEqual(time.rows[0].checked, true);
 });
 
-test('menu: an edge layer is its own switch; without dimensions the menu is the view actions, headed view', () => {
+test('menu: an edge layer is its own switch; without dimensions the menu is empty', () => {
   const m = menuModel({ dimensions: DIMS, layers: [{ id: 'readers', label: 'readers' }], preferences: { readers: true }, axis: {}, show: {} });
   const layer = m.rows.find((r) => r.kind === 'layer');
   assert.deepStrictEqual([layer.id, layer.checked], ['readers', true]);
-  const v = menuModel({ dimensions: DIMS, axis: {}, show: { dimensions: false, layout: false }, layouts: LAYOUTS });
-  assert.strictEqual(v.heading, 'view');
-  assert.deepStrictEqual(v.rows.map((r) => r.kind), ['action', 'action', 'action']);
+  const v = menuModel({ dimensions: DIMS, axis: {}, show: { dimensions: false } });
+  assert.deepStrictEqual(v.rows, []);
+  assert.ok(VIEW_ACTIONS.length >= 3);
 });
 
 test('a dimension tap: on, or off when it is the one on; one at a time', () => {

@@ -426,14 +426,22 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
       {!atTop && graphControls}
 
       {/* Color settings */}
-      {features.colorSettings && viewState && (
+      {features.colorSettings && viewState && (<>
         <Settings
+          where="graph"
           viewState={viewState}
           feedData={feedData}
           subject={selectedArticle || focusedItem}
           readerOpen={selectedArticle ? selectedArticle.id : null}
         />
-      )}
+        <Settings
+          where="reader"
+          viewState={viewState}
+          feedData={feedData}
+          subject={selectedArticle || focusedItem}
+          readerOpen={selectedArticle ? selectedArticle.id : null}
+        />
+      </>)}
 
       {/* Config panel */}
       {features.configPanel && (

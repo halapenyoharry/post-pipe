@@ -1,30 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './Settings.module.css';
 import { readerFonts } from '../../lib/readerSettings';
-import { bookmarkLabel, placedParagraph } from '../../lib/bookmarkPlace';
 import { TTSSettings } from '../TTS/TTS';
 import { config as todConfig } from '../../lib/timeOfDay';
 import { THEMES, themeName } from '../../lib/theme';
 import { isLinkItem } from '../../lib/linkNode';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
+import { panelGroups, panelTitle, modeInReader, whereOf } from '../../lib/panels';
+import { toolbarConfig, VIEW_ACTIONS } from '../../lib/toolbar';
 import { colorKeysInUse } from '../../lib/graphColors';
 import { graphFeed, topBarConfig } from '../../lib/topBar';
 
 /**
- * Settings — the panel that slides out from the right edge, from the graph's
- * gear or the reader's own button. One layout from a phone to a desktop: it is
- * at most the width of the screen, its rows wrap, and nothing is special-cased.
+ * Settings — the panel that slides out from the right edge. One surface,
+ * split in two by where each group belongs (src/lib/panels.js):
  *
- * Four groups, each control in one place only:
- *   Reading     the text: font, size, paragraphs, follow along, bold beginnings
- *   Listening   the voice and its speed (play and pause stay in the reader)
- *   Your place  the selected piece's bookmarks, with a legend, then the rest
- *   View        theme, time of day, containers open or closed, colors, reset
+ *   where 'graph'   the main view's panel, from the sliders in the top bar:
+ *                   Look (theme, the time of day background, the graph's
+ *                   colors), View (zoom to fit, close or open all containers,
+ *                   unpin, sizes, the layout when shown), and what this
+ *                   device remembers (reset, forget)
+ *   where 'reader'  the reader's panel, from the sliders in its header:
+ *                   Reading (face, size, paragraphs, the reading aids),
+ *                   Paper (light or dark, when only the reader changes with
+ *                   it) and Listening (the voice and its speed)
  *
- * It acts on the selected node (`subject`): the piece open in the reader, or
- * else the card last opened on the graph. Everything it changes goes through
- * viewState or the graph's window events.
+ * Bookmarks are not settings: they live in the reader. Both panels are the
+ * same drawer, so they look the same wherever they open. One layout from a
+ * phone to a desktop: at most the width of the screen, its rows wrap.
+ *
+ * A panel opens on postpipe:toggle-settings with detail { where, open };
+ * opening one closes the other. It acts on the selected node (`subject`).
+ * Everything it changes goes through viewState or the graph's window events.
  */
 
 const ENGINE_COLORS = {
@@ -139,59 +147,52 @@ function Section({ id, title, children }) {
   );
 }
 
-const itemTitle = (feed, id) => {
-  const it = feed && Array.isArray(feed.items) ? feed.items.find((i) => i.id === id) : null;
-  return it ? (it.title || '') : '';
-};
 
-function readHash(id, para) {
-  return '#read=' + encodeURIComponent(id) + (para != null ? '&p=' + para : '');
+const fire = (name) => window.dispatchEvent(new CustomEvent(name));
+
+// What a site calls its containers, for Close all / Open all
+// (settings.graph.containersName, "containers" by default).
+function containersName(S) {
+  const n = S && S.graph && typeof S.graph.containersName === 'string' ? S.graph.containersName.trim() : '';
+  return n || 'containers';
 }
 
-// One saved place: where it is, its note, and what can be done with it.
-function BookmarkRow({ b, feedData, viewState }) {
-  const [editing, setEditing] = useState(false);
-  const item = feedData && Array.isArray(feedData.items) ? feedData.items.find((i) => i.id === b.item) : null;
-  const para = placedParagraph(b, item);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(window.location.href.split('#')[0] + readHash(b.item, para)); } catch (_) {}
-  };
+// The button that opens the main view's panel: the sliders, in the top bar
+// when the graph's controls are there (src/components/Toolbar), or on its
+// own at the top right when they are not.
+export function SettingsButton({ className, size = 15, ...rest }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const on = (e) => setOpen(!!(e.detail && e.detail.where === 'graph' && e.detail.open));
+    window.addEventListener('postpipe:settings-state', on);
+    return () => window.removeEventListener('postpipe:settings-state', on);
+  }, []);
   return (
-    <div className={styles.markItem} data-bookmark-row>
-      <div className={styles.markMain}>
-        <div className={styles.markTitle}>{bookmarkLabel(b, itemTitle(feedData, b.item))}</div>
-        {editing ? (
-          <input
-            type="text"
-            value={b.note || ''}
-            onChange={(e) => viewState.setBookmarkNote(b.id, e.target.value)}
-            onBlur={() => setEditing(false)}
-            onKeyDown={(e) => { if (e.key === 'Enter') setEditing(false); }}
-            className={styles.noteInput}
-            aria-label="Note"
-            autoFocus
-          />
-        ) : (
-          <button className={styles.markNote} onClick={() => setEditing(true)}>
-            {b.note || <em>Add a note</em>}
-          </button>
-        )}
-      </div>
-      <div className={styles.markActions}>
-        <button onClick={() => { window.location.hash = readHash(b.item, para); }} title="Go back to this place">Jump</button>
-        <button onClick={copy} title="Copy a link to this place">Copy link</button>
-        <button onClick={() => viewState.removeBookmark(b.id)} title="Delete this bookmark" aria-label="Delete bookmark">Delete</button>
-      </div>
-    </div>
+    <button
+      type="button"
+      className={className}
+      onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { where: 'graph' } }))}
+      title="Things to change"
+      aria-label="Things to change"
+      aria-expanded={open}
+      {...rest}
+    >
+      <Icon body={iconBody('sliders-horizontal')} size={size} />
+    </button>
   );
 }
 
-export function Settings({ viewState, feedData, subject, readerOpen }) {
+// where: 'graph' (the main view's panel) or 'reader' (the reader's).
+// ownButton: draw the panel's own button at the top right; by default the
+// main view's panel does when the graph's controls are not in the top bar.
+export function Settings({ viewState, feedData, subject, readerOpen, where = 'graph', ownButton }) {
+  const W = whereOf(where);
   const [open, setOpen] = useState(false);
   const [confirmForget, setConfirmForget] = useState(false);
   const [, bump] = useState(0);
   const panelRef = useRef(null);
   const wantSection = useRef(null);
+  const S = typeof window !== 'undefined' ? window.SETTINGS : null;
 
   useEffect(() => {
     if (!viewState) return;
@@ -201,7 +202,7 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
   // Reading choices are attributes on <html>, so the reader pane and every
   // open node read them from one place.
   useEffect(() => {
-    if (typeof document === 'undefined' || !viewState) return;
+    if (typeof document === 'undefined' || !viewState || W !== 'reader') return;
     const indent = viewState.paragraphIndent ? viewState.paragraphIndent() : false;
     const space = viewState.paragraphSpace ? viewState.paragraphSpace() : true;
     const root = document.documentElement;
@@ -212,20 +213,21 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
     root.setAttribute('data-pp-size', viewState.readerAid ? viewState.readerAid('size') : 'm');
   });
 
-  // The reader has its own settings button (the graph's gear sits under the
-  // reader on a phone), and its Bookmarks button opens Your place.
-  // detail: { section, open } — open true always opens.
+  // detail: { where, section, open }: open true always opens. Opening one
+  // panel closes the other.
   useEffect(() => {
     const onToggle = (e) => {
       const d = (e && e.detail) || {};
+      if (whereOf(d.where) !== W) { setOpen(false); return; }
       wantSection.current = d.section || null;
       setOpen((o) => (d.open ? true : !o));
     };
     window.addEventListener('postpipe:toggle-settings', onToggle);
     return () => window.removeEventListener('postpipe:toggle-settings', onToggle);
-  }, []);
+  }, [W]);
 
   useEffect(() => {
+    window.dispatchEvent(new CustomEvent('postpipe:settings-state', { detail: { where: W, open } }));
     if (!open) return;
     // Escape closes the panel first, and only the panel: caught before the
     // page's own Escape (which closes the reader under it).
@@ -246,306 +248,245 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
 
   if (!viewState) return null;
 
-  const fonts = readerFonts(typeof window !== 'undefined' ? window.SETTINGS : null);
+  const showOwnButton = ownButton !== undefined ? ownButton : (W === 'graph' && toolbarConfig(S).position !== 'top');
+  const fonts = readerFonts(S);
   const font = viewState.readerAid ? viewState.readerAid('font') : 'default';
   const size = viewState.readerAid ? viewState.readerAid('size') : 'm';
   const current = { ...DEFAULT_COLORS, ...viewState.graphColors() };
   const activeProfile = viewState.colorProfileId();
   // Counted on what the graph draws: an item only in the top bar has no card.
-  const inUse = colorKeysInUse(graphFeed(feedData, topBarConfig(typeof window !== 'undefined' ? window.SETTINGS : null)));
+  const inUse = colorKeysInUse(graphFeed(feedData, topBarConfig(S)));
   const fields = inUse ? FIELDS.filter((f) => inUse.has(f.key)) : FIELDS;
   const hasContainers = !!(feedData && Array.isArray(feedData.containers) && feedData.containers.length);
   const hasVoice = typeof window !== 'undefined' && !!window.TTS;
   // A site whose every item is a link node has nothing to read: no groups
-  // about reading (Reading, Listening, Your place).
+  // about reading.
   const items = (feedData && feedData.items) || [];
   const anyReadable = items.length === 0 || items.some((i) => !isLinkItem(i));
+  const name = themeName(S, viewState.preference('theme'));
+  const modes = THEMES[name].modes;
+  const modePref = viewState.preference('mode');
+  const groups = panelGroups(W, { settings: S, readable: anyReadable, voice: hasVoice, modes: modes.length });
+  const TB = toolbarConfig(S);
+  const noun = containersName(S);
 
-  const subjectId = subject ? subject.id : null;
-  const all = viewState.bookmarks();
-  const mine = subjectId ? viewState.bookmarks(subjectId) : [];
-  const others = all.filter((b) => b.item !== subjectId);
-  const readable = subject && subject._posted !== 'title';
-  const inReader = !!(subject && readerOpen && readerOpen === subjectId);
+  const modeChoice = modes.length > 1 && (
+    <Choice
+      label={W === 'reader' ? 'Light or dark' : 'Mode'}
+      name="mode"
+      options={[
+        { id: 'auto', label: 'Auto', title: 'Follow this device' },
+        { id: 'light', label: 'Light' },
+        { id: 'dark', label: 'Dark' },
+      ]}
+      value={modePref && modes.includes(modePref) ? modePref : 'auto'}
+      onChange={(v) => viewState.setPreference('mode', v === 'auto' ? null : v)}
+    />
+  );
+
+  const body = {
+    look: () => (<>
+      <Choice
+        label="Theme"
+        name="theme"
+        options={Object.values(THEMES).map((t) => ({ id: t.id, label: t.label }))}
+        value={name}
+        onChange={(v) => viewState.setPreference('theme', v === themeName(S, null) ? null : v)}
+      />
+      {!modeInReader(S) && modeChoice}
+      {todConfig(S) && (
+        <Switch
+          on={viewState.preference('timeOfDay') !== false}
+          onChange={(v) => viewState.setPreference('timeOfDay', v ? null : false)}
+          label="narrative time of day background"
+          data-pref="timeOfDay"
+        />
+      )}
+      {fields.length > 0 && (<>
+        <div className={styles.rowLabel}>Colors</div>
+        <div className={styles.presetRow}>
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              className={`${styles.presetBtn} ${activeProfile === p.id ? styles.presetActive : ''}`}
+              onClick={() => viewState.applyColorProfile(p.id, p.colors)}
+              title={p.label}
+            >
+              <span className={styles.presetSwatches}>
+                {fields.map((f) => (
+                  <span key={f.key} className={styles.miniSwatch} style={{ background: p.colors[f.key] }} />
+                ))}
+              </span>
+              <span className={styles.presetLabel}>{p.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className={styles.fieldList}>
+          {fields.map((f) => (
+            <label key={f.key} className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{f.label}</span>
+              <input
+                type="color"
+                className={styles.colorInput}
+                value={current[f.key]}
+                onChange={(e) => viewState.setGraphColor(f.key, e.target.value)}
+              />
+              <span className={styles.hexLabel}>{current[f.key]}</span>
+            </label>
+          ))}
+        </div>
+      </>)}
+    </>),
+
+    view: () => (<>
+      <span className={styles.choices} data-view-actions>
+        <button className={styles.choiceBtn} data-view-action="graph:zoom-to-fit" title="Every node on the screen, zoomed about its middle" onClick={() => fire('graph:zoom-to-fit')}>Zoom to fit</button>
+        {hasContainers && (<>
+          <button className={styles.choiceBtn} data-view-action="graph:close-all-containers" onClick={() => fire('graph:close-all-containers')}>Close all {noun}</button>
+          <button className={styles.choiceBtn} data-view-action="graph:open-all-containers" onClick={() => fire('graph:open-all-containers')}>Open all {noun}</button>
+        </>)}
+        {VIEW_ACTIONS.filter((a) => a.event !== 'graph:zoom-to-fit').map((a) => (
+          <button key={a.event} className={styles.choiceBtn} data-view-action={a.event} title={a.title} onClick={() => fire(a.event)}>{a.label}</button>
+        ))}
+      </span>
+      {TB.show.layout && (
+        <Choice
+          label="Layout"
+          name="layout"
+          options={[{ id: 'force', label: 'cluster', title: 'Cluster: each container its own path' }, { id: 'radial', label: 'ring', title: 'Ring: each container its own ring' }]}
+          value={viewState.state.layout}
+          onChange={(v) => viewState.setLayout(v)}
+        />
+      )}
+    </>),
+
+    memory: () => (<>
+      <button
+        className={styles.resetBtn}
+        data-settings-reset
+        title="Layout, zoom, rotation, open and closed containers, selection and colors, back to how the site starts"
+        onClick={() => {
+          setOpen(false);
+          if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);
+          fire('graph:reset-all');
+        }}
+      >
+        Reset the view
+      </button>
+      <div className={styles.forgetBlock} data-forget>
+        <div className={styles.hint} data-forget-note>
+          What you open, arrange, choose, mark and read here is kept on this device only.
+          Reset the view keeps your bookmarks and progress; Forget removes all of it.
+        </div>
+        {!confirmForget ? (
+          <button className={styles.resetBtn} data-forget-ask onClick={() => setConfirmForget(true)}>
+            Forget my usage on this site
+          </button>
+        ) : (
+          <div className={styles.forgetConfirm} role="group" aria-label="Confirm forgetting" data-forget-confirm>
+            <div className={styles.hint}>
+              Remove your bookmarks and notes, reading progress, open cards, positions,
+              and every choice made here, from this device? This can't be undone.
+            </div>
+            <span className={styles.choices}>
+              <button
+                className={styles.resetBtn}
+                data-forget-yes
+                onClick={async () => {
+                  setConfirmForget(false);
+                  setOpen(false);
+                  if (viewState.forget) await viewState.forget();
+                  window.dispatchEvent(new CustomEvent('postpipe:forgotten'));
+                }}
+              >
+                Forget
+              </button>
+              <button className={styles.choiceBtn} data-forget-no onClick={() => setConfirmForget(false)}>
+                Keep it
+              </button>
+            </span>
+          </div>
+        )}
+      </div>
+    </>),
+
+    reading: () => (<>
+      <div className={styles.fontRow} role="radiogroup" aria-label="Font">
+        {fonts.map((f) => (
+          <button
+            key={f.id}
+            role="radio"
+            aria-checked={font === f.id}
+            data-font={f.id}
+            className={`${styles.fontBtn} ${font === f.id ? styles.aidOn : ''}`}
+            style={{ fontFamily: f.family }}
+            onClick={() => viewState.setReaderAid && viewState.setReaderAid('font', f.id)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {fonts.filter((f) => f.license).map((f) => (
+        <div key={f.id} className={styles.hint}>
+          {f.label} is under the <a className={styles.hintLink} href={`./fonts/${f.license}`} target="_blank" rel="noopener">{f.licenseName}</a>.
+        </div>
+      ))}
+      <Choice label="Size" name="size" options={SIZES} value={size} onChange={(v) => viewState.setReaderAid('size', v)} />
+      <div className={styles.choiceRow}>
+        <span className={styles.rowLabel}>Paragraphs</span>
+        <span className={styles.choices}>
+          <button
+            className={`${styles.choiceBtn} ${viewState.paragraphIndent() ? styles.aidOn : ''}`}
+            aria-pressed={viewState.paragraphIndent()}
+            onClick={() => viewState.setParagraphIndent(!viewState.paragraphIndent())}
+          >
+            Indent first line
+          </button>
+          <button
+            className={`${styles.choiceBtn} ${viewState.paragraphSpace() ? styles.aidOn : ''}`}
+            aria-pressed={viewState.paragraphSpace()}
+            onClick={() => viewState.setParagraphSpace(!viewState.paragraphSpace())}
+          >
+            Space between
+          </button>
+        </span>
+      </div>
+      <div className={styles.aidList}>
+        <ReadingAid viewState={viewState} aid="followAlong" label="Highlighter: follow along" hint="Tap or drag through the text to mark the sentence and word you are on." />
+        <ReadingAid viewState={viewState} aid="boldStart" label="Bold word beginnings" hint="The first part of each word is bold, to lead the eye. The text itself is unchanged." />
+      </div>
+    </>),
+
+    paper: () => modeChoice,
+
+    listening: () => (<>
+      <TTSSettings />
+      <div className={styles.hint}>Play and pause are in the reader.</div>
+    </>),
+  };
 
   return (
     <>
-      <button
-        className={styles.gearBtn}
-        onClick={() => setOpen((o) => !o)}
-        title="Settings"
-        aria-label="Settings"
-        aria-expanded={open}
-        data-settings-gear
-      >
-        <Icon body={iconBody('settings')} size={18} />
-      </button>
+      {showOwnButton && (
+        <SettingsButton className={styles.gearBtn} size={18} aria-expanded={open} data-settings-gear />
+      )}
 
       {open && (
         <>
           {/* A transparent click-catcher: closes the panel on a tap outside
               it, without dimming the canvas. */}
           <div className={styles.backdrop} onClick={() => setOpen(false)} />
-          <aside className={styles.drawer} role="dialog" aria-label="Settings" ref={panelRef} data-settings-panel>
+          <aside className={styles.drawer} role="dialog" aria-label={panelTitle(S, W)} ref={panelRef} data-settings-panel={W}>
             <div className={styles.header}>
-              <span className={styles.title}>Settings</span>
-              {subject && <span className={styles.subject} data-settings-subject>{subject.title}</span>}
-              <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close">×</button>
-            </div>
-
-            {anyReadable && <Section id="reading" title="Reading">
-              <div className={styles.fontRow} role="radiogroup" aria-label="Font">
-                {fonts.map((f) => (
-                  <button
-                    key={f.id}
-                    role="radio"
-                    aria-checked={font === f.id}
-                    data-font={f.id}
-                    className={`${styles.fontBtn} ${font === f.id ? styles.aidOn : ''}`}
-                    style={{ fontFamily: f.family }}
-                    onClick={() => viewState.setReaderAid && viewState.setReaderAid('font', f.id)}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              {fonts.filter((f) => f.license).map((f) => (
-                <div key={f.id} className={styles.hint}>
-                  {f.label} is under the <a className={styles.hintLink} href={`./fonts/${f.license}`} target="_blank" rel="noopener">{f.licenseName}</a>.
-                </div>
-              ))}
-              <Choice
-                label="Size"
-                name="size"
-                options={SIZES}
-                value={size}
-                onChange={(v) => viewState.setReaderAid('size', v)}
-              />
-              <div className={styles.choiceRow}>
-                <span className={styles.rowLabel}>Paragraphs</span>
-                <span className={styles.choices}>
-                  <button
-                    className={`${styles.choiceBtn} ${viewState.paragraphIndent() ? styles.aidOn : ''}`}
-                    aria-pressed={viewState.paragraphIndent()}
-                    onClick={() => viewState.setParagraphIndent(!viewState.paragraphIndent())}
-                  >
-                    Indent first line
-                  </button>
-                  <button
-                    className={`${styles.choiceBtn} ${viewState.paragraphSpace() ? styles.aidOn : ''}`}
-                    aria-pressed={viewState.paragraphSpace()}
-                    onClick={() => viewState.setParagraphSpace(!viewState.paragraphSpace())}
-                  >
-                    Space between
-                  </button>
-                </span>
-              </div>
-              <div className={styles.aidList}>
-                <ReadingAid
-                  viewState={viewState}
-                  aid="followAlong"
-                  label="Highlighter: follow along"
-                  hint="Tap or drag through the text to mark the sentence and word you are on."
-                />
-                <ReadingAid
-                  viewState={viewState}
-                  aid="boldStart"
-                  label="Bold word beginnings"
-                  hint="The first part of each word is bold, to lead the eye. The text itself is unchanged."
-                />
-              </div>
-            </Section>}
-
-            {anyReadable && hasVoice && (
-              <Section id="listening" title="Listening">
-                <TTSSettings />
-                <div className={styles.hint}>Play and pause are in the reader.</div>
-              </Section>
-            )}
-
-            {anyReadable && <Section id="place" title="Your place">
-              <div className={styles.legend} data-bookmark-legend>
-                <strong>Mark here</strong>, in the reader, saves the paragraph at the top of the
-                reader; a ribbon in the margin shows it, and tapping it again removes it. Each saved
-                place below has <em>Jump</em> (go back to it), <em>Copy link</em> and <em>Delete</em>.
-                Tap a note to write one.
-              </div>
-              {subject ? (
-                <div className={styles.subjectBlock} data-place-subject>
-                  <div className={styles.subjectTitle}>{subject.title}</div>
-                  {readable && viewState.readingProgress && (() => {
-                    const p = viewState.readingProgress(subject.id);
-                    const text = p.done ? 'Read to the end' : p.max > 0 ? `Read ${Math.round(p.max * 100)}%` : p.seen ? 'Opened' : 'Not opened yet';
-                    return <div className={styles.hint} data-place-progress>{text}</div>;
-                  })()}
-                  <div className={styles.choices}>
-                    {readable && !inReader && (
-                      <button className={styles.choiceBtn} onClick={() => { setOpen(false); window.location.hash = readHash(subject.id, null); }}>
-                        Read
-                      </button>
-                    )}
-                    {inReader && (
-                      <button
-                        className={`${styles.choiceBtn} ${mine.length ? styles.aidOn : ''}`}
-                        aria-pressed={mine.length > 0}
-                        data-place-mark
-                        onClick={() => window.dispatchEvent(new CustomEvent('postpipe:reader-mark'))}
-                      >
-                        {mine.length ? 'Marked' : 'Mark here'}
-                      </button>
-                    )}
-                  </div>
-                  {mine.map((b) => <BookmarkRow key={b.id} b={b} feedData={feedData} viewState={viewState} />)}
-                  {mine.length === 0 && <div className={styles.hint}>No bookmarks in this one yet.</div>}
-                </div>
-              ) : (
-                <div className={styles.hint}>Open a chapter, or tap one on the graph, to see your place in it.</div>
-              )}
-              {others.length > 0 && (
-                <>
-                  <div className={styles.rowLabel}>{subject ? 'Elsewhere' : 'All bookmarks'}</div>
-                  {others.map((b) => <BookmarkRow key={b.id} b={b} feedData={feedData} viewState={viewState} />)}
-                </>
-              )}
-              {all.length === 0 && !subject && <div className={styles.noMarks}>No bookmarks yet.</div>}
-            </Section>}
-
-            <Section id="view" title="View">
-              {(() => {
-                const S = typeof window !== 'undefined' ? window.SETTINGS : null;
-                const name = themeName(S, viewState.preference('theme'));
-                const modes = THEMES[name].modes;
-                const modePref = viewState.preference('mode');
-                return (<>
-                  <Choice
-                    label="Theme"
-                    name="theme"
-                    options={Object.values(THEMES).map((t) => ({ id: t.id, label: t.label }))}
-                    value={name}
-                    onChange={(v) => viewState.setPreference('theme', v === themeName(S, null) ? null : v)}
-                  />
-                  {modes.length > 1 && (
-                    <Choice
-                      label="Mode"
-                      name="mode"
-                      options={[
-                        { id: 'auto', label: 'Auto', title: 'Follow this device' },
-                        { id: 'light', label: 'Light' },
-                        { id: 'dark', label: 'Dark' },
-                      ]}
-                      value={modePref && modes.includes(modePref) ? modePref : 'auto'}
-                      onChange={(v) => viewState.setPreference('mode', v === 'auto' ? null : v)}
-                    />
-                  )}
-                </>);
-              })()}
-              {todConfig(typeof window !== 'undefined' ? window.SETTINGS : null) && (
-                <Switch
-                  on={viewState.preference('timeOfDay') !== false}
-                  onChange={(v) => viewState.setPreference('timeOfDay', v ? null : false)}
-                  label="Time of day background"
-                  hint="The page behind the graph takes on the light of the chapter's time of day, tinted by its season."
-                  data-pref="timeOfDay"
-                />
-              )}
-              {hasContainers && (
-                <div className={styles.choiceRow}>
-                  <span className={styles.rowLabel}>Containers</span>
-                  <span className={styles.choices}>
-                    <button className={styles.choiceBtn} onClick={() => window.dispatchEvent(new CustomEvent('graph:open-all-containers'))}>Open all</button>
-                    <button className={styles.choiceBtn} onClick={() => window.dispatchEvent(new CustomEvent('graph:close-all-containers'))}>Close all</button>
-                  </span>
-                </div>
-              )}
-
-              {fields.length > 0 && (<>
-                <div className={styles.rowLabel}>Colors</div>
-                <div className={styles.presetRow}>
-                  {PRESETS.map((p) => (
-                    <button
-                      key={p.id}
-                      className={`${styles.presetBtn} ${activeProfile === p.id ? styles.presetActive : ''}`}
-                      onClick={() => viewState.applyColorProfile(p.id, p.colors)}
-                      title={p.label}
-                    >
-                      <span className={styles.presetSwatches}>
-                        {fields.map((f) => (
-                          <span key={f.key} className={styles.miniSwatch} style={{ background: p.colors[f.key] }} />
-                        ))}
-                      </span>
-                      <span className={styles.presetLabel}>{p.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className={styles.fieldList}>
-                  {fields.map((f) => (
-                    <label key={f.key} className={styles.fieldRow}>
-                      <span className={styles.fieldLabel}>{f.label}</span>
-                      <input
-                        type="color"
-                        className={styles.colorInput}
-                        value={current[f.key]}
-                        onChange={(e) => viewState.setGraphColor(f.key, e.target.value)}
-                      />
-                      <span className={styles.hexLabel}>{current[f.key]}</span>
-                    </label>
-                  ))}
-                </div>
-              </>)}
-
-              <button
-                className={styles.resetBtn}
-                data-settings-reset
-                title="Layout, zoom, rotation, open and closed containers, selection and colors, back to how the site starts"
-                onClick={() => {
-                  setOpen(false);
-                  if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);
-                  window.dispatchEvent(new CustomEvent('graph:reset-all'));
-                }}
-              >
-                Reset the view
+              <span className={styles.title}>{panelTitle(S, W)}</span>
+              {W === 'reader' && subject && <span className={styles.subject} data-settings-subject>{subject.title}</span>}
+              <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close">
+                <Icon body={iconBody('x')} size={18} />
               </button>
-
-              <div className={styles.forgetBlock} data-forget>
-                <div className={styles.hint} data-forget-note>
-                  What you open, arrange, choose, mark and read here is kept on this device only.
-                  Reset the view keeps your notes and progress; Forget removes all of it.
-                </div>
-                {!confirmForget ? (
-                  <button
-                    className={styles.resetBtn}
-                    data-forget-ask
-                    onClick={() => setConfirmForget(true)}
-                  >
-                    Forget my usage on this site
-                  </button>
-                ) : (
-                  <div className={styles.forgetConfirm} role="group" aria-label="Confirm forgetting" data-forget-confirm>
-                    <div className={styles.hint}>
-                      Remove your bookmarks and notes, reading progress, open cards, positions,
-                      and every choice made here, from this device? This can't be undone.
-                    </div>
-                    <span className={styles.choices}>
-                      <button
-                        className={styles.resetBtn}
-                        data-forget-yes
-                        onClick={async () => {
-                          setConfirmForget(false);
-                          setOpen(false);
-                          if (viewState.forget) await viewState.forget();
-                          window.dispatchEvent(new CustomEvent('postpipe:forgotten'));
-                        }}
-                      >
-                        Forget
-                      </button>
-                      <button className={styles.choiceBtn} data-forget-no onClick={() => setConfirmForget(false)}>
-                        Keep it
-                      </button>
-                    </span>
-                  </div>
-                )}
-              </div>
-            </Section>
+            </div>
+            {groups.map((g) => (
+              <Section key={g.id} id={g.id} title={g.title}>{body[g.id]()}</Section>
+            ))}
           </aside>
         </>
       )}

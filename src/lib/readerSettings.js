@@ -16,6 +16,13 @@ function allowDownload(settings) {
   return !(settings && settings.reader && settings.reader.allowDownload === false);
 }
 
+// settings.reader.bookmarksList: whether the reader offers the list of every
+// bookmark (a button in its header that shows the list under it). Default
+// true; false hides the list and its button, and the Bookmark button stays.
+function bookmarksList(settings) {
+  return !(settings && settings.reader && settings.reader.bookmarksList === false);
+}
+
 // The faces the reader can choose for the text (Settings → Reading). Each
 // non-default face ships with the page as a file next to it, with its
 // license; nothing is fetched from anywhere else.
@@ -41,4 +48,4 @@ function readerFonts(settings) {
   return [...new Set(ids)].map((id) => READER_FONTS[id]);
 }
 
-module.exports = { progressBarMode, allowDownload, readerFonts, READER_FONTS, PROGRESS_BARS };
+module.exports = { progressBarMode, allowDownload, bookmarksList, readerFonts, READER_FONTS, PROGRESS_BARS };

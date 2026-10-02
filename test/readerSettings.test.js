@@ -33,3 +33,10 @@ test('reader.fonts offers the page face and OpenDyslexic by default, each shippe
   assert.strictEqual(od.license, 'OpenDyslexic-OFL.txt');
   assert.ok(!/https?:/.test(JSON.stringify(readerFonts(undefined))));
 });
+
+test('the bookmarks list is on unless the site turns it off', () => {
+  const { bookmarksList } = require('../src/lib/readerSettings');
+  assert.strictEqual(bookmarksList(null), true);
+  assert.strictEqual(bookmarksList({ reader: {} }), true);
+  assert.strictEqual(bookmarksList({ reader: { bookmarksList: false } }), false);
+});

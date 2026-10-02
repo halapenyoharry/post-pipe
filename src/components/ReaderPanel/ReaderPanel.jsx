@@ -3,7 +3,8 @@ import styles from './ReaderPanel.module.css';
 import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
-import { progressBarMode, allowDownload } from '../../lib/readerSettings';
+import { progressBarMode, allowDownload, bookmarksList } from '../../lib/readerSettings';
+import { BookmarkList } from './BookmarkList';
 import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
@@ -18,6 +19,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const [isMinimized, setIsMinimized] = useState(false);
   const [floatingPos, setFloatingPos] = useState(null);
   const [showFrontmatter, setShowFrontmatter] = useState(false);
+  const [showMarks, setShowMarks] = useState(false);
   const [contentHtml, setContentHtml] = useState('');
   const [scrollProgress, setScrollProgress] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
@@ -597,8 +599,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             />
             <button
               className={`${styles.tb} ${styles.tbLabeled}`}
-              onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { section: 'place', open: true } }))}
-              title="Every place you have bookmarked, in the settings panel under Your place"
+              onClick={() => setShowMarks((v) => !v)}
+              aria-expanded={showMarks}
+              title="Every place you have bookmarked"
               data-bookmark-list
               dangerouslySetInnerHTML={{ __html: `${ICONS.bookmarkList}<span class="${styles.tbText}">Bookmarks</span>` }}
             />
@@ -680,7 +683,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <div className={styles.windowControls}>
             <button
               className={styles.tb}
-              onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings'))}
+              onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { where: 'reader' } }))}
               title="Reading settings"
               aria-label="Reading settings"
               data-reader-settings
@@ -703,6 +706,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
         {showFrontmatter && (
           <FrontmatterPanel article={article} settings={settings} />
+        )}
+        {showMarks && bookmarksList(settings) && (
+          <BookmarkList viewState={viewState} feedData={feedData} itemId={pId} />
         )}
 
         <div
