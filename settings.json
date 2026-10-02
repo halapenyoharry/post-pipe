@@ -457,7 +457,8 @@
       "artState": "",
       "graphState": "",
       "full": "",
-      "rootsVector": ""
+      "rootsVector": "",
+      "rootsFollowMs": 0
     },
     "alt": "",
     "ground": "dark",
@@ -542,5 +543,6 @@
   "_opening_title_fit_note": "opening.title.fit width: each line that names a width (line.width, a fraction of the art's width) is set to that width once the title's face has loaded, its spans scaled together, and the byline is set to the width of the layout's last line, under it in each state.",
   "_opening_graph_rootsFit_note": "opening.graph.rootsFit width: in the graph state the art is scaled so the roots' widest row (below crownY on the graph state's image) spans the screen's width, or, on a wide screen, so the graph state's image from its small plant to its foot fits the height. The art moves and scales between the two states. With artStateOpacity 0 the graph is not drawn at all in the art state (display none, nothing to hit).",
   "_topBar_band_note": "topBar.band: { color }, a band the screen's width behind the top bar, from the screen's top to 8 px under the bar's row, drawn by the two-state cover (opening) and coming and going with the bar. null: none.",
-  "_opening_rootsVector_note": "opening.art.rootsVector: an SVG of the graph state image's roots (one path per part of each edge of the roots' tree, as src/lib/rootsVector.js reads it: data-e, data-part, data-a, data-b, data-tip, data-loop, data-free, stroke, stroke-width; and circle data-tip for each tip), drawn in the graph state in place of the image's roots below backdrop.keepAbove. Each act's roots (containers.<id>.rootTips, tip names from the file; or else the tip nearest its anchor) bend toward it when it is moved: the last third of each root, eased in, its tip by the whole move, what grows off it moving with it. The rootlets (opening.reach) are not drawn for an act that has such roots. Empty: the image's roots."
+  "_opening_rootsVector_note": "opening.art.rootsVector: an SVG of the graph state image's roots (one path per part of each edge of the roots' tree, as src/lib/rootsVector.js reads it: data-e, data-part, data-a, data-b, data-tip, data-loop, data-free, stroke, stroke-width; and circle data-tip for each tip), drawn in the graph state in place of the image's roots below backdrop.keepAbove. Each act's roots (containers.<id>.rootTips, tip names from the file; or else the tip nearest its anchor) bend toward it when it is moved: the last third of each root, eased in, its tip by the whole move, what grows off it moving with it. The rootlets (opening.reach) are not drawn for an act that has such roots. Empty: the image's roots.",
+  "_opening_rootsFollowMs_note": "opening.art.rootsFollowMs (default 0): how far behind its act each act's vector roots follow it, in ms. The bend is driven by where the act is drawn on the screen at each frame (a closed act part way through any move it is easing over, an open one where its cards are), never by where it is going or by the pointer, and follows it as a critically damped spring with this time constant (it covers about 60% of a jump in that time and 95% in 2.4 times it, never overshooting), so the act moves first and its roots answer: when it is dragged, opened, closed, pushed clear of another, sent back by Reset, or zoomed. 0: the roots are where the act is drawn, at once. Reduced motion: at once."
 }

@@ -327,7 +327,12 @@ function openingConfig(settings) {
     // rootsVector: an SVG of the graph state's roots (src/lib/rootsVector.js)
     // drawn in place of the image's roots, below backdrop.keepAbove; each
     // act's roots bend toward it when it is moved.
-    art: { artState, graphState, full, rootsVector: graphState ? str(art.rootsVector) : '' },
+    art: {
+      artState, graphState, full, rootsVector: graphState ? str(art.rootsVector) : '',
+      // How far behind its act each act's roots follow it, in ms (the
+      // roots' spring's time constant, createFollow); 0: at once.
+      rootsFollowMs: Math.max(0, Math.min(2000, num(art.rootsFollowMs, 0))),
+    },
     // The acts the roots belong to: each container with an anchor, and its
     // rootTips (the tips of its roots, by name in the roots' SVG).
     acts: actsOf(settings.containers),

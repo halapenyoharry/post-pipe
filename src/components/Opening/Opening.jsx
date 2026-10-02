@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import styles from './Opening.module.css';
 import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
-import { parseRoots, rootsModel, actRoots, bentRoots, pathD } from '../../lib/rootsVector';
+import { parseRoots, rootsModel, actRoots, bentRoots, pathD, createFollow } from '../../lib/rootsVector';
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
@@ -384,6 +384,7 @@ function Cover({ config, viewState, children }) {
   const reachRef = useRef(null);
   const vectorRef = useRef(null);      // the roots' SVG (rootsVector)
   const rootsRef = useRef(null);       // { draw, acts: Set } once it has loaded
+  const followRef = useRef(null);      // the roots following their acts (rootsFollowMs)
   const zoomRef = useRef(null);       // { k, homeK }: the graph's zoom, from its world
   const geomRef = useRef(null);       // the last painted geometry
   const shiftRef = useRef(0);         // how far below its rest the graph layer is drawn
@@ -476,8 +477,10 @@ function Cover({ config, viewState, children }) {
     const g = geometry(m.p);
     geomRef.current = g;
     paintRoots(g);
-    // Each act's roots bend toward it by how far it is from its anchor,
-    // through the zoom the graph rests at, in the art's own px.
+    // Each act's roots bend toward it by how far it is drawn from its
+    // anchor, through the zoom the graph rests at, in the art's own px; a
+    // little behind it (art.rootsFollowMs), so the act moves first and its
+    // roots answer. Frames go on while the act eases or its roots catch up.
     const rv = rootsRef.current;
     if (rv && world && world.homeK > 0 && sizeRef.current) {
       const g1 = geometry(1);
@@ -486,7 +489,10 @@ function Cover({ config, viewState, children }) {
       for (const c of world.containers) {
         if (c.drift && rv.acts.has(c.id)) drifts.set(c.id, { dx: c.drift.x * world.homeK * perPx, dy: c.drift.y * world.homeK * perPx });
       }
-      rv.draw.bend(drifts);
+      if (!followRef.current) followRef.current = createFollow(reduced ? 0 : config.art.rootsFollowMs);
+      const follow = followRef.current;
+      rv.draw.bend(follow.step(drifts, performance.now()));
+      if (!follow.settled() || world.moving) requestFrame();
     }
     const reach = reachRef.current;
     if (!reach || !sizeRef.current) return;

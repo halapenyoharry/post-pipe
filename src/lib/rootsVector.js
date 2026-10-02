@@ -232,4 +232,59 @@ function bentRoots(model, roots, drifts) {
 
 const pathD = (pts) => (pts.length ? 'M' + pts.map(([x, y]) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`).join('L') : '');
 
-module.exports = { parseRoots, rootsModel, actRoots, nearestTip, bentRoots, pathD, easeRoot: ease };
+// The roots follow their acts, a little behind (opening.art.rootsFollowMs):
+// each act's bend is a critically damped spring pulled toward where its act
+// is drawn, so it moves only in answer to the act, never overshoots it and
+// never gets anywhere first. ms is its time constant: the spring's rate is
+// 2 / ms, so it covers about 60% of a jump in ms and 95% in 2.4 ms. A new
+// act starts where its act is (nothing to catch up); ms 0 follows at once.
+//   follow.step(targets, now)   targets: Map id -> { dx, dy } (an act left
+//                               out goes back to 0, 0); now in ms. Returns
+//                               Map id -> { dx, dy }, where the bends are.
+//   follow.settled()            true once every bend is on its act
+function createFollow(ms) {
+  const w = ms > 0 ? 2 / ms : 0;
+  const state = new Map(); // id -> { x, y, vx, vy }
+  let last = null;
+  let still = true;
+  const EPS = 0.1; // art px
+  function step(targets, now) {
+    const dt = last === null ? 0 : Math.max(0, Math.min(250, now - last));
+    last = now;
+    const out = new Map();
+    still = true;
+    const ids = new Set([...state.keys(), ...(targets ? targets.keys() : [])]);
+    for (const id of ids) {
+      const t = (targets && targets.get(id)) || { dx: 0, dy: 0 };
+      let s = state.get(id);
+      if (!s || !w) {
+        s = { x: t.dx, y: t.dy, vx: 0, vy: 0 };
+      } else if (dt > 0) {
+        const e = Math.exp(-w * dt);
+        const axis = (x, v, target) => {
+          const e0 = x - target;
+          const b = v + w * e0;
+          return [target + (e0 + b * dt) * e, (v - w * b * dt) * e];
+        };
+        [s.x, s.vx] = axis(s.x, s.vx, t.dx);
+        [s.y, s.vy] = axis(s.y, s.vy, t.dy);
+        if (Math.abs(s.x - t.dx) < EPS && Math.abs(s.y - t.dy) < EPS && Math.abs(s.vx) < EPS / 16 && Math.abs(s.vy) < EPS / 16) {
+          s = { x: t.dx, y: t.dy, vx: 0, vy: 0 };
+        }
+      }
+      if (s.x !== t.dx || s.y !== t.dy) still = false;
+      // Back at rest and no longer asked for: forgotten.
+      if (!(targets && targets.has(id)) && s.x === 0 && s.y === 0) { state.delete(id); continue; }
+      state.set(id, s);
+      out.set(id, { dx: s.x, dy: s.y });
+    }
+    return out;
+  }
+  return {
+    step,
+    settled: () => still,
+    reset() { state.clear(); last = null; still = true; },
+  };
+}
+
+module.exports = { parseRoots, rootsModel, actRoots, nearestTip, bentRoots, pathD, easeRoot: ease, createFollow };

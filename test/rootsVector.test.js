@@ -109,3 +109,66 @@ test('settings: rootsVector with a graph state image, and the acts with their an
   const one = openingConfig({ opening: { enabled: true, art: { full: 'a.png', rootsVector: 'r.svg' } } });
   assert.equal(one.art.rootsVector, '', 'only over a graph state image');
 });
+
+// The roots follow their acts a little behind (opening.art.rootsFollowMs).
+const { createFollow } = require('../src/lib/rootsVector');
+const run = (follow, targetAt, ms, dt = 16) => {
+  const out = [];
+  for (let t = 0; t <= ms; t += dt) out.push({ t, at: follow.step(new Map([['a', targetAt(t)]]), t).get('a'), want: targetAt(t) });
+  return out;
+};
+
+test('follow: with no time constant, the roots are where the act is at once', () => {
+  const f = createFollow(0);
+  const out = f.step(new Map([['a', { dx: 30, dy: -4 }]]), 0);
+  assert.deepStrictEqual(out.get('a'), { dx: 30, dy: -4 });
+  assert.deepStrictEqual(f.step(new Map([['a', { dx: 90, dy: 0 }]]), 16).get('a'), { dx: 90, dy: 0 });
+  assert.equal(f.settled(), true);
+});
+
+test('follow: a new act starts where it is; a jump is followed behind, never overshot, about 60% in ms and 95% in 2.4 ms', () => {
+  const f = createFollow(120);
+  assert.deepStrictEqual(f.step(new Map([['a', { dx: 0, dy: 0 }]]), 0).get('a'), { dx: 0, dy: 0 });
+  let prev = 0;
+  let at120 = null, at288 = null;
+  for (let t = 16; t <= 900; t += 16) {
+    const x = f.step(new Map([['a', { dx: 100, dy: 0 }]]), t).get('a').dx;
+    assert.ok(x >= prev - 1e-9 && x <= 100 + 1e-9, `at ${t}: ${x}`);
+    prev = x;
+    if (t === 128) at120 = x;
+    if (t === 288) at288 = x;
+  }
+  assert.ok(at120 > 50 && at120 < 70, String(at120));
+  assert.ok(at288 > 94, String(at288));
+  assert.equal(prev, 100);
+  assert.equal(f.settled(), true);
+});
+
+test('follow: an act dragged steadily is followed behind all the way, and caught within 300 ms of stopping', () => {
+  const f = createFollow(120);
+  f.step(new Map([['a', { dx: 0, dy: 0 }]]), 0);
+  // 120 px in 12 steps of 10 px, one every 40 ms, then held.
+  const target = (t) => ({ dx: Math.min(120, 10 * Math.floor(t / 40)), dy: 0 });
+  const rows = run(f, target, 900);
+  let lagged = 0;
+  for (const r of rows) {
+    assert.ok(r.at.dx <= r.want.dx + 1e-9, `at ${r.t}: ${r.at.dx} past ${r.want.dx}`);
+    if (r.t <= 480 && r.want.dx - r.at.dx > 5) lagged++;
+  }
+  assert.ok(lagged > 3, `measurably behind in ${lagged} frames`);
+  const stop = 480;
+  const caught = rows.find((r) => r.t >= stop && r.want.dx - r.at.dx <= 2);
+  assert.ok(caught && caught.t - stop <= 300, caught ? `caught ${caught.t - stop} ms after` : 'never caught');
+});
+
+test('follow: an act no longer asked for goes back to rest and is forgotten; settled says when all are there', () => {
+  const f = createFollow(100);
+  f.step(new Map([['a', { dx: 40, dy: 20 }], ['b', { dx: 0, dy: 0 }]]), 0);
+  let out;
+  for (let t = 16; t < 2000; t += 16) {
+    out = f.step(new Map([['b', { dx: 0, dy: 0 }]]), t);
+    if (t === 32) assert.equal(f.settled(), false);
+  }
+  assert.equal(out.has('a'), false);
+  assert.equal(f.settled(), true);
+});

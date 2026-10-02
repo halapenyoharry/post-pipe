@@ -1761,10 +1761,26 @@ export function GraphViewer({
       outlineCache.set(path, { d, pts });
       return pts;
     }
+    // Where an anchored container's centre is drawn at this frame, in its
+    // own frame (the world, less any offset it is drawn with while it grows
+    // in place): a closed node as the browser has it now, part way through
+    // any move it is easing over (its transform's transition), an open one
+    // where its members are.
+    function drawnCentre(id, closed, group) {
+      if (!closed) return centreOf(id);
+      const macro = group.select('.container-macro-node').node();
+      const gEl = group.node();
+      const m = macro && macro.getScreenCTM ? macro.getScreenCTM() : null;
+      const gm = gEl && gEl.getScreenCTM ? gEl.getScreenCTM() : null;
+      if (!m || !gm) return centreOf(id);
+      const inv = gm.inverse();
+      return { x: inv.a * m.e + inv.c * m.f + inv.e, y: inv.b * m.e + inv.d * m.f + inv.f };
+    }
     function worldSnapshot() {
       const out = [];
-      if (!positionsReady) return { containers: out, k: zoomScaleRef.current, homeK };
+      if (!positionsReady) return { containers: out, k: zoomScaleRef.current, homeK, moving: false };
       const targets = anchorsOn() ? anchorTargets() : null;
+      let moving = false;
       for (const id of reachIds()) {
         const group = containerGroups.filter((c) => c.id === id);
         const el = group.node();
@@ -1779,16 +1795,21 @@ export function GraphViewer({
         let cx = 0, cy = 0;
         for (const q of hull) { cx += q.x; cy += q.y; }
         const entry = { id, closed, hull, centre: { x: cx / hull.length, y: cy / hull.length } };
-        // How far an anchored container is from its anchor, in the world
-        // (dragged, or pushed clear of another act): the cover's roots bend
-        // toward it by that much at the zoom the graph rests at.
+        // How far an anchored container is drawn from its anchor, in the
+        // world (dragged, or pushed clear of another act): the cover's roots
+        // bend toward it by that much at the zoom the graph rests at. Where
+        // it is drawn, not where it is going: its roots answer it. moving:
+        // it is still easing toward where it is going.
         if (targets && targets.has(id)) {
-          const c = centreOf(id), t = targets.get(id);
+          const t = targets.get(id);
+          const c = drawnCentre(id, closed, group);
           if (c && t) entry.drift = { x: c.x - t.x, y: c.y - t.y };
+          const to = centreOf(id);
+          if (c && to && Math.hypot(c.x - to.x, c.y - to.y) > 0.25) moving = true;
         }
         out.push(entry);
       }
-      return { containers: out, k: zoomScaleRef.current, homeK };
+      return { containers: out, k: zoomScaleRef.current, homeK, moving };
     }
     function publishWorld() {
       if (typeof window === 'undefined') return;
