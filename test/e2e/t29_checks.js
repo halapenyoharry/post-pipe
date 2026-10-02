@@ -240,7 +240,8 @@ async function checkAuthor(s, record) {
   if (SHOTS) await s.page.screenshot({ path: path.join(SHOTS, `t29-author-${s.name}-${s.phone ? 'phone' : 'desktop'}.png`) });
 
   // The panel: no groups about reading.
-  await s.page.click('[data-settings-gear]');
+  // The main view's panel: the sliders in the top bar since T32, else the gear.
+  await s.page.click((await s.page.$('[data-settings-open]')) ? '[data-settings-open]' : '[data-settings-gear]');
   await s.page.waitForSelector('[data-settings-panel]');
   const sections = await s.page.evaluate(() => [...document.querySelectorAll('[data-settings-panel] [data-section]')].map((e) => e.getAttribute('data-section')));
   record('1 the panel has no groups about reading', !sections.some((x) => ['reading', 'listening', 'place'].includes(x)) && sections.includes('view'), sections.join(', '));

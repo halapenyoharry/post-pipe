@@ -141,7 +141,8 @@ const coverInfo = (page) => page.evaluate(() => {
     readerMode: document.documentElement.getAttribute('data-pp-reader-mode'),
     onTop: top ? (top.closest('[data-cover-stage]') ? 'art' : top.closest('[data-cover-section]') ? 'graph' : top.tagName) : null,
     handle: handle ? { opacity: getComputedStyle(handle).opacity, events: getComputedStyle(handle).pointerEvents } : null,
-    gear: (() => { const g = document.querySelector('[data-settings-gear]'); return g ? getComputedStyle(g).visibility : null; })(),
+    // The settings control: the gear, or since T32 the sliders in the top bar.
+    gear: (() => { const g = document.querySelector('[data-settings-gear], [data-settings-open]'); return g ? getComputedStyle(g).visibility : null; })(),
   };
 });
 
@@ -291,7 +292,10 @@ async function run(bt, name, size, record) {
     const c = await coverInfo(s.page);
     // Since T30 the graph is never hidden: in the art state it hangs under
     // the roots at graph.artStateOpacity, and takes no taps.
-    record('fresh: the art state first, the graph under the roots taking no taps', st === 'art' && c.onTop === 'art' && Math.abs(c.graph.opacity - OPENING.graph.artStateOpacity) < 0.01 && c.graph.inert, `state ${st}, on top ${c.onTop}, graph opacity ${c.graph.opacity}, inert ${c.graph.inert}`);
+    // Since T32 a site can keep the graph off the cover until the first move
+    // (opening.graph.hiddenUntilMove): then it is at 0 on a fresh load.
+    const freshOpacity = openingConfig(SETTINGS).graph.hiddenUntilMove ? 0 : OPENING.graph.artStateOpacity;
+    record('fresh: the art state first, the graph under the roots taking no taps', st === 'art' && c.onTop === 'art' && Math.abs(c.graph.opacity - freshOpacity) < 0.01 && c.graph.inert, `state ${st}, on top ${c.onTop}, graph opacity ${c.graph.opacity} (want ${freshOpacity}), inert ${c.graph.inert}`);
     const artImg = c.imgs.find((i) => i.which === 'art');
     const graphImg = c.imgs.find((i) => i.which === 'graph');
     record('fresh: the whole plant fits, loaded, with its alt', !!artImg && artImg.loaded && artImg.src === OPENING.art.artState && c.art.top >= 0 && c.art.bottom <= c.H && c.art.left >= 0 && c.art.right <= c.W && c.alt === OPENING.alt,
@@ -426,10 +430,19 @@ async function run(bt, name, size, record) {
     await settle(s.page);
     record('tap on the art: to the graph, over snapMs', (await state(s.page)) === 'graph' && (moving === 'moving' || moving === 'graph'), `${moving} → ${await state(s.page)}`);
     await s.page.waitForTimeout(450);
-    const h = await s.page.evaluate(() => { const r = document.querySelector('[data-cover-handle]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, hgt: r.height }; });
+    // The grip at its middle, or, where a top-bar control sits there, at the
+    // nearest point along its row where the grip itself is on top.
+    const h = await s.page.evaluate(() => {
+      const el = document.querySelector('[data-cover-handle]');
+      const r = el.getBoundingClientRect();
+      const y = r.top + r.height / 2;
+      const xs = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.4, 0.3].map((f) => r.left + r.width * f);
+      const x = xs.find((x) => { const t = document.elementFromPoint(x, y); return t && el.contains(t); });
+      return { x: x === undefined ? r.left + r.width / 2 : x, y, w: r.width, hgt: r.height, at: x === undefined ? 'centre (covered)' : `${Math.round(((x - r.left) / r.width) * 100)}% across` };
+    });
     await tapAt(s, h);
     await settle(s.page);
-    record('tap on the grip: back to the art', (await state(s.page)) === 'art', `grip ${Math.round(h.w)}x${Math.round(h.hgt)} at the top centre`);
+    record('tap on the grip: back to the art', (await state(s.page)) === 'art', `grip ${Math.round(h.w)}x${Math.round(h.hgt)}, tapped ${h.at}`);
     const ps = await s.page.evaluate(() => window.__cover.ps.map((x) => x[0]));
     record('taps: the move is drawn frame by frame', ps.filter((p) => p > 0 && p < 1).length >= 5, `${ps.filter((p) => p > 0 && p < 1).length} frames in between`);
     record('taps: no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));

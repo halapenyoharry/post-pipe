@@ -185,11 +185,14 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
     ground: gs ? { image: gs.backgroundImage, color: gs.backgroundColor, opacity: Number(gs.opacity) } : null,
     texture: tex ? { opacity: Number(getComputedStyle(tex).opacity), mask: getComputedStyle(tex).maskImage || getComputedStyle(tex).webkitMaskImage, image: getComputedStyle(tex).backgroundImage.slice(0, 30) } : null,
     grainMask: after.maskImage || after.webkitMaskImage || '',
-    pill: box(document.querySelector('[data-feeds] > [role="button"]')),
+    // The title pill, or the top bar's first control when a site leaves the
+    // source pills out (T32).
+    pill: box(document.querySelector('[data-feeds] > [role="button"]') || document.querySelector('[data-feeds] > *')),
     page: box(document.querySelector('[data-top-pages]')),
-    pageLabel: (document.querySelector('[data-top-pages]') || {}).textContent || '',
-    gear: box(document.querySelector('[data-settings-gear]')),
-    gearVis: document.querySelector('[data-settings-gear]') ? getComputedStyle(document.querySelector('[data-settings-gear]')).visibility : null,
+    pageLabel: (() => { const e = document.querySelector('[data-top-pages]'); return e ? (e.textContent.trim() || e.getAttribute('aria-label') || '') : ''; })(),
+    // The settings control: the gear, or since T32 the sliders in the top bar.
+    gear: box(document.querySelector('[data-settings-gear], [data-settings-open]')),
+    gearVis: document.querySelector('[data-settings-gear], [data-settings-open]') ? getComputedStyle(document.querySelector('[data-settings-gear], [data-settings-open]')).visibility : null,
     add: document.querySelectorAll('[data-feeds] button[title="Add a feed"], [data-feeds] form').length,
     feedsChildren: [...document.querySelectorAll('[data-feeds] > *')].map((e) => e.getAttribute('data-top-page') || e.getAttribute('title') || e.tagName),
   };
@@ -324,7 +327,14 @@ async function run(bt, name, size, record) {
       ta.y <= s.H * 0.12 && ta.y >= ctrl,
       `plant top ${r1(ta.y)} px (${r2(ta.y / s.H)} of ${s.H}), ${r1(ta.y - ctrl)} px under the controls ending at ${r1(ctrl)}`);
 
-    // 3. The graph in the art state.
+    // 3. The graph in the art state. A site can keep it off the cover until
+    // the first move (T32, opening.graph.hiddenUntilMove): a 1 px wheel first.
+    if (openingConfig(SETTINGS).graph.hiddenUntilMove) {
+      await p.mouse.move(s.W / 2, s.H * 0.55);
+      await p.mouse.wheel(0, 1);
+      await p.waitForTimeout(500);
+      m = await measure(p);
+    }
     const below = ACTS.map((a) => ({ a, c: m.acts[a.id] })).filter((x) => x.c);
     const onAnchors = ACTS.map((a) => anchorOff(m, a));
     record('3 art state: the graph is there, visible (opacity > 0.3)', m.graph.opacity > 0.3 && m.graph.containers > 0,

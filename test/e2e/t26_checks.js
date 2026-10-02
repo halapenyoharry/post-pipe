@@ -220,7 +220,8 @@ async function run(bt, name, size, record) {
       await s.page.keyboard.press('Escape');
       await s.page.waitForTimeout(200);
     }
-    await s.page.click('[data-settings-gear]');
+    // The main view's panel: the sliders in the top bar since T32, else the gear.
+    await s.page.click((await s.page.$('[data-settings-open]')) ? '[data-settings-open]' : '[data-settings-gear]');
     await s.page.waitForSelector('[data-settings-panel]');
     await s.page.waitForTimeout(350);
     const panel = await s.page.evaluate(() => {
@@ -236,7 +237,7 @@ async function run(bt, name, size, record) {
     record(`${m}: the panel's accent and its selected choice`, hex(panel.accent) === want && !!panel.on && hex(panel.on.border) === want && panel.on.bg === ACCENT.bg && panelRatio >= 4.5,
       `accent ${panel.accent} on ${hex(panel.bg)}: ${panelRatio.toFixed(2)}:1; selected "${panel.on && panel.on.text}" border ${panel.on && hex(panel.on.border)}, ${panel.on && panel.on.bg}`);
     await s.page.keyboard.press('Escape');
-    if (await s.page.$('[data-settings-panel]')) await s.page.click('[data-settings-gear]').catch(() => {});
+    if (await s.page.$('[data-settings-panel]')) await s.page.click('[data-settings-open], [data-settings-gear]').catch(() => {});
     await s.page.waitForTimeout(250);
 
     await s.page.evaluate((id) => { window.location.hash = '#read=' + encodeURIComponent(id); }, FIRST.id);

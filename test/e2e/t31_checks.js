@@ -157,6 +157,7 @@ const bar = (page) => page.evaluate(() => {
     if (!el) return null;
     return { ...box(el), label: el.getAttribute('aria-label') || '', title: el.getAttribute('title') || '', svg: !!el.querySelector('svg[data-icon]'), inert: !!el.closest('[inert]'), text: el.textContent };
   };
+  // The settings control: the gear, or since T32 the sliders in the top bar.
   const gear = document.querySelector('[data-settings-gear]');
   return {
     bottomBar: document.querySelectorAll('[data-toolbar]').length,
@@ -241,7 +242,12 @@ async function part1(bt, name, size, record) {
   const g = await bar(p);
   record('1 graph state: the icons are in the top bar, live', want.every((k) => g.icons[k] && !g.icons[k].inert));
   record('1 graph state: one row', oneRow(g), `${g.row.map((r) => `${r.what}@${r.top}`).join(' ')}; fit ${g.fit.join(',') || 'none'}; first pill ${g.firstPill && r1(g.firstPill.w)} px`);
-  record('1 the first pill keeps its whole text as its name', !!g.firstPill && g.firstPill.text.length > 0 && g.firstPill.title.includes(g.firstPill.text.trim()), g.firstPill && `${g.firstPill.text} / ${g.firstPill.title}`);
+  // Since T32 a site can leave the source pills out (topBar.showSourcePills).
+  if (require('../../src/lib/topBar').topBarConfig(SETTINGS).showSourcePills) {
+    record('1 the first pill keeps its whole text as its name', !!g.firstPill && g.firstPill.text.length > 0 && g.firstPill.title.includes(g.firstPill.text.trim()), g.firstPill && `${g.firstPill.text} / ${g.firstPill.title}`);
+  } else {
+    record('1 no source pill (topBar.showSourcePills false)', !g.firstPill, g.firstPill ? 'a pill is there' : 'none');
+  }
   await shot(s, 't31-graph');
 
   // The menu.
@@ -264,10 +270,12 @@ async function part1(bt, name, size, record) {
     };
   });
   record('1 the menu opens under the hourglass, within the screen', !!menu && menu.under && menu.inView && menu.expanded === 'true');
-  record('1 the menu: headed with the group label, a row per dimension, the view actions',
-    !!menu && menu.heading.toLowerCase() === GROUP.toLowerCase() && menu.dims.length === DIMS.length && menu.actions.join('|') === 'Zoom to fit|Unpin all|Reset sizes',
-    menu && `"${menu.heading}"; ${menu.dims.join(', ')}; ${menu.actions.join(', ')}`);
-  record('1 the menu: layout row only when show.layout', !!menu && (menu.layout > 0) === SHOW.layout, `${menu && menu.layout} layout options, show.layout ${SHOW.layout}`);
+  // Since T32 the view actions and the layout are in the main view's panel
+  // (the sliders after the hourglass); the menu keeps the timelines.
+  record('1 the menu: headed with the group label, a row per dimension, no view actions',
+    !!menu && menu.heading.toLowerCase() === GROUP.toLowerCase() && menu.dims.length === DIMS.length && menu.actions.length === 0,
+    menu && `"${menu.heading}"; ${menu.dims.join(', ')}; ${menu.actions.length} view actions`);
+  record('1 the menu: no layout row (it is in the main view\'s panel)', !!menu && menu.layout === 0, `${menu && menu.layout} layout options`);
   record('1 the menu takes the focus; ArrowDown moves it', !!menu && menu.focus);
   await p.keyboard.press('ArrowDown');
   const second = await p.evaluate(() => document.activeElement && document.activeElement.textContent.trim());

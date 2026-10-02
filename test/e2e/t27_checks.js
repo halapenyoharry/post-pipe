@@ -24,6 +24,7 @@ const http = require('http');
 const handler = require('serve-handler');
 const { chromium, webkit } = require('playwright');
 const { reachConfig, backdropConfig, artPoint, rayHit } = require('../../src/lib/reach');
+const { openingConfig } = require('../../src/lib/opening');
 
 const SITE = path.resolve(process.argv[2] || path.join(process.env.HOME, 'Projects/epicofelinorjones.com/_site'));
 const PORT = 39453;
@@ -216,7 +217,14 @@ async function run(bt, name, size, record) {
     const s = await open(bt, name, size, { scheme: 'light' });
     const p = s.page;
     // Since T30 the graph hangs under the roots in the art state too, so the
-    // rootlets first show there, on load, and draw in then.
+    // rootlets first show there, on load, and draw in then. Since T32 a site
+    // can keep them back until the first move (opening.graph.hiddenUntilMove):
+    // then a 1 px wheel first, and they draw in from it.
+    if (openingConfig(SETTINGS).graph.hiddenUntilMove) {
+      await p.mouse.move(s.phone ? 195 : 640, s.phone ? 500 : 450);
+      await p.mouse.wheel(0, 1);
+      await p.waitForTimeout(350);
+    }
     const first = await measure(p);
     const drawing = first.rootlets.filter((r) => r.visible);
     const dashes = drawing.map((r) => Number.parseFloat(r.dash)).filter(Number.isFinite);

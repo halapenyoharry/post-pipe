@@ -355,11 +355,14 @@ function Cover({ config, viewState, children }) {
     revealRef.current.at = performance.now();
     document.documentElement.setAttribute('data-pp-cover-acts', 'shown');
     const step = () => {
-      if (machineRef.current) paintRef.current(machineRef.current.p);
+      // Mid-swap (reduced motion) the swap paints the new state once it is
+      // out of sight; the reveal does not paint ahead of it.
+      if (machineRef.current && !swapRef.current) paintRef.current(machineRef.current.p);
       if (revealNow() < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   };
+  const swapRef = useRef(false); // a reduced-motion swap under way
   const revealRef2 = useRef(reveal);
   revealRef2.current = reveal;
 
@@ -591,9 +594,13 @@ function Cover({ config, viewState, children }) {
       frame: (fn) => requestAnimationFrame(fn),
       cancelFrame: (h) => cancelAnimationFrame(h),
       onChange(p, info) {
+        // Any move of the page is a first move (hiddenUntilMove), the
+        // reduced-motion swap included.
+        if (p > 0 || (info && info.swap)) revealRef2.current();
         if (info && info.swap) {
           // Reduced motion: out, swap, back in.
           const half = Math.round((info.ms || TUNING.reducedFadeMs) / 2);
+          swapRef.current = true;
           const els = [coverRef.current, sectionRef.current].filter(Boolean);
           for (const el of els) { el.style.transition = `opacity ${half}ms linear`; el.style.opacity = '0'; }
           if (fadeTimer) clearTimeout(fadeTimer);
@@ -605,6 +612,7 @@ function Cover({ config, viewState, children }) {
             const el = coverRef.current;
             const o = el ? Number(getComputedStyle(el).opacity) : 0;
             if (o > 0.02 && Date.now() - t0 < half * 4) { fadeTimer = setTimeout(outOfSight, 16); return; }
+            swapRef.current = false;
             paintRef.current(p);
             for (const x of els) x.style.opacity = '1';
             fadeTimer = setTimeout(() => {
@@ -616,7 +624,6 @@ function Cover({ config, viewState, children }) {
           fadeTimer = setTimeout(outOfSight, half);
           return;
         }
-        if (p > 0) revealRef2.current();
         paintRef.current(p);
       },
       onRest(state) {
