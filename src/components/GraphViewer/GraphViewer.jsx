@@ -10,6 +10,7 @@ import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { zoomAbout, fitRatioAbout, repivot, zoomPivotMode } from './zoomPivot';
+import { zoomModeOf, growShift, growConstrain, growCap, growFitRatio } from './growZoom';
 import { minCardScale, homeScale } from './initialScale';
 import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, closeAllPlan } from './closedState';
 import { createTapGate } from './tapGate';
@@ -547,6 +548,8 @@ export function GraphViewer({
       paintView(event.transform);
       const newScale = event.transform.k;
       zoomScaleRef.current = newScale;
+      // Growing in place, every zoom moves where the containers are drawn.
+      if (positionsReady && GROW && growOn()) applyPositions();
       if (edgeLabelFor) placeEdgeLabel();
       // The rail is pinned to the window and the nodes are not, so every pan
       // and zoom moves one end of every connector.
@@ -569,6 +572,11 @@ export function GraphViewer({
     // the way. Without a cover frame, the pointer and the viewport's middle,
     // as before.
     const ART_PIVOT = zoomPivotMode(GS) === 'art';
+    // graph.zoomMode 'grow-in-place' (growZoom.js): with anchored containers,
+    // a zoom grows each one about its own centre, on its anchor, instead of
+    // moving them apart; every zoom is about the pivot's world point where
+    // it is drawn now (see Grow in place below).
+    const GROW = zoomModeOf(GS) === 'grow-in-place';
     const pivotPoint = () => {
       if (!ART_PIVOT || typeof window === 'undefined') return null;
       const f = window.PostPipeCoverFrame;
@@ -578,13 +586,22 @@ export function GraphViewer({
       const shift = (window.PostPipeCover && window.PostPipeCover.shift) || 0;
       return [s.x - r.left, s.y - (r.top - shift)];
     };
-    if (ART_PIVOT) {
+    if (ART_PIVOT || GROW) {
       const constrainAsGiven = zoom.constrain();
       zoom.constrain((t, extent, translateExtent) => {
-        const p = pivotPoint();
-        if (p) {
-          const v = repivot(d3.zoomTransform(svg.node()), t, p[0], p[1]);
+        const prev = d3.zoomTransform(svg.node());
+        if (growOn()) {
+          // Growing in place: about the pivot's world point where it is
+          // drawn now, and no further in than the containers can grow.
+          const p = growPivot();
+          const v = growConstrain(prev, t, p[0], p[1], growMaxK());
           t = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
+        } else {
+          const p = pivotPoint();
+          if (p) {
+            const v = repivot(prev, t, p[0], p[1]);
+            t = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
+          }
         }
         return constrainAsGiven(t, extent, translateExtent);
       });
@@ -1194,6 +1211,9 @@ export function GraphViewer({
 
     function createContainerDragHandler({ isCollapsed }) {
       return d3.drag().clickDistance(5)
+        // Pointer positions in the graph's world, not the container's own
+        // group (which moves with it while it grows in place).
+        .container(() => g.node())
         .filter((event) => {
           if (event.ctrlKey) return false;
           if (event.button !== undefined && event.button !== 0) return false;
@@ -1214,13 +1234,29 @@ export function GraphViewer({
         .on('drag', function (event, c) {
           const state = d3.select(this).datum()._dragState;
           if (!state) return;
-          const dx = event.x - state.lastX;
-          const dy = event.y - state.lastY;
+          // Grown in place (r times its size at the home view), a container
+          // is drawn moving 1/r of what its members move: they move r times
+          // the pointer, so it stays under it.
+          const r = growOn() ? view.k / homeK : 1;
+          const dx = (event.x - state.lastX) * r;
+          const dy = (event.y - state.lastY) * r;
           state.lastX = event.x;
           state.lastY = event.y;
-          state.totalMove += Math.hypot(dx, dy);
+          state.totalMove += Math.hypot(dx, dy) / r;
 
           const memberSlugs = getAllMemberSlugs(c.id);
+          // The anchored containers it carries carry their centres along.
+          if (!state.carried) {
+            const all = new Set(memberSlugs);
+            state.carried = [...ANCHORS.keys()].filter((cId) => {
+              const own = getAllMemberSlugs(cId);
+              return own.length && own.every((sl) => all.has(sl));
+            });
+          }
+          for (const cId of state.carried) {
+            const G = growCentreOf(cId);
+            if (G) growCentres.set(cId, { x: G.x + dx, y: G.y + dy });
+          }
           for (const slug of memberSlugs) {
             const node = nodeBySlug.get(slug);
             if (node) {
@@ -1494,6 +1530,88 @@ export function GraphViewer({
       for (const [cId, a] of ANCHORS) out.set(cId, anchorWorld(a, coverFrame.art, view, origin));
       return out;
     }
+    // ── Grow in place (graph.zoomMode 'grow-in-place', growZoom.js) ───────
+    // Each anchored container is drawn larger or smaller about its own
+    // centre, which stays on its anchor at every zoom: drawn with an offset
+    // in the world (growShift) that undoes, for its centre, what the zoom
+    // does to it. The view itself still zooms about one point, so whatever
+    // is not anchored zooms as before, and a pan moves everything.
+    // growCentres: each anchored container's centre where it was last
+    // placed (on its anchor, pushed clear of another, or dropped by the
+    // reader); a card dragged inside it does not move it.
+    const growCentres = new Map();
+    let growShifts = new Map();
+    function growOn() { return GROW && homeK > 0 && anchorsOn(); }
+    // The world point under the pivot at the home view.
+    function pivotWorld() {
+      const k = homeK > 0 ? homeK : HOME_K;
+      const p = pivotPoint() || [width / 2, height / 2];
+      const v = homeView(k);
+      return { x: (p[0] - v.x) / k, y: (p[1] - v.y) / k };
+    }
+    // Where the pivot's world point is drawn now: every zoom is about it,
+    // so a pan made before a zoom is kept.
+    function growPivot() {
+      const P = pivotWorld();
+      const t = d3.zoomTransform(svg.node());
+      return [t.x + t.k * P.x, t.y + t.k * P.y];
+    }
+    const growCentreOf = (cId) => growCentres.get(cId) || centreOf(cId);
+    function refreshGrow() {
+      growShifts = new Map();
+      if (!growOn()) return;
+      const r = view.k / homeK;
+      if (Math.abs(r - 1) < 1e-9) return;
+      const P = pivotWorld();
+      for (const cId of ANCHORS.keys()) {
+        const G = growCentreOf(cId);
+        if (G) growShifts.set(cId, growShift(G, P, r));
+      }
+    }
+    const NO_SHIFT = { x: 0, y: 0 };
+    // A node's offset: its innermost anchored container's.
+    const shiftOfNode = (n) => (growShifts.size && n ? growShifts.get(anchoredOf.get(n.id)) || NO_SHIFT : NO_SHIFT);
+    // A container's offset: its own when it is anchored, else its nearest
+    // anchored ancestor's, else none.
+    function shiftOfContainer(c) {
+      if (!growShifts.size || !c) return NO_SHIFT;
+      let cur = c;
+      for (let guard = 0; cur && guard < 20; guard++) {
+        const sh = growShifts.get(cur.id);
+        if (sh) return sh;
+        cur = cur.parent ? containerById.get(cur.parent) : null;
+      }
+      return NO_SHIFT;
+    }
+    // Where a node is drawn in the world.
+    const drawnAt = (n) => { const sh = shiftOfNode(n); return sh === NO_SHIFT ? n : { x: n.x + sh.x, y: n.y + sh.y }; };
+    // The largest zoom the anchored containers can grow to before two of
+    // them come within 16 px of each other (growCap), each at its centre
+    // as placed (or as given in `centres`), open hulls with room for their
+    // curve as apart() allows. Infinity when not growing.
+    function growMaxK(centres) {
+      if (!growOn()) return Infinity;
+      const acts = [];
+      for (const cId of ANCHORS.keys()) {
+        const info = CL.containers.get(cId);
+        const c = containerById.get(cId);
+        if (!info || !c || hasClosedAncestor(c)) continue;
+        const G = (centres && centres.get(cId)) || growCentreOf(cId);
+        if (!G) continue;
+        const ox = G.x - info.center.x, oy = G.y - info.center.y;
+        const out = closedContainers.has(cId) ? 0 : 0.75 * HULL_PAD;
+        acts.push({ id: cId, centre: G, box: { x0: info.box.x0 + ox - out, y0: info.box.y0 + oy - out, x1: info.box.x1 + ox + out, y1: info.box.y1 + oy + out } });
+      }
+      return homeK * growCap(acts, { gap: 16, homeK });
+    }
+    // Zoomed in past where the containers can grow (one was opened, say):
+    // back out to it.
+    function keepGrowCap(centres) {
+      if (!growOn()) return;
+      const kMax = growMaxK(centres);
+      if (view.k > kMax + 1e-9) zoomAboutCentre(kMax / view.k);
+    }
+
     // Move each anchored container, members and all, so its centre is on
     // its anchor; they stay there (pinned) until the reader moves them.
     const anchorsPending = new Set(); // fresh: placed when the art is known
@@ -1544,6 +1662,7 @@ export function GraphViewer({
       for (const [cId, w] of targets) {
         const c = centreOf(cId);
         if (!w || !c) continue;
+        if (ANCHORS.has(cId)) growCentres.set(cId, { x: w.x, y: w.y });
         const dx = w.x - c.x, dy = w.y - c.y;
         for (const slug of getAllMemberSlugs(cId)) {
           const n = nodeBySlug.get(slug);
@@ -1877,6 +1996,7 @@ export function GraphViewer({
 
     function updateContainers() {
       if (sortedContainers.length === 0) return;
+      refreshGrow();
       publishWorld();
       const useLayout = spiralOn() && CL.containers.size > 0;
       // Each container's frame is measured from its own members, so a label
@@ -1910,11 +2030,18 @@ export function GraphViewer({
         const isClosed = closedContainers.has(c.id);
         const fs = c._fs || 52;
         const f = framed(c);
+        // Grown in place, the group is drawn with its container's offset;
+        // everything in it is placed in its own frame, and what is drawn
+        // elsewhere (the roots, the edges) is told where it is drawn.
+        const gs = shiftOfContainer(c);
+        group.attr('transform', gs.x || gs.y ? `translate(${gs.x}, ${gs.y})` : null);
+        const drawn = (p) => (p && (gs.x || gs.y) ? { x: p.x + gs.x, y: p.y + gs.y } : p);
+        const local = (n) => { const q = drawnAt(n); return { x: q.x - gs.x, y: q.y - gs.y }; };
 
         if (isClosed) {
           const pos = macroPos(c);
-          containerCentroids.set(c.id, pos);
-          containerAnchor.set(c.id, pos);
+          containerCentroids.set(c.id, drawn(pos));
+          containerAnchor.set(c.id, drawn(pos));
           group.style('display', null);
           group.select('.container-hull').style('display', 'none');
           group.select('.container-hull-ghost').attr('d', '');
@@ -1926,8 +2053,8 @@ export function GraphViewer({
           return;
         }
 
-        const avgX = d3.mean(memberNodes, (n) => n.x);
-        const avgY = d3.mean(memberNodes, (n) => n.y);
+        const avgX = d3.mean(memberNodes, (n) => drawnAt(n).x);
+        const avgY = d3.mean(memberNodes, (n) => drawnAt(n).y);
         containerCentroids.set(c.id, { x: avgX, y: avgY });
 
         group.style('display', null);
@@ -1942,8 +2069,10 @@ export function GraphViewer({
         for (const childId of (containerChildren.get(c.id) || [])) {
           if (!closedContainers.has(childId)) continue;
           const childObj = containerById.get(childId);
-          const cp = childObj && macroPos(childObj);
-          if (!cp) continue;
+          const cp0 = childObj && macroPos(childObj);
+          if (!cp0) continue;
+          const cs = shiftOfContainer(childObj);
+          const cp = { x: cp0.x + cs.x - gs.x, y: cp0.y + cs.y - gs.y };
           const hw = (childObj._macroHalfW || 130) + pad / 2;
           const hh = (childObj._macroHalfH || 45) + pad / 2;
           points.push([cp.x - hw, cp.y - hh], [cp.x + hw, cp.y - hh], [cp.x + hw, cp.y + hh], [cp.x - hw, cp.y + hh]);
@@ -1963,11 +2092,12 @@ export function GraphViewer({
           const h = (n._size?.height || (n.type === 'article' ? CARD.height : n.size)) * s;
           const halfW = w / 2 + pad;
           const halfH = h / 2 + pad;
+          const q = local(n);
           points.push(
-            [n.x - halfW, n.y - halfH],
-            [n.x + halfW, n.y - halfH],
-            [n.x + halfW, n.y + halfH],
-            [n.x - halfW, n.y + halfH]
+            [q.x - halfW, q.y - halfH],
+            [q.x + halfW, q.y - halfH],
+            [q.x + halfW, q.y + halfH],
+            [q.x - halfW, q.y + halfH]
           );
         }
 
@@ -1984,7 +2114,8 @@ export function GraphViewer({
               if (closedContainers.has(ch)) continue;
               const chObj = containerById.get(ch);
               const fc = chObj && framed(chObj);
-              if (fc && labelPositionOf(chObj) !== 'hidden') inner.push({ L: fc.info.label, off: fc.off });
+              const cs = chObj ? shiftOfContainer(chObj) : NO_SHIFT;
+              if (fc && labelPositionOf(chObj) !== 'hidden') inner.push({ L: fc.info.label, off: { x: fc.off.x + cs.x - gs.x, y: fc.off.y + cs.y - gs.y } });
               walk(ch);
             }
           };
@@ -2041,7 +2172,7 @@ export function GraphViewer({
 
         if (labelPos === 'hidden') {
           badge.style('display', 'none');
-          containerAnchor.set(c.id, labelAt || { x: d3.mean(hull, (p) => p[0]), y: d3.mean(hull, (p) => p[1]) });
+          containerAnchor.set(c.id, drawn(labelAt || { x: d3.mean(hull, (p) => p[0]), y: d3.mean(hull, (p) => p[1]) }));
           return;
         }
         if (labelPos === 'top') {
@@ -2054,7 +2185,7 @@ export function GraphViewer({
           badge.select('.container-badge-text').attr('font-size', `${size}px`);
           sizeHit(size);
           badge.attr('transform', `translate(${at.x}, ${at.y})${upright()}`);
-          containerAnchor.set(c.id, at);
+          containerAnchor.set(c.id, drawn(at));
           return;
         }
 
@@ -2062,7 +2193,7 @@ export function GraphViewer({
           badge.select('.container-badge-text').attr('font-size', `${fs}px`);
           sizeHit(fs);
           badge.attr('transform', `translate(${labelAt.x}, ${labelAt.y})${upright()}`);
-          containerAnchor.set(c.id, labelAt);
+          containerAnchor.set(c.id, drawn(labelAt));
           return;
         }
 
@@ -2078,7 +2209,7 @@ export function GraphViewer({
         const center = d3.polygonCentroid(hull);
         const cx = Number.isFinite(center[0]) ? center[0] : d3.mean(hull, (p) => p[0]);
         badge.attr('transform', `translate(${cx}, ${minY + (maxY - minY) / 3})${upright()}`);
-        containerAnchor.set(c.id, { x: cx, y: minY + (maxY - minY) / 3 });
+        containerAnchor.set(c.id, drawn({ x: cx, y: minY + (maxY - minY) / 3 }));
       });
     }
 
@@ -2128,6 +2259,8 @@ export function GraphViewer({
       }
       if (!changed) return false;
       applyContainerVisibility();
+      // Opened past where the containers can grow in place: back out to it.
+      keepGrowCap(relaidCentres);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('graph:containers-changed', { detail: containerState() }));
       }
@@ -2147,6 +2280,8 @@ export function GraphViewer({
     // Opening or closing a container changes the size of everything around
     // it. Re-run the layout, keep each top-level container's label where it
     // is, and move members to their new places.
+    // The anchored containers' centres the last relayout placed them at.
+    let relaidCentres = null;
     function relayoutContainers() {
       if (!data.containers || data.containers.length === 0) return;
       const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
@@ -2165,6 +2300,17 @@ export function GraphViewer({
       refreshContainerForces();
       if (anchorsOn()) centres = apart(centres);
       if (!spiralOn()) return;
+      // Each anchored container's centre goes with its members (growing in
+      // place, it is what the container is drawn about).
+      const centreMoves = [];
+      for (const [cId, c] of centres) {
+        const from = growCentreOf(cId);
+        centreMoves.push({ cId, x0: from ? from.x : c.x, y0: from ? from.y : c.y, x1: c.x, y1: c.y });
+      }
+      const placeCentres = (t) => {
+        for (const m of centreMoves) growCentres.set(m.cId, { x: m.x0 + (m.x1 - m.x0) * t, y: m.y0 + (m.y1 - m.y0) * t });
+      };
+      relaidCentres = centres;
       const moves = [];
       for (const [id, p] of CL.nodes) {
         const n = nodeBySlug.get(id);
@@ -2175,7 +2321,7 @@ export function GraphViewer({
         if (!info) continue;
         moves.push({ n, x0: n.x, y0: n.y, x1: c.x - info.center.x + p.x, y1: c.y - info.center.y + p.y });
       }
-      if (!hasSettled && !moves.length) { simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
+      if (!hasSettled && !moves.length) { placeCentres(1); simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
       for (const [id, p] of CL.nodes) {
         const n = nodeBySlug.get(id);
         const off = anchors.get(p.root);
@@ -2193,6 +2339,7 @@ export function GraphViewer({
             m.n.y = m.y0 + (m.y1 - m.y0) * t;
             m.n.fx = m.n.x; m.n.fy = m.n.y;
           }
+          placeCentres(t);
           applyPositions();
           if (connectorUpdateRef.current) connectorUpdateRef.current();
         })
@@ -2212,10 +2359,12 @@ export function GraphViewer({
     }
 
     function linkEndpoints(l) {
-      let sx = typeof l.source === 'object' ? l.source.x : 0;
-      let sy = typeof l.source === 'object' ? l.source.y : 0;
-      let tx = typeof l.target === 'object' ? l.target.x : 0;
-      let ty = typeof l.target === 'object' ? l.target.y : 0;
+      const sd = typeof l.source === 'object' ? drawnAt(l.source) : null;
+      const td = typeof l.target === 'object' ? drawnAt(l.target) : null;
+      let sx = sd ? sd.x : 0;
+      let sy = sd ? sd.y : 0;
+      let tx = td ? td.x : 0;
+      let ty = td ? td.y : 0;
 
       const sid = typeof l.source === 'object' ? l.source.id : l.source;
       const tid = typeof l.target === 'object' ? l.target.id : l.target;
@@ -2560,11 +2709,12 @@ export function GraphViewer({
           if (viewStateRef.current) {
             viewStateRef.current.setNodePosition(persistKey(d), event.x, event.y, { transient: true });
           }
+          const at = drawnAt(d);
           nodes.filter(nd => nd.id === d.id)
-            .attr('transform', 'translate(' + event.x + ',' + event.y + ')' + upright());
+            .attr('transform', 'translate(' + at.x + ',' + at.y + ')' + upright());
           if (articleNodes) {
             articleNodes.filter(nd => nd.id === d.id)
-              .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`);
+              .style('transform', `translate3d(${at.x}px, ${at.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`);
           }
           if (connectorUpdateRef.current) connectorUpdateRef.current();
           links.each(function(l) {
@@ -3121,10 +3271,11 @@ export function GraphViewer({
       if (edgeLabelFor) placeEdgeLabel();
     }
     function applyPositions() {
+      refreshGrow();
       redrawLinks();
-      nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')' + upright());
+      nodes.attr('transform', (d) => { const q = drawnAt(d); return 'translate(' + q.x + ',' + q.y + ')' + upright(); });
       if (articleNodes) {
-        articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`);
+        articleNodes.style('transform', (d) => { const q = drawnAt(d); return `translate3d(${q.x}px, ${q.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`; });
       }
       updateContainers();
       if (rootsUpdateRef.current) rootsUpdateRef.current();
@@ -3204,7 +3355,8 @@ export function GraphViewer({
         const n = nodeBySlug.get(end.node);
         if (!n || !Number.isFinite(n.x) || closedHidden.has(n.id)) return null;
         if (n._source && hiddenSourcesRef.current.has(n._source.id)) return null;
-        return { x: n.x, y: n.y };
+        const q = drawnAt(n);
+        return { x: q.x, y: q.y };
       }
       return containerAnchor.get(end.container) || null;
     }
@@ -3261,7 +3413,7 @@ export function GraphViewer({
     rootsUpdateRef.current = ROOTS ? scheduleRoots : null;
 
     let hasFitted = false;
-    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen };
+    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen, drawnAt };
     positionsReady = true;
 
     // The cover says where its art sits in the graph state (and again when
@@ -3451,7 +3603,7 @@ export function GraphViewer({
       // Back about the art's pivot, when there is one: straight there, the
       // pivot's world point still under it all the way when the reader only
       // zoomed.
-      const pivot = pivotPoint();
+      const pivot = growOn() ? growPivot() : pivotPoint();
       if (animate) svg.transition().duration(750).call(zoom.transform, transform, pivot || undefined);
       else svg.call(zoom.transform, transform);
       publishWorld();
@@ -3673,11 +3825,14 @@ export function GraphViewer({
     // re-centring on the graph: what hangs from the cover's art stays over
     // it. The wheel and a pinch zoom about the pointer and the fingers
     // (d3.zoom), or about the pivot too.
-    const zoomCentre = () => pivotPoint() || [width / 2, height / 2];
+    const zoomCentre = () => (growOn() ? growPivot() : (pivotPoint() || [width / 2, height / 2]));
     function zoomAboutCentre(ratio, animate = true) {
       if (!Number.isFinite(ratio) || ratio <= 0) return;
       const t = d3.zoomTransform(svg.node());
-      const k = Math.max(0.04, Math.min(8, t.k * ratio));
+      let k = Math.max(0.04, Math.min(8, t.k * ratio));
+      // Growing in place: no further in than the containers can grow.
+      if (k > t.k && growOn()) k = Math.min(k, Math.max(t.k, growMaxK()));
+      if (Math.abs(k - t.k) <= 1e-9 * t.k) return;
       const [px, py] = zoomCentre();
       const v = zoomAbout(t, k / t.k, px, py);
       const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
@@ -3696,6 +3851,29 @@ export function GraphViewer({
       const inset = chromeInsets(height);
       const m = 24;
       const area = { x0: m, y0: inset.top + m, x1: width - m, y1: height - inset.bottom - m };
+      // Growing in place: each container grown about its own centre until
+      // the first one meets the area's edge (or two come too close).
+      if (growOn()) {
+        const box = containerRef.current ? containerRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+        const items = [];
+        for (const cId of ANCHORS.keys()) {
+          const c = containerById.get(cId);
+          if (!c || hasClosedAncestor(c)) continue;
+          const group = containerGroups.filter((x) => x.id === cId);
+          const el = group.select(closedContainers.has(cId) ? '.container-macro-bg' : '.container-hull').node();
+          if (!el || !(el.getAttribute('d') || '').length) continue;
+          const b = el.getBoundingClientRect();
+          if (!b.width || !b.height) continue;
+          const G = growCentreOf(cId);
+          if (!G) continue;
+          const sh = shiftOfContainer(c);
+          items.push({ box: { x0: b.left - box.left, y0: b.top - box.top, x1: b.right - box.left, y1: b.bottom - box.top }, at: (() => { const q = toScreen(G.x + sh.x, G.y + sh.y); return { x: q[0], y: q[1] }; })() });
+        }
+        const r = growFitRatio(items, area);
+        if (r && r > 0.02) { zoomAboutCentre(r); return; }
+        applyHomeView(true);
+        return;
+      }
       if (ext) {
         const corners = [[ext.x0, ext.y0], [ext.x1, ext.y0], [ext.x0, ext.y1], [ext.x1, ext.y1]].map(([x, y]) => toScreen(x, y));
         const box = {
@@ -3953,7 +4131,8 @@ export function GraphViewer({
       connected.forEach(({ node, anchor, line }) => {
         // A node inside a closed container has no connector either.
         line.style('display', node._closedHidden ? 'none' : null);
-        const p = g.toScreen ? g.toScreen(node.x, node.y) : t.apply([node.x, node.y]);
+        const q = g.drawnAt ? g.drawnAt(node) : node;
+        const p = g.toScreen ? g.toScreen(q.x, q.y) : t.apply([q.x, q.y]);
         line.attr('x1', anchor.x).attr('y1', anchor.y).attr('x2', p[0]).attr('y2', p[1]);
       });
     }
