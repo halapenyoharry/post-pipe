@@ -291,6 +291,8 @@ const ICONS = {
 function buildIndexHTML() {
   const ttsSource = fs.readFileSync(path.join(__dirname, 'tts.js'), 'utf8');
   const viewStateSource = fs.readFileSync(path.join(__dirname, 'src/lib/viewState.js'), 'utf8');
+  // The voice picker's list (src/lib/voices.js), for tts.js on the page.
+  const voicesSource = fs.readFileSync(path.join(__dirname, 'src/lib/voices.js'), 'utf8');
   const fontB64 = fs.readFileSync(FONT_PATH).toString('base64');
   const fontBoldB64 = fs.readFileSync(FONT_BOLD_PATH).toString('base64');
   const settingsJSON = JSON.stringify(SETTINGS);
@@ -308,7 +310,7 @@ function buildIndexHTML() {
   // of "it still looks wrong" were a cached index.html rather than a bug.
   // (Kept out of the page itself: published output carries no HTML comments.)
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${siteLang()}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -397,11 +399,19 @@ window.TTS_CONFIG = {
   exposedEngines: ${JSON.stringify(exposedEngineIds())},
   defaultEngine: '${SETTINGS.tts?.default_engine || 'browser'}',
   preferredVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.preferredVoices || [])},
-  maxVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.maxVoices || 5)},
+  maxVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.maxVoices || null)},
+  // The chapters' language: only voices for it are offered.
+  lang: ${JSON.stringify(siteLang())},
 ${geminiConfigBlock()}};
 </script>
 <script>
 ${viewStateSource.replace(/module\.exports[\s\S]*?};/, '')}
+</script>
+<script>
+window.PPVoices = (function () {
+${voicesSource.replace(/module\.exports\s*=\s*\{[^}]*\};?/, '')}
+  return { voiceList: voiceList, voiceLabel: voiceLabel, languageName: languageName };
+})();
 </script>
 <script>
 ${ttsSource}
@@ -761,6 +771,13 @@ ${reactJs}
 </script>
 </body>
 </html>`;
+}
+
+// The site's language (settings.site.lang, "en" by default): the page's lang,
+// and the language the reader's voices are offered in.
+function siteLang() {
+  const l = SETTINGS.site && typeof SETTINGS.site.lang === 'string' ? SETTINGS.site.lang.trim() : '';
+  return /^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$/.test(l) ? l : 'en';
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────

@@ -219,8 +219,13 @@ export function TTSSettings() {
   if (!T) return null;
 
   // The engine already curates the list: a handful of voices, best first.
+  // A chapter is spoken in its own language: only the device's voices for
+  // it are offered (src/lib/voices.js); nothing is translated.
+  const langName = (typeof window !== 'undefined' && window.PPVoices && window.TTS_CONFIG)
+    ? window.PPVoices.languageName(window.TTS_CONFIG.lang || 'en') : 'English';
+  const deviceHasVoices = typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.getVoices().length > 0;
   const renderVoiceOptions = () => {
-    if (!voices.length) return <option>Loading...</option>;
+    if (!voices.length) return <option>{deviceHasVoices ? `No ${langName} voice on this device` : 'Loading...'}</option>;
     return voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>);
   };
 
@@ -246,6 +251,7 @@ export function TTSSettings() {
           className={styles.select}
           value={selectedVoice}
           onChange={handleVoiceChange}
+          title={`Voices on this device for ${langName}`}
           data-tts-voice
         >
           {renderVoiceOptions()}

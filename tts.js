@@ -416,36 +416,35 @@
     synth.addEventListener('voiceschanged', refreshVoices);
     refreshVoices();
 
-    // A few good English voices rather than every voice the device has.
-    // TTS_CONFIG.preferredVoices is an ordered list of names; a device voice
-    // matches a name exactly or by prefix ("Samantha (Enhanced)", "Microsoft
-    // Aria Online (Natural) - English (United States)"). At most maxVoices
-    // are offered, in the list's order; if none of them exist on this device,
-    // one English voice is offered instead.
+    // The voices for the chapters' language (TTS_CONFIG.lang, "en" by
+    // default), the preferred names first, then the rest by name, each
+    // labelled by name and region (src/lib/voices.js, on the page as
+    // window.PPVoices). The device decides which voices exist; the site can
+    // only prefer names. Never a voice in another language: nothing is
+    // translated. Without PPVoices (an embed): the preferred English voices.
     const DEFAULT_PREFERRED = [
       'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa',
       'Google US English', 'Google UK English Female', 'Google UK English Male',
       'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
     ];
-    function curatedVoices(all) {
+    function voiceEntries(all) {
       const cfg = window.TTS_CONFIG || {};
       const preferred = Array.isArray(cfg.preferredVoices) && cfg.preferredVoices.length
         ? cfg.preferredVoices : DEFAULT_PREFERRED;
-      const max = Number.isFinite(cfg.maxVoices) && cfg.maxVoices > 0 ? cfg.maxVoices : 5;
+      const max = Number.isFinite(cfg.maxVoices) && cfg.maxVoices > 0 ? cfg.maxVoices : Infinity;
+      if (window.PPVoices) return window.PPVoices.voiceList(all, { lang: cfg.lang || 'en', preferred, max });
       const english = all.filter(v => /^en([-_]|$)/i.test(v.lang || ''));
       const picked = [];
       for (const name of preferred) {
-        if (picked.length >= max) break;
+        if (picked.length >= (Number.isFinite(max) ? max : 5)) break;
         const exact = english.find(v => v.name === name && picked.indexOf(v) === -1);
         const prefix = exact || english.find(v => v.name.indexOf(name) === 0 && picked.indexOf(v) === -1);
         if (prefix) picked.push(prefix);
       }
-      if (!picked.length) {
-        const fallback = english.find(v => v.default) || english[0] || all.find(v => v.default) || all[0];
-        if (fallback) picked.push(fallback);
-      }
-      return picked;
+      if (!picked.length && english[0]) picked.push(english.find(v => v.default) || english[0]);
+      return picked.map(v => ({ voice: v, label: v.name }));
     }
+    function curatedVoices(all) { return voiceEntries(all).map(e => e.voice); }
 
     function findDefaultBrowserVoice(allVoices) {
       const first = curatedVoices(allVoices)[0];
@@ -474,10 +473,10 @@
       },
 
       voices: function () {
-        return curatedVoices(synth.getVoices()).map(v => ({
-          id: v.name,
-          label: v.name,
-          lang: v.lang,
+        return voiceEntries(synth.getVoices()).map(e => ({
+          id: e.voice.name,
+          label: e.label,
+          lang: e.voice.lang,
         }));
       },
 
