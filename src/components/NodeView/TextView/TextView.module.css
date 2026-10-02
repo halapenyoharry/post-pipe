@@ -262,11 +262,11 @@
    the site's theme-color said, which may be hex or hsl(). The plain-colour
    shadow before it is the fallback where color-mix is unavailable. */
 .glow {
-  border-color: var(--nv-src) !important;
+  border-color: var(--nv-outline, var(--nv-src)) !important;
   box-shadow:
-    0 0 14px -1px color-mix(in srgb, var(--nv-src) 55%, transparent),
-    0 0 24px 2px color-mix(in srgb, var(--nv-src) 25%, transparent),
-    inset 0 0 10px -3px color-mix(in srgb, var(--nv-src) 25%, transparent);
+    0 0 14px -1px color-mix(in srgb, var(--nv-outline, var(--nv-src)) 55%, transparent),
+    0 0 24px 2px color-mix(in srgb, var(--nv-outline, var(--nv-src)) 25%, transparent),
+    inset 0 0 10px -3px color-mix(in srgb, var(--nv-outline, var(--nv-src)) 25%, transparent);
 }
 
 .glow .titleCentered,
@@ -437,7 +437,7 @@
   pointer-events: none;
 }
 :global(html[data-pp-theme="sketchbook"]) .sketchBorder { display: block; }
-:global(html[data-pp-theme="sketchbook"]) .sketchBorder path { fill: none; stroke: var(--nv-src, var(--sk-line)); stroke-linecap: round; stroke-linejoin: round; }
+:global(html[data-pp-theme="sketchbook"]) .sketchBorder path { fill: none; stroke: var(--nv-outline, var(--nv-src, var(--sk-line))); stroke-linecap: round; stroke-linejoin: round; }
 :global(html[data-pp-theme="sketchbook"]) .sketchBorder .sketchMain { stroke-width: 1.4px; stroke-opacity: 0.9; }
 :global(html[data-pp-theme="sketchbook"]) .sketchBorder .sketchGhost { stroke-width: 0.8px; stroke-opacity: 0.38; }
 :global(html[data-pp-theme="sketchbook"]) .pinned .sketchBorder .sketchMain { stroke-width: 2.2px; }

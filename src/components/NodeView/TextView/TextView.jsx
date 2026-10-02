@@ -152,7 +152,10 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         // edge or a saturated ring. The ring competed with the card's own
         // contents; a halo sits behind it. Rendered into the gutter the
         // GraphViewer leaves around the card for exactly this.
-        ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {})
+        ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {}),
+        // A card inside a container takes the node colour the reader chose
+        // (graph.nodePalettes; --pp-node-color on the graph) for its outline.
+        ...(sourceColor && !pinned && article.containerColor ? { '--nv-outline': `var(--pp-node-color, ${sourceColor})` } : {}),
       }}
     >
       {sketch && (

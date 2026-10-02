@@ -351,6 +351,9 @@ function openingConfig(settings) {
       // 'width': in the graph state the art is as large as puts the roots'
       // widest row (below crownY, on the graph state's image) edge to edge.
       rootsFit: graph.rootsFit === 'width' ? 'width' : null,
+      // The roots' brightness in the graph state (the graph state image's
+      // roots and the vector roots; rootsBrightnessAt): 1 as drawn.
+      rootsBrightness: Math.max(0, Math.min(2, num(graph.rootsBrightness, 1))),
     },
     // 'width': in the art state the plant (the art state's image above
     // crownY) spans the screen's width, sideMargin px in from each edge;
@@ -413,6 +416,14 @@ function pivotOf(p) {
 function crownYOf(v) {
   const y = num(v, NaN);
   return Number.isFinite(y) && y >= 0 && y <= 1 ? y : null;
+}
+
+// The roots' brightness at progress p: as drawn (1) in the art state, at
+// graph.rootsBrightness in the graph state, crossfading between them as the
+// page moves (a CSS brightness() on the graph state's roots).
+function rootsBrightnessAt(config, p) {
+  const b = config && config.graph && Number.isFinite(config.graph.rootsBrightness) ? config.graph.rootsBrightness : 1;
+  return lerp(1, b, clamp01(p));
 }
 
 // opening.graph.hiddenUntilMove: on a load that starts on the art, the graph
@@ -810,7 +821,7 @@ function pageKey(e) {
   return null;
 }
 
-module.exports = { REVEAL_MS, revealFactor,
+module.exports = { REVEAL_MS, revealFactor, rootsBrightnessAt,
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
   openingConfig, bylineConfig, bylineText, groundConfig, topConfig, gripConfig, gripHeight, firstInkRow, lastInkRow, inkSpan, widestInkRow, titleConfig, titleLayout, fitTitle, startState, coverGeometry, createCover, pageKey,
 };

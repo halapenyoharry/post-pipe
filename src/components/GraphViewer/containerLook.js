@@ -9,7 +9,12 @@
 // containment entry's fill and stroke, the open title in the container's
 // colour (its contrast kept by the renderer).
 //
-//   containerLook(c) -> {
+// A node palette the reader chose (graph.nodePalettes, nodePalettes.js)
+// colours every container over its own look: outline and fill in its
+// colour, the fill at its fillOpacity, the labels in its labelColor (else
+// its colour); the face stays the container's own.
+//
+//   containerLook(c, palette) -> {
 //     closed: { fill, fillOpacity, stroke, glow },   fillOpacity null: as given;
 //                                                     stroke 'none': no outline
 //                                                     and no glow (glow null)
@@ -33,12 +38,13 @@ function faceFamily(face) {
   return f ? `'${f}', sans-serif` : null;
 }
 
-function containerLook(c) {
+function containerLook(c, palette) {
   const own = (c && c.look && typeof c.look === 'object') ? c.look : {};
+  const pal = palette && str(palette.color) ? palette : null;
   const base = containerColor(c);
-  const fill = str(own.fill);
-  const stroke = str(own.stroke);
-  const fillOpacity = fill ? opacityOf(own.fillOpacity) : null;
+  const fill = pal ? str(pal.color) : str(own.fill);
+  const stroke = pal ? str(pal.color) : str(own.stroke);
+  const fillOpacity = fill ? opacityOf(pal ? pal.fillOpacity : own.fillOpacity) : null;
   const closedStroke = stroke || base;
   return {
     closed: {
@@ -54,7 +60,7 @@ function containerLook(c) {
     },
     label: {
       face: faceFamily(own.labelFace),
-      color: str(own.labelColor) || null,
+      color: (pal ? str(pal.labelColor) || str(pal.color) : str(own.labelColor)) || null,
     },
   };
 }

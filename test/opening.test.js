@@ -78,7 +78,7 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.ok(onlyFull, 'full alone is enough');
   assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png', rootsVector: '', rootsFollowMs: 0 }, 'full stands for both states');
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
-  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false, rootsFit: null });
+  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false, rootsFit: null, rootsBrightness: 1 });
   assert.equal(onlyFull.fit, 'height');
   assert.equal(onlyFull.sideMargin, 0);
   assert.equal(onlyFull.returnAbove, null);

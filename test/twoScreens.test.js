@@ -7,7 +7,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  openingConfig, coverGeometry, inkSpan, widestInkRow, lastInkRow, fitTitle, titleLayout,
+  openingConfig, coverGeometry, inkSpan, widestInkRow, lastInkRow, fitTitle, titleLayout, rootsBrightnessAt,
 } = require('../src/lib/opening');
 
 const SITE = {
@@ -160,4 +160,15 @@ test('byline graphScale: in the graph state a share of that title\'s size, not a
   // On the way, between the two.
   const half = at(0.5);
   assert.ok(half.byline.size < g0.byline.size && half.byline.size > g1.byline.size);
+});
+
+test('graph.rootsBrightness: as drawn in the art state, the set brightness in the graph state, between them on the way', () => {
+  const c = openingConfig({ opening: { ...SITE.opening, graph: { ...SITE.opening.graph, rootsBrightness: 0.55 } } });
+  assert.equal(c.graph.rootsBrightness, 0.55);
+  assert.equal(rootsBrightnessAt(c, 0), 1);
+  assert.equal(rootsBrightnessAt(c, 1), 0.55);
+  assert.ok(close(rootsBrightnessAt(c, 0.5), 0.775));
+  assert.equal(rootsBrightnessAt(openingConfig(SITE), 1), 1, 'unset: as drawn');
+  assert.equal(openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: -3 } } }).graph.rootsBrightness, 0);
+  assert.equal(openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: 9 } } }).graph.rootsBrightness, 2);
 });

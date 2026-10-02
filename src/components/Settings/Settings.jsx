@@ -11,6 +11,7 @@ import { panelGroups, panelTitle, modeInReader, whereOf } from '../../lib/panels
 import { toolbarConfig, VIEW_ACTIONS } from '../../lib/toolbar';
 import { colorKeysInUse } from '../../lib/graphColors';
 import { graphFeed, topBarConfig } from '../../lib/topBar';
+import { nodePalettesOf } from '../../lib/nodePalettes';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -269,6 +270,9 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const groups = panelGroups(W, { settings: S, readable: anyReadable, voice: hasVoice, modes: modes.length });
   const TB = toolbarConfig(S);
   const noun = containersName(S);
+  // graph.nodePalettes: with two or more, a choice of colour for the nodes.
+  const palettes = nodePalettesOf(S && S.graph);
+  const paletteId = (palettes.find((p) => p.id === viewState.preference('nodePalette')) || palettes[0] || {}).id;
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -301,6 +305,35 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           label="narrative time of day background"
           data-pref="timeOfDay"
         />
+      )}
+      {palettes.length >= 2 && (
+        <div className={styles.choiceRow} role="radiogroup" aria-label="node colour" data-choice="nodePalette">
+          <span className={styles.rowLabel}>node colour</span>
+          <span className={styles.choices}>
+            {palettes.map((p, i) => (
+              <button
+                key={p.id}
+                role="radio"
+                aria-checked={paletteId === p.id}
+                title={p.label}
+                data-value={p.id}
+                className={`${styles.choiceBtn} ${paletteId === p.id ? styles.aidOn : ''}`}
+                onClick={() => viewState.setPreference('nodePalette', i === 0 ? null : p.id)}
+              >
+                <span
+                  className={styles.paletteSwatch}
+                  data-palette-swatch={p.id}
+                  aria-hidden="true"
+                  style={{
+                    borderColor: p.color,
+                    background: p.fillOpacity === null ? p.color : `color-mix(in srgb, ${p.color} ${Math.round(p.fillOpacity * 100)}%, transparent)`,
+                  }}
+                />
+                {p.label}
+              </button>
+            ))}
+          </span>
+        </div>
       )}
       {fields.length > 0 && (<>
         <div className={styles.rowLabel}>Colors</div>

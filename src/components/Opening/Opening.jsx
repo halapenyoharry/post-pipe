@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor, rootsBrightnessAt } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 import { parseRoots, rootsModel, actRoots, bentRoots, pathD, createFollow } from '../../lib/rootsVector';
 
@@ -514,9 +514,14 @@ function Cover({ config, viewState, children }) {
   drawFrameRef.current = drawFrame;
 
   // The graph state's image: its roots at the backdrop's strength, the
-  // small plant (the copy masked above keepAbove) at its own.
+  // small plant (the copy masked above keepAbove) at its own; the roots at
+  // graph.rootsBrightness in the graph state, as drawn in the art state.
   const paintRoots = (g) => {
     const roots = graphStateRef.current;
+    const b = rootsBrightnessAt(config, g.p);
+    const filter = b === 1 ? '' : `brightness(${b.toFixed(3)})`;
+    if (vectorRef.current && vectorRef.current.style.filter !== filter) vectorRef.current.style.filter = filter;
+    if (roots && roots.style.filter !== filter) roots.style.filter = filter;
     // Drawn as vectors: the image's roots give way to them.
     if (rootsRef.current && vectorRef.current) {
       vectorRef.current.style.opacity = String(g.fade.graph * g.roots);

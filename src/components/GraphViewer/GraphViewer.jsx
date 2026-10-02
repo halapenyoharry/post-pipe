@@ -6,6 +6,7 @@ import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
 import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf } from './containerLayout';
 import { containerLook } from './containerLook';
+import { nodePaletteFor } from '../../lib/nodePalettes';
 import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
@@ -338,6 +339,7 @@ export function GraphViewer({
   const connectorUpdateRef = useRef(null);
   const renderAllArticleBodiesRef = useRef(null);
   const rootsUpdateRef = useRef(null);
+  const paletteUpdateRef = useRef(null);
   // Readers' contributions (settings.contributions): counted on the cards,
   // and their connections drawn as their own edge layer, the readers
   // dimension, off until the reader turns it on.
@@ -415,6 +417,7 @@ export function GraphViewer({
       }
       if (rootsUpdateRef.current) rootsUpdateRef.current();
       if (readersUpdateRef.current) readersUpdateRef.current();
+      if (paletteUpdateRef.current) paletteUpdateRef.current();
     });
   }, [viewState]);
 
@@ -880,10 +883,22 @@ export function GraphViewer({
       .attr('class', 'container-group')
       .attr('data-container-id', (d) => d.id);
 
-    // Each container's look, open and closed alike (containerLook.js):
-    // painted by paintLooks below.
-    const lookOf = (d) => (d && d._look) || containerLook(d);
-    for (const c of (data.containers || [])) c._look = containerLook(c);
+    // Each container's look, open and closed alike (containerLook.js), in
+    // the node palette the reader chose (graph.nodePalettes) when the site
+    // has any: painted by paintLooks below.
+    const paletteChosen = () => {
+      const vs = viewStateRef.current;
+      return vs && vs.preference ? vs.preference('nodePalette') : null;
+    };
+    let palette = nodePaletteFor(GS, paletteChosen());
+    const lookOf = (d) => (d && d._look) || containerLook(d, palette);
+    for (const c of (data.containers || [])) c._look = containerLook(c, palette);
+    // The cards inside the containers take its colour for their outlines.
+    const paintCardOutlines = () => {
+      if (palette) container.style.setProperty('--pp-node-color', palette.color);
+      else container.style.removeProperty('--pp-node-color');
+    };
+    paintCardOutlines();
 
     containerGroups.append('path')
       .attr('class', 'container-hull')
@@ -1132,6 +1147,16 @@ export function GraphViewer({
       applyLabelContrast();
     }
     paintLooks();
+    // Another node colour chosen in the panel: every container and card
+    // outline repainted, nothing moved.
+    paletteUpdateRef.current = () => {
+      const next = nodePaletteFor(GS, paletteChosen());
+      if ((next && next.id) === (palette && palette.id)) return;
+      palette = next;
+      for (const c of (data.containers || [])) c._look = containerLook(c, palette);
+      paintLooks();
+      paintCardOutlines();
+    };
 
     // A soft closed outline through points on a rounded rectangle, nudged in
     // and out a little (the same way every time for the same container).
@@ -4069,6 +4094,7 @@ export function GraphViewer({
     return () => {
       renderAllArticleBodiesRef.current = null;
       rootsUpdateRef.current = null;
+      paletteUpdateRef.current = null;
       readersUpdateRef.current = null;
       if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
       if (themeObserver) themeObserver.disconnect();
