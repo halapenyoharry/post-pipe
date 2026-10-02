@@ -51,7 +51,11 @@ const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map
 const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
 const ACTS = Object.entries(SETTINGS.containers || {})
   .filter(([id, c]) => id.startsWith('container:') && c && c.anchor)
-  .map(([id, c]) => ({ id, anchor: c.anchor, hang: (SETTINGS.graph || {}).containerLayout === 'hang' || c.layout === 'hang' ? ((c.hang && c.hang.direction) || ((SETTINGS.graph || {}).hang || {}).direction || 'down') : null }));
+  .map(([id, c]) => ({ id, anchor: c.anchor, hang: (SETTINGS.graph || {}).containerLayout === 'hang' || c.layout === 'hang' ? ((c.hang && c.hang.direction) || ((SETTINGS.graph || {}).hang || {}).direction || 'down') : null,
+    // Since T34 an open act's spiral can sit on its anchor by its outer end
+    // (spiral.anchorEnd outer): its last chapter is the point on the anchor.
+    outer: (SETTINGS.graph || {}).containerLayout !== 'hang' && c.layout !== 'hang'
+      && ((c.spiral && c.spiral.anchorEnd) || ((SETTINGS.graph || {}).spiral || {}).anchorEnd) === 'outer' }));
 const BOOK = (SETTINGS.containment || []).find((c) => !c.parent).id;
 const START = (SETTINGS.graph && SETTINGS.graph.containersStart) || '';
 // How each act starts, as the site says: graph.containersStart (closed or
@@ -163,7 +167,9 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
   // An act's place: its closed node's centre, or open, its title; or, for
   // an act that hangs from its anchor (T33), the point of its hull's top
   // that hangs there: the middle for down, the inner edge for the sides.
-  const centre = (id, hang) => {
+  // An act whose spiral sits by its outer end (T34): its last chapter, the
+  // card with the highest series_part, is the point on the anchor.
+  const centre = (id, hang, outer) => {
     const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"]`);
     if (!g || getComputedStyle(g).display === 'none') return null;
     const macro = g.querySelector('.container-macro-node');
@@ -173,6 +179,17 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
       const x = hang === 'down-right' ? r.left : hang === 'down-left' ? r.right : (r.left + r.right) / 2;
       const t = g.querySelector('.container-badge').getScreenCTM();
       return { closed, x, y: r.top, title: { x: t.e, y: t.f } };
+    }
+    const n = /act-(\d+)/.exec(id);
+    if (!closed && outer && n) {
+      const last = [...document.querySelectorAll('.node-card')]
+        .filter((c) => c.__data__ && new RegExp(`-a${n[1]}-`).test(c.__data__.id) && getComputedStyle(c).display !== 'none')
+        .sort((p, q) => q.__data__.series_part - p.__data__.series_part)[0];
+      if (last) {
+        const r = (last.firstElementChild || last).getBoundingClientRect();
+        const t = g.querySelector('.container-badge').getScreenCTM();
+        return { closed, x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2, title: { x: t.e, y: t.f } };
+      }
     }
     const el = closed ? macro : g.querySelector('.container-badge');
     const m = el.getScreenCTM();
@@ -189,7 +206,7 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
     W: innerWidth, H: innerHeight,
     state: window.PostPipeCover.state, p: window.PostPipeCover.p,
     art: { left: art.left, top: art.top, width: art.width, height: art.height },
-    acts: Object.fromEntries(acts.map((a) => [a.id, centre(a.id, a.hang)])),
+    acts: Object.fromEntries(acts.map((a) => [a.id, centre(a.id, a.hang, a.outer)])),
     book: centre(book),
     graph: { opacity: Number(cs.opacity), inert: root.inert === true, transform: cs.transform, pointer: cs.pointerEvents, containers: items },
     ground: gs ? { image: gs.backgroundImage, color: gs.backgroundColor, opacity: Number(gs.opacity) } : null,
@@ -432,7 +449,7 @@ async function run(bt, name, size, record) {
     const o2 = await measure(p);
     record('4 open an act: it opens centred on its anchor and stays there',
       !o2.acts[a1.id].closed && anchorOff(o1, a1) <= 2 && anchorOff(o2, a1) <= 2,
-      `${a1.id.replace('container:', '')} title ${r1(anchorOff(o1, a1))} px from its anchor after 0.9 s, ${r1(anchorOff(o2, a1))} px after 3.1 s`);
+      `${a1.id.replace('container:', '')} ${a1.outer ? 'last chapter' : 'title'} ${r1(anchorOff(o1, a1))} px from its anchor after 0.9 s, ${r1(anchorOff(o2, a1))} px after 3.1 s`);
     // A tap on its title closes it (an open act that hangs is measured at
     // its hull's top, which is not its title).
     await tapAt(s, o2.acts[a1.id].title || o2.acts[a1.id]);
@@ -454,8 +471,8 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(2500);
     const d2 = await measure(p);
     record('4 a dragged act opens where it was dropped, not on its anchor', !d2.acts[a2.id].closed && off(d2.acts[a2.id], dropped) <= 3,
-      `title ${r1(off(d2.acts[a2.id], dropped))} px from where it was dropped`);
-    await tapAt(s, d2.acts[a2.id]);
+      `${ACTS.find((a) => a.id === a2.id).outer ? 'last chapter' : 'title'} ${r1(off(d2.acts[a2.id], dropped))} px from where it was dropped`);
+    await tapAt(s, d2.acts[a2.id].title || d2.acts[a2.id]);
     await p.waitForTimeout(1200);
     const marks = await p.evaluate(() => {
       const nodes = (JSON.parse(localStorage.getItem('post-pipe:viewstate') || '{}').nodes) || {};

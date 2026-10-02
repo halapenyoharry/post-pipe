@@ -25,6 +25,13 @@
 //
 // PP_E2E_ENGINES=chromium,webkit picks engines. An engine that cannot start
 // is reported as not run, not as passing.
+//
+// Retired for epicofelinorjones.com since T34: the site went back to the
+// golden spiral (graph.containerLayout spiral), so it has no hanging acts to
+// measure. On such a site this exits 0 saying so; the engine's hang layout
+// is still checked on fixtures by test/hangLayout.test.js (reading order,
+// the hull's top at the anchor, the width in cards, the directions, no
+// overlaps for 1 to 40 cards, the closed pill), which npm test runs.
 
 const path = require('path');
 const fs = require('fs');
@@ -63,8 +70,8 @@ const STEM_X = 0.495;
 const actOfCard = (id) => { const m = /-a(\d+)-/.exec(id); return m ? `container:act-${m[1]}` : null; };
 
 if (!MIDDLE || SIDES.length !== 2 || GS.containerLayout !== 'hang') {
-  console.error('this site has no hanging acts (graph.containerLayout hang, one act down and two at the sides); nothing to check');
-  process.exit(1);
+  console.log('retired: this site has no hanging acts (graph.containerLayout is not hang); the engine\'s hang layout is checked on fixtures by test/hangLayout.test.js');
+  process.exit(0);
 }
 
 async function open(bt, name, size) {

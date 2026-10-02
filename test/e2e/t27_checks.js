@@ -106,7 +106,17 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
     const badge = g.querySelector('.container-badge');
     let label = null;
     if (!closed && badge && getComputedStyle(badge).display !== 'none') { const bm = badge.getScreenCTM(); label = { x: bm.e, y: bm.f }; }
-    return { closed, pts, centre, label };
+    // An open act's last chapter (its highest series_part), the card the
+    // spiral puts on the anchor when it sits by its outer end.
+    let last = null;
+    const n = /act-(\d+)/.exec(id);
+    if (!closed && n) {
+      const mine = [...document.querySelectorAll('.node-card')]
+        .filter((c) => c.__data__ && new RegExp(`-a${n[1]}-`).test(c.__data__.id) && getComputedStyle(c).display !== 'none')
+        .sort((p, q) => q.__data__.series_part - p.__data__.series_part);
+      if (mine.length) { const r = (mine[0].firstElementChild || mine[0]).getBoundingClientRect(); last = { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 }; }
+    }
+    return { closed, pts, centre, label, last };
   };
   const nums = (d) => (d.match(/-?[\d.]+/g) || []).map(Number);
   const rootlets = [...document.querySelectorAll('[data-reach]')].map((g) => {
@@ -161,8 +171,14 @@ const anchorAt = (m, a) => artPoint(a.anchor, m.art);
 // than its title. How far an act is from its anchor, closed (its node's
 // centre) or open (its title, or the top of its hull when it hangs).
 const HANGING = (SETTINGS.graph || {}).containerLayout === 'hang';
+// Since T34 an open act's spiral can sit on its anchor by its outer end
+// (graph.spiral.anchorEnd outer): its last chapter is on the anchor, its
+// title wherever the hull puts it.
+const OUTER = !HANGING && ((SETTINGS.graph || {}).spiral || {}).anchorEnd === 'outer';
+const OPEN_ON = HANGING ? "hull's top" : OUTER ? 'last chapter' : 'title';
 function offAnchor(o, at) {
   if (!o) return Infinity;
+  if (!o.closed && OUTER) return o.last ? off(o.last, at) : Infinity;
   if (o.closed || !HANGING) return centreOf(o) ? off(centreOf(o), at) : Infinity;
   const ys = o.pts.map((q) => q.y), xs = o.pts.map((q) => q.x);
   const top = Math.min(...ys);
@@ -376,7 +392,7 @@ async function run(bt, name, size, record) {
     const inPlace = o && !o.closed ? offAnchor(o, anchorAt(op, a1)) : Infinity;
     const sso = checkStopShort(op, [a1.id]);
     const n1 = op.rootlets.filter((r) => r.c === a1.id).length;
-    record(`open: the act opens in place, its ${HANGING ? "hull's top" : 'title'} on its anchor`, inPlace <= 3, `${a1.id.replace('container:', '')} ${HANGING ? "hull's top" : 'title'} ${r1(inPlace)} px from its anchor`);
+    record(`open: the act opens in place, its ${OPEN_ON} on its anchor`, inPlace <= (OUTER ? 8 : 3), `${a1.id.replace('container:', '')} ${OPEN_ON} ${r1(inPlace)} px from its anchor`);
     record('open: the rootlets reach to the open hull\'s near edge, stopping short', n1 >= 1 && sso.ok, `${n1} rootlets, gaps ${sso.gaps.map(r1).join(', ')}`);
     for (const a of ACTS) if (a.id !== a1.id) await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } })), a.id);
     await p.waitForTimeout(1500);

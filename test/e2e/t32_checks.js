@@ -156,6 +156,16 @@ const zoomAt = (page, x, y) => page.evaluate(([x, y]) => {
   const t = sv.__zoom; const r = sv.getBoundingClientRect();
   return { k: t.k, wx: (x - r.left - t.x) / t.k, wy: (y - r.top - t.y) / t.k };
 }, [x, y]);
+// With graph.zoomPivot art (T34) every zoom is about one point on the
+// cover's art, opening.zoomPivot, wherever the pointer, the fingers or the
+// viewport's middle are: the zoom checks below then measure that point
+// instead.
+const ART_PIVOT = (SETTINGS.graph || {}).zoomPivot === 'art' && SETTINGS.opening && SETTINGS.opening.zoomPivot;
+const fixedPoint = (page, x, y) => (ART_PIVOT ? page.evaluate((pv) => {
+  const a = document.querySelector('[data-cover-art]').getBoundingClientRect();
+  return [a.left + a.width * pv.x, a.top + a.height * pv.y];
+}, ART_PIVOT) : Promise.resolve([x, y]));
+const pivotWord = (what) => (ART_PIVOT ? 'the art\'s pivot (graph.zoomPivot art)' : what);
 const artCrown = (page) => page.evaluate(() => {
   const a = document.querySelector('[data-cover-art]').getBoundingClientRect();
   return { x: a.left + a.width * (523 / 1045), y: a.top + a.height * (1330 / 2111) };
@@ -236,25 +246,26 @@ async function part1(bt, name, size, record) {
   await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
   await p.waitForTimeout(1500);
   const cx = s.W / 2, cy = s.H / 2;
-  const before = await zoomAt(p, cx, cy);
+  const [fx, fy] = await fixedPoint(p, cx, cy);
+  const before = await zoomAt(p, fx, fy);
   const crown0 = await artCrown(p);
   const acts0 = await actScreen(p);
   await p.mouse.move(cx, cy);
   for (let i = 0; i < 3; i += 1) { await p.mouse.wheel(0, -100); await p.waitForTimeout(120); }
   await p.waitForTimeout(700);
-  const after = await zoomAt(p, cx, cy);
+  const after = await zoomAt(p, fx, fy);
   const crown1 = await artCrown(p);
   const acts1 = await actScreen(p);
   const ratio = after.k / before.k;
   const drift = Math.max(...Object.keys(acts0).filter((id) => acts1[id]).map((id) => {
-    const want = { x: cx + (acts0[id].x - cx) * ratio, y: cy + (acts0[id].y - cy) * ratio };
+    const want = { x: fx + (acts0[id].x - fx) * ratio, y: fy + (acts0[id].y - fy) * ratio };
     return Math.hypot(acts1[id].x - want.x, acts1[id].y - want.y);
   }));
-  record('1.2 a wheel zoom at the screen\'s centre keeps the point under it', ratio > 1.2 && Math.hypot(after.wx - before.wx, after.wy - before.wy) * after.k < 0.5,
-    `zoom ${r1(ratio)}x, the centre's point moved ${r1(Math.hypot(after.wx - before.wx, after.wy - before.wy) * after.k)} px`);
+  record(`1.2 a wheel zoom at the screen's centre keeps the point under ${pivotWord('it')}`, ratio > 1.2 && Math.hypot(after.wx - before.wx, after.wy - before.wy) * after.k < 0.5,
+    `zoom ${r1(ratio)}x, the fixed point's point moved ${r1(Math.hypot(after.wx - before.wx, after.wy - before.wy) * after.k)} px`);
   record('1.2 ... the crown of the roots stays where it was', Math.hypot(crown1.x - crown0.x, crown1.y - crown0.y) < 0.5,
     `crown (${r1(crown0.x)}, ${r1(crown0.y)}) → (${r1(crown1.x)}, ${r1(crown1.y)})`);
-  record('1.2 ... and the acts move about the centre, not toward the graph\'s middle', drift < 3, `largest drift from zooming about the centre ${r1(drift)} px`);
+  record(`1.2 ... and the acts move about ${pivotWord('the centre')}, not toward the graph's middle`, drift < 3, `largest drift from zooming about it ${r1(drift)} px`);
 
   // A point on the empty canvas (a card takes the wheel for its own text).
   const off = await p.evaluate(({ W, H }) => {
@@ -264,23 +275,24 @@ async function part1(bt, name, size, record) {
     }
     return { x: W * 0.3, y: H * 0.65, where: 'fallback' };
   }, { W: s.W, H: s.H });
-  const b2 = await zoomAt(p, off.x, off.y);
+  const [ox, oy] = await fixedPoint(p, off.x, off.y);
+  const b2 = await zoomAt(p, ox, oy);
   await p.mouse.move(off.x, off.y);
   await p.mouse.wheel(0, 120);
   await p.waitForTimeout(600);
-  const a2 = await zoomAt(p, off.x, off.y);
-  record('1.2 a wheel zoom elsewhere keeps the point under the pointer', a2.k < b2.k && Math.hypot(a2.wx - b2.wx, a2.wy - b2.wy) * a2.k < 0.5,
+  const a2 = await zoomAt(p, ox, oy);
+  record(`1.2 a wheel zoom elsewhere keeps the point under ${pivotWord('the pointer')}`, a2.k < b2.k && Math.hypot(a2.wx - b2.wx, a2.wy - b2.wy) * a2.k < 0.5,
     `at (${r1(off.x)}, ${r1(off.y)}) on the ${off.where}: zoom ${r1(a2.k / b2.k)}x, moved ${r1(Math.hypot(a2.wx - b2.wx, a2.wy - b2.wy) * a2.k)} px`);
 
   if (!s.phone) {
-    const b3 = await zoomAt(p, cx, cy);
+    const b3 = await zoomAt(p, fx, fy);
     await p.keyboard.press('=');
     await p.waitForTimeout(500);
-    const a3 = await zoomAt(p, cx, cy);
+    const a3 = await zoomAt(p, fx, fy);
     await p.keyboard.press('-');
     await p.waitForTimeout(500);
-    const a4 = await zoomAt(p, cx, cy);
-    record('1.2 + and - zoom about the viewport\'s centre', a3.k > b3.k * 1.2 && Math.abs(a4.k - b3.k) < 1e-6
+    const a4 = await zoomAt(p, fx, fy);
+    record(`1.2 + and - zoom about ${pivotWord("the viewport's centre")}`, a3.k > b3.k * 1.2 && Math.abs(a4.k - b3.k) < 1e-6
       && Math.hypot(a3.wx - b3.wx, a3.wy - b3.wy) * a3.k < 0.5 && Math.hypot(a4.wx - b3.wx, a4.wy - b3.wy) * a4.k < 0.5,
       `+ ${r1(a3.k / b3.k)}x, - back to ${r1(a4.k / b3.k)}x, centre moved ${r1(Math.hypot(a3.wx - b3.wx, a3.wy - b3.wy) * a3.k)} px`);
   } else {
@@ -292,7 +304,8 @@ async function part1(bt, name, size, record) {
       }
       return { x: W / 2, y: H * 0.6 };
     }, { W: s.W, H: s.H });
-    const b4 = await zoomAt(p, at.x, at.y);
+    const [px, py] = await fixedPoint(p, at.x, at.y);
+    const b4 = await zoomAt(p, px, py);
     await p.evaluate(async ({ x, y }) => {
       const el = document.elementFromPoint(x, y);
       let d = 40;
@@ -305,16 +318,16 @@ async function part1(bt, name, size, record) {
       el.dispatchEvent(window.__touchEvent('touchend', el, [], [[x - d, y], [x + d, y]]));
     }, at);
     await p.waitForTimeout(600);
-    const a4 = await zoomAt(p, at.x, at.y);
-    record('1.2 a pinch keeps the point between the fingers', a4.k > b4.k * 1.3 && Math.hypot(a4.wx - b4.wx, a4.wy - b4.wy) * a4.k < 1,
+    const a4 = await zoomAt(p, px, py);
+    record(`1.2 a pinch keeps the point between ${pivotWord('the fingers')}`, a4.k > b4.k * 1.3 && Math.hypot(a4.wx - b4.wx, a4.wy - b4.wy) * a4.k < 1,
       `zoom ${r1(a4.k / b4.k)}x, moved ${r1(Math.hypot(a4.wx - b4.wx, a4.wy - b4.wy) * a4.k)} px`);
   }
 
-  const b5 = await zoomAt(p, cx, cy);
+  const b5 = await zoomAt(p, fx, fy);
   await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:zoom-to-fit')));
   await p.waitForTimeout(900);
-  const a5 = await zoomAt(p, cx, cy);
-  record('1.2 Zoom to fit zooms about the viewport\'s centre (no re-centring)', Math.hypot(a5.wx - b5.wx, a5.wy - b5.wy) * a5.k < 0.5,
+  const a5 = await zoomAt(p, fx, fy);
+  record(`1.2 Zoom to fit zooms about ${pivotWord("the viewport's centre")} (no re-centring)`, Math.hypot(a5.wx - b5.wx, a5.wy - b5.wy) * a5.k < 0.5,
     `zoom ${r1(a5.k / b5.k)}x, centre moved ${r1(Math.hypot(a5.wx - b5.wx, a5.wy - b5.wy) * a5.k)} px`);
 
   // Colours: nothing they colour is drawn here, so they are not offered.
