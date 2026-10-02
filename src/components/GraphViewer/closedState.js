@@ -35,4 +35,16 @@ function initiallyClosed(containers, graph) {
   return Array.isArray(G.initialCollapsed) ? G.initialCollapsed.slice() : [];
 }
 
-module.exports = { closedMemberSet, edgeHidden, initiallyClosed };
+// What Close all closes: every container inside another (a book's acts), or
+// every container when none is inside another; the ones they sit in are
+// opened, so each closed one shows as its own small node. Open all opens all.
+function closeAllPlan(containers) {
+  const all = containers || [];
+  const inner = all.filter((c) => c.parent);
+  const close = (inner.length ? inner : all).map((c) => c.id);
+  const closing = new Set(close);
+  const open = all.filter((c) => !closing.has(c.id)).map((c) => c.id);
+  return { close, open };
+}
+
+module.exports = { closedMemberSet, edgeHidden, initiallyClosed, closeAllPlan };

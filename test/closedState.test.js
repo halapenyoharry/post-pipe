@@ -38,3 +38,12 @@ test('containers start closed or open as the site says, initialCollapsed otherwi
   assert.deepStrictEqual(initiallyClosed(book, { initialCollapsed: ['container:act-2'] }), ['container:act-2']);
   assert.deepStrictEqual(initiallyClosed(undefined, { containersStart: 'closed' }), []);
 });
+
+test('close all closes the containers inside another and opens the ones they sit in', () => {
+  const { closeAllPlan } = require('../src/components/GraphViewer/closedState');
+  const book = [{ id: 'book' }, { id: 'a1', parent: 'book' }, { id: 'a2', parent: 'book' }];
+  assert.deepStrictEqual(closeAllPlan(book), { close: ['a1', 'a2'], open: ['book'] });
+  const flat = [{ id: 'x' }, { id: 'y' }];
+  assert.deepStrictEqual(closeAllPlan(flat), { close: ['x', 'y'], open: [] });
+  assert.deepStrictEqual(closeAllPlan([]), { close: [], open: [] });
+});

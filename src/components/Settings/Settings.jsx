@@ -8,6 +8,8 @@ import { THEMES, themeName } from '../../lib/theme';
 import { isLinkItem } from '../../lib/linkNode';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
+import { colorKeysInUse } from '../../lib/graphColors';
+import { graphFeed, topBarConfig } from '../../lib/topBar';
 
 /**
  * Settings — the panel that slides out from the right edge, from the graph's
@@ -39,29 +41,6 @@ function themeColors() {
     ...(t.node_published ? { published: t.node_published } : {}),
     ...(t.tag_color ? { tag: t.tag_color } : {}),
   };
-}
-
-// Which of the five colors this corpus actually draws. A card inside a
-// container takes the container's color, so draft/published only count for
-// cards outside one; tag, topology, and placeholder only exist if there are
-// such nodes. Offering a picker that changes nothing on screen is the thing
-// this avoids.
-export function colorKeysInUse(feed) {
-  if (!feed || !Array.isArray(feed.items)) return null;
-  const containers = feed.containers || [];
-  const inContainer = (item) => containers.some((c) => c.parent && c.tag && (item.tags || []).includes(c.tag));
-  const used = new Set();
-  const ids = new Set(feed.items.map((i) => i.id));
-  for (const item of feed.items) {
-    if (inContainer(item)) continue;
-    used.add(item._status === 'published' ? 'published' : 'draft');
-  }
-  for (const e of feed.edges || []) {
-    if (e.layer === 'tag') used.add('tag');
-    else if (e.layer === 'topology') used.add('topology');
-    else if (e.layer === 'authored' && !ids.has(e.target)) used.add('placeholder');
-  }
-  return used;
 }
 
 const DEFAULT_COLORS = themeColors();
@@ -272,7 +251,8 @@ export function Settings({ viewState, feedData, subject, readerOpen }) {
   const size = viewState.readerAid ? viewState.readerAid('size') : 'm';
   const current = { ...DEFAULT_COLORS, ...viewState.graphColors() };
   const activeProfile = viewState.colorProfileId();
-  const inUse = colorKeysInUse(feedData);
+  // Counted on what the graph draws: an item only in the top bar has no card.
+  const inUse = colorKeysInUse(graphFeed(feedData, topBarConfig(typeof window !== 'undefined' ? window.SETTINGS : null)));
   const fields = inUse ? FIELDS.filter((f) => inUse.has(f.key)) : FIELDS;
   const hasContainers = !!(feedData && Array.isArray(feedData.containers) && feedData.containers.length);
   const hasVoice = typeof window !== 'undefined' && !!window.TTS;

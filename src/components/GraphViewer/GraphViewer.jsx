@@ -7,7 +7,8 @@ import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dime
 import { containerLayout } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
-import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds } from './closedState';
+import { zoomAbout, fitRatioAbout } from './zoomPivot';
+import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, closeAllPlan } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
@@ -1853,11 +1854,16 @@ export function GraphViewer({
       return Object.fromEntries((data.containers || []).map((c) => [c.id, closedContainers.has(c.id) ? 'closed' : 'open']));
     }
     function setContainersOpen(ids, open) {
+      return setContainers(open ? { open: ids } : { close: ids });
+    }
+    // { open: [ids], close: [ids] }, drawn once.
+    function setContainers({ open = [], close = [] }) {
       let changed = false;
-      for (const id of ids) {
-        if (!containerById.has(id)) continue;
-        if (open && closedContainers.has(id)) { closedContainers.delete(id); changed = true; }
-        if (!open && !closedContainers.has(id)) { closedContainers.add(id); changed = true; }
+      for (const id of open) {
+        if (containerById.has(id) && closedContainers.has(id)) { closedContainers.delete(id); changed = true; }
+      }
+      for (const id of close) {
+        if (containerById.has(id) && !closedContainers.has(id)) { closedContainers.add(id); changed = true; }
       }
       if (!changed) return false;
       applyContainerVisibility();
@@ -1872,7 +1878,7 @@ export function GraphViewer({
       closeContainer: (id) => setContainersOpen([id], false),
       toggleContainer: (id) => setContainersOpen([id], closedContainers.has(id)),
       openAllContainers: () => setContainersOpen(allContainerIds(), true),
-      closeAllContainers: () => setContainersOpen(allContainerIds(), false),
+      closeAllContainers: () => setContainers(closeAllPlan(data.containers)),
       getContainerState: containerState,
     };
     if (apiRef) apiRef.current = containerApi;
@@ -1903,6 +1909,8 @@ export function GraphViewer({
         const a = anchoredOf.get(id);
         if (!n || !Number.isFinite(n.x) || !a || !centres.has(a)) continue;
         const c = centres.get(a), info = CL.containers.get(a);
+        // Not laid out (inside a closed container): nothing to move to.
+        if (!info) continue;
         moves.push({ n, x0: n.x, y0: n.y, x1: c.x - info.center.x + p.x, y1: c.y - info.center.y + p.y });
       }
       if (!hasSettled && !moves.length) { simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
@@ -3375,7 +3383,62 @@ export function GraphViewer({
     // LayoutControls dispatches these from outside the component. They reach
     // into the closure that owns the simulation, the zoom, and the data.
 
-    const handleZoomToFit = () => { focusActive = false; fitToViewport({ animate: true, focus: false }); };
+    // Zoom about the middle of the viewport (src/components/GraphViewer/
+    // zoomPivot.js), never re-centring on the graph: what hangs from the
+    // cover's art stays over it. The wheel and a pinch zoom about the pointer
+    // and the fingers (d3.zoom).
+    function zoomAboutCentre(ratio, animate = true) {
+      if (!Number.isFinite(ratio) || ratio <= 0) return;
+      const t = d3.zoomTransform(svg.node());
+      const k = Math.max(0.04, Math.min(8, t.k * ratio));
+      const v = zoomAbout(t, k / t.k, width / 2, height / 2);
+      const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
+      userMovedView = true;
+      focusActive = false;
+      if (animate) svg.transition('key-zoom').duration(260).ease(d3.easeCubicOut).call(zoom.transform, transform);
+      else svg.call(zoom.transform, transform);
+    }
+    // Zoom to fit: the whole graph on the screen, zoomed about the middle of
+    // the viewport. Falls back to framing the graph when it cannot be fitted
+    // from there (it lies across the middle's far side of the screen).
+    const handleZoomToFit = () => {
+      focusActive = false;
+      const ext = containerExtent() || nodeExtent();
+      const inset = chromeInsets(height);
+      const m = 24;
+      const area = { x0: m, y0: inset.top + m, x1: width - m, y1: height - inset.bottom - m };
+      if (ext) {
+        const corners = [[ext.x0, ext.y0], [ext.x1, ext.y0], [ext.x0, ext.y1], [ext.x1, ext.y1]].map(([x, y]) => toScreen(x, y));
+        const box = {
+          x0: Math.min(...corners.map((c) => c[0])), x1: Math.max(...corners.map((c) => c[0])),
+          y0: Math.min(...corners.map((c) => c[1])), y1: Math.max(...corners.map((c) => c[1])),
+        };
+        const r = fitRatioAbout(box, width / 2, height / 2, area);
+        if (r && r > 0.02) { zoomAboutCentre(r); return; }
+      }
+      fitToViewport({ animate: true, focus: false });
+    };
+    function nodeExtent() {
+      const pts = data.nodes.filter((d) => !d._closedHidden && Number.isFinite(d.x));
+      if (!pts.length) return null;
+      return { x0: d3.min(pts, (d) => d.x) - 40, y0: d3.min(pts, (d) => d.y) - 40, x1: d3.max(pts, (d) => d.x) + 40, y1: d3.max(pts, (d) => d.y) + 40 };
+    }
+    // + and - zoom in and out about the middle of the viewport; not while
+    // typing, not with a modifier held (those are the browser's own zoom),
+    // and not while the cover's art has the page.
+    const handleZoomKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      const tEl = e.target;
+      if (tEl && (tEl.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tEl.tagName))) return;
+      if (typeof window !== 'undefined' && window.PostPipeCover && window.PostPipeCover.state && window.PostPipeCover.state !== 'graph') return;
+      if (document.querySelector('[data-settings-panel]')) return;
+      const inKey = e.key === '+' || e.key === '=';
+      const outKey = e.key === '-' || e.key === '_';
+      if (!inKey && !outKey) return;
+      e.preventDefault();
+      zoomAboutCentre(inKey ? 1.25 : 0.8);
+    };
+    window.addEventListener('keydown', handleZoomKey);
 
     const handleUnpinAll = () => {
       data.nodes.forEach(d => {
@@ -3503,6 +3566,7 @@ export function GraphViewer({
       window.removeEventListener('postpipe:cover-frame', onCoverFrame);
       if (window.PostPipeGraphWorld && window.PostPipeGraphWorld.snapshot === worldSnapshot) delete window.PostPipeGraphWorld;
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
+      window.removeEventListener('keydown', handleZoomKey);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
       window.removeEventListener('graph:reset-sizes', handleResetSizes);
       window.removeEventListener('graph:reset-layout', handleResetLayout);
