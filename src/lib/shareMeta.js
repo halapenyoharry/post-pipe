@@ -34,7 +34,7 @@ function shareMeta(site, base) {
     `<meta property="og:title" content="${title}">`,
     `<meta property="og:description" content="${desc}">`,
     `<meta property="og:type" content="website">`,
-    `<meta property="og:url" content="${escAttr(base)}">`,
+    `<meta property="og:url" content="${escAttr(base ? String(base).replace(/\/*$/, '/') : '')}">`,
   ];
   const img = S.share_image;
   if (img && img.src) {

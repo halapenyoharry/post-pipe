@@ -37,3 +37,8 @@ test('icons: the old single svg link by default, the set when given', () => {
     '<link rel="apple-touch-icon" href="./apple-touch-icon.png">',
   ]);
 });
+
+test('og:url ends with one slash', () => {
+  assert.ok(shareMeta({}, 'https://x.org').includes('<meta property="og:url" content="https://x.org/">'));
+  assert.ok(shareMeta({}, 'https://x.org//').includes('<meta property="og:url" content="https://x.org/">'));
+});
