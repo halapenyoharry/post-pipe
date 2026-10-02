@@ -8,7 +8,8 @@
 //      the graph state's top edge returns to the art;
 //   4. containers start as graph.containersStart says (or, without it, as
 //      graph.initialCollapsed says), on their anchors;
-//      opening keeps an act centred on its anchor, a drag leaves it where it
+//      opening keeps an act centred on its anchor (since T33, an act that
+//      hangs from its anchor keeps its hull's top on it), a drag leaves it where it
 //      was dropped (across a reload, and when it opens), Reset returns it;
 //      the other start (open) as a variant;
 //   5. the top bar's page (labelled as the site says) in line with the title pill and the gear in
@@ -50,7 +51,7 @@ const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map
 const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
 const ACTS = Object.entries(SETTINGS.containers || {})
   .filter(([id, c]) => id.startsWith('container:') && c && c.anchor)
-  .map(([id, c]) => ({ id, anchor: c.anchor }));
+  .map(([id, c]) => ({ id, anchor: c.anchor, hang: (SETTINGS.graph || {}).containerLayout === 'hang' || c.layout === 'hang' ? ((c.hang && c.hang.direction) || ((SETTINGS.graph || {}).hang || {}).direction || 'down') : null }));
 const BOOK = (SETTINGS.containment || []).find((c) => !c.parent).id;
 const START = (SETTINGS.graph && SETTINGS.graph.containersStart) || '';
 // How each act starts, as the site says: graph.containersStart (closed or
@@ -159,11 +160,20 @@ async function tapAt(s, p) {
 const measure = (page) => page.evaluate(({ acts, book }) => {
   const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, w: r.width, h: r.height, cy: r.top + r.height / 2 }; };
   const art = document.querySelector('[data-cover-art]').getBoundingClientRect();
-  const centre = (id) => {
+  // An act's place: its closed node's centre, or open, its title; or, for
+  // an act that hangs from its anchor (T33), the point of its hull's top
+  // that hangs there: the middle for down, the inner edge for the sides.
+  const centre = (id, hang) => {
     const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"]`);
     if (!g || getComputedStyle(g).display === 'none') return null;
     const macro = g.querySelector('.container-macro-node');
     const closed = !!macro && getComputedStyle(macro).display !== 'none';
+    if (!closed && hang) {
+      const r = g.querySelector('.container-hull').getBoundingClientRect();
+      const x = hang === 'down-right' ? r.left : hang === 'down-left' ? r.right : (r.left + r.right) / 2;
+      const t = g.querySelector('.container-badge').getScreenCTM();
+      return { closed, x, y: r.top, title: { x: t.e, y: t.f } };
+    }
     const el = closed ? macro : g.querySelector('.container-badge');
     const m = el.getScreenCTM();
     return { closed, x: m.e, y: m.f };
@@ -179,7 +189,7 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
     W: innerWidth, H: innerHeight,
     state: window.PostPipeCover.state, p: window.PostPipeCover.p,
     art: { left: art.left, top: art.top, width: art.width, height: art.height },
-    acts: Object.fromEntries(acts.map((a) => [a.id, centre(a.id)])),
+    acts: Object.fromEntries(acts.map((a) => [a.id, centre(a.id, a.hang)])),
     book: centre(book),
     graph: { opacity: Number(cs.opacity), inert: root.inert === true, transform: cs.transform, pointer: cs.pointerEvents, containers: items },
     ground: gs ? { image: gs.backgroundImage, color: gs.backgroundColor, opacity: Number(gs.opacity) } : null,
@@ -423,7 +433,9 @@ async function run(bt, name, size, record) {
     record('4 open an act: it opens centred on its anchor and stays there',
       !o2.acts[a1.id].closed && anchorOff(o1, a1) <= 2 && anchorOff(o2, a1) <= 2,
       `${a1.id.replace('container:', '')} title ${r1(anchorOff(o1, a1))} px from its anchor after 0.9 s, ${r1(anchorOff(o2, a1))} px after 3.1 s`);
-    await tapAt(s, o2.acts[a1.id]);
+    // A tap on its title closes it (an open act that hangs is measured at
+    // its hull's top, which is not its title).
+    await tapAt(s, o2.acts[a1.id].title || o2.acts[a1.id]);
     await p.waitForTimeout(1500);
     const c1 = await measure(p);
     record('4 close it again: back on its anchor', c1.acts[a1.id].closed && anchorOff(c1, a1) <= 2, `${r1(anchorOff(c1, a1))} px off`);

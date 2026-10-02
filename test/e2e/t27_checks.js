@@ -9,6 +9,9 @@
 // book's own title is hidden (or, as the alternative, at the top of its
 // hull); Reset puts the acts back, saved positions bring them back where the
 // reader left them; an act opens in place; reduced motion; no page errors.
+// Since T33, when the acts hang from their anchors (graph.containerLayout
+// hang), an open act is on its anchor when the top of its hull is, and a
+// book whose hull is not drawn has no outline to measure.
 // Chromium and WebKit, desktop (1280x800) and phone (390x844). Screenshots
 // (closed and open, light and dark, and the title at the top) go to
 // PP_E2E_SHOTS when set.
@@ -89,6 +92,8 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
     const macro = g.querySelector('.container-macro-node');
     const closed = !!macro && getComputedStyle(macro).display !== 'none';
     const path = g.querySelector(closed ? '.container-macro-bg' : '.container-hull');
+    // An undrawn hull (containers[].hull false) has no outline.
+    if (!(path.getAttribute('d') || '').length || getComputedStyle(path).display === 'none') return null;
     const m = path.getScreenCTM();
     const len = path.getTotalLength();
     const pts = [];
@@ -151,6 +156,20 @@ const startsClosed = (id) => (GSET.containersStart === 'closed' ? true : GSET.co
 const centreOf = (a) => (a ? (a.closed ? a.centre : a.label) : null);
 const off = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const anchorAt = (m, a) => artPoint(a.anchor, m.art);
+// Since T33 an open act can hang from its anchor (graph.containerLayout
+// hang): its hull's top is on the anchor, which lies along that top, rather
+// than its title. How far an act is from its anchor, closed (its node's
+// centre) or open (its title, or the top of its hull when it hangs).
+const HANGING = (SETTINGS.graph || {}).containerLayout === 'hang';
+function offAnchor(o, at) {
+  if (!o) return Infinity;
+  if (o.closed || !HANGING) return centreOf(o) ? off(centreOf(o), at) : Infinity;
+  const ys = o.pts.map((q) => q.y), xs = o.pts.map((q) => q.x);
+  const top = Math.min(...ys);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const outside = at.x < x0 ? x0 - at.x : at.x > x1 ? at.x - x1 : 0;
+  return Math.hypot(top - at.y, outside);
+}
 const stray = (m) => Math.max(0, ...m.rootlets.map((r) => off(r.end, r.target)));
 const r1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : String(n));
 
@@ -236,7 +255,7 @@ async function run(bt, name, size, record) {
     record('fresh: drawn in by drawMs', m.rootlets.length > 0 && m.rootlets.every((r) => r.drawn === 'drawn' && (r.dasharray === 'none' || r.dasharray === '')),
       `${m.rootlets.filter((r) => r.drawn === 'drawn').length} of ${m.rootlets.length} drawn`);
 
-    const anchorOff = ACTS.map((a) => ({ id: a.id, closed: m.acts[a.id] && m.acts[a.id].closed, d: centreOf(m.acts[a.id]) ? off(centreOf(m.acts[a.id]), anchorAt(m, a)) : Infinity }));
+    const anchorOff = ACTS.map((a) => ({ id: a.id, closed: m.acts[a.id] && m.acts[a.id].closed, d: offAnchor(m.acts[a.id], anchorAt(m, a)) }));
     record('fresh: the acts start open or closed as the site says, each on its anchor', anchorOff.every((a) => a.closed === startsClosed(a.id) && a.d <= 2),
       anchorOff.map((a) => `${a.id.replace('container:', '')} ${a.closed ? 'closed' : 'open'} ${r1(a.d)} px off`).join(', '));
     record('fresh: the graph rests at the home view', Math.abs(m.k - m.homeK) < 1e-6, `k ${m.k}, homeK ${m.homeK}`);
@@ -312,7 +331,9 @@ async function run(bt, name, size, record) {
 
     // A pan on empty canvas.
     const bp = await measure(p);
-    await drag(p, { x: s.phone ? 60 : 200, y: s.phone ? 690 : 640 }, { x: 70, y: -40 }, 6);
+    // On empty canvas: since T33 Act 1 hangs across a phone's lower half, so
+    // there the pan starts between the closed acts and Act 1's top.
+    await drag(p, { x: s.phone ? 40 : 200, y: s.phone ? 265 : 640 }, { x: 70, y: -40 }, 6);
     const ps = await waitSettled(p, 1500);
     const ssp = checkStopShort(ps.m);
     const panned = Math.max(...ps.m.rootlets.map((r) => { const b = bp.rootlets.find((x) => x.key === r.key); return b ? off(b.target, r.target) : 0; }));
@@ -325,7 +346,7 @@ async function run(bt, name, size, record) {
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1300);
     const rs = (await waitSettled(p, 1500)).m;
-    const back = ACTS.map((a) => (centreOf(rs.acts[a.id]) ? off(centreOf(rs.acts[a.id]), anchorAt(rs, a)) : Infinity));
+    const back = ACTS.map((a) => offAnchor(rs.acts[a.id], anchorAt(rs, a)));
     record('Reset: the acts back on their anchors, the view at home', back.every((d) => d <= 2) && Math.abs(rs.k - rs.homeK) < 1e-6, back.map(r1).join(', ') + ' px off; k ' + rs.k);
 
     // Zoom in: the roots and the rootlets fade to the floor; the plant stays.
@@ -352,10 +373,10 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(1300);
     const op = (await waitSettled(p, 1500)).m;
     const o = op.acts[a1.id];
-    const inPlace = o && !o.closed && o.label ? off(o.label, anchorAt(op, a1)) : Infinity;
+    const inPlace = o && !o.closed ? offAnchor(o, anchorAt(op, a1)) : Infinity;
     const sso = checkStopShort(op, [a1.id]);
     const n1 = op.rootlets.filter((r) => r.c === a1.id).length;
-    record('open: the act opens in place, its title on its anchor', inPlace <= 3, `${a1.id.replace('container:', '')} title ${r1(inPlace)} px from its anchor`);
+    record(`open: the act opens in place, its ${HANGING ? "hull's top" : 'title'} on its anchor`, inPlace <= 3, `${a1.id.replace('container:', '')} ${HANGING ? "hull's top" : 'title'} ${r1(inPlace)} px from its anchor`);
     record('open: the rootlets reach to the open hull\'s near edge, stopping short', n1 >= 1 && sso.ok, `${n1} rootlets, gaps ${sso.gaps.map(r1).join(', ')}`);
     for (const a of ACTS) if (a.id !== a1.id) await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } })), a.id);
     await p.waitForTimeout(1500);
@@ -384,7 +405,7 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(600);
     const r = await measure(p);
     const kept = off(r.acts[a3.id].centre, dragged);
-    const others = ACTS.filter((a) => a.id !== a3.id).map((a) => off(centreOf(r.acts[a.id]), anchorAt(r, a)));
+    const others = ACTS.filter((a) => a.id !== a3.id).map((a) => offAnchor(r.acts[a.id], anchorAt(r, a)));
     record('saved positions: a dragged act comes back where the reader left it, the others on their anchors', kept <= 3 && others.every((d) => d <= 3),
       `${a3.id.replace('container:', '')} ${r1(kept)} px from where it was left (${r1(off(dragged, c0))} px from its anchor); others ${others.map(r1).join(', ')} px off`);
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
@@ -426,6 +447,7 @@ async function run(bt, name, size, record) {
             const st = JSON.parse(json);
             st.opening.title.hideGraphTitle = false;
             st.containers[BOOK] = { ...(st.containers[BOOK] || {}), labelPosition: 'top' };
+            delete st.containers[BOOK].hull;
             return `window.SETTINGS = ${JSON.stringify(st)};\n</script>`;
           });
           body = body.replace(/"labelPosition":\s*"hidden"/g, '"labelPosition":"top"');
@@ -434,7 +456,8 @@ async function run(bt, name, size, record) {
         if (/feed\.json(\?|$)/.test(url)) {
           const resp = await route.fetch();
           const feed = await resp.json();
-          for (const c of feed.containers || []) if (c.id === BOOK) c.labelPosition = 'top';
+          // With its hull drawn again (the site leaves it undrawn since T33).
+          for (const c of feed.containers || []) if (c.id === BOOK) { c.labelPosition = 'top'; delete c.hull; }
           return route.fulfill({ response: resp, json: feed });
         }
         return route.continue();
