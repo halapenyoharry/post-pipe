@@ -33,3 +33,35 @@ test('no fit for an empty box or a pivot outside the area', () => {
   assert.strictEqual(fitRatioAbout({ x0: 10, y0: 10, x1: 10, y1: 20 }, 50, 50, area), null);
   assert.strictEqual(fitRatioAbout({ x0: 10, y0: 10, x1: 20, y1: 20 }, 150, 50, area), null);
 });
+
+const { repivot, zoomPivotMode } = require('../src/components/GraphViewer/zoomPivot');
+
+test('a zoom asked about the pointer becomes the same zoom about the pivot', () => {
+  const prev = { x: 120, y: -60, k: 0.4 };
+  // A wheel step in at the screen's corner: d3 keeps the corner's world point.
+  const atCorner = zoomAbout(prev, 1.149, 1270, 790);
+  const v = repivot(prev, atCorner, 623, 285);
+  assert.ok(Math.abs(v.k - atCorner.k) < 1e-12);
+  const [a, b] = world(prev, 623, 285), [c, d] = world(v, 623, 285);
+  assert.ok(Math.abs(a - c) < 1e-9 && Math.abs(b - d) < 1e-9);
+  // Ten steps keep the pivot's world point exactly where it was.
+  let w = prev;
+  for (let i = 0; i < 10; i++) w = repivot(w, zoomAbout(w, 1.149, 10, 10), 623, 285);
+  const [e, f] = world(w, 623, 285);
+  assert.ok(Math.abs(a - e) < 1e-9 && Math.abs(b - f) < 1e-9);
+  assert.ok(Math.abs(w.k - prev.k * Math.pow(1.149, 10)) < 1e-9);
+});
+
+test('a pan passes through; out as well as in is pivoted', () => {
+  const prev = { x: 10, y: 20, k: 1 };
+  assert.deepStrictEqual(repivot(prev, { x: 40, y: -5, k: 1 }, 300, 300), { x: 40, y: -5, k: 1 });
+  const out = repivot(prev, { x: 0, y: 0, k: 0.5 }, 300, 300);
+  assert.deepStrictEqual(out, zoomAbout(prev, 0.5, 300, 300));
+});
+
+test('graph.zoomPivot: art, or the pointer by default', () => {
+  assert.strictEqual(zoomPivotMode({ zoomPivot: 'art' }), 'art');
+  assert.strictEqual(zoomPivotMode({ zoomPivot: 'pointer' }), 'pointer');
+  assert.strictEqual(zoomPivotMode({}), 'pointer');
+  assert.strictEqual(zoomPivotMode(null), 'pointer');
+});

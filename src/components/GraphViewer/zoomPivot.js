@@ -1,8 +1,11 @@
-// Zooming about a fixed point on the screen. The keys and Zoom to fit zoom
-// about the middle of the viewport, as the wheel and a pinch zoom about the
-// pointer and the fingers: the view is never moved to re-centre on the
-// graph's own middle, which would pull whatever hangs from the cover's art
-// away from it. Pure math, so it can be tested.
+// Zooming about a fixed point on the screen. By default the keys and Zoom to
+// fit zoom about the middle of the viewport, as the wheel and a pinch zoom
+// about the pointer and the fingers. With graph.zoomPivot 'art' every zoom,
+// the wheel's and a pinch's too, is about one point on the cover's art
+// (opening.zoomPivot): repivot turns whatever zoom a gesture asked for into
+// the same zoom about that point. Either way the view is never moved to
+// re-centre on the graph's own middle, which would pull whatever hangs from
+// the cover's art away from it. Pure math, so it can be tested.
 
 // The view after zooming by `ratio` about the screen point (px, py): that
 // point shows the same place in the world before and after.
@@ -28,4 +31,20 @@ function fitRatioAbout(box, px, py, area) {
   return Number.isFinite(r) ? r : null;
 }
 
-module.exports = { zoomAbout, fitRatioAbout };
+// A gesture moved the view from prev to next. When it zoomed, the same zoom
+// about the screen point (px, py) instead: only next's scale is kept, and the
+// world point under (px, py) stays there. When it only panned (the scale
+// unchanged), next as it is.
+function repivot(prev, next, px, py) {
+  if (!prev || !next || !(prev.k > 0) || !(next.k > 0)) return next;
+  if (Math.abs(next.k - prev.k) <= 1e-9 * prev.k) return next;
+  return zoomAbout(prev, next.k / prev.k, px, py);
+}
+
+// graph.zoomPivot: 'art' (every zoom about opening.zoomPivot on the cover's
+// art) or 'pointer' (the default).
+function zoomPivotMode(graphSettings) {
+  return graphSettings && graphSettings.zoomPivot === 'art' ? 'art' : 'pointer';
+}
+
+module.exports = { zoomAbout, fitRatioAbout, repivot, zoomPivotMode };

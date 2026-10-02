@@ -7,14 +7,14 @@ import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dime
 import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
-import { zoomAbout, fitRatioAbout } from './zoomPivot';
+import { zoomAbout, fitRatioAbout, repivot, zoomPivotMode } from './zoomPivot';
 import { minCardScale, homeScale } from './initialScale';
 import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, closeAllPlan } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { layoutKey } from './layoutKey';
-import { fraction, anchorWorld, homeView } from '../../lib/reach';
+import { fraction, anchorWorld, homeView, artPoint } from '../../lib/reach';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
@@ -557,6 +557,37 @@ export function GraphViewer({
         redrawLinks();
       }
     });
+    // graph.zoomPivot 'art': every zoom is about one point on the cover's
+    // art (opening.zoomPivot, published with the cover's frame), wherever the
+    // pointer or the fingers are. d3.zoom passes each wheel step, pinch and
+    // double-tap through constrain, so that is where the zoom it asked for
+    // becomes the same zoom about the pivot (zoomPivot.js repivot); a pan
+    // keeps its own translate. Transitions (the keys, Zoom to fit, Reset) are
+    // given the pivot as their point and run straight, so it stays put all
+    // the way. Without a cover frame, the pointer and the viewport's middle,
+    // as before.
+    const ART_PIVOT = zoomPivotMode(GS) === 'art';
+    const pivotPoint = () => {
+      if (!ART_PIVOT || typeof window === 'undefined') return null;
+      const f = window.PostPipeCoverFrame;
+      if (!f || !f.art || !f.zoomPivot) return null;
+      const s = artPoint(f.zoomPivot, f.art);
+      const r = containerRef.current ? containerRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+      const shift = (window.PostPipeCover && window.PostPipeCover.shift) || 0;
+      return [s.x - r.left, s.y - (r.top - shift)];
+    };
+    if (ART_PIVOT) {
+      const constrainAsGiven = zoom.constrain();
+      zoom.constrain((t, extent, translateExtent) => {
+        const p = pivotPoint();
+        if (p) {
+          const v = repivot(d3.zoomTransform(svg.node()), t, p[0], p[1]);
+          t = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
+        }
+        return constrainAsGiven(t, extent, translateExtent);
+      });
+      zoom.interpolate(d3.interpolate);
+    }
     svg.call(zoom).on('dblclick.zoom', null);
 
     // Two-finger rotate. Listening in the capture phase on the container runs
@@ -3300,7 +3331,11 @@ export function GraphViewer({
       const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
       homeK = v.k;
       resetRotation({ repaint: false });
-      if (animate) svg.transition().duration(750).call(zoom.transform, transform);
+      // Back about the art's pivot, when there is one: straight there, the
+      // pivot's world point still under it all the way when the reader only
+      // zoomed.
+      const pivot = pivotPoint();
+      if (animate) svg.transition().duration(750).call(zoom.transform, transform, pivot || undefined);
       else svg.call(zoom.transform, transform);
       publishWorld();
       return true;
@@ -3516,24 +3551,28 @@ export function GraphViewer({
     // LayoutControls dispatches these from outside the component. They reach
     // into the closure that owns the simulation, the zoom, and the data.
 
-    // Zoom about the middle of the viewport (src/components/GraphViewer/
-    // zoomPivot.js), never re-centring on the graph: what hangs from the
-    // cover's art stays over it. The wheel and a pinch zoom about the pointer
-    // and the fingers (d3.zoom).
+    // Zoom about the middle of the viewport, or about the art's pivot with
+    // graph.zoomPivot 'art' (src/components/GraphViewer/zoomPivot.js), never
+    // re-centring on the graph: what hangs from the cover's art stays over
+    // it. The wheel and a pinch zoom about the pointer and the fingers
+    // (d3.zoom), or about the pivot too.
+    const zoomCentre = () => pivotPoint() || [width / 2, height / 2];
     function zoomAboutCentre(ratio, animate = true) {
       if (!Number.isFinite(ratio) || ratio <= 0) return;
       const t = d3.zoomTransform(svg.node());
       const k = Math.max(0.04, Math.min(8, t.k * ratio));
-      const v = zoomAbout(t, k / t.k, width / 2, height / 2);
+      const [px, py] = zoomCentre();
+      const v = zoomAbout(t, k / t.k, px, py);
       const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
       userMovedView = true;
       focusActive = false;
-      if (animate) svg.transition('key-zoom').duration(260).ease(d3.easeCubicOut).call(zoom.transform, transform);
+      if (animate) svg.transition('key-zoom').duration(260).ease(d3.easeCubicOut).call(zoom.transform, transform, [px, py]);
       else svg.call(zoom.transform, transform);
     }
     // Zoom to fit: the whole graph on the screen, zoomed about the middle of
-    // the viewport. Falls back to framing the graph when it cannot be fitted
-    // from there (it lies across the middle's far side of the screen).
+    // the viewport (or the art's pivot). Falls back to framing the graph when
+    // it cannot be fitted from there (it lies across the pivot's far side of
+    // the screen).
     const handleZoomToFit = () => {
       focusActive = false;
       const ext = containerExtent() || nodeExtent();
@@ -3546,7 +3585,8 @@ export function GraphViewer({
           x0: Math.min(...corners.map((c) => c[0])), x1: Math.max(...corners.map((c) => c[0])),
           y0: Math.min(...corners.map((c) => c[1])), y1: Math.max(...corners.map((c) => c[1])),
         };
-        const r = fitRatioAbout(box, width / 2, height / 2, area);
+        const [px, py] = zoomCentre();
+        const r = fitRatioAbout(box, px, py, area);
         if (r && r > 0.02) { zoomAboutCentre(r); return; }
       }
       fitToViewport({ animate: true, focus: false });

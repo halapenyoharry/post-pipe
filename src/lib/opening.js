@@ -278,7 +278,16 @@ function openingConfig(settings) {
     // (the stem meets the roots there): the line spiral.keepBelow 'crown'
     // keeps an act's cards and hull under. null when not set.
     crownY: crownYOf(o.crownY),
+    // The fixed point every zoom is about when graph.zoomPivot is 'art':
+    // { x, y }, fractions of the art. null when not set.
+    zoomPivot: pivotOf(o.zoomPivot),
   };
+}
+
+function pivotOf(p) {
+  if (!p || typeof p !== 'object') return null;
+  const x = num(p.x, NaN), y = num(p.y, NaN);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
 function crownYOf(v) {

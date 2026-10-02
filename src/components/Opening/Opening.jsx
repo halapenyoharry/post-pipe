@@ -432,6 +432,7 @@ function Cover({ config, viewState, children }) {
       art: { left: g1.art.left, top: g1.art.top, width: g1.art.width, height: g1.art.height },
       natural: { ...sizeRef.current },
       crownY: config.crownY,
+      zoomPivot: config.zoomPivot,
     };
     window.dispatchEvent(new CustomEvent('postpipe:cover-frame'));
   };
