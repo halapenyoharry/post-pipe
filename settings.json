@@ -1,5 +1,6 @@
 {
   "site": {
+    "_share_note": "Optional, for link previews and icons (src/lib/shareMeta.js). description: the page's description and og:/twitter: text (escaped, so it may hold quotes). share_image: { src, width, height, alt }, the picture a link preview shows, relative to the site (made absolute with base_url); with it come og:image, og:site_name and a summary_large_image twitter card. icons: { ico, svg, png, png_sizes, apple_touch }, files relative to the site; without it the head keeps its one ./favicon.svg link.",
     "title": "Harold Young \u2014 Human Posts",
     "description": "Writing about systems, consciousness, and the spaces between humans and machines.",
     "base_url": "https://halapenyoharry.github.io/haroldyoung-human-posts"

@@ -93,6 +93,7 @@ const { buildEdges } = require('./src/corpus/buildEdges');
 const { readerFonts } = require('./src/lib/readerSettings');
 const { accentCss } = require('./src/lib/accent');
 const { rightsMeta, rightsFooterHtml } = require('./src/lib/rights');
+const { shareMeta, iconLinks, escAttr } = require('./src/lib/shareMeta');
 const { introConfig, introHtml } = require('./src/lib/linkNode');
 const { marked } = require('marked');
 
@@ -319,14 +320,10 @@ function buildIndexHTML() {
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="generator" content="post-pipe ${new Date().toISOString()}">
-<title>${SETTINGS.site.title}</title>
-<meta name="description" content="${SETTINGS.site.description}">
+<title>${escAttr(SETTINGS.site.title)}</title>
+${shareMeta(SETTINGS.site, PAGES_BASE)}
 ${rightsMeta(SETTINGS.rights)}
-<meta property="og:title" content="${SETTINGS.site.title}">
-<meta property="og:description" content="${SETTINGS.site.description}">
-<meta property="og:type" content="website">
-<meta property="og:url" content="${PAGES_BASE}">
-<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+${iconLinks(SETTINGS.site)}
 ${themeFontPreload()}
 ${siteFontPreload()}
 <style>
