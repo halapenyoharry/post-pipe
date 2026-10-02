@@ -21,6 +21,12 @@
 //   - mode 'ring' (the ring layout): members on a circle round the label, in
 //     order, clockwise from the top; child containers as for 'path'.
 //
+//   - layout 'hang' (options.layoutOf(container) === 'hang'): the container
+//     hangs from its anchor. Its frame's origin is the top of its hull, and
+//     its members run below in a chain at most `columns` cards wide: down the
+//     far side, round, and up the near side, so one end of the chain is low
+//     and the other is at the top, under the anchor (hangChain below).
+//
 // The renderer turns this into a gentle positional force, so the result is a
 // target the simulation settles into rather than coordinates it is nailed to.
 
@@ -60,6 +66,133 @@ function compareUnits(a, b) {
   return a.index - b.index;
 }
 
+// How a container is laid out: containers.<id>.layout, else
+// graph.containerLayout. 'hang' hangs it from its anchor (containerLayout.js);
+// anything else, the spiral.
+function containerLayoutOf(c, GS) {
+  const l = (c && c.layout) || (GS && GS.containerLayout);
+  return l === 'hang' ? 'hang' : null;
+}
+
+// Whether a container's hull is drawn: containers.<id>.hull false leaves it
+// undrawn (a book whose acts and cover stand in for it).
+function hullDrawn(c) {
+  return !(c && c.hull === false);
+}
+
+// The closed pill's scale against its full size (graph.closedPillScale).
+function closedPillScaleOf(GS) {
+  const v = Number(GS && GS.closedPillScale);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
+const HANG_DIRECTIONS = ['down', 'down-left', 'down-right'];
+
+// A hanging container's settings with their defaults: containers.<id>.hang
+// over graph.hang.
+function hangOptions(h) {
+  const o = h && typeof h === 'object' ? h : {};
+  const columns = Math.max(1, Math.round(Number(o.columns) || 2));
+  const gap = Number.isFinite(Number(o.gap)) && o.gap !== null && o.gap !== '' ? Math.max(0, Number(o.gap)) : 12;
+  return {
+    direction: HANG_DIRECTIONS.includes(o.direction) ? o.direction : 'down',
+    firstAt: o.firstAt === 'top' ? 'top' : 'bottom',
+    columns,
+    gap,
+  };
+}
+
+// How many rows a chain of n takes in `columns` columns. With one column,
+// one row each. With more, the near column (the one that comes back up to
+// the top) is the long one, about three-fifths of the chain for two columns,
+// so the far side starts well down and the first member is low.
+function hangRows(n, columns) {
+  if (n <= 0) return 0;
+  if (columns <= 1) return n;
+  return Math.max(Math.ceil(n / columns), Math.ceil((0.6 * n) / (columns - 1)));
+}
+
+/**
+ * A hanging chain, in a frame whose origin is the anchor: the top of the
+ * hull. Pure geometry, so it can be tested on its own.
+ *
+ * The slots run, from the top end of the chain: down the near column, up the
+ * next one, down the one after, and so on out to the far side. The chain
+ * takes the first n of them, so it ends partway along the far column. With
+ * firstAt 'bottom' the first member takes that far, low end and the last one
+ * the top of the near column, under the anchor; with 'top', the reverse.
+ *
+ * The near column is the one under the anchor. 'down' centres the chain on
+ * the anchor, its far side to the right; 'down-right' hangs it to the right of
+ * the anchor, the hull's left edge (the near card's, padded) under it, so
+ * nothing of it reaches back past the anchor; 'down-left' mirrors that.
+ *
+ * The label goes in the far column's empty top, when there is one it fits
+ * (beside the near column's top); otherwise above the chain. Either way the
+ * top of everything, padded by `pad`, is at y = 0.
+ *
+ * @param {Array}  units  [{ w, h }] in reading order
+ * @param {Object} lab    { w, h } of the label
+ * @param {Object} opts   { direction, firstAt, columns, gap, pad, labelGap }
+ * @returns {{ positions: [{x, y}], label: rect, rows, columns, slots: [{col, row}] }}
+ */
+function hangChain(units, lab, opts = {}) {
+  const o = { ...hangOptions(opts), pad: opts.pad != null ? opts.pad : 40, labelGap: opts.labelGap != null ? opts.labelGap : 12 };
+  const n = units.length;
+  const cw = n ? Math.max(...units.map((u) => u.w)) : 0;
+  const ch = n ? Math.max(...units.map((u) => u.h)) : 0;
+  const cols = Math.max(1, Math.min(o.columns, n || 1));
+  const R = hangRows(n, cols);
+  // Slots from the top end of the chain.
+  const slots = [];
+  for (let j = 0; j < cols && slots.length < n; j++) {
+    for (let i = 0; i < R && slots.length < n; i++) slots.push({ col: j, row: j % 2 === 0 ? i : R - 1 - i });
+  }
+  // Member k's slot: from the far, low end for 'bottom'.
+  const slotOf = (k) => (o.firstAt === 'bottom' ? slots[n - 1 - k] : slots[k]);
+  const usedCols = n ? Math.max(...slots.map((s) => s.col)) + 1 : 1;
+  const far = o.direction === 'down-left' ? -1 : 1;
+  const stepX = cw + o.gap;
+  const stepY = ch + o.gap;
+  // x of the near column's centre.
+  const nearX = o.direction === 'down' ? -far * ((usedCols - 1) * stepX) / 2
+    : o.direction === 'down-right' ? o.pad + cw / 2 : -(o.pad + cw / 2);
+  const colX = (j) => nearX + far * j * stepX;
+
+  // The far column's empty top, above the far end of the chain: rows before
+  // the first one it uses.
+  const farCol = usedCols - 1;
+  const farRows = slots.filter((s) => s.col === farCol).map((s) => s.row);
+  const emptyRows = farCol > 0 ? Math.min(...farRows) : 0;
+  const emptyH = emptyRows * stepY - o.gap;
+  const chainX0 = Math.min(colX(0), colX(farCol)) - cw / 2;
+  const chainX1 = Math.max(colX(0), colX(farCol)) + cw / 2;
+  // The label may spill past its column outward, never inward over the
+  // next column's cards.
+  const besideRoom = cw + o.gap;
+  const fitsBeside = farCol > 0 && lab.w <= besideRoom && lab.h <= emptyH;
+
+  let top = o.pad; // the top of the first row
+  let label;
+  if (fitsBeside) {
+    // Centred in the empty space, on the far column.
+    const cy = o.pad + emptyH / 2;
+    const cx = colX(farCol);
+    label = { x0: cx - lab.w / 2, y0: cy - lab.h / 2, x1: cx + lab.w / 2, y1: cy + lab.h / 2 };
+  } else {
+    // Above the chain, centred over it; the hull pads a label by half.
+    const cx = n ? (chainX0 + chainX1) / 2 : 0;
+    const y0 = o.pad / 2;
+    label = { x0: cx - lab.w / 2, y0, x1: cx + lab.w / 2, y1: y0 + lab.h };
+    top = Math.max(o.pad, label.y1 + o.labelGap);
+  }
+  const positions = units.map((u, k) => {
+    const s = slotOf(k);
+    return { x: colX(s.col), y: top + s.row * stepY + ch / 2 };
+  });
+  return { positions, label, rows: R, columns: usedCols, slots: units.map((u, k) => slotOf(k)), labelBeside: fitsBeside };
+}
+
 /**
  * @param {Object}   input
  * @param {Array}    input.containers  [{ id, parent }] in declaration order
@@ -68,6 +201,8 @@ function compareUnits(a, b) {
  * @param {Function} [input.macroSize] (container) -> { w, h } of its closed form
  * @param {Set}      [input.closed]    ids of closed containers
  * @param {Object}   [input.options]   { spacing, gap, padding(container), mode, startRadius }
+ *   layoutOf(container): 'hang' lays that container out as a hanging chain (hangChain);
+ *   hangOf(container): its hang settings { direction, firstAt, columns, gap }
  *   mode: 'path' (default) | 'scatter' | 'ring'; startRadius: the spiral's radius at its first member;
  *   direction: 'outward' (default, the first member beside the label) | 'inward' (the first member on the outer end)
  * @returns {{ roots: string[], nodes: Map, containers: Map }}
@@ -122,6 +257,31 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
     units.sort(compareUnits);
 
     const lab = labelSize(c, depth) || { w: 160, h: 60 };
+
+    // A hanging container: its frame's origin is its anchor, the top of
+    // its hull. Only members hang; a container holding containers is laid
+    // out as below.
+    if (options.layoutOf && options.layoutOf(c) === 'hang' && units.every((u) => u.kind === 'node')) {
+      const pad = paddingOf(c, depth);
+      const hang = hangOptions(options.hangOf ? options.hangOf(c) : null);
+      const res = hangChain(units, lab, { ...hang, pad, labelGap: gap / 2 });
+      const nodes = new Map();
+      const placed = units.map((u, k) => {
+        nodes.set(u.id, { x: res.positions[k].x, y: res.positions[k].y });
+        return rectAt(res.positions[k].x, res.positions[k].y, u.w, u.h);
+      });
+      const inner = placed.length ? union([res.label, ...placed]) : res.label;
+      // The hull's top is at the origin; the box allows for its curve
+      // bulging a little past the padded corners at the sides and the foot.
+      const bulge = pad * 1.25;
+      const box = { x0: inner.x0 - bulge, y0: 0, x1: inner.x1 + bulge, y1: inner.y1 + bulge };
+      const self = {
+        label: res.label, box, center: { x: 0, y: 0 }, closed: false, spiral: null,
+        hang: { ...hang, pad, rows: res.rows, columns: res.columns, labelBeside: res.labelBeside },
+      };
+      return { box, nodes, containers: new Map([[c.id, self]]) };
+    }
+
     const labelRect = rectAt(0, 0, lab.w, lab.h);
     const nodes = new Map();
     const cmap = new Map();
@@ -307,4 +467,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
   return { roots, nodes: outNodes, containers: outContainers };
 }
 
-module.exports = { containerLayout, rectsOverlap, compareUnits };
+module.exports = {
+  containerLayout, rectsOverlap, compareUnits, hangChain, hangOptions, hangRows,
+  containerLayoutOf, hullDrawn, closedPillScaleOf,
+};

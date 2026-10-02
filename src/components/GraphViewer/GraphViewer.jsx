@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
-import { containerLayout } from './containerLayout';
+import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf } from './containerLayout';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { zoomAbout, fitRatioAbout } from './zoomPivot';
@@ -227,6 +227,20 @@ function anchorsOf(feed) {
   return out;
 }
 
+// Each container's own layout settings ({ layout, hang, hull }), for the
+// layout key.
+function layoutsOf(feed) {
+  const out = {};
+  for (const c of (feed && feed.containers) || []) {
+    const own = {};
+    if (c.layout) own.layout = c.layout;
+    if (c.hang && typeof c.hang === 'object') own.hang = c.hang;
+    if (c.hull === false || (c.hull && typeof c.hull === 'object')) own.hull = c.hull;
+    if (Object.keys(own).length) out[c.id] = own;
+  }
+  return out;
+}
+
 // A container's title: where the layout puts it ('center', the default), at
 // the top of its hull ('top'), or not drawn ('hidden').
 function labelPositionOf(c) {
@@ -271,6 +285,17 @@ export function GraphViewer({
     ...(GS.timeAxis || {}) };
   const SIM = { linkDistance: 160, chargeStrength: -500, collidePadding: 10,
     velocityDecay: 0.7, alphaDecay: 0.028, ...(GS.simulation || {}) };
+  // A container's hull padding: containers.<id>.hull.padding, else
+  // graph.hull.padding, else half a card for a hanging container and the
+  // earlier fixed padding for the rest.
+  const hullPadOf = (c) => {
+    const own = c && c.hull && typeof c.hull === 'object' ? Number(c.hull.padding) : NaN;
+    if (Number.isFinite(own)) return own;
+    const all = GS.hull && typeof GS.hull === 'object' ? Number(GS.hull.padding) : NaN;
+    if (Number.isFinite(all)) return all;
+    if (containerLayoutOf(c, GS) === 'hang') return CARD.width / 2;
+    return c && c.padding != null ? c.padding : (c && c.parent ? 42 : 75);
+  };
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const cardsLayerRef = useRef(null);
@@ -330,7 +355,7 @@ export function GraphViewer({
   const placeOf = (name) => {
     const c = layoutKeys.current;
     if (c.settings !== graphSettings || c.feed !== feedData) { c.settings = graphSettings; c.feed = feedData; c.keys = new Map(); }
-    if (!c.keys.has(name)) c.keys.set(name, layoutKey(name, graphSettings, { anchors: anchorsOf(feedData) }) + '::');
+    if (!c.keys.has(name)) c.keys.set(name, layoutKey(name, graphSettings, { anchors: anchorsOf(feedData), layouts: layoutsOf(feedData) }) + '::');
     return c.keys.get(name);
   };
   const positionKey = (d) => placeOf(layoutRef.current) + persistKey(d);
@@ -1003,6 +1028,7 @@ export function GraphViewer({
       .attr('stroke-width', 2.2)
       .style('filter', (d) => `drop-shadow(0 0 18px color-mix(in srgb, ${getContainerColor(d)} 45%, transparent))`);
 
+    const PILL_SCALE = closedPillScaleOf(GS);
     const CLOSED_FONT = Math.round((CARD.labelMaxFontSize || 26) * 1.6);
     const containerMacroTexts = containerMacroNodes.append('text')
       .attr('class', 'container-macro-text')
@@ -1047,8 +1073,10 @@ export function GraphViewer({
         const bw = Math.max(CARD.width * 1.5, block.w + fs * 1.4);
         const bh = Math.max(CARD.height * 1.5, block.h + fs * 1.4);
         g.select('.container-macro-bg').attr('d', blobPath(d.id, bw / 2, bh / 2));
-        d._macroHalfW = bw / 2;
-        d._macroHalfH = bh / 2;
+        // Drawn at full size and scaled as a whole (graph.closedPillScale),
+        // text and all; the layout and the hull take the scaled size.
+        d._macroHalfW = (bw / 2) * PILL_SCALE;
+        d._macroHalfH = (bh / 2) * PILL_SCALE;
       });
     }
     updateMacroBounds();
@@ -1149,6 +1177,20 @@ export function GraphViewer({
     containerMacroNodes.on('click', (event) => event.stopPropagation());
 
     const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+    const hangHullLine = d3.line().curve(d3.curveBasisClosed);
+    // Points every `step` or so along each side of a polygon, the corners kept.
+    function densify(poly, step) {
+      const out = [];
+      const s = Math.max(8, step);
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        out.push(a);
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const k = Math.floor(len / s);
+        for (let j = 1; j < k; j++) out.push([a[0] + ((b[0] - a[0]) * j) / k, a[1] + ((b[1] - a[1]) * j) / k]);
+      }
+      return out;
+    }
     const nodeBySlug = new Map(data.nodes.map((n) => [n.id, n]));
 
     // ── Nested container layout (cluster layout only) ──────────────────────
@@ -1201,7 +1243,9 @@ export function GraphViewer({
           startRadius: graphSettings.spiral?.startRadius,
           direction: graphSettings.spiral?.direction,
           gap: 28,
-          padding: (c) => (c.padding != null ? c.padding : (c.parent ? 42 : 75)),
+          padding: hullPadOf,
+          layoutOf: (c) => (layoutRef.current === 'force' ? containerLayoutOf(c, GS) : null),
+          hangOf: (c) => ({ ...(GS.hang || {}), ...(c.hang || {}) }),
         },
       });
       // Two passes: the label's size depends on how wide its container ends
@@ -1213,6 +1257,14 @@ export function GraphViewer({
         const w = info ? info.box.x1 - info.box.x0 : 0;
         const max = LABEL_MAX * Math.pow(LABEL_NESTED, depthOf(c));
         c._fs = Math.max(LABEL_MIN, Math.min(Math.max(LABEL_MIN, max), w / 8));
+        // A hanging container's title sits beside the top of its chain, in
+        // a column a card wide: no larger than fits there.
+        if (info && info.hang) {
+          const room = CARD.width + info.hang.gap;
+          for (let guard = 0; guard < 40 && c._fs > LABEL_MIN && labelBlockSize(c, c._fs).w > room; guard++) {
+            c._fs = Math.max(LABEL_MIN, c._fs * 0.92);
+          }
+        }
       }
       res = run();
       CL = res;
@@ -1673,7 +1725,7 @@ export function GraphViewer({
           group.select('.container-badge').style('display', 'none');
           group.select('.container-macro-node')
             .style('display', null)
-            .attr('transform', `translate(${pos.x}, ${pos.y})${upright()}`)
+            .attr('transform', `translate(${pos.x}, ${pos.y})${upright()}${PILL_SCALE !== 1 ? ` scale(${PILL_SCALE})` : ''}`)
             .select('.label-count').text(containerCountText(GS, memberNodes.length));
           return;
         }
@@ -1688,7 +1740,7 @@ export function GraphViewer({
         group.select('.container-badge').style('display', null);
 
         const points = [];
-        const pad = c.padding || (c.parent ? 42 : 75);
+        const pad = hullPadOf(c);
 
         // Closed children are drawn as nodes; the hull wraps those.
         for (const childId of (containerChildren.get(c.id) || [])) {
@@ -1763,10 +1815,22 @@ export function GraphViewer({
           return;
         }
 
-        const hull = d3.polygonHull(points);
+        let hull = d3.polygonHull(points);
         if (!hull || hull.length < 3) return;
-        group.select('.container-hull').attr('d', hullLine(hull));
-        group.select('.container-hull-ghost').attr('d', sketchOn ? hullLine(jitterPoints(hull, c.id, 3.5)) : '');
+        // A hanging container's hull hugs its cards: points along its
+        // straight sides, and a curve that rounds the corners from inside
+        // (a B-spline never leaves its points' outline), so it never bows
+        // out past them, nor above the anchor at its top.
+        const hanging = !!(f && f.info.hang);
+        if (hanging) hull = densify(hull, pad / 2);
+        const line = hanging ? hangHullLine : hullLine;
+        if (hullDrawn(c)) {
+          group.select('.container-hull').style('display', null).attr('d', line(hull));
+          group.select('.container-hull-ghost').attr('d', sketchOn ? line(jitterPoints(hull, c.id, 3.5)) : '');
+        } else {
+          group.select('.container-hull').style('display', 'none').attr('d', '');
+          group.select('.container-hull-ghost').attr('d', '');
+        }
 
         const badge = group.select('.container-badge');
         badge.attr('data-label-position', labelPos);

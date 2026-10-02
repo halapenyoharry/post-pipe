@@ -811,8 +811,9 @@ async function main() {
   if (SETTINGS.containment) {
     // settings.containers.<id> carries per-container extras: a status line
     // such as "soon"; an anchor, where the container rests on the cover's
-    // art ({ x, y }, fractions of the art); and labelPosition (center, top or
-    // hidden). Each wins over the same field on the containment entry.
+    // art ({ x, y }, fractions of the art); labelPosition (center, top or
+    // hidden); and layout, hang and hull (below). Each wins over the same
+    // field on the containment entry.
     // Keyed by the full id ("container:act-2") or the bare one ("act-2").
     const extras = SETTINGS.containers || {};
     feed.containers = SETTINGS.containment.map((c) => {
@@ -825,6 +826,15 @@ async function main() {
       else delete out.anchor;
       const labelPosition = extra.labelPosition != null ? extra.labelPosition : c.labelPosition;
       if (['center', 'top', 'hidden'].includes(labelPosition)) out.labelPosition = labelPosition; else delete out.labelPosition;
+      // layout ('hang' hangs the container from its anchor), its hang
+      // settings ({ direction, firstAt, columns, gap }), and hull (false
+      // leaves it undrawn, or { padding }).
+      const layout = extra.layout != null ? extra.layout : c.layout;
+      if (layout === 'hang') out.layout = layout; else delete out.layout;
+      const hang = extra.hang != null ? extra.hang : c.hang;
+      if (hang && typeof hang === 'object') out.hang = { ...hang }; else delete out.hang;
+      const hull = extra.hull != null ? extra.hull : c.hull;
+      if (hull === false || (hull && typeof hull === 'object')) out.hull = hull === false ? false : { ...hull }; else delete out.hull;
       return out;
     });
   }

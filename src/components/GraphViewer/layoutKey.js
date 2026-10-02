@@ -3,7 +3,9 @@
 // shape it: the spiral's mode, spacing, start radius and direction, the card
 // size it spaces by, the force simulation, and graph.layoutVersion, which a
 // site bumps to retire saved positions on purpose, and the containers'
-// anchors (where a site rests them on its cover's art). So the key is the layout's
+// anchors (where a site rests them on its cover's art), and how the containers
+// are laid out (graph.containerLayout, graph.hang, graph.hull.padding, and each
+// container's own layout, hang and hull). So the key is the layout's
 // name plus a short signature of those settings. When any of them changes,
 // positions saved under the old key are no longer read (they stay in storage
 // until Forget clears them), and the layout places the nodes afresh.
@@ -29,8 +31,16 @@ function anchorPart(anchors) {
   return ids.map((id) => [id, Number(anchors[id].x), Number(anchors[id].y)]);
 }
 
+// Each container's own layout settings, in id order; none, nothing.
+function containerPart(layouts) {
+  if (!layouts || typeof layouts !== 'object') return null;
+  const ids = Object.keys(layouts).filter((id) => layouts[id] && Object.keys(layouts[id]).length).sort();
+  if (!ids.length) return null;
+  return ids.map((id) => [id, layouts[id]]);
+}
+
 // The settings that move nodes, in a fixed order.
-function layoutSignature(graphSettings, { anchors } = {}) {
+function layoutSignature(graphSettings, { anchors, layouts } = {}) {
   const g = graphSettings || {};
   const v = Number.isFinite(Number(g.layoutVersion)) && g.layoutVersion !== null && g.layoutVersion !== '' ? Number(g.layoutVersion) : 1;
   const card = g.card || {};
@@ -42,6 +52,12 @@ function layoutSignature(graphSettings, { anchors } = {}) {
   };
   const a = anchorPart(anchors);
   if (a) sig.anchors = a;
+  // Only when set, so a site without them keeps the keys it had.
+  if (g.containerLayout) sig.containerLayout = g.containerLayout;
+  if (g.hang && typeof g.hang === 'object') sig.hang = pick(g.hang, ['direction', 'firstAt', 'columns', 'gap']);
+  if (g.hull && typeof g.hull === 'object' && g.hull.padding != null) sig.hullPadding = g.hull.padding;
+  const l = containerPart(layouts);
+  if (l) sig.layouts = l;
   return JSON.stringify(sig);
 }
 
