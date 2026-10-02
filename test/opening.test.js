@@ -76,7 +76,11 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.ok(onlyFull, 'full alone is enough');
   assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png' }, 'full stands for both states');
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
-  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false });
+  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false, rootsFit: null });
+  assert.equal(onlyFull.fit, 'height');
+  assert.equal(onlyFull.sideMargin, 0);
+  assert.equal(onlyFull.returnAbove, null);
+  assert.equal(onlyFull.topBarInArt, false);
   assert.deepStrictEqual(onlyFull.backdrop, { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 });
   assert.equal(onlyFull.reach, null, 'no reach unless it is on and names tips');
   assert.equal(onlyFull.ground, 'dark');
@@ -407,7 +411,9 @@ test('top: the plant comes up to a margin under the top controls in each state, 
   assert.equal(firstInkRow(px, 4, 4), 0.5, 'faint pixels below the threshold are not ink');
 
   const base = openingConfig(SITE);
-  const c = { ...base, top: { art: 6, graph: 6 } };
+  // With the top bar kept in the art state (topBarInArt), both states
+  // measure from under it.
+  const c = { ...base, topBarInArt: true, top: { art: 6, graph: 6 } };
   const ink = { art: 0.01, graph: 0.42 };
   for (const [vw, vh] of [[390, 844], [1280, 800]]) {
     const view = { vw, vh, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48, ink };
@@ -423,6 +429,16 @@ test('top: the plant comes up to a margin under the top controls in each state, 
     const old = coverGeometry(base, view, 0);
     assert.ok(a.art.height >= old.art.height - 48, 'no smaller than the controls cost');
     assert.ok(a.travel > 0, 'the graph state is further up');
+  }
+  // Without it (the default) the art state measures from the screen's top,
+  // and the graph state from under the bar.
+  {
+    const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48, ink };
+    const d = { ...base, top: { art: 6, graph: 6 } };
+    assert.equal(base.topBarInArt, false);
+    const a = coverGeometry(d, view, 0), g = coverGeometry(d, view, 1);
+    assert.ok(Math.abs(a.art.top + ink.art * a.art.height - 6) < 1e-9, 'art state: 6 px under the screen top');
+    assert.ok(Math.abs(g.art.top + ink.graph * g.art.height - 54) < 1e-9, 'graph state: 6 px under the bar');
   }
   // Unset, or no ink known: as before.
   const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48 };

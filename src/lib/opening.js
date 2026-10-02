@@ -58,7 +58,8 @@ function titleLayoutConfig(layout) {
       .filter((sp) => sp && typeof sp.text === 'string' && sp.text !== '')
       .map((sp) => ({ text: sp.text, size: Math.max(0, num(sp.size, 0.05)), rise: num(sp.rise, 0) }));
     if (!spans.length) continue;
-    out.push({ x: num(line.x, 0), y: num(line.y, 0), spans });
+    const width = num(line.width, NaN);
+    out.push({ x: num(line.x, 0), y: num(line.y, 0), spans, width: Number.isFinite(width) && width > 0 ? width : null });
   }
   return { lines: out };
 }
@@ -79,9 +80,30 @@ function titleConfig(t) {
     color: str(t.color).trim(),
     opacity: clamp01(num(t.opacity, TITLE_DEFAULTS.opacity)),
     hideGraphTitle: t.hideGraphTitle !== false,
+    // fit 'width': each line that names a width (a fraction of the art's
+    // width) is set to that width, its spans scaled together once its face
+    // has loaded (fitTitle), and the byline to the last line's width.
+    fit: t.fit === 'width' ? 'width' : null,
     art,
     graph,
   };
+}
+
+// The title with each line that names a width set to it: lengths holds,
+// per layout, each line's drawn length at its set sizes (in the art's px,
+// natural size w); every span of a line is scaled by the same factor. A
+// line without a width, or without a length, keeps its sizes.
+function fitTitle(title, lengths, w) {
+  if (!title || title.fit !== 'width' || !lengths) return title;
+  const fitLayout = (layout, lens) => ({
+    lines: layout.lines.map((l, i) => {
+      const len = lens && lens[i];
+      if (!l.width || !(len > 0)) return l;
+      const k = (l.width * w) / len;
+      return { ...l, spans: l.spans.map((sp) => ({ ...sp, size: sp.size * k })) };
+    }),
+  });
+  return { ...title, art: fitLayout(title.art, lengths.art), graph: fitLayout(title.graph, lengths.graph) };
 }
 
 // A title layout in px for the canvas drawn in box { left, top, width,
@@ -92,6 +114,7 @@ function titleLayout(layout, box) {
     lines: ((layout && layout.lines) || []).map((l) => ({
       x: left + l.x * width,
       y: top + l.y * height,
+      width: l.width ? l.width * width : null,
       spans: l.spans.map((sp) => ({ text: sp.text, size: sp.size * width, rise: sp.rise * width })),
     })),
   };
@@ -132,16 +155,20 @@ function bylineText(byline) {
 
 // Where the byline sits under one layout of the title, for the art drawn in
 // box { left, top, width, height }: the last line's left edge, its top, its
-// size; null for a layout without lines.
-function bylineUnder(layout, box, byline) {
+// size; null for a layout without lines. With perPx (the byline's drawn
+// width per px of its size, once its face has loaded) and a last line that
+// names its width, it is set to that width (title.fit 'width').
+function bylineUnder(layout, box, byline, perPx) {
   const lines = (layout && layout.lines) || [];
   if (!lines.length) return null;
   const last = lines[lines.length - 1];
   const titleSize = Math.max(...lines.flatMap((l) => l.spans.map((sp) => sp.size))) * box.width;
+  const lastSize = Math.max(...last.spans.map((sp) => sp.size)) * box.width;
+  const fitted = perPx > 0 && last.width ? (last.width * box.width) / perPx : null;
   return {
     x: box.left + last.x * box.width,
-    y: box.top + last.y * box.height + byline.gap * titleSize,
-    size: Math.max(byline.minSize, byline.size * titleSize),
+    y: box.top + last.y * box.height + byline.gap * (fitted ? lastSize : titleSize),
+    size: fitted || Math.max(byline.minSize, byline.size * titleSize),
     titleSize,
   };
 }
@@ -171,7 +198,7 @@ const str = (v) => (typeof v === 'string' ? v : '');
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // A colour as a stylesheet takes it (#hex, rgb(), a name, var()), or ''.
 const colour = (v) => (typeof v === 'string' && v.trim() && !/[;{}<>]/.test(v) ? v.trim() : '');
-const lerp = (a, b, t) => a + (b - a) * t;
+const lerp = (a, b, t) => (t === 1 ? b : a + (b - a) * t);
 const smooth = (x) => { const t = clamp01(x); return t * t * (3 - 2 * t); };
 
 // The art state's ground (opening.ground). 'dark' (the theme's dark paper,
@@ -237,6 +264,46 @@ function firstInkRow(data, w, h, threshold = 64) {
   return 1;
 }
 
+// The last row with ink, as a share of the image's height counted to its
+// foot (so an image inked to its last row gives 1); 0 for one with none.
+function lastInkRow(data, w, h, threshold = 64) {
+  for (let y = h - 1; y >= 0; y -= 1) {
+    for (let x = 0, i = y * w * 4 + 3; x < w; x += 1, i += 4) {
+      if (data[i] >= threshold) return (y + 1) / h;
+    }
+  }
+  return 0;
+}
+
+// Where an image's ink reaches across rows from..to (shares of its height):
+// { l, r }, its leftmost and rightmost inked columns as shares of its width
+// (r counted to the column's right edge); null without ink there.
+function inkSpan(data, w, h, from = 0, to = 1, threshold = 64) {
+  const y0 = Math.max(0, Math.floor(from * h)), y1 = Math.min(h, Math.ceil(to * h));
+  let l = w, r = -1;
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = 0, i = y * w * 4 + 3; x < w; x += 1, i += 4) {
+      if (data[i] >= threshold) { if (x < l) l = x; if (x > r) r = x; }
+    }
+  }
+  return r < 0 ? null : { l: l / w, r: (r + 1) / w };
+}
+
+// The widest single row of ink across rows from..to: { l, r, y }, shares of
+// the image's width and height; null without ink there.
+function widestInkRow(data, w, h, from = 0, to = 1, threshold = 64) {
+  const y0 = Math.max(0, Math.floor(from * h)), y1 = Math.min(h, Math.ceil(to * h));
+  let best = null;
+  for (let y = y0; y < y1; y += 1) {
+    let l = -1, r = -1;
+    for (let x = 0, i = y * w * 4 + 3; x < w; x += 1, i += 4) {
+      if (data[i] >= threshold) { if (l < 0) l = x; r = x; }
+    }
+    if (l >= 0 && (!best || r - l > best.r - best.l)) best = { l, r, y };
+  }
+  return best && { l: best.l / w, r: (best.r + 1) / w, y: best.y / h };
+}
+
 // settings.opening with its defaults, or null when it is off, in another mode,
 // or has no art: artState and graphState, or full alone (one image for both
 // states, no crossfade).
@@ -265,7 +332,25 @@ function openingConfig(settings) {
       artOffset: Math.max(0, Math.min(0.95, num(graph.artOffset, DEFAULTS.graph.artOffset))),
       artStateOpacity: clamp01(num(graph.artStateOpacity, DEFAULTS.graph.artStateOpacity)),
       hiddenUntilMove: graph.hiddenUntilMove === true,
+      // 'width': in the graph state the art is as large as puts the roots'
+      // widest row (below crownY, on the graph state's image) edge to edge.
+      rootsFit: graph.rootsFit === 'width' ? 'width' : null,
     },
+    // 'width': in the art state the plant (the art state's image above
+    // crownY) spans the screen's width, sideMargin px in from each edge;
+    // 'height' (the default): the whole plant fits the height.
+    fit: o.fit === 'width' ? 'width' : 'height',
+    sideMargin: Math.max(0, num(o.sideMargin, 0)),
+    // 'crown': in the graph state a scroll up (or a drag down) anywhere
+    // above the roots' crown brings the cover back, not only at the top.
+    returnAbove: o.returnAbove === 'crown' && crownYOf(o.crownY) !== null ? 'crown' : null,
+    // The top bar shows in the graph state alone, coming in as the page
+    // settles there; topBarInArt true keeps it in the art state too.
+    topBarInArt: o.topBarInArt === true,
+    // topBar.band: { color }, a band the width of the screen behind the top
+    // bar, from the screen's top to 8 px under the bar's row, coming and
+    // going with the bar. null without a colour.
+    band: bandConfig(settings.topBar && settings.topBar.band),
     top: topConfig(o.top),
     grip: gripConfig(o.grip),
     backdrop: backdropConfig(o),
@@ -282,6 +367,11 @@ function openingConfig(settings) {
     // { x, y }, fractions of the art. null when not set.
     zoomPivot: pivotOf(o.zoomPivot),
   };
+}
+
+function bandConfig(b) {
+  const color = b && typeof b === 'object' ? colour(b.color) : '';
+  return color ? { color } : null;
 }
 
 function pivotOf(p) {
@@ -323,9 +413,15 @@ function startState(config, { stored, hash } = {}) {
 // graph's zoom (zoom: { k, homeK }), the bottom edge of the page's top
 // controls (controls, px; opening.top is measured from it), and where each
 // state image's plant starts (ink: { art, graph }, shares of the canvas's
-// height; firstInkRow). The art
-// keeps one scale throughout, the largest that fits the whole plant, with
-// the byline under it, in the art state; only its top moves.
+// height; firstInkRow; and, for fit 'width' and graph.rootsFit 'width',
+// bush and roots, { l, r } shares of its width: inkSpan above the crown on
+// the art state's image, widestInkRow below it on the graph state's; bottom,
+// the graph state's last inked row, lastInkRow), and perPx, the byline's
+// width per px of its size (title.fit 'width'). By default the art keeps one
+// scale throughout, the largest that fits the whole plant, with the byline
+// under it, in the art state, and only its top moves; with fit 'width' and
+// graph.rootsFit 'width' each state has its own scale and the art moves and
+// scales between them.
 //   art         { top, left, width, height, scale, opacity }: the canvas
 //   roots       the backdrop's roots' strength at p: 1 at art, and at graph
 //               backdrop.opacity, lowered as the graph is zoomed in past the
@@ -345,7 +441,7 @@ function startState(config, { stored, hash } = {}) {
 //               of its top (align 'center', under the art, without a title),
 //               or its top left corner (align 'left', under the title: under
 //               'title'), between the two layouts' places as the page moves
-function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null } = {}, p = 0) {
+function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null, perPx = null } = {}, p = 0) {
   const t = clamp01(p);
   const T = TUNING;
   const W = Math.max(1, (art && art.w) || 1), H = Math.max(1, (art && art.h) || 1);
@@ -354,30 +450,65 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
   const pad = Math.min(T.pad, vh * 0.03);
   const floor = Math.max(pad, bottom);
   const topCfg = (config && config.top) || null;
+  // Without the top bar in the art state (topBarInArt false), the art
+  // state's top is measured from the screen's top.
+  const artControls = config && config.topBarInArt === false ? 0 : Math.max(0, controls);
   // With opening.top.art the plant's top edge (ink.art of the canvas down)
   // sits that far under the top controls, and the art is as large as fits
   // from there down; otherwise the whole canvas is centred in the room.
   const inkArt = clamp01(num(ink && ink.art, 0));
   const inkGraph = ink && Number.isFinite(ink.graph) ? clamp01(ink.graph) : null;
-  const from = topCfg && topCfg.art !== null ? Math.max(0, controls) + topCfg.art : null;
+  const from = topCfg && topCfg.art !== null ? artControls + topCfg.art : null;
   const room = Math.max(1, vh - (from === null ? pad : from) - floor - below);
   const tall = from === null ? H : H * Math.max(0.05, 1 - inkArt);
-  const scale = Math.max(0.01, Math.min(room / tall, (vw - 2 * pad) / W));
-  const width = W * scale, height = H * scale;
   const g = (config && config.graph) || DEFAULTS.graph;
   const bd = (config && config.backdrop) || DEFAULTS.backdrop;
-  const artTop0 = from === null ? pad + Math.max(0, (room - height) / 2) : from - inkArt * height;
+  let scale0 = Math.max(0.01, Math.min(room / tall, (vw - 2 * pad) / W));
+  let left0 = (vw - W * scale0) / 2;
+  // fit 'width': the plant (ink.bush, its columns above the crown) spans
+  // the screen less sideMargin each side, but never so large that the
+  // crown falls below the screen's foot, so the roots always start on it.
+  const crown = config && Number.isFinite(config.crownY) ? config.crownY : 1;
+  if (config && config.fit === 'width') {
+    const bush = (ink && ink.bush) || { l: 0, r: 1 };
+    const side = Math.min(num(config.sideMargin, 0), vw * 0.25);
+    const byWidth = (vw - 2 * side) / (Math.max(0.01, bush.r - bush.l) * W);
+    const fromTop = from === null ? pad : from;
+    const byCrown = (vh - floor - fromTop) / (Math.max(0.05, crown - inkArt) * H);
+    scale0 = Math.max(0.01, Math.min(byWidth, byCrown));
+    left0 = vw / 2 - ((bush.l + bush.r) / 2) * W * scale0;
+  }
+  const artTop0 = from === null
+    ? pad + Math.max(0, (room - H * scale0) / 2)
+    : from - inkArt * H * scale0;
+  // The graph state keeps the art state's size, unless graph.rootsFit
+  // 'width' puts the roots' widest row (ink.roots) edge to edge: never so
+  // large that the image's ink, from the small plant (ink.graph) to its
+  // foot (ink.bottom), does not fit under the top controls.
+  let scale1 = scale0, left1 = left0;
+  if (g.rootsFit === 'width') {
+    const roots = (ink && ink.roots) || { l: 0, r: 1 };
+    const byWidth = vw / (Math.max(0.01, roots.r - roots.l) * W);
+    const fromTop = Math.max(0, controls) + (topCfg && topCfg.graph !== null ? topCfg.graph : 0);
+    const inkFoot = ink && Number.isFinite(ink.bottom) ? clamp01(ink.bottom) : 1;
+    const byHeight = (vh - floor - fromTop) / (Math.max(0.05, inkFoot - (inkGraph === null ? 0 : inkGraph)) * H);
+    scale1 = Math.max(0.01, Math.min(byWidth, byHeight));
+    left1 = vw / 2 - ((roots.l + roots.r) / 2) * W * scale1;
+  }
   // With opening.top.graph the graph state's plant (ink.graph of the canvas
   // down) sits that far under the top controls; otherwise artOffset.
   const artTop1 = topCfg && topCfg.graph !== null && inkGraph !== null
-    ? Math.min(artTop0 - 1, Math.max(0, controls) + topCfg.graph - inkGraph * height)
-    : -g.artOffset * height;
+    ? Math.min(artTop0 - 1, Math.max(0, controls) + topCfg.graph - inkGraph * H * scale1)
+    : -g.artOffset * (H * scale1);
+  const scale = lerp(scale0, scale1, t);
+  const width = W * scale, height = H * scale;
   const top = lerp(artTop0, artTop1, t);
+  const left = lerp(left0, left1, t);
   const show = smooth((t - T.graphFrom) / (1 - T.graphFrom));
   return {
     p: t,
     vw, vh,
-    art: { top, left: (vw - width) / 2, width, height, scale, opacity: 1 },
+    art: { top, left, width, height, scale, opacity: 1 },
     roots: lerp(1, zoom ? backdropOpacity(bd, zoom.k, zoom.homeK) : bd.opacity, t),
     fade: { art: 1 - t, graph: t },
     artTop0, artTop1,
@@ -391,7 +522,7 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
       follow: top - artTop1,
     },
     ground: 1 - t,
-    byline: bylineAt(config, { left: (vw - width) / 2, top, width, height }, t, {
+    byline: bylineAt(config, { left, top, width, height }, t, perPx, {
       x: vw / 2,
       y: top + height + (below - T.bylineSize * 1.3) / 2,
       size: T.bylineSize,
@@ -405,12 +536,13 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
 // The byline at progress t: under the title's art layout at the art rest,
 // under its graph layout at the graph rest, between the two on the way (a
 // state without lines keeps the other's place); `fallback` without a title.
-function bylineAt(config, box, t, fallback) {
+function bylineAt(config, box, t, perPx, fallback) {
   const title = config && config.title;
   const byline = config && config.byline;
   if (!title || !byline || !byline.text) return fallback;
-  const a = bylineUnder(title.art, box, byline);
-  const g = bylineUnder(title.graph, box, byline);
+  const per = title.fit === 'width' ? perPx : null;
+  const a = bylineUnder(title.art, box, byline, per);
+  const g = bylineUnder(title.graph, box, byline, per);
   const from = a || g, to = g || a;
   return {
     x: lerp(from.x, to.x, t),
@@ -650,5 +782,5 @@ function pageKey(e) {
 
 module.exports = { REVEAL_MS, revealFactor,
   DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
-  openingConfig, bylineConfig, bylineText, groundConfig, topConfig, gripConfig, gripHeight, firstInkRow, titleConfig, titleLayout, startState, coverGeometry, createCover, pageKey,
+  openingConfig, bylineConfig, bylineText, groundConfig, topConfig, gripConfig, gripHeight, firstInkRow, lastInkRow, inkSpan, widestInkRow, titleConfig, titleLayout, fitTitle, startState, coverGeometry, createCover, pageKey,
 };

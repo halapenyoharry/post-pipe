@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, bylineText, gripHeight, TUNING, revealFactor } from '../../lib/opening';
+import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 
 /**
@@ -54,10 +54,12 @@ function loadSize(src) {
   });
 }
 
-// Where an image's plant starts: the first row with ink, as a share of its
-// height, read at the image's own size (a small copy loses the thin tips).
-// null when the image cannot be read.
-function loadInkTop(src) {
+// Where an image's ink is, read at the image's own size (a small copy loses
+// the thin tips): top, the first row with ink, and bottom, the last, as
+// shares of its height; above, the columns its ink spans above `crown` (a
+// share of its height: the plant), and below, its widest row under it (the
+// roots), { l, r } as shares of its width. null when it cannot be read.
+function loadInk(src, crown) {
   return new Promise((resolve) => {
     if (!src) { resolve(null); return; }
     const img = new Image();
@@ -68,7 +70,14 @@ function loadInkTop(src) {
         c.width = w; c.height = h;
         const ctx = c.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(firstInkRow(ctx.getImageData(0, 0, w, h).data, w, h));
+        const data = ctx.getImageData(0, 0, w, h).data;
+        const at = crown === null || crown === undefined ? 1 : crown;
+        resolve({
+          top: firstInkRow(data, w, h),
+          bottom: lastInkRow(data, w, h),
+          above: inkSpan(data, w, h, 0, at),
+          below: at < 1 ? widestInkRow(data, w, h, at, 1) : null,
+        });
       } catch (e) { resolve(null); }
     };
     img.onerror = () => resolve(null);
@@ -333,6 +342,7 @@ function Cover({ config, viewState, children }) {
   const bylineRef = useRef(null);
   const sectionRef = useRef(null);
   const handleRef = useRef(null);
+  const bandRef = useRef(null);
   const machineRef = useRef(null);
   const sizeRef = useRef(null);
   const dragRef = useRef(() => false);
@@ -370,22 +380,37 @@ function Cover({ config, viewState, children }) {
   // drawn on the same canvas).
   useEffect(() => {
     let live = true;
-    const inks = config.top
-      ? Promise.all([loadInkTop(config.art.artState), loadInkTop(config.art.graphState || config.art.artState)])
+    const wanted = config.top || config.fit === 'width' || config.graph.rootsFit === 'width';
+    const inks = wanted
+      ? Promise.all([loadInk(config.art.artState, config.crownY), loadInk(config.art.graphState || config.art.artState, config.crownY)])
       : Promise.resolve([null, null]);
     Promise.all([loadSize(config.art.artState), inks]).then(([s, [a, g]]) => {
       if (!live) return;
-      inkRef.current = { art: a, graph: g };
+      inkRef.current = {
+        art: a ? a.top : null,
+        graph: g ? g.top : null,
+        bottom: g ? g.bottom : null,
+        bush: a && a.above,
+        roots: g && g.below,
+      };
       setArt(s || { w: 1, h: 2 });
     });
     return () => { live = false; };
   }, [config]);
 
+  // The title as drawn: with title.fit 'width', each line set to its width
+  // once the face has loaded (fitTitle); and the byline's width per px of
+  // its size, to set it to the last line's width.
+  const [title, setTitle] = useState(config.title);
+  const titleRef = useRef(config.title);
+  titleRef.current = title;
+  const perPxRef = useRef(null);
+
   const geometry = (p) => {
     const vw = window.innerWidth, vh = window.innerHeight;
-    return coverGeometry(config, {
+    return coverGeometry(titleRef.current === config.title ? config : { ...config, title: titleRef.current }, {
       vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh), zoom: zoomRef.current,
-      controls: controlsRef.current, ink: inkRef.current,
+      controls: controlsRef.current, ink: inkRef.current, perPx: perPxRef.current,
     }, p);
   };
 
@@ -402,6 +427,8 @@ function Cover({ config, viewState, children }) {
     paintRoots(g);
     const reach = reachRef.current;
     if (!reach || !sizeRef.current) return;
+    // The graph is not drawn: nor are the rootlets, which keep their state.
+    if (graphHiddenRef.current) { if (reachLayerRef.current) reachLayerRef.current.style.opacity = '0'; return; }
     const zoomed = zoomRef.current ? backdropOpacity(config.backdrop, zoomRef.current.k, zoomRef.current.homeK) : config.backdrop.opacity;
     const moving = reach.draw(performance.now(), {
       box: g.art, world, opacity: g.layer.opacity * zoomed * revealNow(), settledCover: m.p >= 1 && !m.moving,
@@ -424,9 +451,34 @@ function Cover({ config, viewState, children }) {
     if (graphKeepRef.current) graphKeepRef.current.style.opacity = String(g.fade.graph);
   };
 
+  const sizeGrip = () => {
+    const row = topRowBottom(window.innerHeight);
+    const band = bandRef.current;
+    if (band) band.style.height = `calc(env(safe-area-inset-top, 0px) + ${Math.ceil(row + 8)}px)`;
+    const h = handleRef.current;
+    if (!h) return;
+    const strip = `calc(env(safe-area-inset-top, 0px) + ${gripHeight(row, config.grip)}px)`;
+    if (config.returnAbove === 'crown' && sizeRef.current) {
+      const g1 = geometry(1);
+      const crown = g1.art.top + config.crownY * g1.art.height;
+      h.style.height = `max(${strip}, ${Math.max(0, Math.round(crown))}px)`;
+      h.setAttribute('data-cover-handle-to', 'crown');
+    } else h.style.height = strip;
+  };
+  const sizeGripRef = useRef(sizeGrip);
+  sizeGripRef.current = sizeGrip;
+
+  // The top controls' bottom edge: the top bar's, or its band's.
+  const controlsNow = () => {
+    const band = bandRef.current;
+    const b = band ? band.getBoundingClientRect().bottom : 0;
+    return Math.max(topControls(window.innerHeight), b);
+  };
+
   // Where the art sits in the graph state, for the graph's anchors.
   const publishFrame = () => {
     if (!sizeRef.current) return;
+    sizeGrip();
     const g1 = geometry(1);
     window.PostPipeCoverFrame = {
       art: { left: g1.art.left, top: g1.art.top, width: g1.art.width, height: g1.art.height },
@@ -439,6 +491,17 @@ function Cover({ config, viewState, children }) {
   const publishFrameRef = useRef(publishFrame);
   publishFrameRef.current = publishFrame;
 
+  // At the art rest, with graph.artStateOpacity 0, nothing of the graph is
+  // drawn or can be hit: its layers are display: none (the graph's own box
+  // keeps its size). Only once the graph has laid itself out (its world is
+  // published), since it measures its text as it does.
+  const graphHiddenRef = useRef(false);
+  const hideGraph = (el, label, g) => {
+    const off = label === 'art' && g.layer.opacity === 0 && Boolean(window.PostPipeGraphWorld);
+    graphHiddenRef.current = off;
+    for (const c of el.children) c.style.display = off ? 'none' : '';
+  };
+
   // Paint progress p: every moving part, straight to the DOM.
   const paint = (p) => {
     const g = geometry(p);
@@ -447,6 +510,9 @@ function Cover({ config, viewState, children }) {
     const root = document.documentElement;
     root.style.setProperty('--pp-cover-p', String(g.p));
     root.setAttribute('data-pp-cover', label);
+    // The top bar (and its band) only in the graph state, unless the site
+    // keeps it in the art state too (topBarInArt); the stylesheet fades it.
+    if (!config.topBarInArt) root.setAttribute('data-pp-cover-bar', label === 'graph' ? 'shown' : 'hidden');
 
     const a = artRef.current;
     if (a) {
@@ -493,8 +559,9 @@ function Cover({ config, viewState, children }) {
       // fade out below. Only the top bar takes taps until the graph rests.
       sec.style.pointerEvents = atRest ? '' : 'none';
       for (const el of sec.children) {
-        if (el.matches('[data-feeds], [data-top-bar], [data-cover-handle]')) continue;
+        if (el.matches('[data-feeds], [data-top-bar], [data-top-band], [data-cover-handle]')) continue;
         const graph = el.matches('[data-graph-root]');
+        if (graph) hideGraph(el, label, g);
         const shown = graph ? revealNow() : 1;
         el.style.opacity = atRest && shown >= 1 ? '' : String(atRest ? shown : (graph ? g.layer.opacity * shown : g.graph.opacity));
         el.style.transform = atRest ? '' : (graph
@@ -546,7 +613,8 @@ function Cover({ config, viewState, children }) {
   useLayoutEffect(() => {
     if (!art) return;
     sizeRef.current = art;
-    controlsRef.current = config.top ? topControls(window.innerHeight) : 0;
+    sizeGrip();
+    controlsRef.current = config.top ? controlsNow() : 0;
     const m = machineRef.current;
     if (m) {
       m.resize(geometry(0).travel);
@@ -557,7 +625,8 @@ function Cover({ config, viewState, children }) {
     let live = true;
     if (config.top && document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        const c = topControls(window.innerHeight);
+        sizeGrip();
+        const c = controlsNow();
         if (!live || Math.abs(c - controlsRef.current) < 0.5) return;
         controlsRef.current = c;
         const mm = machineRef.current;
@@ -568,12 +637,56 @@ function Cover({ config, viewState, children }) {
     return () => { live = false; };
   }, [art]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // title.fit 'width': once the title's face has loaded, each line is
+  // measured as drawn and set to its width, and the byline measured at
+  // 100 px in the same face; then everything is painted again.
+  useEffect(() => {
+    if (!art || !config.title || config.title.fit !== 'width') return undefined;
+    let live = true;
+    const lengths = (ref) => (ref.current
+      ? [...ref.current.querySelectorAll('[data-cover-title-line]')].map((t) => { try { return t.getComputedTextLength(); } catch (e) { return 0; } })
+      : []);
+    const measure = () => {
+      if (!live) return;
+      setTitle((t) => fitTitle(t, { art: lengths(titleArtRef), graph: lengths(titleGraphRef) }, art.w));
+      const by = bylineRef.current;
+      if (by) {
+        const probe = document.createElement('span');
+        const cs = getComputedStyle(by);
+        probe.textContent = by.textContent;
+        Object.assign(probe.style, {
+          position: 'absolute', left: '-10000px', top: '0', visibility: 'hidden', whiteSpace: 'nowrap',
+          fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, letterSpacing: cs.letterSpacing, fontSize: '100px',
+        });
+        document.body.appendChild(probe);
+        const w = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (w > 0) perPxRef.current = w / 100;
+      }
+    };
+    const ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    ready.then(() => requestAnimationFrame(measure));
+    return () => { live = false; };
+  }, [art, config]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The fitted title: paint again with its sizes, and say where the art is.
+  useLayoutEffect(() => {
+    if (title === config.title) return;
+    const m = machineRef.current;
+    if (m) paintRef.current(m.p);
+    publishFrameRef.current();
+  }, [title]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The rootlets' layer, and the graph's word that its world has changed.
   useEffect(() => {
     if (config.reach && reachLayerRef.current) {
       reachRef.current = createReach(config.reach, reachLayerRef.current, { reduced, seed: config.art.graphState || config.art.artState });
     }
-    const onWorld = () => requestFrame();
+    const onWorld = () => {
+      const m = machineRef.current;
+      if (m && !m.moving && m.p === 0 && !graphHiddenRef.current) paintRef.current(m.p);
+      requestFrame();
+    };
     window.addEventListener('graph:world', onWorld);
     requestFrame();
     return () => {
@@ -654,17 +767,16 @@ function Cover({ config, viewState, children }) {
       go: (s, o) => machine.go(s, o),
     };
 
-    // The grip reaches down to the top bar's row and a little below it.
-    const sizeGrip = () => {
-      const h = handleRef.current;
-      if (h) h.style.height = `calc(env(safe-area-inset-top, 0px) + ${gripHeight(topRowBottom(window.innerHeight), config.grip)}px)`;
-    };
+    // The grip reaches down to the top bar's row and a little below it, or
+    // with returnAbove 'crown' down to the roots' crown in the graph state.
+    // The band (topBar.band) is the top bar's row and 8 px under it.
+    const sizeGrip = () => sizeGripRef.current();
     sizeGrip();
     const gripFrame = requestAnimationFrame(sizeGrip);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(sizeGrip);
     const onResize = () => {
       sizeGrip();
-      if (config.top) controlsRef.current = topControls(window.innerHeight);
+      if (config.top) controlsRef.current = controlsNow();
       machine.resize(geometry(0).travel);
       paintRef.current(machine.p);
       publishFrameRef.current();
@@ -682,13 +794,20 @@ function Cover({ config, viewState, children }) {
       if (bylineRef.current && bylineRef.current.contains(t)) return machine.p < 1 || machine.moving ? 'stage' : 'graph';
       if (!sec || !sec.contains(t)) return null;
       if (machine.moving || machine.p < 1) return 'stage';
-      return e.clientY <= TUNING.edgePx ? 'edge' : 'graph';
+      return e.clientY <= edgeY() ? 'edge' : 'graph';
+    };
+    // Above this the page's top edge: the roots' crown (returnAbove), or a
+    // thin strip at the top.
+    const edgeY = () => {
+      if (config.returnAbove !== 'crown' || !sizeRef.current) return TUNING.edgePx;
+      const g1 = geometry(1);
+      return Math.max(TUNING.edgePx, g1.art.top + config.crownY * g1.art.height);
     };
     const onWheel = (e) => {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       const where = whereOf(e);
       if (!where) return;
-      if (e.ctrlKey && where === 'graph') return; // a pinch is the graph's
+      if (e.ctrlKey && where !== 'stage') return; // a pinch is the graph's, never the page's
       if (machine.wheel(e.deltaY, { deltaMode: e.deltaMode, where })) {
         e.preventDefault();
         e.stopPropagation();
@@ -855,7 +974,7 @@ function Cover({ config, viewState, children }) {
               <img ref={graphKeepRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
                 data-cover-image="graph-keep" style={{ opacity: startArt ? 0 : 1, ...keepMask(config.backdrop.keepAbove, 'above') }} />
             )}
-            <CoverTitle title={config.title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
+            <CoverTitle title={title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
           </div>
           {config.alt && <span className={styles.alt} role="img" aria-label={config.alt} data-cover-alt />}
         </div>
@@ -868,6 +987,9 @@ function Cover({ config, viewState, children }) {
         style={startArt ? { pointerEvents: 'none' } : undefined}
       >
         {children}
+        {config.band && (
+          <div ref={bandRef} className={styles.band} data-top-band aria-hidden="true" style={{ background: config.band.color }} />
+        )}
         {/* The grip: the whole top strip, under the top bar's controls (they
             keep their taps) and over the graph; the mark is the hint. */}
         <button

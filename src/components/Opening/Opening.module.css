@@ -175,6 +175,37 @@ html[data-pp-cover="graph"] .stage {
   border-radius: 3px;
 }
 
+/* The top bar in the graph state alone (opening.topBarInArt false): out of
+   sight and out of reach in the art state and on the way, fading in over
+   200 ms once the page settles on the graph, with its band. */
+:global(html[data-pp-cover-bar] [data-feeds]),
+:global(html[data-pp-cover-bar] [data-settings-gear]),
+:global(html[data-pp-cover-bar] [data-top-band]) {
+  transition: opacity 200ms linear, visibility 0s linear 0s;
+}
+
+:global(html[data-pp-cover-bar="hidden"] [data-feeds]),
+:global(html[data-pp-cover-bar="hidden"] [data-settings-gear]),
+:global(html[data-pp-cover-bar="hidden"] [data-top-band]) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity 200ms linear, visibility 0s linear 200ms;
+}
+
+/* The band behind the top bar (topBar.band): the screen's width, from its
+   top to under the bar's row (its height is set by Opening.jsx). Under the
+   bar's controls and the grip's taps, over the graph. */
+.band {
+  position: fixed;
+  z-index: 49;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(env(safe-area-inset-top, 0px) + 52px);
+  pointer-events: none;
+}
+
 /* The graph layer: the canvas and its controls, over the art. */
 .section {
   position: fixed;
