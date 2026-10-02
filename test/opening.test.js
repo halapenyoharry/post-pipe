@@ -469,7 +469,7 @@ test('the graph hangs from the roots in both states: moved with the art, at artS
 test('byline: defaults, lower case, and its opacity per state', () => {
   const { bylineConfig, bylineText } = require('../src/lib/opening');
   const d = bylineConfig({ text: 'by Some One', href: 'about.html' });
-  assert.deepStrictEqual(d, { text: 'by Some One', href: 'about.html', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower' });
+  assert.deepStrictEqual(d, { text: 'by Some One', href: 'about.html', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower', graphScale: null });
   assert.equal(bylineText(d), 'by some one');
   assert.equal(bylineText(bylineConfig({ text: 'by Some One', case: 'as-written' })), 'by Some One');
   assert.deepStrictEqual(bylineConfig({ text: 'x', opacity: 0.5 }).opacity, { art: 0.5, graph: 0.5 });

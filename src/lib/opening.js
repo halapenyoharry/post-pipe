@@ -26,7 +26,7 @@ const DEFAULTS = {
   top: null,
   backdrop: { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 },
   reach: { enabled: false, tips: [], perContainer: 3, stopShort: 18, lagMs: 600, drawMs: 1800 },
-  byline: { text: '', href: '', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower' },
+  byline: { text: '', href: '', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower', graphScale: null },
   startOn: 'remembered',
   snapMs: 420,
   title: null,
@@ -126,7 +126,9 @@ function titleLayout(layout, box) {
 // its top `gap` of the title's size under the last line's baseline, at
 // opacity.art in the art state and opacity.graph in the graph state. case
 // 'lower' (the default) draws it in lower case; 'as-written' as written.
-// Without a title it sits under the art, as before.
+// graphScale: in the graph state it is that share of the graph state title's
+// size instead (never set to a line's width there); null: as in the art
+// state. Without a title it sits under the art, as before.
 function bylineConfig(b) {
   const o = b && typeof b === 'object' ? b : {};
   const d = DEFAULTS.byline;
@@ -144,6 +146,8 @@ function bylineConfig(b) {
     gap: Math.max(0, Math.min(2, num(o.gap, d.gap))),
     minSize: Math.max(0, num(o.minSize, d.minSize)),
     case: o.case === 'as-written' ? 'as-written' : 'lower',
+    graphScale: Number.isFinite(Number(o.graphScale)) && o.graphScale !== null && o.graphScale !== '' && Number(o.graphScale) > 0
+      ? Math.min(1, Number(o.graphScale)) : null,
   };
 }
 
@@ -157,18 +161,19 @@ function bylineText(byline) {
 // box { left, top, width, height }: the last line's left edge, its top, its
 // size; null for a layout without lines. With perPx (the byline's drawn
 // width per px of its size, once its face has loaded) and a last line that
-// names its width, it is set to that width (title.fit 'width').
-function bylineUnder(layout, box, byline, perPx) {
+// names its width, it is set to that width (title.fit 'width'). With scale
+// it is that share of the title's size, whatever the line's width.
+function bylineUnder(layout, box, byline, perPx, scale = null) {
   const lines = (layout && layout.lines) || [];
   if (!lines.length) return null;
   const last = lines[lines.length - 1];
   const titleSize = Math.max(...lines.flatMap((l) => l.spans.map((sp) => sp.size))) * box.width;
   const lastSize = Math.max(...last.spans.map((sp) => sp.size)) * box.width;
-  const fitted = perPx > 0 && last.width ? (last.width * box.width) / perPx : null;
+  const fitted = !scale && perPx > 0 && last.width ? (last.width * box.width) / perPx : null;
   return {
     x: box.left + last.x * box.width,
     y: box.top + last.y * box.height + byline.gap * (fitted ? lastSize : titleSize),
-    size: fitted || Math.max(byline.minSize, byline.size * titleSize),
+    size: scale ? Math.max(byline.minSize, scale * titleSize) : (fitted || Math.max(byline.minSize, byline.size * titleSize)),
     titleSize,
   };
 }
@@ -567,7 +572,7 @@ function bylineAt(config, box, t, perPx, fallback) {
   if (!title || !byline || !byline.text) return fallback;
   const per = title.fit === 'width' ? perPx : null;
   const a = bylineUnder(title.art, box, byline, per);
-  const g = bylineUnder(title.graph, box, byline, per);
+  const g = bylineUnder(title.graph, box, byline, per, byline.graphScale);
   const from = a || g, to = g || a;
   return {
     x: lerp(from.x, to.x, t),

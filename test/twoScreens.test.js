@@ -136,3 +136,28 @@ test('title fit width: each line scaled to its width as measured; the byline set
     assert.equal(g.byline.under, 'title');
   }
 });
+
+test('byline graphScale: in the graph state a share of that title\'s size, not a line\'s width; the art state as before', () => {
+  const c = openingConfig({ opening: { ...SITE.opening, byline: { ...SITE.opening.byline, graphScale: 0.25 } } });
+  assert.equal(c.byline.graphScale, 0.25);
+  assert.equal(openingConfig(SITE).byline.graphScale, null, 'unset: none');
+  assert.equal(openingConfig({ opening: { ...SITE.opening, byline: { ...SITE.opening.byline, graphScale: -1 } } }).byline.graphScale, null);
+  const fitted = fitTitle(c.title, { art: [400, 500], graph: [700] }, ART.w);
+  const conf = { ...c, title: fitted };
+  const at = (p) => coverGeometry(conf, { vw: 390, vh: 844, art: ART, ink: INK, controls: 52, perPx: 9 }, p);
+  // The art state: still the last line's width.
+  const g0 = at(0);
+  const lastArt = fitted.art.lines[fitted.art.lines.length - 1];
+  assert.ok(close(g0.byline.size * 9, lastArt.width * g0.art.width), 'art state: as wide as the last line');
+  // The graph state: a quarter of the graph title's size (its largest span).
+  const g1 = at(1);
+  const gl = fitted.graph.lines[0];
+  const titleSize = Math.max(...gl.spans.map((sp) => sp.size)) * g1.art.width;
+  assert.ok(close(g1.byline.size, 0.25 * titleSize), `${g1.byline.size} against ${0.25 * titleSize}`);
+  assert.ok(g1.byline.size * 9 < gl.width * g1.art.width * 0.5, 'well under the line\'s width');
+  assert.ok(close(g1.byline.x, g1.art.left + gl.x * g1.art.width), 'at the line\'s left edge');
+  assert.ok(close(g1.byline.y, g1.art.top + gl.y * g1.art.height + 0.1 * titleSize), 'gap of the title\'s size under its baseline');
+  // On the way, between the two.
+  const half = at(0.5);
+  assert.ok(half.byline.size < g0.byline.size && half.byline.size > g1.byline.size);
+});
