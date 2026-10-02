@@ -438,7 +438,8 @@
       "status": true,
       "labelSize": null
     },
-    "_closedPill_note": "The closed pill's look. shape blob: an irregular rounded shape (eight corners round an ellipse, nearly straight sides, soft corners, the same every time for the same container); soft: the rounded card. status false leaves the container's status line off it. labelSize: its label in px at full size (before closedPillScale); null: 1.6 of card.labelMaxFontSize. Per container (containers.<id>): fill, a colour, at fillOpacity, with no outline or glow; labelFace, a family the site's fonts carry; labelColor."
+    "_closedPill_note": "The closed pill's look. shape soft (default): the engine's own soft rounded shape, the same every time for the same container; blob: an irregular rounded shape (eight corners round an ellipse, nearly straight sides, soft corners), kept for a site that wants it. status false leaves the container's status line off it. labelSize: its label in px at full size (before closedPillScale); null: 1.6 of card.labelMaxFontSize. Its colours and its label's face are the container's look (_containerLook_note).",
+    "_containerLook_note": "A container's own look, per container under containers.<id>, drawn on its closed node and its open hull alike: fill, a colour, at fillOpacity (0 to 1; unset, as given); stroke, the outline's colour (none for no outline; unset, the container's own colour on the closed node and the containment entry's stroke on the open hull); labelFace, a family the site's fonts carry, for the closed node's label and the open hull's title alike (measured in it); labelColor, both labels' colour, drawn as given. The closed node keeps its glow in its outline's colour (none in the sketchbook theme). The containment entry's own colours (badgeColor, color) stay its chapters' cards'. Without these, the engine's own look, as before."
   },
   "dimensions": {
     "groupLabel": "dimensions",

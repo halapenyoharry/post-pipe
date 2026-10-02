@@ -5,6 +5,7 @@ import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
 import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf } from './containerLayout';
+import { containerLook } from './containerLook';
 import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
@@ -860,17 +861,19 @@ export function GraphViewer({
       .attr('class', 'container-group')
       .attr('data-container-id', (d) => d.id);
 
+    // Each container's look, open and closed alike (containerLook.js):
+    // painted by paintLooks below.
+    const lookOf = (d) => (d && d._look) || containerLook(d);
+    for (const c of (data.containers || [])) c._look = containerLook(c);
+
     containerGroups.append('path')
       .attr('class', 'container-hull')
-      .attr('fill', (d) => d.fill || 'rgba(212, 175, 55, 0.03)')
-      .attr('stroke', (d) => d.stroke || 'rgba(212, 175, 55, 0.45)')
       .attr('stroke-width', (d) => d.strokeWidth || 1.5)
       .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
 
     // The sketchbook theme's second pencil pass round each container.
     containerGroups.append('path')
-      .attr('class', 'container-hull-ghost')
-      .attr('stroke', (d) => d.stroke || 'rgba(212, 175, 55, 0.45)');
+      .attr('class', 'container-hull-ghost');
 
     // Whether the page wears the sketchbook theme: the pencil passes are
     // drawn only then.
@@ -1007,6 +1010,9 @@ export function GraphViewer({
     containerBadgeTexts.each(function(d) {
       buildWrappedLabel(d3.select(this), d);
     });
+    // An open container's title in its own face (containers.<id>.labelFace),
+    // measured in it too.
+    const faceOf = (d) => lookOf(d).label.face;
 
     // A container's title sits straight on the page, translucent. It keeps
     // that look, but never below 3:1 (WCAG AA for large text) on any
@@ -1020,7 +1026,10 @@ export function GraphViewer({
       const transparent = !bodyBg || /rgba\([^)]*,\s*0\)$/.test(bodyBg) || bodyBg === 'transparent';
       const bgs = allBackgrounds(todConfig(S), mode, transparent ? null : bodyBg);
       containerBadgeTexts.each(function (d) {
-        const l = legibleOn(getContainerColor(d), bgs, { opacity: 0.55 });
+        // A container's own label colour is drawn as given, as its closed
+        // node's is.
+        const own = lookOf(d).label.color;
+        const l = own ? { color: own, opacity: 1 } : legibleOn(getContainerColor(d), bgs, { opacity: 0.55 });
         d3.select(this).attr('fill', l.color).attr('opacity', l.opacity);
       });
     }
@@ -1060,21 +1069,13 @@ export function GraphViewer({
       .style('display', 'none')
       .style('touch-action', 'manipulation');
 
-    // A closed container is a node, but a bigger, softer one: a blob in the
-    // container's color rather than a card, with larger text than a chapter's.
-    // A container's closed look of its own (containers.<id>.fill,
-    // fillOpacity, labelFace, labelColor; generate-index carries them as
-    // blob): a flat fill, no outline or glow, the label in its face.
+    // A closed container is a node, but a bigger, softer one: a soft shape in
+    // the container's color rather than a card, with larger text than a
+    // chapter's; its look (and the open hull's) from paintLooks.
     const PILL = closedPillOf(GS);
-    const blobOf = (d) => (d && d.blob) || {};
-    const faceOf = (d) => (blobOf(d).labelFace ? `'${String(blobOf(d).labelFace).replace(/'/g, '')}', sans-serif` : null);
     containerMacroNodes.append('path')
       .attr('class', 'container-macro-bg')
-      .style('fill', (d) => blobOf(d).fill || `color-mix(in srgb, ${getContainerColor(d)} 16%, var(--pp-macro-base, #151826))`)
-      .style('fill-opacity', (d) => (blobOf(d).fill && Number.isFinite(blobOf(d).fillOpacity) ? blobOf(d).fillOpacity : null))
-      .attr('stroke', (d) => (blobOf(d).fill ? 'none' : getContainerColor(d)))
-      .attr('stroke-width', 2.2)
-      .style('filter', (d) => (blobOf(d).fill ? 'none' : `drop-shadow(0 0 18px color-mix(in srgb, ${getContainerColor(d)} 45%, transparent))`));
+      .attr('stroke-width', 2.2);
 
     const PILL_SCALE = closedPillScaleOf(GS);
     const CLOSED_FONT = PILL.labelSize || Math.round((CARD.labelMaxFontSize || 26) * 1.6);
@@ -1082,15 +1083,36 @@ export function GraphViewer({
       .attr('class', 'container-macro-text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
-      .attr('fill', (d) => blobOf(d).labelColor || getContainerColor(d))
       .attr('font-size', (d) => `${!d.parent ? Math.round(CLOSED_FONT * 1.25) : CLOSED_FONT}px`)
       .attr('font-family', "'Atkinson', sans-serif")
       .attr('font-weight', '700')
-      .attr('letter-spacing', '-0.02em')
-      // Inline, over the theme's own face for titles.
-      .style('font-family', (d) => faceOf(d))
-      .style('font-weight', (d) => (faceOf(d) ? '400' : null))
-      .style('letter-spacing', (d) => (faceOf(d) ? '0' : null));
+      .attr('letter-spacing', '-0.02em');
+
+    // Every container's look, closed and open alike: the closed node's fill,
+    // outline and glow, the open hull's fill and stroke (and its pencil
+    // pass), and both titles' face and colour. Inline, over the theme's own
+    // face for titles.
+    function paintLooks() {
+      containerGroups.select('.container-hull')
+        .style('fill', (d) => lookOf(d).open.fill)
+        .style('fill-opacity', (d) => lookOf(d).open.fillOpacity)
+        .style('stroke', (d) => lookOf(d).open.stroke);
+      containerGroups.select('.container-hull-ghost')
+        .style('stroke', (d) => lookOf(d).open.stroke);
+      containerGroups.select('.container-macro-bg')
+        .style('fill', (d) => lookOf(d).closed.fill)
+        .style('fill-opacity', (d) => lookOf(d).closed.fillOpacity)
+        .style('stroke', (d) => lookOf(d).closed.stroke)
+        .style('filter', (d) => (lookOf(d).closed.glow ? `drop-shadow(0 0 18px color-mix(in srgb, ${lookOf(d).closed.glow} 45%, transparent))` : 'none'));
+      for (const sel of [containerMacroTexts, containerBadgeTexts]) {
+        sel.style('font-family', (d) => faceOf(d))
+          .style('font-weight', (d) => (faceOf(d) ? '400' : null))
+          .style('letter-spacing', (d) => (faceOf(d) ? '0' : null));
+      }
+      containerMacroTexts.attr('fill', (d) => lookOf(d).label.color || getContainerColor(d));
+      applyLabelContrast();
+    }
+    paintLooks();
 
     // A soft closed outline through points on a rounded rectangle, nudged in
     // and out a little (the same way every time for the same container).
@@ -1324,7 +1346,7 @@ export function GraphViewer({
         containers: data.containers,
         members,
         closed: closedContainers,
-        labelSize: (c) => labelBlockSize(c, c._fs || LABEL_MIN),
+        labelSize: (c) => labelBlockSize(c, c._fs || LABEL_MIN, { family: faceOf(c) }),
         macroSize: (c) => ({ w: (c._macroHalfW || 130) * 2, h: (c._macroHalfH || 45) * 2 }),
         options: {
           spacing: graphSettings.spiral?.spacing ?? 20,
@@ -1351,7 +1373,7 @@ export function GraphViewer({
         // a column a card wide: no larger than fits there.
         if (info && info.hang) {
           const room = CARD.width + info.hang.gap;
-          for (let guard = 0; guard < 40 && c._fs > LABEL_MIN && labelBlockSize(c, c._fs).w > room; guard++) {
+          for (let guard = 0; guard < 40 && c._fs > LABEL_MIN && labelBlockSize(c, c._fs, { family: faceOf(c) }).w > room; guard++) {
             c._fs = Math.max(LABEL_MIN, c._fs * 0.92);
           }
         }
@@ -2012,7 +2034,7 @@ export function GraphViewer({
         badge.select('.label-count').text(containerCountText(GS, memberNodes.length));
 
         const sizeHit = (size) => {
-          const blk = labelBlockSize(c, size);
+          const blk = labelBlockSize(c, size, { family: faceOf(c) });
           badge.select('.container-badge-hit')
             .attr('x', -blk.w / 2).attr('y', -blk.h / 2).attr('width', blk.w).attr('height', blk.h);
         };
@@ -2025,7 +2047,7 @@ export function GraphViewer({
         if (labelPos === 'top') {
           // Centred across the hull, its top just inside the hull's top.
           const size = labelAt ? fs : Math.max(LABEL_MIN, Math.min(LABEL_MAX, (d3.max(hull, (p) => p[0]) - d3.min(hull, (p) => p[0])) / 8));
-          const blk = labelBlockSize(c, size);
+          const blk = labelBlockSize(c, size, { family: faceOf(c) });
           const minY = d3.min(hull, (p) => p[1]);
           const x0 = d3.min(hull, (p) => p[0]), x1 = d3.max(hull, (p) => p[0]);
           const at = { x: (x0 + x1) / 2, y: minY + pad * 0.5 + blk.h / 2 };

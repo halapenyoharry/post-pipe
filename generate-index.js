@@ -197,6 +197,7 @@ function readerFontFaces() {
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
 const { contributionsConfig } = require('./src/lib/contributions');
+const { lookFromSettings } = require('./src/components/GraphViewer/containerLook');
 
 // Readers' contributions (settings.contributions) are the site's own file,
 // served beside the page as it is: src names it relative to the page, and
@@ -839,16 +840,14 @@ async function main() {
       // ({ anchorEnd, openTowards, keepBelow, cardScale, spacing }).
       const spiral = extra.spiral != null ? extra.spiral : c.spiral;
       if (spiral && typeof spiral === 'object') out.spiral = { ...spiral }; else delete out.spiral;
-      // The closed pill's own look: fill (a colour) at fillOpacity, its
-      // label in labelFace (a family the site's fonts carry) and labelColor.
-      // Kept apart as blob, so the containment entry's fill (its open
-      // hull's) is untouched.
-      const blob = {};
-      if (typeof extra.fill === 'string' && extra.fill.trim()) blob.fill = extra.fill.trim();
-      if (Number.isFinite(Number(extra.fillOpacity)) && extra.fillOpacity !== '' && extra.fillOpacity !== null) blob.fillOpacity = Math.max(0, Math.min(1, Number(extra.fillOpacity)));
-      if (typeof extra.labelFace === 'string' && extra.labelFace.trim()) blob.labelFace = extra.labelFace.trim();
-      if (typeof extra.labelColor === 'string' && extra.labelColor.trim()) blob.labelColor = extra.labelColor.trim();
-      if (Object.keys(blob).length) out.blob = blob; else delete out.blob;
+      // The container's own look, closed and open alike: fill (a colour) at
+      // fillOpacity, stroke, its label in labelFace (a family the site's
+      // fonts carry) and labelColor (containerLook.js). Kept apart as look,
+      // so the containment entry's own colours (its chapters' cards') are
+      // untouched.
+      const look = lookFromSettings(extra);
+      if (look) out.look = look; else delete out.look;
+      delete out.blob;
       return out;
     });
   }
