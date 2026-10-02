@@ -418,6 +418,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           showCount={showContainerCount(settings.graph)}
           links={topBarConfig(settings).links}
           subscribe={topBarConfig(settings).subscribe}
+          showSources={topBarConfig(settings).showSourcePills}
           controls={atTop ? graphControls : null}
         />
       )}

@@ -75,7 +75,21 @@
   --rp-width: 740px;
 }
 
+/* Expand: the reader fills the window. */
+.panel.full {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+
 @media (max-width: 900px) {
+  /* Wider does nothing where the reader already spans the screen. */
+  .tb.growBtn { display: none; }
   .panel {
     top: 12px;
     right: 12px;
@@ -91,7 +105,7 @@
 }
 
 .toolbar {
-  padding: 8px 14px;
+  padding: 8px 52px 8px 14px;
   background: var(--rp-toolbar-bg);
   border-bottom: 1px solid var(--rp-border);
   display: flex;
@@ -209,7 +223,7 @@
    and a separator never starts or ends a row. */
 @media (max-width: 600px) {
   .toolbar {
-    padding: 8px 10px;
+    padding: 8px 50px 8px 10px;
     gap: 6px;
   }
   .toolbarSeparator,
@@ -217,7 +231,7 @@
     display: none;
   }
   .ttsMount {
-    flex: 1 1 100%;
+    flex: 0 1 auto;
   }
   .toolbarSpacer {
     flex: 1 0 0;
@@ -235,9 +249,11 @@
   flex: 1;
 }
 
+/* The reader's buttons have no outline or border: an icon, a tint on hover
+   and when on, and the focus ring for the keyboard. */
 .tb {
   background: transparent;
-  border: 1px solid rgba(100, 255, 218, 0.2);
+  border: none;
   color: var(--rp-accent);
   width: 36px;
   height: 36px;
@@ -246,15 +262,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
   position: relative;
   flex-shrink: 0;
 }
 
 .tb:hover {
-  background: rgba(100, 255, 218, 0.1);
-  border-color: var(--rp-accent);
+  background: color-mix(in srgb, var(--rp-accent) 10%, transparent);
+}
+
+.tb:focus-visible,
+.closeX:focus-visible,
+.navItem:focus-visible {
+  outline: 2px solid var(--rp-accent);
+  outline-offset: 1px;
 }
 
 /* A control with its name written beside the icon. */
@@ -271,19 +293,36 @@
 }
 
 .tb.active {
-  background: rgba(100, 255, 218, 0.15);
-  border-color: var(--rp-accent);
+  background: color-mix(in srgb, var(--rp-accent) 15%, transparent);
 }
 
-.tb.closeBtn {
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #ef4444;
+/* "copied", beside the link icon for a second. */
+.copied {
+  font-size: 12px;
+  color: var(--rp-accent);
+  padding: 0 4px;
+  white-space: nowrap;
 }
 
-.tb.closeBtn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: #ef4444;
+/* Close: an X at the reader's top right corner, whatever the header wraps to. */
+.closeX {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--rp-text-bright);
+  cursor: pointer;
 }
+.closeX:hover { background: color-mix(in srgb, var(--rp-accent) 10%, transparent); }
 
 .tb :global(svg) {
   width: 18px;
@@ -912,14 +951,19 @@
 /* Previous and next, so the reader works like a book: a quiet link above the
    chapter, a clear one under it. A chapter that cannot be read yet shows its
    status instead of a link. */
+/* The chapters either side, at the top and at the bottom: an arrow and the
+   title, the one before on the left, the one after on the right. No border. */
 .navTop,
 .navBottom {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
 }
 .navTop { margin: -12px 0 14px; }
-.navBottom { margin: 40px 0 8px; justify-content: flex-end; }
+.navBottom { margin: 40px 0 8px; }
+.navSide { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
+.navSideNext { align-items: flex-end; margin-left: auto; }
 
 .navItem {
   display: inline-flex;
@@ -927,37 +971,27 @@
   align-items: flex-start;
   gap: 2px;
   max-width: 100%;
-  padding: 6px 10px;
+  padding: 6px 8px;
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   border-radius: 8px;
-  color: var(--rp-text);
+  color: var(--rp-text-bright);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
 }
-.navItem:hover { border-color: var(--rp-border); }
-.navDir {
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.75;
-}
+.navItem:hover { background: color-mix(in srgb, var(--rp-accent) 8%, transparent); }
+.navNext { align-items: flex-end; text-align: right; }
+.navLine { display: inline-flex; align-items: center; gap: 6px; }
+.navArrow { flex-shrink: 0; color: var(--rp-accent); }
 .navTitle {
   font-size: 14px;
   color: var(--rp-text-bright);
 }
-.navBig {
-  flex: 1 1 240px;
-  align-items: flex-end;
-  text-align: right;
-  padding: 14px 16px;
-  border-color: var(--rp-border);
-}
-.navBig .navTitle { font-size: 20px; font-weight: 600; }
+.navBottom .navTitle { font-size: 17px; }
 .navLocked { cursor: default; opacity: 0.8; }
-.navLocked:hover { border-color: var(--rp-border); }
+.navLocked:hover { background: transparent; }
 .navStatus {
   font-size: 12px;
   font-style: italic;
@@ -995,8 +1029,9 @@
   box-shadow: 0 14px 40px var(--sk-shadow), 0 0 0 1px var(--sk-line-soft);
 }
 :global(html[data-pp-theme="sketchbook"]) .dragGrip { color: var(--sk-ink-soft); }
-:global(html[data-pp-theme="sketchbook"]) .tb { border-color: var(--sk-line-soft); color: var(--sk-ink); }
-:global(html[data-pp-theme="sketchbook"]) .tb:hover, :global(html[data-pp-theme="sketchbook"]) .tb.active { background: var(--sk-accent-bg); border-color: var(--sk-accent); }
+:global(html[data-pp-theme="sketchbook"]) .tb { color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .tb:hover, :global(html[data-pp-theme="sketchbook"]) .tb.active { background: var(--sk-accent-bg); }
+:global(html[data-pp-theme="sketchbook"]) .closeX { color: var(--sk-ink); }
 :global(html[data-pp-theme="sketchbook"]) .tbTooltip { background: var(--sk-ink); color: var(--sk-paper); }
 :global(html[data-pp-theme="sketchbook"]) .toolbarSeparator { background: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .progress, :global(html[data-pp-theme="sketchbook"]) .progressSide { background: var(--sk-line-soft); }

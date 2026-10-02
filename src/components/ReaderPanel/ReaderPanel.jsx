@@ -5,6 +5,9 @@ import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
 import { progressBarMode, allowDownload, bookmarksList } from '../../lib/readerSettings';
 import { BookmarkList } from './BookmarkList';
+import { Icon } from '../Icon/Icon';
+import { iconBody } from '../../lib/icons';
+import { bookmarkTap } from '../../lib/bookmarkPlace';
 import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
@@ -22,10 +25,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const [showMarks, setShowMarks] = useState(false);
   const [contentHtml, setContentHtml] = useState('');
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [toastVisible, setToastVisible] = useState(false);
   // Reader always leaves the graph visible — `wide` toggles between
   // narrow (540px) and wide (760px).
   const [wide, setWide] = useState(false);
+  // Expand: the reader fills the window.
+  const [full, setFull] = useState(false);
+  // "copied" beside the link icon, for a second.
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef(null);
   const bodyRef = useRef(null);
   // The chapter's own text, apart from everything drawn around it.
   const textRef = useRef(null);
@@ -112,7 +119,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       const actNum = Number(partNum) >= 21 ? '3' : '2';
       setContentHtml(`
         <div style="padding: 40px 24px; text-align: center; border: 1px dashed rgba(212, 175, 55, 0.35); border-radius: 12px; background: rgba(20, 24, 38, 0.6); margin-top: 24px;">
-          <div style="font-size: 32px; margin-bottom: 12px; opacity: 0.9;">📖</div>
           <div style="font-size: 20px; font-weight: 600; color: var(--rp-accent, #d4af37); margin-bottom: 8px;">Chapter ${partNum}</div>
           <div style="font-size: 13px; color: var(--rp-text, #a8b2d1); opacity: 0.8; letter-spacing: 0.5px;">Act ${actNum} · In Progress</div>
         </div>
@@ -201,14 +207,17 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     }
   };
 
+  // Bookmark: one per chapter. A tap puts it at the paragraph at the top of
+  // the reader, replacing the one before; a tap where it already is takes it
+  // away (src/lib/bookmarkPlace.js). The reading position is kept on its own.
   const toggleBookmark = () => {
     if (!viewState || !article) return;
     const pId = getPersistentId(article);
     const marks = viewState.bookmarks(pId);
-    if (marks.length) {
-      marks.forEach(b => viewState.removeBookmark(b.id));
-    } else {
-      const topP = findTopVisibleParagraph();
+    const topP = findTopVisibleParagraph();
+    const action = bookmarkTap(marks, topP);
+    marks.forEach(b => viewState.removeBookmark(b.id));
+    if (action === 'set') {
       const ps = bodyRef.current ? bodyRef.current.querySelectorAll('p') : [];
       const words = topP !== null && ps[topP] ? ps[topP].innerText.trim().split(/\s+/).slice(0, 8).join(' ') : '';
       viewState.addBookmark({ item: pId, para: topP !== null ? topP : undefined, quote: words, version: article.version });
@@ -228,22 +237,26 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     return null;
   };
 
+  // The link icon: the chapter's address with the reading position (the
+  // paragraph at the top of the reader), to the clipboard; "copied" shows
+  // beside it for a second.
   const handleCopyLinkToHere = async () => {
     if (!article) return;
     const pId = getPersistentId(article);
     const topP = findTopVisibleParagraph();
     let url = window.location.href.split('#')[0] + '#read=' + encodeURIComponent(pId);
-    if (topP !== null) {
-      url += '&p=' + topP;
-    }
+    if (topP !== null) url += '&p=' + topP;
     try {
       await navigator.clipboard.writeText(url);
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 2000);
-    } catch(e) {
+    } catch (e) {
       console.error('Copy link failed:', e);
+      return;
     }
+    setCopied(true);
+    clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1000);
   };
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
 
   const jumpToParagraph = (pIndex) => {
     if (!bodyRef.current || pIndex === undefined || pIndex === null) return;
@@ -252,34 +265,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       const containerRect = bodyRef.current.getBoundingClientRect();
       const pRect = ps[pIndex].getBoundingClientRect();
       bodyRef.current.scrollTop += (pRect.top - containerRect.top) - 20; // 20px padding
-    }
-  };
-
-  const handleCopyBookmarkLink = async (pId, pIndex) => {
-    let url = window.location.href.split('#')[0] + '#read=' + encodeURIComponent(pId);
-    if (pIndex !== undefined && pIndex !== null) {
-      url += '&p=' + pIndex;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 2000);
-    } catch(e) {
-      console.error('Copy link failed:', e);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!article || !bodyRef.current) return;
-    const licenseHeader = settings?.export?.license_header || '';
-    const license = licenseHeader.replace('{{canonical_url}}', article.canonical_url || article.url);
-    const text = `${license}\n\n---\n\n${bodyRef.current.innerText}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 2000);
-    } catch(e) {
-      console.error('Copy failed:', e);
     }
   };
 
@@ -294,18 +279,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     a.download = `${(article.id || article.url).split('/').pop().replace('.html', '') || 'article'}.md`;
     a.click();
     URL.revokeObjectURL(a.href);
-  };
-
-  const handleCopyUrl = async (e) => {
-    e.preventDefault();
-    if (!article) return;
-    try {
-      await navigator.clipboard.writeText(article.canonical_url || article.url);
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 2000);
-    } catch(err) {
-      console.error('Copy URL failed:', err);
-    }
   };
 
   // When a chapter's text arrives: go back to where this reader left it
@@ -497,14 +470,19 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
   if (!article) return null;
 
-  const navLink = (item, dir, big) => {
+  // A neighbouring chapter: an arrow and its title, no word for the
+  // direction. One not yet readable shows its title and status, not as a
+  // button. Absent where there is no neighbour.
+  const navLink = (item, dir) => {
     const status = navStatus(feedData, item);
-    const label = dir === 'next' ? 'Next' : 'Previous';
+    const arrow = <Icon body={iconBody(dir === 'next' ? 'arrow-right' : 'arrow-left')} size={16} className={styles.navArrow} />;
+    const inner = dir === 'next'
+      ? (<><span className={styles.navTitle}>{item.title}</span>{arrow}</>)
+      : (<>{arrow}<span className={styles.navTitle}>{item.title}</span></>);
     if (status) {
       return (
-        <div key={item.id} className={`${styles.navItem} ${styles.navLocked} ${big ? styles.navBig : ''}`} data-reader-nav={dir} data-nav-status>
-          <span className={styles.navDir}>{label}</span>
-          <span className={styles.navTitle}>{item.title}</span>
+        <div key={item.id} className={`${styles.navItem} ${styles.navLocked} ${dir === 'next' ? styles.navNext : ''}`} data-reader-nav={dir} data-nav-status>
+          <span className={styles.navLine}>{inner}</span>
           <span className={styles.navStatus}>{status}</span>
         </div>
       );
@@ -512,16 +490,21 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     return (
       <button
         key={item.id}
-        className={`${styles.navItem} ${big ? styles.navBig : ''}`}
+        className={`${styles.navItem} ${dir === 'next' ? styles.navNext : ''}`}
         data-reader-nav={dir}
         onClick={() => goTo(item, dir)}
-        title={`${label}: ${item.title}`}
+        title={item.title}
       >
-        <span className={styles.navDir}>{dir === 'prev' ? '← ' : ''}{label}{dir === 'next' ? ' →' : ''}</span>
-        <span className={styles.navTitle}>{item.title}</span>
+        <span className={styles.navLine}>{inner}</span>
       </button>
     );
   };
+  const navRow = (where) => (nav.prev.length > 0 || nav.next.length > 0) && (
+    <nav className={where === 'top' ? styles.navTop : styles.navBottom} aria-label="Chapters either side" data-reader-nav-row={where} {...(where === 'bottom' ? { 'data-reader-nav-bottom': '' } : {})}>
+      <span className={styles.navSide}>{nav.prev.map((item) => navLink(item, 'prev'))}</span>
+      <span className={`${styles.navSide} ${styles.navSideNext}`}>{nav.next.map((item) => navLink(item, 'next'))}</span>
+    </nav>
+  );
 
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
@@ -552,7 +535,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       />
       <div
         data-reader-panel
-        className={`${styles.panel} ${isOpen && !isMinimized ? styles.open : ''} ${isMinimized ? styles.minimized : ''} ${wide ? styles.wide : ''}`}
+        className={`${styles.panel} ${isOpen && !isMinimized ? styles.open : ''} ${isMinimized ? styles.minimized : ''} ${wide ? styles.wide : ''} ${full ? styles.full : ''}`}
         style={floatingPos ? { transform: `translate3d(${floatingPos.x}px, ${floatingPos.y}px, 0px)` } : undefined}
       >
         {progressMode !== 'none' && (
@@ -575,92 +558,60 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           className={styles.toolbar}
           onMouseDown={handleToolbarMouseDown}
           onDoubleClick={() => setFloatingPos(null)}
-          title="Drag toolbar to move window · Double-click to reset"
+          title="Drag to move the reader · Double-click to put it back"
+          data-reader-header
         >
-          <div className={styles.dragGrip} title="Drag to move reading window">⋮⋮</div>
-          {/* TTS Toolbar Placeholder */}
+          <div className={styles.dragGrip} aria-hidden="true">⋮⋮</div>
           <div id="tts-mount-point" className={`${styles.toolbarGroup} ${styles.ttsMount}`}></div>
 
-          <div className={styles.toolbarSeparator}></div>
-
-          
-          <div className={styles.toolbarSeparator}></div>
-
           <div className={styles.toolbarGroup}>
-            {/* Each bookmark control says what it does in words, not only on
-                hover: a phone has no hover. */}
             <button
               className={`${styles.tb} ${styles.tbLabeled} ${itemBookmarks.length > 0 ? styles.active : ''}`}
               onClick={toggleBookmark}
               aria-pressed={itemBookmarks.length > 0}
-              title={itemBookmarks.length > 0 ? 'Remove the bookmark in this chapter' : 'Save the paragraph at the top of the reader'}
+              title={itemBookmarks.length > 0 ? 'Bookmark the paragraph at the top (it replaces this chapter\'s bookmark), or take it away where it is' : 'Bookmark the paragraph at the top of the reader'}
               data-bookmark-toggle
-              dangerouslySetInnerHTML={{ __html: `${ICONS.bookmark}<span class="${styles.tbText}">${itemBookmarks.length > 0 ? 'Marked' : 'Mark here'}</span>` }}
-            />
-            <button
-              className={`${styles.tb} ${styles.tbLabeled}`}
-              onClick={() => setShowMarks((v) => !v)}
-              aria-expanded={showMarks}
-              title="Every place you have bookmarked"
-              data-bookmark-list
-              dangerouslySetInnerHTML={{ __html: `${ICONS.bookmarkList}<span class="${styles.tbText}">Bookmarks</span>` }}
-            />
-          </div>
-
-          <div className={styles.toolbarSeparator}></div>
-
-          <div className={styles.toolbarGroup}>
-            <button
-              className={styles.tb}
-              onClick={handleCopyLinkToHere}
-              title="Copy link to here"
-              dangerouslySetInnerHTML={{ __html: `${ICONS.copy}<span class="${styles.tbTooltip}">Link here</span>` }}
-            />
-          </div>
-
-          <div className={styles.toolbarSeparator}></div>
-
-          <div className={styles.toolbarGroup}>
-            <button
-              className={`${styles.tb} ${showFrontmatter ? styles.active : ''}`}
-              onClick={() => setShowFrontmatter(!showFrontmatter)}
-              title="Article details"
-              dangerouslySetInnerHTML={{ __html: `${ICONS.info}<span class="${styles.tbTooltip}">Details</span>` }}
-            />
-            {canDownload && (
+            >
+              <Icon body={iconBody('bookmark')} size={17} />
+              <span className={styles.tbText}>Bookmark</span>
+            </button>
+            {bookmarksList(settings) && (
               <button
-                className={styles.tb}
-                onClick={handleExport}
-                title="Export markdown"
-                data-reader-download
-                dangerouslySetInnerHTML={{ __html: `${ICONS.download}<span class="${styles.tbTooltip}">Export</span>` }}
-              />
+                className={`${styles.tb} ${showMarks ? styles.active : ''}`}
+                onClick={() => setShowMarks((v) => !v)}
+                aria-expanded={showMarks}
+                title="Every place you have bookmarked"
+                aria-label="Bookmarks"
+                data-bookmark-list
+              >
+                <Icon body={iconBody('list')} size={17} />
+              </button>
             )}
             <button
               className={styles.tb}
-              onClick={handleCopy}
-              title="Copy to clipboard"
-              dangerouslySetInnerHTML={{ __html: `${ICONS.copy}<span class="${styles.tbTooltip}">Copy</span>` }}
-            />
+              onClick={handleCopyLinkToHere}
+              title="Copy a link to here"
+              aria-label="Copy a link to here"
+              data-reader-link
+            >
+              <Icon body={iconBody('link')} size={17} />
+            </button>
+            {copied && <span className={styles.copied} role="status" data-reader-copied>copied</span>}
             <button
-              className={`${styles.tb} ${wide ? styles.active : ''}`}
-              onClick={() => setWide(w => !w)}
-              title={wide ? 'Shrink reader' : 'Widen reader'}
-              dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">${wide
-                ? '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>'
-                : '<polyline points="3 9 3 3 9 3"/><polyline points="21 15 21 21 15 21"/><line x1="3" y1="3" x2="10" y2="10"/><line x1="21" y1="21" x2="14" y2="14"/>'}</svg><span class="${styles.tbTooltip}">${wide ? 'Shrink' : 'Widen'}</span>` }}
-            />
-          </div>
-
-          <div className={styles.toolbarSeparator}></div>
-
-          <div className={styles.toolbarGroup}>
-            <button
-              className={`${styles.tb} ${styles.syndLink} ${styles.canonical}`}
-              onClick={handleCopyUrl}
-              dangerouslySetInnerHTML={{ __html: `${ICONS.link}<span class="${styles.tbTooltip}">Copy URL</span>` }}
-            />
-            {/* Other syndication links */}
+              className={`${styles.tb} ${showFrontmatter ? styles.active : ''}`}
+              onClick={() => setShowFrontmatter(!showFrontmatter)}
+              title="Details"
+              aria-label="Details"
+              aria-pressed={showFrontmatter}
+              data-reader-details
+            >
+              <Icon body={iconBody('info')} size={17} />
+            </button>
+            {canDownload && (
+              <button className={styles.tb} onClick={handleExport} title="Download" aria-label="Download" data-reader-download>
+                <Icon body={iconBody('download')} size={17} />
+              </button>
+            )}
             {Object.entries(article.syndication || {}).map(([platform, url]) => {
               if (!url) return null;
               const cfg = settings?.toolbar?.syndication_icons?.[platform];
@@ -672,7 +623,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${styles.tb} ${styles.syndLink}`}
-                  dangerouslySetInnerHTML={{ __html: `${ICONS[cfg.icon] || ICONS.globe}<span class="${styles.tbTooltip}">${cfg.label}</span>` }}
+                  title={cfg.label}
+                  aria-label={cfg.label}
+                  dangerouslySetInnerHTML={{ __html: ICONS[cfg.icon] || ICONS.globe }}
                 />
               );
             })}
@@ -680,29 +633,51 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
           <div className={styles.toolbarSpacer}></div>
 
-          <div className={styles.windowControls}>
+          {/* The reader's own panel; then grow, expand and minimise, one set. */}
+          <div className={styles.windowControls} data-reader-window>
             <button
               className={styles.tb}
               onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { where: 'reader' } }))}
               title="Reading settings"
               aria-label="Reading settings"
               data-reader-settings
-              dangerouslySetInnerHTML={{ __html: `${ICONS.settings}<span class="${styles.tbTooltip}">Settings</span>` }}
-            />
+            >
+              <Icon body={iconBody('sliders-horizontal')} size={17} />
+            </button>
             <button
-              className={`${styles.tb} ${styles.minimizeBtn}`}
+              className={`${styles.tb} ${styles.growBtn} ${wide ? styles.active : ''}`}
+              onClick={() => setWide((w) => !w)}
+              aria-pressed={wide}
+              title={wide ? 'Narrower' : 'Wider'}
+              aria-label={wide ? 'Narrower' : 'Wider'}
+              data-reader-grow
+            >
+              <Icon body={iconBody('move-horizontal')} size={17} />
+            </button>
+            <button
+              className={`${styles.tb} ${full ? styles.active : ''}`}
+              onClick={() => { setFull((f) => !f); setFloatingPos(null); }}
+              aria-pressed={full}
+              title={full ? 'Back to the side' : 'Fill the window'}
+              aria-label={full ? 'Back to the side' : 'Fill the window'}
+              data-reader-expand
+            >
+              <Icon body={iconBody(full ? 'minimize-2' : 'maximize-2')} size={17} />
+            </button>
+            <button
+              className={styles.tb}
               onClick={() => setIsMinimized(true)}
-              title="Minimize reading window (turn off)"
-              dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="${styles.tbTooltip}">Minimize</span>` }}
-            />
-            <button
-              className={`${styles.tb} ${styles.closeBtn}`}
-              onClick={onClose}
-              title="Close reading window"
-              dangerouslySetInnerHTML={{ __html: `${ICONS.close}<span class="${styles.tbTooltip}">Close</span>` }}
-            />
+              title="Minimise the reader"
+              aria-label="Minimise the reader"
+              data-reader-minimise
+            >
+              <Icon body={iconBody('minus')} size={17} />
+            </button>
           </div>
         </div>
+        <button className={styles.closeX} onClick={onClose} title="Close the reader" aria-label="Close the reader" data-reader-close>
+          <Icon body={iconBody('x')} size={20} />
+        </button>
 
         {showFrontmatter && (
           <FrontmatterPanel article={article} settings={settings} />
@@ -718,11 +693,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           ref={bodyRef}
           onScroll={handleScroll}
         >
-          {nav.prev.length > 0 && (
-            <nav className={styles.navTop} aria-label="Previous chapter">
-              {nav.prev.map((item) => navLink(item, 'prev', false))}
-            </nav>
-          )}
+          {navRow('top')}
           <div className={styles.articleHeader}>
             {header.kicker && (
               <div className={styles.articleKicker}>{header.kicker}</div>
@@ -747,12 +718,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             )}
           </div>
           <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
-          {contentHtml && (nav.next.length > 0 || nav.prev.length > 0) && (
-            <nav className={styles.navBottom} aria-label="Next chapter" data-reader-nav-bottom>
-              {nav.next.map((item) => navLink(item, 'next', true))}
-              {nav.next.length === 0 && nav.prev.map((item) => navLink(item, 'prev', false))}
-            </nav>
-          )}
+          {contentHtml && navRow('bottom')}
           {rights && contentHtml && (
             <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
           )}
@@ -770,22 +736,18 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         </div>
       </div>
 
-      <div className={`${styles.copyToast} ${toastVisible ? styles.show : ''}`}>
-        Copied to clipboard
-      </div>
-
       {isMinimized && article && (
         <div
           className={styles.restorePill}
           onClick={() => setIsMinimized(false)}
           title="Bring reading window back"
         >
-          <span className={styles.pillIcon}>📖</span>
+          <span className={styles.pillIcon}><Icon body={iconBody('bookmark')} size={18} /></span>
           <span className={styles.pillLabel}>
             <span className={styles.pillTitle}>{article.title || article.label}</span>
             <span className={styles.pillAuthor}>by {authorName}</span>
           </span>
-          <span className={styles.pillAction}>Restore ↗</span>
+          <span className={styles.pillAction}>Restore</span>
         </div>
       )}
     </>

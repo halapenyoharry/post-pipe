@@ -35,6 +35,8 @@ import { Subscribe } from './Subscribe';
  *   subscribe      — optional; the top bar's email sign-up
  *                    (settings.topBar.subscribe): after the links
  *   showAddButton  — optional, default true; false leaves out the "+"
+ *   showSources    — optional, default true; false leaves out the source
+ *                    pills (settings.topBar.showSourcePills)
  *                    (settings.topBar.addFeed; the embed's addFeed feature)
  *   intro          — optional HTML (settings.graph.intro, rendered at build
  *                    time): one short block under the pills, for a site's
@@ -46,7 +48,7 @@ import { Subscribe } from './Subscribe';
  *                    the first pill's text gives way (an ellipsis; its whole
  *                    text stays its name)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, showAddButton = true, intro = '', controls = null }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, showAddButton = true, intro = '', controls = null, showSources = true }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
@@ -59,6 +61,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) document.fonts.ready.then(run);
     return () => window.removeEventListener('resize', run);
   }, [fit]);
+  if (showSources === false) sources = [];
   if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !intro && !controls) return null;
 
   const hidden = hiddenSources || new Set();

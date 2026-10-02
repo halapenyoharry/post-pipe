@@ -687,6 +687,7 @@ ${reactJs}
             links: TOP_BAR.links,
             subscribe: TOP_BAR.subscribe,
             showAddButton: TOP_BAR.addFeed,
+            showSources: TOP_BAR.showSourcePills,
             intro: window.PP_INTRO_HTML || '',
             controls: TOOLBAR.position === 'top' ? graphControls : null,
             onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }

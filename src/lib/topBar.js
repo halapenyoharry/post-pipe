@@ -5,7 +5,9 @@
 // button is then the way to it).
 //
 // addFeed (default true) shows the "+" after them, for adding a feed; a site
-// whose readers have no use for it sets it false.
+// whose readers have no use for it sets it false. showSourcePills (default
+// true) shows a pill per source; a site with one source, whose pill says
+// nothing a reader needs, sets it false.
 //
 // A page can carry an icon (an SVG body on a 24-unit box) and showLabel
 // (default true: the label is shown as text beside it). links: buttons after
@@ -16,7 +18,7 @@
 //   "topBar": { "pages": [ { "id": "<item id or slug>", "label": "About", "hideFromGraph": true, "icon": "<path .../>" } ],
 //               "links": [ { "id": "support", "label": "Support", "href": "https://...", "icon": "<path .../>", "newTab": true } ],
 //               "subscribe": { "action": "/api/subscribe", "label": "Notify me", "icon": "<path .../>" },
-//               "addFeed": false }
+//               "addFeed": false, "showSourcePills": false }
 
 const { siteIcon } = require('./icons');
 
@@ -48,7 +50,7 @@ function topBarConfig(settings) {
       const label = str(l.label) || str(l.id);
       return { id: str(l.id) || `link-${i + 1}`, label, href: safeHref(l.href), icon, newTab: l.newTab === true, showLabel: !icon || l.showLabel === true };
     });
-  return { pages, links, subscribe: subscribeConfig(t.subscribe), addFeed: t.addFeed !== false };
+  return { pages, links, subscribe: subscribeConfig(t.subscribe), addFeed: t.addFeed !== false, showSourcePills: t.showSourcePills !== false };
 }
 
 // topBar.subscribe: an email sign-up, off unless action is set. An icon

@@ -24,4 +24,15 @@ function placedParagraph(b, item) {
   return para;
 }
 
-module.exports = { bookmarkLabel, placedParagraph };
+// What a tap on Bookmark does, with this chapter's bookmarks and the
+// paragraph now at the top of the reader: 'remove' when its bookmark is
+// already there, else 'set' (one bookmark per chapter: the new one replaces
+// any before it).
+function bookmarkTap(marks, para) {
+  const list = Array.isArray(marks) ? marks : [];
+  const at = (b) => (b.para !== undefined ? b.para : b.paragraph);
+  if (list.length && para !== null && para !== undefined && list.every((b) => at(b) === para)) return 'remove';
+  return 'set';
+}
+
+module.exports = { bookmarkTap, bookmarkLabel, placedParagraph };

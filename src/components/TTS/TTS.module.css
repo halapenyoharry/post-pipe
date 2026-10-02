@@ -18,7 +18,7 @@
 
 .tb {
   background: transparent;
-  border: 1px solid var(--tts-border);
+  border: none;
   color: var(--tts-accent);
   width: 36px;
   height: 36px;
@@ -34,9 +34,9 @@
 }
 
 .tb:hover {
-  background: rgba(100, 255, 218, 0.1);
-  border-color: var(--tts-accent);
+  background: color-mix(in srgb, var(--tts-accent) 10%, transparent);
 }
+.tb:focus-visible { outline: 2px solid var(--tts-accent); outline-offset: 1px; }
 
 .tb :global(svg) {
   width: 18px;

@@ -18,7 +18,7 @@ const feed = {
 };
 
 test('settings: pages with an id, a label (the id when none), hideFromGraph only when true', () => {
-  assert.deepStrictEqual(topBarConfig({}), { pages: [], links: [], subscribe: null, addFeed: true });
+  assert.deepStrictEqual(topBarConfig({}), { pages: [], links: [], subscribe: null, addFeed: true, showSourcePills: true });
   assert.deepStrictEqual(topBarConfig({ topBar: { pages: [{ id: 'about', label: 'About', hideFromGraph: true }, { id: ' ' }, null, { id: 'x' }] } }).pages,
     [{ id: 'about', label: 'About', hideFromGraph: true, icon: '', showLabel: true }, { id: 'x', label: 'x', hideFromGraph: false, icon: '', showLabel: true }]);
 });
@@ -121,4 +121,10 @@ test('subscribe: posts JSON { field: value } to the action, and maps the reply (
   const named = subscribeConfig({ action: '/s', field: 'address' });
   await subscribe(named, 'x@y.z', fake(200, {}));
   assert.deepStrictEqual(JSON.parse(calls[calls.length - 1].opts.body), { address: 'x@y.z' });
+});
+
+test('showSourcePills: a pill per source unless a site turns them off', () => {
+  assert.equal(topBarConfig({}).showSourcePills, true);
+  assert.equal(topBarConfig({ topBar: { showSourcePills: false } }).showSourcePills, false);
+  assert.equal(topBarConfig({ topBar: { showSourcePills: 'no' } }).showSourcePills, true);
 });
