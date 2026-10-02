@@ -82,6 +82,21 @@ html[data-pp-cover="graph"] .stage {
   -webkit-user-drag: none;
 }
 
+/* The roots as vectors (opening.art.rootsVector), on the art's canvas over
+   the graph state's image, whose own roots give way to them. Each act's
+   roots are bent toward it by Opening.jsx. */
+.roots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* The rootlets (opening.reach): one layer over the art and under the graph,
    in screen px, never touched. Drawn in the roots' own pale ink. */
 .reach {

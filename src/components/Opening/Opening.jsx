@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import styles from './Opening.module.css';
 import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
+import { parseRoots, rootsModel, actRoots, bentRoots, pathD } from '../../lib/rootsVector';
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
@@ -151,7 +152,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 //   draw(now, { box, opacity, settledCover, world })   world is the graph's
 //   snapshot; returns true while any end is still on its way, so the caller
 //   asks for another frame.
-function createReach(cfg, layer, { reduced, seed }) {
+function createReach(cfg, layer, { reduced, seed, skip = () => null }) {
   const rootlets = new Map();
   const lagMs = reduced ? 0 : cfg.lagMs;
 
@@ -209,7 +210,10 @@ function createReach(cfg, layer, { reduced, seed }) {
     const tips = cfg.tips.map((t) => artPoint(t, box));
     const seen = new Set();
     let moving = false;
+    // An act whose roots are drawn as vectors reaches with its own roots.
+    const own = skip();
     for (const c of world.containers) {
+      if (own && own.has(c.id)) continue;
       for (const hit of reachFor(tips, c, cfg.perContainer, cfg.stopShort)) {
         const i = hit.tip;
         const key = `${c.id}|${i}`;
@@ -236,6 +240,51 @@ function createReach(cfg, layer, { reduced, seed }) {
   return {
     draw,
     dispose() { for (const r of rootlets.values()) remove(r); rootlets.clear(); },
+  };
+}
+
+// The roots as vectors (opening.art.rootsVector): the file's parts as
+// paths in an SVG on the art's own canvas, and, each frame the acts have
+// moved, each act's roots bent toward it (src/lib/rootsVector.js).
+function createRootsVector(svg, model, roots) {
+  const els = new Map(); // edge number -> its parts' paths
+  const actOf = new Map();
+  for (const [id, tips] of roots) {
+    for (const tip of tips) for (const e of model.chains.get(tip) || []) if (e.tip === tip) actOf.set(e.e, id);
+  }
+  const frag = document.createDocumentFragment();
+  for (const edge of model.edges) {
+    const list = edge.parts.map((part, i) => {
+      const el = document.createElementNS(SVG_NS, 'path');
+      el.setAttribute('d', pathD(part.pts));
+      el.setAttribute('stroke', part.stroke || '#e4e1db');
+      el.setAttribute('stroke-width', String(part.width));
+      el.setAttribute('data-e', String(edge.e));
+      el.setAttribute('data-part', String(i));
+      if (edge.tip) el.setAttribute('data-tip', edge.tip);
+      if (actOf.has(edge.e)) el.setAttribute('data-act-root', actOf.get(edge.e));
+      frag.appendChild(el);
+      return el;
+    });
+    els.set(edge.e, list);
+  }
+  svg.setAttribute('viewBox', `0 0 ${model.w} ${model.h}`);
+  svg.appendChild(frag);
+  let last = '';
+  return {
+    // drifts: Map act id -> { dx, dy } in the art's px.
+    bend(drifts) {
+      const key = [...drifts].map(([id, d]) => `${id}:${d.dx.toFixed(1)},${d.dy.toFixed(1)}`).join('|');
+      if (key === last) return;
+      last = key;
+      const bent = bentRoots(model, roots, drifts);
+      for (const [e, parts] of bent) {
+        const list = els.get(e);
+        if (!list) continue;
+        parts.forEach((pts, i) => { if (list[i]) list[i].setAttribute('d', pathD(pts)); });
+      }
+    },
+    dispose() { for (const list of els.values()) for (const el of list) el.remove(); els.clear(); },
   };
 }
 
@@ -333,6 +382,8 @@ function Cover({ config, viewState, children }) {
   const graphKeepRef = useRef(null);
   const reachLayerRef = useRef(null);
   const reachRef = useRef(null);
+  const vectorRef = useRef(null);      // the roots' SVG (rootsVector)
+  const rootsRef = useRef(null);       // { draw, acts: Set } once it has loaded
   const zoomRef = useRef(null);       // { k, homeK }: the graph's zoom, from its world
   const geomRef = useRef(null);       // the last painted geometry
   const shiftRef = useRef(0);         // how far below its rest the graph layer is drawn
@@ -425,6 +476,18 @@ function Cover({ config, viewState, children }) {
     const g = geometry(m.p);
     geomRef.current = g;
     paintRoots(g);
+    // Each act's roots bend toward it by how far it is from its anchor,
+    // through the zoom the graph rests at, in the art's own px.
+    const rv = rootsRef.current;
+    if (rv && world && world.homeK > 0 && sizeRef.current) {
+      const g1 = geometry(1);
+      const perPx = sizeRef.current.w / Math.max(1, g1.art.width);
+      const drifts = new Map();
+      for (const c of world.containers) {
+        if (c.drift && rv.acts.has(c.id)) drifts.set(c.id, { dx: c.drift.x * world.homeK * perPx, dy: c.drift.y * world.homeK * perPx });
+      }
+      rv.draw.bend(drifts);
+    }
     const reach = reachRef.current;
     if (!reach || !sizeRef.current) return;
     // The graph is not drawn: nor are the rootlets, which keep their state.
@@ -446,7 +509,11 @@ function Cover({ config, viewState, children }) {
   // small plant (the copy masked above keepAbove) at its own.
   const paintRoots = (g) => {
     const roots = graphStateRef.current;
-    if (roots) roots.style.opacity = String(g.fade.graph * g.roots);
+    // Drawn as vectors: the image's roots give way to them.
+    if (rootsRef.current && vectorRef.current) {
+      vectorRef.current.style.opacity = String(g.fade.graph * g.roots);
+      if (roots) roots.style.opacity = '0';
+    } else if (roots) roots.style.opacity = String(g.fade.graph * g.roots);
     else if (artStateRef.current) artStateRef.current.style.opacity = String(g.roots);
     if (graphKeepRef.current) graphKeepRef.current.style.opacity = String(g.fade.graph);
   };
@@ -677,10 +744,38 @@ function Cover({ config, viewState, children }) {
     publishFrameRef.current();
   }, [title]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The roots as vectors: read once (the site's own file), drawn, and from
+  // then on bent toward their acts each frame (drawFrame).
+  useEffect(() => {
+    const src = config.art.rootsVector;
+    if (!src || !art || typeof fetch === 'undefined') return undefined;
+    let live = true;
+    let built = null;
+    fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => {
+      const svg = vectorRef.current;
+      const model = rootsModel(parseRoots(text));
+      if (!live || !svg || !model) return;
+      const roots = actRoots(model, config.acts);
+      built = createRootsVector(svg, model, roots);
+      rootsRef.current = { draw: built, acts: new Set(roots.keys()) };
+      svg.setAttribute('data-roots-vector', 'ready');
+      const m = machineRef.current;
+      if (m) paintRef.current(m.p);
+    }).catch(() => {});
+    return () => {
+      live = false;
+      if (built) built.dispose();
+      rootsRef.current = null;
+    };
+  }, [config, art]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The rootlets' layer, and the graph's word that its world has changed.
   useEffect(() => {
     if (config.reach && reachLayerRef.current) {
-      reachRef.current = createReach(config.reach, reachLayerRef.current, { reduced, seed: config.art.graphState || config.art.artState });
+      reachRef.current = createReach(config.reach, reachLayerRef.current, {
+        reduced, seed: config.art.graphState || config.art.artState,
+        skip: () => (rootsRef.current ? rootsRef.current.acts : null),
+      });
     }
     const onWorld = () => {
       const m = machineRef.current;
@@ -973,6 +1068,11 @@ function Cover({ config, viewState, children }) {
             {config.art.graphState && config.backdrop.keepAbove > 0 && (
               <img ref={graphKeepRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
                 data-cover-image="graph-keep" style={{ opacity: startArt ? 0 : 1, ...keepMask(config.backdrop.keepAbove, 'above') }} />
+            )}
+            {config.art.rootsVector && (
+              <svg ref={vectorRef} className={styles.roots} aria-hidden="true" data-roots-vector="loading"
+                preserveAspectRatio="none" viewBox={art ? `0 0 ${art.w} ${art.h}` : undefined}
+                style={{ opacity: 0, ...keepMask(config.backdrop.keepAbove, 'below') }} />
             )}
             <CoverTitle title={title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
           </div>

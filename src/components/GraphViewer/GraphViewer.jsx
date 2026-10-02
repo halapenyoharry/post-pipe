@@ -1618,6 +1618,7 @@ export function GraphViewer({
     function worldSnapshot() {
       const out = [];
       if (!positionsReady) return { containers: out, k: zoomScaleRef.current, homeK };
+      const targets = anchorsOn() ? anchorTargets() : null;
       for (const id of reachIds()) {
         const group = containerGroups.filter((c) => c.id === id);
         const el = group.node();
@@ -1631,7 +1632,15 @@ export function GraphViewer({
         const hull = local.map(([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }));
         let cx = 0, cy = 0;
         for (const q of hull) { cx += q.x; cy += q.y; }
-        out.push({ id, closed, hull, centre: { x: cx / hull.length, y: cy / hull.length } });
+        const entry = { id, closed, hull, centre: { x: cx / hull.length, y: cy / hull.length } };
+        // How far an anchored container is from its anchor, in the world
+        // (dragged, or pushed clear of another act): the cover's roots bend
+        // toward it by that much at the zoom the graph rests at.
+        if (targets && targets.has(id)) {
+          const c = centreOf(id), t = targets.get(id);
+          if (c && t) entry.drift = { x: c.x - t.x, y: c.y - t.y };
+        }
+        out.push(entry);
       }
       return { containers: out, k: zoomScaleRef.current, homeK };
     }

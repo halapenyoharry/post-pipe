@@ -71,10 +71,10 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png' } } }), null, 'one state image and no full: no art');
   assert.equal(openingConfig({ opening: { enabled: true, art: { bush: 'b.png', roots: 'r.png' } } }), null, 'the old halves are not read');
   const both = openingConfig(SITE);
-  assert.deepStrictEqual(both.art, { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png', full: '' });
+  assert.deepStrictEqual(both.art, { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png', full: '', rootsVector: '' });
   const onlyFull = openingConfig({ opening: { enabled: true, art: { full: 'a.png' } } });
   assert.ok(onlyFull, 'full alone is enough');
-  assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png' }, 'full stands for both states');
+  assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png', rootsVector: '' }, 'full stands for both states');
   assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
   assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false, rootsFit: null });
   assert.equal(onlyFull.fit, 'height');

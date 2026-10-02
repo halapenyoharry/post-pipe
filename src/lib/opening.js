@@ -324,7 +324,13 @@ function openingConfig(settings) {
   return {
     enabled: true,
     mode: 'two-state',
-    art: { artState, graphState, full },
+    // rootsVector: an SVG of the graph state's roots (src/lib/rootsVector.js)
+    // drawn in place of the image's roots, below backdrop.keepAbove; each
+    // act's roots bend toward it when it is moved.
+    art: { artState, graphState, full, rootsVector: graphState ? str(art.rootsVector) : '' },
+    // The acts the roots belong to: each container with an anchor, and its
+    // rootTips (the tips of its roots, by name in the roots' SVG).
+    acts: actsOf(settings.containers),
     alt: str(o.alt),
     ground: ground.mode,
     sky: ground.sky,
@@ -367,6 +373,20 @@ function openingConfig(settings) {
     // { x, y }, fractions of the art. null when not set.
     zoomPivot: pivotOf(o.zoomPivot),
   };
+}
+
+function actsOf(containers) {
+  if (!containers || typeof containers !== 'object') return [];
+  const out = [];
+  for (const [key, c] of Object.entries(containers)) {
+    if (!c || typeof c !== 'object' || key.startsWith('_')) continue;
+    const anchor = c.anchor && Number.isFinite(Number(c.anchor.x)) && Number.isFinite(Number(c.anchor.y))
+      ? { x: Number(c.anchor.x), y: Number(c.anchor.y) } : null;
+    const rootTips = Array.isArray(c.rootTips) ? c.rootTips.filter((t) => typeof t === 'string' && t) : null;
+    if (!anchor && !rootTips) continue;
+    out.push({ id: key.startsWith('container:') ? key : `container:${key}`, anchor, rootTips });
+  }
+  return out;
 }
 
 function bandConfig(b) {
