@@ -172,3 +172,18 @@ test('graph.rootsBrightness: as drawn in the art state, the set brightness in th
   assert.equal(openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: -3 } } }).graph.rootsBrightness, 0);
   assert.equal(openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: 9 } } }).graph.rootsBrightness, 2);
 });
+
+test('graph.footRoom: on a wide screen the graph state\'s picture leaves that much free under its foot; a phone, fitted to its width, keeps its size', () => {
+  const base = openingConfig(SITE);
+  const room = openingConfig({ opening: { ...SITE.opening, graph: { ...SITE.opening.graph, footRoom: 60 } } });
+  assert.equal(room.graph.footRoom, 60);
+  assert.equal(base.graph.footRoom, 0);
+  const desk = { vw: 1280, vh: 800, art: ART, ink: INK, controls: 52 };
+  const g0 = coverGeometry(base, desk, 1), g1 = coverGeometry(room, desk, 1);
+  const footOf = (g) => g.art.top + INK.bottom * g.art.height;
+  // The small plant stays under the band, so the foot comes up by the room.
+  assert.ok(close(footOf(g0) - footOf(g1), 60, 1e-6), `foot ${footOf(g0)} -> ${footOf(g1)}`);
+  assert.ok(g1.art.width < g0.art.width, 'smaller on a wide screen');
+  const phone = { vw: 390, vh: 844, art: ART, ink: INK, controls: 52 };
+  assert.ok(close(coverGeometry(base, phone, 1).art.width, coverGeometry(room, phone, 1).art.width), 'a phone, fitted to its width, as it was');
+});

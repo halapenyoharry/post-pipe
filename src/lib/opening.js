@@ -354,6 +354,10 @@ function openingConfig(settings) {
       // The roots' brightness in the graph state (the graph state image's
       // roots and the vector roots; rootsBrightnessAt): 1 as drawn.
       rootsBrightness: Math.max(0, Math.min(2, num(graph.rootsBrightness, 1))),
+      // px kept free under the graph state's picture when rootsFit fits it
+      // to the height (a wide screen), for what hangs below the roots' ends
+      // (an act on the lowest tip). 0: none.
+      footRoom: Math.max(0, num(graph.footRoom, 0)),
     },
     // 'width': in the art state the plant (the art state's image above
     // crownY) spans the screen's width, sideMargin px in from each edge;
@@ -532,7 +536,8 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
     const byWidth = vw / (Math.max(0.01, roots.r - roots.l) * W);
     const fromTop = Math.max(0, controls) + (topCfg && topCfg.graph !== null ? topCfg.graph : 0);
     const inkFoot = ink && Number.isFinite(ink.bottom) ? clamp01(ink.bottom) : 1;
-    const byHeight = (vh - floor - fromTop) / (Math.max(0.05, inkFoot - (inkGraph === null ? 0 : inkGraph)) * H);
+    const foot = Math.max(0, num(g.footRoom, 0));
+    const byHeight = (vh - floor - foot - fromTop) / (Math.max(0.05, inkFoot - (inkGraph === null ? 0 : inkGraph)) * H);
     scale1 = Math.max(0.01, Math.min(byWidth, byHeight));
     left1 = vw / 2 - ((roots.l + roots.r) / 2) * W * scale1;
   }
