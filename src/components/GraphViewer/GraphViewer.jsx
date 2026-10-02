@@ -8,6 +8,7 @@ import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf } from
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { zoomAbout, fitRatioAbout } from './zoomPivot';
+import { minCardScale, homeScale } from './initialScale';
 import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, closeAllPlan } from './closedState';
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
@@ -502,6 +503,11 @@ export function GraphViewer({
     // Whether automatic framing still goes to settings.graph.initialFocus.
     let focusActive = !!GS.initialFocus && GS.initialFocus !== 'all';
     const FOCUS_MIN_SCALE = GS.initialFocusMinScale != null ? GS.initialFocusMinScale : 0.4;
+    // The first frame shows cards at least graph.initialScale.minCardWidthPx
+    // wide (initialScale.js); with anchors, that is the scale the graph state
+    // rests at, the anchors placed through it.
+    const MIN_CARD_K = minCardScale(GS.initialScale, CARD.width);
+    const HOME_K = homeScale(FOCUS_MIN_SCALE, GS.initialScale, CARD.width);
 
     // Rotation (two fingers on a touch screen). The view is
     // translate · rotate · scale; d3.zoom keeps translate and scale and works
@@ -1350,7 +1356,7 @@ export function GraphViewer({
     function anchorTargets() {
       const out = new Map();
       if (!anchorsOn()) return out;
-      const view = homeView(FOCUS_MIN_SCALE);
+      const view = homeView(HOME_K);
       const origin = graphOrigin();
       for (const [cId, a] of ANCHORS) out.set(cId, anchorWorld(a, coverFrame.art, view, origin));
       return out;
@@ -3234,7 +3240,7 @@ export function GraphViewer({
     // anchored container sits on its anchor), else the first framing
     // (homeK, declared with the view above).
     function applyHomeView(animate) {
-      const v = homeView(FOCUS_MIN_SCALE);
+      const v = homeView(HOME_K);
       const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
       homeK = v.k;
       resetRotation({ repaint: false });
@@ -3275,6 +3281,13 @@ export function GraphViewer({
             // Too big to fit legibly: keep the cards legible and show the
             // top of the container (its title and first chapters).
             k = FOCUS_MIN_SCALE;
+            topAligned = (ff.box.y1 - ff.box.y0) * k > h - margin * 2;
+          }
+          // Cards at least minCardWidthPx wide: zoomed in that far, the
+          // container's top shown when the whole no longer fits.
+          if (k < MIN_CARD_K) {
+            k = MIN_CARD_K;
+            frame = ff.box;
             topAligned = (ff.box.y1 - ff.box.y0) * k > h - margin * 2;
           }
         }
