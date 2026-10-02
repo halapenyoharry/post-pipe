@@ -1550,6 +1550,7 @@ export function GraphViewer({
     // whose box meets another's is moved the way its spiral opens until it
     // clears them, 16 px apart at the zoom the graph rests at. Closed ones,
     // and ones the reader dragged, stay. targets: cId -> its centre.
+    const HULL_PAD = Number.isFinite(Number(GS.hull && GS.hull.padding)) ? Number(GS.hull.padding) : 24;
     function apart(targets) {
       if (!anchorsOn()) return targets;
       const acts = [];
@@ -1558,9 +1559,13 @@ export function GraphViewer({
         const c = targets.get(cId) || centreOf(cId);
         if (!info || !c) continue;
         const ox = c.x - info.center.x, oy = c.y - info.center.y;
+        // An open hull's smoothed curve can reach a little past the box the
+        // layout gives it (measured: up to 15 px at rest on a phone): a
+        // margin of three quarters of the hull's padding allows for it.
+        const out = closedContainers.has(cId) ? 0 : 0.75 * HULL_PAD;
         acts.push({
           id: cId,
-          box: { x0: info.box.x0 + ox, y0: info.box.y0 + oy, x1: info.box.x1 + ox, y1: info.box.y1 + oy },
+          box: { x0: info.box.x0 + ox - out, y0: info.box.y0 + oy - out, x1: info.box.x1 + ox + out, y1: info.box.y1 + oy + out },
           open: !closedContainers.has(cId),
           fixed: isDetached(cId),
           towards: spiralOf(containerById.get(cId)).openTowards,
