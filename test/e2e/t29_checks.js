@@ -135,7 +135,17 @@ async function checkByline(s, record) {
       m.under === 'title' && Math.abs(m.left - e.x) <= 1.5 && below >= 0 && below <= 0.5 * e.titleSize,
       `left ${r1(m.left)} vs ${r1(e.x)}; top ${r1(below)} px under the baseline (title ${r1(e.titleSize)} px)`);
     record(`0 ${st} state: in the title's face`, m.font === m.titleFont && m.font.includes(OPENING.title.font), m.font);
-    if (OPENING.title.fit === 'width') {
+    if (st === 'graph' && OPENING.byline.graphScale) {
+      // Since T36 the graph state's byline is its own size, a share of that
+      // title's drawn size (byline.graphScale; "by harold young is too big
+      // in the second frame"), as T29 had it.
+      const t = await s.page.evaluate(() => {
+        const svg = document.querySelector('[data-cover-title-svg]');
+        const k = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+        return Math.max(...[...document.querySelectorAll('[data-cover-title="graph"] tspan')].map((x) => parseFloat(x.getAttribute('font-size')) * k));
+      });
+      record(`0 graph state: ${OPENING.byline.graphScale} of the title's size (byline.graphScale)`, Math.abs(m.size / (OPENING.byline.graphScale * t) - 1) <= 0.03, `${r1(m.size)} px / ${r1(t)} px = ${r3(m.size / t)}`);
+    } else if (OPENING.title.fit === 'width') {
       // Since T35 the byline is set to the width of the title's last line
       // (title.fit width), not to a quarter of its size.
       const w = await s.page.evaluate((st) => {

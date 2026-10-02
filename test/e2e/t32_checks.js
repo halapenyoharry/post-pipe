@@ -166,6 +166,10 @@ const fixedPoint = (page, x, y) => (ART_PIVOT ? page.evaluate((pv) => {
   return [a.left + a.width * pv.x, a.top + a.height * pv.y];
 }, ART_PIVOT) : Promise.resolve([x, y]));
 const pivotWord = (what) => (ART_PIVOT ? 'the art\'s pivot (graph.zoomPivot art)' : what);
+// Since T36, with graph.zoomMode grow-in-place, a zoom grows each act about
+// its own tip instead: the acts stay where they are, and a zoom in stops
+// where two would come within 16 px (the T36 checks measure both).
+const GROW = (SETTINGS.graph || {}).zoomMode === 'grow-in-place';
 const artCrown = (page) => page.evaluate(() => {
   const a = document.querySelector('[data-cover-art]').getBoundingClientRect();
   return { x: a.left + a.width * (523 / 1045), y: a.top + a.height * (1330 / 2111) };
@@ -258,14 +262,15 @@ async function part1(bt, name, size, record) {
   const acts1 = await actScreen(p);
   const ratio = after.k / before.k;
   const drift = Math.max(...Object.keys(acts0).filter((id) => acts1[id]).map((id) => {
-    const want = { x: fx + (acts0[id].x - fx) * ratio, y: fy + (acts0[id].y - fy) * ratio };
+    const want = GROW ? acts0[id] : { x: fx + (acts0[id].x - fx) * ratio, y: fy + (acts0[id].y - fy) * ratio };
     return Math.hypot(acts1[id].x - want.x, acts1[id].y - want.y);
   }));
   record(`1.2 a wheel zoom at the screen's centre keeps the point under ${pivotWord('it')}`, ratio > 1.2 && Math.hypot(after.wx - before.wx, after.wy - before.wy) * after.k < 0.5,
     `zoom ${r1(ratio)}x, the fixed point's point moved ${r1(Math.hypot(after.wx - before.wx, after.wy - before.wy) * after.k)} px`);
   record('1.2 ... the crown of the roots stays where it was', Math.hypot(crown1.x - crown0.x, crown1.y - crown0.y) < 0.5,
     `crown (${r1(crown0.x)}, ${r1(crown0.y)}) → (${r1(crown1.x)}, ${r1(crown1.y)})`);
-  record(`1.2 ... and the acts move about ${pivotWord('the centre')}, not toward the graph's middle`, drift < 3, `largest drift from zooming about it ${r1(drift)} px`);
+  record(GROW ? '1.2 ... and the acts stay where they are, each grown on its tip (graph.zoomMode grow-in-place)' : `1.2 ... and the acts move about ${pivotWord('the centre')}, not toward the graph's middle`, drift < 3,
+    GROW ? `largest move ${r1(drift)} px` : `largest drift from zooming about it ${r1(drift)} px`);
 
   // A point on the empty canvas (a card takes the wheel for its own text).
   const off = await p.evaluate(({ W, H }) => {
@@ -319,7 +324,7 @@ async function part1(bt, name, size, record) {
     }, at);
     await p.waitForTimeout(600);
     const a4 = await zoomAt(p, px, py);
-    record(`1.2 a pinch keeps the point between ${pivotWord('the fingers')}`, a4.k > b4.k * 1.3 && Math.hypot(a4.wx - b4.wx, a4.wy - b4.wy) * a4.k < 1,
+    record(`1.2 a pinch keeps the point between ${pivotWord('the fingers')}`, a4.k > b4.k * (GROW ? 1.05 : 1.3) && Math.hypot(a4.wx - b4.wx, a4.wy - b4.wy) * a4.k < 1,
       `zoom ${r1(a4.k / b4.k)}x, moved ${r1(Math.hypot(a4.wx - b4.wx, a4.wy - b4.wy) * a4.k)} px`);
   }
 

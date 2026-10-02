@@ -26,7 +26,7 @@ const fs = require('fs');
 const http = require('http');
 const handler = require('serve-handler');
 const { chromium, webkit } = require('playwright');
-const { reachConfig, backdropConfig, artPoint, rayHit } = require('../../src/lib/reach');
+const { reachConfig, backdropConfig, backdropOpacity, artPoint, rayHit } = require('../../src/lib/reach');
 const { openingConfig } = require('../../src/lib/opening');
 
 const SITE = path.resolve(process.argv[2] || path.join(process.env.HOME, 'Projects/epicofelinorjones.com/_site'));
@@ -187,6 +187,7 @@ function offAnchor(o, at) {
   return Math.hypot(top - at.y, outside);
 }
 const stray = (m) => Math.max(0, ...m.rootlets.map((r) => off(r.end, r.target)));
+const r2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : String(n));
 const r1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : String(n));
 
 // Until every end is on its target, read twice in a row a few frames apart
@@ -378,9 +379,17 @@ async function run(bt, name, size, record) {
 
     // Zoom in: the roots and the rootlets fade to the floor; the plant stays.
     const z25 = await zoomTo(s, 2.5);
-    record(`zoom in to ${BACKDROP.zoomForFloor}x: the roots and the rootlets fade to opacityZoomedIn, the small plant keeps its strength`,
-      z25.k / z25.homeK >= BACKDROP.zoomForFloor - 0.01 && Math.abs(z25.roots - BACKDROP.opacityZoomedIn) < 0.02 && Math.abs(z25.layer - BACKDROP.opacityZoomedIn) < 0.02 && z25.keep === 1,
-      `at 1x roots ${rs.roots}, rootlets ${rs.layer}, plant ${rs.keep}; at ${r1(z25.k / z25.homeK)}x roots ${r1(z25.roots)}, rootlets ${r1(z25.layer)}, plant ${z25.keep}`);
+    // Since T36 (graph.zoomMode grow-in-place) a zoom in stops where two
+    // acts would come within 16 px, short of the floor's zoom on a phone and
+    // a desktop: there the roots and the rootlets are checked to have faded
+    // as far as the backdrop's curve puts them at the zoom reached.
+    const reached = z25.k / z25.homeK;
+    const capped = (SETTINGS.graph || {}).zoomMode === 'grow-in-place' && reached < BACKDROP.zoomForFloor - 0.01 && reached > 1.2;
+    const wantFade = capped ? backdropOpacity(BACKDROP, z25.k, z25.homeK) : BACKDROP.opacityZoomedIn;
+    record(capped ? `zoom in as far as the acts can grow: the roots and the rootlets fade along the backdrop's curve, the small plant keeps its strength`
+      : `zoom in to ${BACKDROP.zoomForFloor}x: the roots and the rootlets fade to opacityZoomedIn, the small plant keeps its strength`,
+      (capped || reached >= BACKDROP.zoomForFloor - 0.01) && wantFade < BACKDROP.opacity - 0.05 && Math.abs(z25.roots - wantFade) < 0.02 && Math.abs(z25.layer - wantFade) < 0.02 && z25.keep === 1,
+      `at 1x roots ${rs.roots}, rootlets ${rs.layer}, plant ${rs.keep}; at ${r1(reached)}x roots ${r2(z25.roots)}, rootlets ${r2(z25.layer)} (the curve ${r2(wantFade)}), plant ${z25.keep}`);
     const zo = await zoomTo(s, 1);
     record('zoom back out: the roots return', Math.abs(zo.roots - BACKDROP.opacity) < 0.02, `at ${(zo.k / zo.homeK).toFixed(2)}x roots ${zo.roots.toFixed(2)}`);
 

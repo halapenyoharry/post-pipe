@@ -55,7 +55,7 @@ const MOCKUP = path.resolve(__dirname, '../../_handoff/T35-mockup-iphone13-two-s
 const CONTAINERS = SETTINGS.containers || {};
 const ACTS = Object.entries(CONTAINERS)
   .filter(([id, c]) => id.startsWith('container:') && c && c.anchor)
-  .map(([id, c]) => ({ id, anchor: c.anchor, fill: c.fill, fillOpacity: c.fillOpacity, face: c.labelFace, rootTips: c.rootTips || [] }));
+  .map(([id, c]) => ({ id, anchor: c.anchor, fill: c.fill, fillOpacity: c.fillOpacity, stroke: c.stroke || null, face: c.labelFace, rootTips: c.rootTips || [] }));
 const LABELS = Object.fromEntries((SETTINGS.containment || []).map((c) => [c.id, c.label]));
 const byLabel = (l) => ACTS.find((a) => LABELS[a.id] === l);
 const CROWN = OPENING.crownY;
@@ -309,7 +309,15 @@ async function run(bt, name, size, record, shots) {
   record(tag('graph: the title under the small plant, above the crown'), lineGraph.y0 > plantTop && lineGraph.y1 <= crownG + 2, `title ${r1(lineGraph.y0)}-${r1(lineGraph.y1)}, crown ${r1(crownG)}`);
   record(tag('graph: the byline under the title\'s last line, at its left edge'), !!byG && byG.y0 > lineGraph.y0 + lineGraph.h * 0.5 && byG.y0 < lineGraph.y1 + lineGraph.h && Math.abs(byG.x0 - lineGraph.x0) <= lineGraph.h * 0.25 && g.bylineOpacity > 0.3,
     `line ${r1(lineGraph.x0)},${r1(lineGraph.y0)}-${r1(lineGraph.y1)}; byline ${r1(byG.x0)},${r1(byG.y0)}, opacity ${r1(g.bylineOpacity)}`);
-  record(tag('graph: the byline within 10% of the last line\'s width'), Math.abs(byG.w / lineGraph.w - 1) <= 0.1, `${r1(byG.w)} against ${r1(lineGraph.w)}`);
+  // Since T36 the graph state's byline can be its own size, a share of the
+  // title's (opening.byline.graphScale; "by harold young is too big in the
+  // second frame"), checked to the px by the T36 checks; here only that it
+  // is no longer the line's width.
+  if (OPENING.byline && OPENING.byline.graphScale) {
+    record(tag('graph: the byline its own size since T36, well under the title\'s width'), byG.w < lineGraph.w * 0.5, `${r1(byG.w)} against ${r1(lineGraph.w)}`);
+  } else {
+    record(tag('graph: the byline within 10% of the last line\'s width'), Math.abs(byG.w / lineGraph.w - 1) <= 0.1, `${r1(byG.w)} against ${r1(lineGraph.w)}`);
+  }
 
   // The closed acts: blobs in the teal, in the title's face, at the mockup's places.
   const acts = await actsNow(page);
@@ -321,7 +329,13 @@ async function run(bt, name, size, record, shots) {
     if (!m || !m.closed) continue;
     const rgb = /rgb\((\d+), (\d+), (\d+)\)/.exec(m.fill);
     const hex = rgb ? '#' + rgb.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, '0')).join('') : m.fill;
-    record(tag(`${LABELS[act.id]}: filled with the title's teal at ${act.fillOpacity}, no outline`), hex.toLowerCase() === String(act.fill).toLowerCase() && Math.abs(m.fillOpacity - act.fillOpacity) < 0.01 && m.stroke === 'none', `${hex} at ${m.fillOpacity}, stroke ${m.stroke}`);
+    // Since T36 an act can have an outline of its own (containers.<id>.stroke:
+    // the title's teal, as Harold asked the acts to keep their own shape and
+    // only change colour); without one, none.
+    const srgb = /rgb\((\d+), (\d+), (\d+)\)/.exec(m.stroke);
+    const shex = srgb ? '#' + srgb.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, '0')).join('') : m.stroke;
+    const strokeOk = act.stroke ? shex.toLowerCase() === act.stroke.toLowerCase() : m.stroke === 'none';
+    record(tag(`${LABELS[act.id]}: filled with the title's teal at ${act.fillOpacity}, ${act.stroke ? `outlined in ${act.stroke}` : 'no outline'}`), hex.toLowerCase() === String(act.fill).toLowerCase() && Math.abs(m.fillOpacity - act.fillOpacity) < 0.01 && strokeOk, `${hex} at ${m.fillOpacity}, stroke ${m.stroke}`);
     record(tag(`${LABELS[act.id]}: its label "${LABELS[act.id]}" in the title's face`), m.label.trim() === LABELS[act.id] && m.face.includes(act.face), `"${m.label}" in ${m.face}`);
     // A blob, not a capsule: its outline is not symmetric about its centre.
     const c = m.centre;

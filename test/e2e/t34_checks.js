@@ -361,9 +361,17 @@ async function run(bt, name, size, record, shots) {
   const reset = await pivotView(p, PIVOT);
   record(`${tagOf('zoom')}: Reset comes back to the first frame (the same zoom, the pivot's point under it)`,
     Math.abs(reset.v.k - home.v.k) < 1e-6 && drift(home, reset) <= 2, `zoom ${r1(reset.v.k)} against ${r1(home.v.k)}, moved ${r1(drift(home, reset))} px`);
+  // Since T36 (graph.zoomMode grow-in-place) a zoom grows each pill about
+  // its own tip instead of moving it: a pill at the screen's edge then
+  // reaches past it while its tip stays on the art. There a pill is on the
+  // screen when its centre is; the T36 checks hold the tips to 2 px.
+  const GROW = GS.zoomMode === 'grow-in-place';
+  const pillShown = (o, mm) => (GROW
+    ? (o.x0 + o.x1) / 2 >= 0 && (o.x0 + o.x1) / 2 <= mm.W && (o.y0 + o.y1) / 2 >= 0 && (o.y0 + o.y1) / 2 <= mm.H
+    : onScreen(o, mm));
   const pills = async () => {
     const mm = await measure(p, { acts: ACTS, book: BOOK });
-    return { mm, off: ACTS.filter((a) => !(mm.acts[a.id] && mm.acts[a.id].pill && onScreen(mm.acts[a.id].pill, mm))).map((a) => a.name) };
+    return { mm, off: ACTS.filter((a) => !(mm.acts[a.id] && mm.acts[a.id].pill && pillShown(mm.acts[a.id].pill, mm))).map((a) => a.name) };
   };
   const crownAt = (mm) => mm.art.top + CROWN * mm.art.height;
   const m0 = await measure(p, { acts: ACTS, book: BOOK });
@@ -376,10 +384,12 @@ async function run(bt, name, size, record, shots) {
     const { mm, off } = await pills();
     const ratio = a.v.k / b.v.k;
     record(`${tagOf('zoom')}: ${label} zooms in about the roots' middle (the graph's point under the pivot moves under 2 px)`,
-      ratio >= wantRatio && drift(b, a) <= 2, `zoom ${r1(ratio)}x, moved ${r1(drift(b, a))} px`);
+      // Growing in place, a zoom in stops where two acts would come within
+      // 16 px (the T36 checks measure where): here only that it zoomed in.
+      ratio >= (GROW ? Math.min(wantRatio, 1.2) : wantRatio) && drift(b, a) <= 2, `zoom ${r1(ratio)}x, moved ${r1(drift(b, a))} px`);
     record(`${tagOf('zoom')}: ${label}: the crown on the art stays where it was (within 2 px)`, Math.abs(crownAt(mm) - crownAt(m0)) <= 2
       && Math.abs(mm.art.left - m0.art.left) <= 2, `crown at ${r1(crownAt(mm))}, was ${r1(crownAt(m0))}`);
-    if (pillsCheck === 'all') record(`${tagOf('zoom')}: ${label}: every closed pill on the screen`, off.length === 0, off.length ? `off: ${off.join(', ')}` : `at ${r1(ratio)}x`);
+    if (pillsCheck === 'all' || GROW) record(`${tagOf('zoom')}: ${label}: every closed pill on the screen${GROW ? ' (its centre, on its tip)' : ''}`, off.length === 0, off.length ? `off: ${off.join(', ')}` : `at ${r1(ratio)}x`);
     else console.log(`      ${label}: at ${r1(ratio)}x, pills off the screen: ${off.length ? off.join(', ') : 'none'}`);
     return { b, a, mm };
   };
