@@ -95,6 +95,22 @@ function closedPillScaleOf(GS) {
   return Number.isFinite(v) && v > 0 ? v : 1;
 }
 
+// The closed pill's look (graph.closedPill): shape 'blob', an irregular
+// rounded shape with straight-ish sides and soft corners, the same every
+// time for the same container; otherwise the soft rounded card it has
+// always been. status false leaves the container's status line off it.
+// labelSize: its label's size in px at the pill's full size (before
+// closedPillScale); null keeps the engine's (1.6 of a card's largest title).
+function closedPillOf(GS) {
+  const o = GS && GS.closedPill && typeof GS.closedPill === 'object' ? GS.closedPill : {};
+  const size = Number(o.labelSize);
+  return {
+    shape: o.shape === 'blob' ? 'blob' : 'soft',
+    status: o.status !== false,
+    labelSize: o.labelSize !== null && o.labelSize !== '' && Number.isFinite(size) && size > 0 ? size : null,
+  };
+}
+
 // Where a spiral with anchorEnd 'outer' opens: the direction, from its last
 // member, in which its first member lies (screen angles, y down).
 const SPIRAL_TOWARDS = { down: Math.PI / 2, 'down-right': Math.PI / 4, 'down-left': (3 * Math.PI) / 4 };
@@ -626,5 +642,5 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
 
 module.exports = {
   containerLayout, rectsOverlap, compareUnits, hangChain, hangOptions, hangRows, spiralOptions,
-  containerLayoutOf, hullDrawn, closedPillScaleOf,
+  containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf,
 };

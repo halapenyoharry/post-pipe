@@ -4,7 +4,8 @@ import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
-import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf } from './containerLayout';
+import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf } from './containerLayout';
+import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { zoomAbout, fitRatioAbout, repivot, zoomPivotMode } from './zoomPivot';
@@ -907,14 +908,16 @@ export function GraphViewer({
     const STATUS_SCALE = 0.42;
     const STATUS_GAP = 0.2;
     const statusOf = (d) => (d.status ? String(d.status) : '');
-    function labelBlockEm(d) {
+    // opts.status false leaves the status line out; opts.family measures in
+    // that face (a closed pill's labelFace).
+    function labelBlockEm(d, opts = {}) {
       const n = labelLines(d).length;
-      const statusH = statusOf(d) ? STATUS_GAP + STATUS_SCALE * 1.3 : 0;
+      const statusH = statusOf(d) && opts.status !== false ? STATUS_GAP + STATUS_SCALE * 1.3 : 0;
       return { n, statusH, total: n * LABEL_LINE_H + statusH };
     }
-    function buildWrappedLabel(textSel, d) {
+    function buildWrappedLabel(textSel, d, opts = {}) {
       const lines = labelLines(d);
-      const { n: nLines, total } = labelBlockEm(d);
+      const { n: nLines, total } = labelBlockEm(d, opts);
       const top = -total / 2;
       textSel.selectAll('*').remove();
       lines.forEach((line, i) => {
@@ -932,7 +935,7 @@ export function GraphViewer({
             .text('');
         }
       });
-      const status = statusOf(d);
+      const status = opts.status === false ? '' : statusOf(d);
       if (status) {
         // y is in the tspan's own (smaller) em, hence the division.
         const yParent = top + nLines * LABEL_LINE_H + STATUS_GAP + (STATUS_SCALE * 1.3) / 2;
@@ -954,25 +957,25 @@ export function GraphViewer({
       const v = getComputedStyle(document.documentElement).getPropertyValue('--pp-title-font').trim();
       return v || "'Atkinson', sans-serif";
     }
-    function labelInkWidth(text, fs, weight) {
+    function labelInkWidth(text, fs, weight, family) {
       // Letter-spacing is 0.05em in the stylesheet; canvas does not apply it.
-      const spacing = text.length * fs * 0.05;
+      const spacing = family ? 0 : text.length * fs * 0.05;
       if (!labelMeasureCtx) return text.length * fs * 0.6 + spacing;
       // The face titles are drawn in: the theme's (--pp-title-font), else Atkinson.
-      labelMeasureCtx.font = `${sketchOn ? 400 : weight} ${fs}px ${titleFamily()}`;
+      labelMeasureCtx.font = family ? `400 ${fs}px ${family}` : `${sketchOn ? 400 : weight} ${fs}px ${titleFamily()}`;
       return labelMeasureCtx.measureText(text).width * 1.06 + spacing;
     }
     // The rectangle a container's label occupies at font size fs.
-    function labelBlockSize(c, fs) {
+    function labelBlockSize(c, fs, opts = {}) {
       const lines = labelLines(c);
-      const countW = SHOW_COUNT ? labelInkWidth(' 000', fs * 0.5, 500) + 12 : 0;
-      const status = statusOf(c);
+      const countW = SHOW_COUNT ? labelInkWidth(' 000', fs * 0.5, 500, opts.family) + 12 : 0;
+      const status = opts.status === false ? '' : statusOf(c);
       const w = Math.max(
-        ...lines.map((l, i) => labelInkWidth(l, fs, 700) + (i === lines.length - 1 ? countW : 0)),
-        status ? labelInkWidth(status, fs * STATUS_SCALE, 500) : 0,
+        ...lines.map((l, i) => labelInkWidth(l, fs, 700, opts.family) + (i === lines.length - 1 ? countW : 0)),
+        status ? labelInkWidth(status, fs * STATUS_SCALE, 500, opts.family) : 0,
       );
       // A text box is taller than its lines: ascenders and descenders.
-      const h = labelBlockEm(c).total * fs + 0.3 * fs;
+      const h = labelBlockEm(c, opts).total * fs + 0.3 * fs;
       return { w: w + 24, h: h + 12 };
     }
     function getContainerColor(c) {
@@ -1059,24 +1062,35 @@ export function GraphViewer({
 
     // A closed container is a node, but a bigger, softer one: a blob in the
     // container's color rather than a card, with larger text than a chapter's.
+    // A container's closed look of its own (containers.<id>.fill,
+    // fillOpacity, labelFace, labelColor; generate-index carries them as
+    // blob): a flat fill, no outline or glow, the label in its face.
+    const PILL = closedPillOf(GS);
+    const blobOf = (d) => (d && d.blob) || {};
+    const faceOf = (d) => (blobOf(d).labelFace ? `'${String(blobOf(d).labelFace).replace(/'/g, '')}', sans-serif` : null);
     containerMacroNodes.append('path')
       .attr('class', 'container-macro-bg')
-      .style('fill', (d) => `color-mix(in srgb, ${getContainerColor(d)} 16%, var(--pp-macro-base, #151826))`)
-      .attr('stroke', (d) => getContainerColor(d))
+      .style('fill', (d) => blobOf(d).fill || `color-mix(in srgb, ${getContainerColor(d)} 16%, var(--pp-macro-base, #151826))`)
+      .style('fill-opacity', (d) => (blobOf(d).fill && Number.isFinite(blobOf(d).fillOpacity) ? blobOf(d).fillOpacity : null))
+      .attr('stroke', (d) => (blobOf(d).fill ? 'none' : getContainerColor(d)))
       .attr('stroke-width', 2.2)
-      .style('filter', (d) => `drop-shadow(0 0 18px color-mix(in srgb, ${getContainerColor(d)} 45%, transparent))`);
+      .style('filter', (d) => (blobOf(d).fill ? 'none' : `drop-shadow(0 0 18px color-mix(in srgb, ${getContainerColor(d)} 45%, transparent))`));
 
     const PILL_SCALE = closedPillScaleOf(GS);
-    const CLOSED_FONT = Math.round((CARD.labelMaxFontSize || 26) * 1.6);
+    const CLOSED_FONT = PILL.labelSize || Math.round((CARD.labelMaxFontSize || 26) * 1.6);
     const containerMacroTexts = containerMacroNodes.append('text')
       .attr('class', 'container-macro-text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
-      .attr('fill', (d) => getContainerColor(d))
+      .attr('fill', (d) => blobOf(d).labelColor || getContainerColor(d))
       .attr('font-size', (d) => `${!d.parent ? Math.round(CLOSED_FONT * 1.25) : CLOSED_FONT}px`)
       .attr('font-family', "'Atkinson', sans-serif")
       .attr('font-weight', '700')
-      .attr('letter-spacing', '-0.02em');
+      .attr('letter-spacing', '-0.02em')
+      // Inline, over the theme's own face for titles.
+      .style('font-family', (d) => faceOf(d))
+      .style('font-weight', (d) => (faceOf(d) ? '400' : null))
+      .style('letter-spacing', (d) => (faceOf(d) ? '0' : null));
 
     // A soft closed outline through points on a rounded rectangle, nudged in
     // and out a little (the same way every time for the same container).
@@ -1085,6 +1099,7 @@ export function GraphViewer({
       let seed = 0;
       for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) >>> 0;
       const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      if (PILL.shape === 'blob') return blobLine(irregularBlob(rand, hw, hh));
       const pts = [];
       const N = 14;
       for (let k = 0; k < N; k++) {
@@ -1098,15 +1113,51 @@ export function GraphViewer({
       return blobLine(pts);
     }
 
+    // graph.closedPill.shape 'blob': eight corners round an ellipse, each
+    // its own distance out and a little off its even place, the sides
+    // between them kept nearly straight and the corners rounded (three
+    // points along each side: a sixth in from each end, and its middle).
+    // It stays within
+    // hw x hh.
+    function irregularBlob(rand, hw, hh) {
+      const N = 8;
+      const corners = [];
+      const turn = rand() * Math.PI * 2;
+      for (let k = 0; k < N; k++) {
+        const t = turn + ((k + (rand() - 0.5) * 0.5) / N) * Math.PI * 2;
+        const r = 0.86 + rand() * 0.14;
+        corners.push([Math.cos(t) * r, Math.sin(t) * r]);
+      }
+      // Stretched to fill hw x hh.
+      const xs = corners.map((p) => p[0]), ys = corners.map((p) => p[1]);
+      const sx = hw / Math.max(...xs.map(Math.abs)), sy = hh / Math.max(...ys.map(Math.abs));
+      const pts = [];
+      for (let k = 0; k < N; k++) {
+        const a = corners[k], b = corners[(k + 1) % N];
+        const at = (f) => [(a[0] + (b[0] - a[0]) * f) * sx, (a[1] + (b[1] - a[1]) * f) * sy];
+        pts.push(at(0.16), at(0.5), at(0.84));
+      }
+      return pts;
+    }
+
     containerMacroTexts.each(function(d) {
-      buildWrappedLabel(d3.select(this), d);
+      buildWrappedLabel(d3.select(this), d, { status: PILL.status, family: faceOf(d) });
     });
+    // A closed label's own face: measured again once it has loaded.
+    const pillFaces = [...new Set((data.containers || []).map(faceOf).filter(Boolean))];
+    if (pillFaces.length && typeof document !== 'undefined' && document.fonts && document.fonts.load) {
+      Promise.all(pillFaces.map((f) => document.fonts.load(`48px ${f}`))).then(() => {
+        if (!positionsReady || !svgRef.current) return;
+        relayoutContainers();
+        applyPositions();
+      }, () => {});
+    }
 
     function updateMacroBounds() {
       containerMacroNodes.each(function (d) {
         const g = d3.select(this);
         const fs = parseFloat(g.select('.container-macro-text').attr('font-size')) || CLOSED_FONT;
-        const block = labelBlockSize(d, fs);
+        const block = labelBlockSize(d, fs, { status: PILL.status, family: faceOf(d) });
         // At least half again a chapter card, and room for the text.
         const bw = Math.max(CARD.width * 1.5, block.w + fs * 1.4);
         const bh = Math.max(CARD.height * 1.5, block.h + fs * 1.4);
@@ -1495,9 +1546,38 @@ export function GraphViewer({
         n.vx = 0; n.vy = 0;
       }
     }
+    // Open acts never overlap (actsApart.js): an open anchored container
+    // whose box meets another's is moved the way its spiral opens until it
+    // clears them, 16 px apart at the zoom the graph rests at. Closed ones,
+    // and ones the reader dragged, stay. targets: cId -> its centre.
+    function apart(targets) {
+      if (!anchorsOn()) return targets;
+      const acts = [];
+      for (const cId of ANCHORS.keys()) {
+        const info = CL.containers.get(cId);
+        const c = targets.get(cId) || centreOf(cId);
+        if (!info || !c) continue;
+        const ox = c.x - info.center.x, oy = c.y - info.center.y;
+        acts.push({
+          id: cId,
+          box: { x0: info.box.x0 + ox, y0: info.box.y0 + oy, x1: info.box.x1 + ox, y1: info.box.y1 + oy },
+          open: !closedContainers.has(cId),
+          fixed: isDetached(cId),
+          towards: spiralOf(containerById.get(cId)).openTowards,
+        });
+      }
+      const moved = actsApart(acts, { gap: 16 / HOME_K });
+      if (!moved.size) return targets;
+      const out = new Map(targets);
+      for (const [cId, m] of moved) {
+        const c = out.get(cId) || centreOf(cId);
+        if (c) out.set(cId, { x: c.x + m.dx, y: c.y + m.dy });
+      }
+      return out;
+    }
     function placeAnchors(ids = [...ANCHORS.keys()]) {
       if (!anchorsOn()) return false;
-      const targets = anchorTargets();
+      const targets = apart(anchorTargets());
       moveCentres(ids.map((cId) => [cId, targets.get(cId)]));
       for (const cId of ids) anchorsPending.delete(cId);
       anchorsAuto = ids.length === ANCHORS.size;
@@ -2036,7 +2116,7 @@ export function GraphViewer({
       const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
       // An anchored container keeps its anchor as its centre, or, once the
       // reader has dragged it, its centre where it is.
-      const centres = new Map();
+      let centres = new Map();
       if (anchorsOn()) {
         const targets = anchorTargets();
         for (const cId of ANCHORS.keys()) {
@@ -2047,6 +2127,7 @@ export function GraphViewer({
       updateMacroBounds();
       computeContainerLayout();
       refreshContainerForces();
+      if (anchorsOn()) centres = apart(centres);
       if (!spiralOn()) return;
       const moves = [];
       for (const [id, p] of CL.nodes) {
