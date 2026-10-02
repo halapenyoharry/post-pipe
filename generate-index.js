@@ -381,6 +381,26 @@ ${siteFontFaces()}
     font: 10px/1.35 system-ui, -apple-system, sans-serif; text-align: center;
     color: var(--pp-quiet-text, #a3abc4); pointer-events: none;
   }
+  .pp-rights a { pointer-events: auto; }
+  /* rights.position bottom-edge: at the screen's very foot, the last line's
+     baseline 6 px above it (and the safe area), no margin beyond that; 11 px
+     and one line on a wide screen, 10 px and at most two lines on a phone
+     (set a little narrower there to fit); faded to a quarter while a card
+     is under it (data-rights-over, set by the graph). */
+  .pp-rights[data-rights-position="bottom-edge"] {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px - 0.2em);
+    margin: 0; padding: 0;
+    font-size: 11px; line-height: 1.2;
+    max-width: calc(100vw - 16px);
+    transition: opacity 0.2s ease;
+  }
+  @media (max-width: 600px) {
+    .pp-rights[data-rights-position="bottom-edge"] {
+      font-size: 10px; max-width: calc(100vw - 8px);
+      font-stretch: semi-condensed; letter-spacing: -0.02em;
+    }
+  }
+  .pp-rights[data-rights-over] { opacity: 0.25; }
 
   #error { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #e74c3c; font-size: 18px; }
 

@@ -53,3 +53,17 @@ test('every piece page carries the rights line and meta', async () => {
   assert.ok(page.indexOf('Some text.') < page.indexOf('pp-rights'), 'the line follows the text');
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('rights.position bottom-edge: the footer says so; the line meets a card only when their boxes overlap', () => {
+  const { rightsPosition, rightsOverCards } = require('../src/lib/rights');
+  assert.strictEqual(rightsPosition({ ...RIGHTS, position: 'bottom-edge' }), 'bottom-edge');
+  assert.strictEqual(rightsPosition(RIGHTS), null);
+  assert.strictEqual(rightsPosition({ ...RIGHTS, position: 'top' }), null);
+  assert.match(rightsFooterHtml({ ...RIGHTS, position: 'bottom-edge' }), /^<footer class="pp-rights" data-rights data-rights-position="bottom-edge">© 2026 A Holder\./);
+  const line = { left: 4, top: 820, right: 386, bottom: 840 };
+  assert.strictEqual(rightsOverCards(line, [{ left: 100, top: 700, right: 160, bottom: 780 }]), false, 'a card above it');
+  assert.strictEqual(rightsOverCards(line, [{ left: 100, top: 800, right: 160, bottom: 830 }]), true, 'a card under it');
+  assert.strictEqual(rightsOverCards(line, [{ left: 0, top: 0, right: 0, bottom: 0 }]), false, 'a card not drawn');
+  assert.strictEqual(rightsOverCards(null, [{ left: 100, top: 800, right: 160, bottom: 830 }]), false);
+  assert.strictEqual(rightsOverCards(line, []), false);
+});

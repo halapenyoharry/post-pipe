@@ -130,10 +130,12 @@ function keysBelongElsewhere(e) {
   return false;
 }
 
-// The space the page keeps at the bottom: the rights line, when there is one.
+// The space the page keeps at the bottom: the rights line, when there is one
+// above the foot (at the very foot, rights.position bottom-edge, it lies over
+// the picture and keeps no room).
 function bottomInset(vh) {
   const el = typeof document !== 'undefined' && document.querySelector('[data-rights]');
-  if (!el) return 0;
+  if (!el || el.getAttribute('data-rights-position') === 'bottom-edge') return 0;
   const r = el.getBoundingClientRect();
   return r.height > 0 ? Math.max(0, vh - r.top + 8) : 0;
 }

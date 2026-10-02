@@ -22,6 +22,7 @@ import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
 import { isLinkItem, linkOf, followLink } from '../../lib/linkNode';
+import { rightsOverCards } from '../../lib/rights';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -550,6 +551,7 @@ export function GraphViewer({
       zoomScaleRef.current = newScale;
       // Growing in place, every zoom moves where the containers are drawn.
       if (positionsReady && GROW && growOn()) applyPositions();
+      if (positionsReady) scheduleRightsFade();
       if (edgeLabelFor) placeEdgeLabel();
       // The rail is pinned to the window and the nodes are not, so every pan
       // and zoom moves one end of every connector.
@@ -3301,6 +3303,32 @@ export function GraphViewer({
       updateContainers();
       if (rootsUpdateRef.current) rootsUpdateRef.current();
       if (readersUpdateRef.current) readersUpdateRef.current();
+      scheduleRightsFade();
+    }
+    // ── The rights line at the foot ───────────────────────────────────────
+    // With rights.position bottom-edge the page's rights line lies at the
+    // screen's very foot, over the picture; while a card is under it, it
+    // fades to a quarter (data-rights-over), so it never sits over a card's
+    // title. Checked at most once a frame, after anything moves or zooms.
+    let rightsFrame = null;
+    function fadeRights() {
+      rightsFrame = null;
+      if (typeof document === 'undefined') return;
+      const el = document.querySelector('[data-rights][data-rights-position="bottom-edge"]');
+      if (!el) return;
+      const cards = [];
+      if (articleNodes) {
+        articleNodes.each(function (d) {
+          if (d._closedHidden || this.style.display === 'none') return;
+          cards.push(this.getBoundingClientRect());
+        });
+      }
+      const over = rightsOverCards(el.getBoundingClientRect(), cards);
+      if (over !== el.hasAttribute('data-rights-over')) el.toggleAttribute('data-rights-over', over);
+    }
+    function scheduleRightsFade() {
+      if (rightsFrame || typeof requestAnimationFrame === 'undefined') return;
+      rightsFrame = requestAnimationFrame(fadeRights);
     }
     // ── Readers ───────────────────────────────────────────────────────────
     // Connections readers drew between chapters: a layer of its own, dashed
@@ -3462,6 +3490,10 @@ export function GraphViewer({
     }
     window.addEventListener('postpipe:cover-frame', onCoverFrame);
     onCoverFrame();
+    // The cover settling moves the graph under the rights line.
+    const onCoverRest = () => scheduleRightsFade();
+    window.addEventListener('postpipe:cover', onCoverRest);
+    window.addEventListener('resize', onCoverRest);
 
     // The axis is measured against the corpus extent, which keeps changing
     // while the simulation runs — so drawing it once at the start pins it to
@@ -4053,6 +4085,9 @@ export function GraphViewer({
       tapGate.cancel();
       window.removeEventListener('graph:reset-all', handleResetAll);
       window.removeEventListener('postpipe:cover-frame', onCoverFrame);
+      window.removeEventListener('postpipe:cover', onCoverRest);
+      window.removeEventListener('resize', onCoverRest);
+      if (rightsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rightsFrame);
       if (window.PostPipeGraphWorld && window.PostPipeGraphWorld.snapshot === worldSnapshot) delete window.PostPipeGraphWorld;
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('keydown', handleZoomKey);
