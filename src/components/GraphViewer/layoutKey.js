@@ -1,24 +1,37 @@
 // Where the positions a layout gave its nodes are filed. A node's place
 // depends on the layout (a ring is not a cluster) and on the settings that
-// shape it: the spiral's mode, spacing, start radius and direction, the card
+// shape it: the spiral's mode, spacing, start radius and direction (and
+// where it sits on its anchor, which way it opens, the line it keeps below
+// and the scale of its cards), the card
 // size it spaces by, the force simulation, and graph.layoutVersion, which a
 // site bumps to retire saved positions on purpose, and the containers'
 // anchors (where a site rests them on its cover's art), and how the containers
 // are laid out (graph.containerLayout, graph.hang, graph.hull.padding, and each
-// container's own layout, hang and hull). So the key is the layout's
+// container's own layout, hang, hull and spiral). So the key is the layout's
 // name plus a short signature of those settings. When any of them changes,
 // positions saved under the old key are no longer read (they stay in storage
 // until Forget clears them), and the layout places the nodes afresh.
 //
 // The key never contains '::', which separates it from the item id.
 
-const SPIRAL_KEYS = ['enabled', 'mode', 'spacing', 'startRadius', 'direction', 'strength'];
+const SPIRAL_KEYS = ['enabled', 'mode', 'spacing', 'startRadius', 'direction', 'strength', 'anchorEnd', 'openTowards', 'keepBelow', 'cardScale'];
 const SIM_KEYS = ['linkDistance', 'chargeStrength', 'collidePadding'];
 
 function pick(obj, keys) {
   const out = {};
   if (!obj || typeof obj !== 'object') return out;
   for (const k of keys) if (obj[k] !== undefined && obj[k] !== null) out[k] = obj[k];
+  return out;
+}
+
+// The spiral's settings; the ones added since (anchorEnd, openTowards,
+// cardScale) only when not their defaults, so a site that leaves them alone
+// keeps the keys it had.
+function spiralPart(spiral) {
+  const out = pick(spiral, SPIRAL_KEYS);
+  if (out.anchorEnd === 'center') delete out.anchorEnd;
+  if (out.openTowards === 'down') delete out.openTowards;
+  if (Number(out.cardScale) === 1) delete out.cardScale;
   return out;
 }
 
@@ -46,7 +59,7 @@ function layoutSignature(graphSettings, { anchors, layouts } = {}) {
   const card = g.card || {};
   const sig = {
     v,
-    spiral: pick(g.spiral, SPIRAL_KEYS),
+    spiral: spiralPart(g.spiral),
     card: pick(card, ['width', 'height']),
     sim: pick(g.simulation, SIM_KEYS),
   };

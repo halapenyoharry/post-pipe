@@ -50,3 +50,15 @@ test('each layout has its own key, and none contains the item separator', () => 
   }
   assert.ok(layoutSignature(SITE).includes('"direction":"outward"'));
 });
+
+test('the spiral on its tip: a set anchorEnd, openTowards, keepBelow or cardScale changes the key; their defaults do not', () => {
+  const { layoutKey: key } = require('../src/components/GraphViewer/layoutKey');
+  const base = { spiral: { spacing: 20 } };
+  const same = { spiral: { spacing: 20, anchorEnd: 'center', openTowards: 'down', cardScale: 1, keepBelow: null } };
+  assert.strictEqual(key('force', same), key('force', base));
+  for (const extra of [{ anchorEnd: 'outer' }, { openTowards: 'down-left' }, { keepBelow: 'crown' }, { cardScale: 0.5 }]) {
+    assert.notStrictEqual(key('force', { spiral: { spacing: 20, ...extra } }), key('force', base), JSON.stringify(extra));
+  }
+  const own = { layouts: { 'container:a': { spiral: { openTowards: 'down-right' } } } };
+  assert.notStrictEqual(key('force', base, own), key('force', base));
+});

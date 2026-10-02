@@ -399,7 +399,15 @@
       "startRadius": null,
       "_startRadius_note": "The spiral's radius at the first chapter. null = about two thirds of a card.",
       "direction": "outward",
-      "_direction_note": "outward (default): the first chapter sits under the container's label and the spiral winds clockwise outward from it, so the last chapter is on the outer end. inward: the same reading order turned round, so the first chapter is on the outer end, at the top where a new reader looks first, and the spiral winds clockwise inward to the last one beside the label."
+      "_direction_note": "outward (default): the first chapter sits under the container's label and the spiral winds clockwise outward from it, so the last chapter is on the outer end. inward: the same reading order turned round, so the first chapter is on the outer end, at the top where a new reader looks first, and the spiral winds clockwise inward to the last one beside the label.",
+      "anchorEnd": "center",
+      "_anchorEnd_note": "Which part of a container's spiral sits on its anchor (containers.<id>.anchor). center (default): the spiral's centre, its title there and the first chapter just under it. outer: the spiral's outer end, its last chapter, sits on the anchor, and the spiral is turned so the first chapter lies from it toward openTowards.",
+      "openTowards": "down",
+      "_openTowards_note": "With anchorEnd outer, the direction from the last chapter (on the anchor) to the first: down (default), down-left or down-right. Set per container under containers.<id>.spiral.",
+      "keepBelow": null,
+      "_keepBelow_note": "crown: no card and no part of the hull of an anchored container goes above the roots' crown, the line opening.crownY (a fraction of the cover art's height). Where the spiral would cross it, it is turned (the least turn that clears it, up to a quarter turn) or else moved down; nothing is cut off. null (default): no line.",
+      "cardScale": 1,
+      "_cardScale_note": "The scale a container's cards are drawn at, and spaced for, against graph.card (default 1). A card keeps its text at every scale; the reader zooms in to read it. Set per container under containers.<id>.spiral, with spacing, anchorEnd, openTowards and keepBelow, each over the graph-wide value."
     },
     "initialFocus": "all",
     "_initialFocus_note": "What the first screen frames: all (default) or a container id. A container is framed so its cards are still cards (initialFocusMinScale, default 0.4); when the whole top-level container fits at that scale, it is framed instead. Zoom to Fit always frames everything.",

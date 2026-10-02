@@ -27,6 +27,15 @@
 //     far side, round, and up the near side, so one end of the chain is low
 //     and the other is at the top, under the anchor (hangChain below).
 //
+//   - the spiral's own settings (options.spiralOf(container), spiralOptions
+//     below): anchorEnd 'outer' puts the spiral's outer end, its last member,
+//     at the frame's origin (the container's anchor), turned so the first
+//     member lies from it toward openTowards ('down', 'down-left' or
+//     'down-right'); keepBelowY keeps every card and the hull at or below
+//     that line of the frame, turning the spiral or else moving it down;
+//     cardScale draws the container's cards at that scale and spaces them
+//     for it; spacing overrides options.spacing for that container.
+//
 // The renderer turns this into a gentle positional force, so the result is a
 // target the simulation settles into rather than coordinates it is nailed to.
 
@@ -84,6 +93,35 @@ function hullDrawn(c) {
 function closedPillScaleOf(GS) {
   const v = Number(GS && GS.closedPillScale);
   return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
+// Where a spiral with anchorEnd 'outer' opens: the direction, from its last
+// member, in which its first member lies (screen angles, y down).
+const SPIRAL_TOWARDS = { down: Math.PI / 2, 'down-right': Math.PI / 4, 'down-left': (3 * Math.PI) / 4 };
+
+// A container's spiral settings with their defaults: containers.<id>.spiral
+// over graph.spiral. keepBelowY is a y in the container's frame (the anchor
+// at 0), worked out by the renderer from spiral.keepBelow; null for none.
+function spiralOptions(s) {
+  const o = s && typeof s === 'object' ? s : {};
+  const num = (v) => (v !== null && v !== '' && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : null);
+  const scale = num(o.cardScale);
+  const spacing = num(o.spacing);
+  return {
+    anchorEnd: o.anchorEnd === 'outer' ? 'outer' : 'center',
+    openTowards: Object.prototype.hasOwnProperty.call(SPIRAL_TOWARDS, o.openTowards) ? o.openTowards : 'down',
+    keepBelowY: num(o.keepBelowY),
+    cardScale: scale !== null && scale > 0 ? scale : 1,
+    spacing: spacing !== null && spacing >= 0 ? spacing : null,
+  };
+}
+
+// The signed difference a - b of two angles, in (-π, π].
+function angleDiff(a, b) {
+  let d = (a - b) % (2 * Math.PI);
+  if (d <= -Math.PI) d += 2 * Math.PI;
+  if (d > Math.PI) d -= 2 * Math.PI;
+  return d;
 }
 
 const HANG_DIRECTIONS = ['down', 'down-left', 'down-right'];
@@ -205,8 +243,9 @@ function hangChain(units, lab, opts = {}) {
  *   hangOf(container): its hang settings { direction, firstAt, columns, gap }
  *   mode: 'path' (default) | 'scatter' | 'ring'; startRadius: the spiral's radius at its first member;
  *   direction: 'outward' (default, the first member beside the label) | 'inward' (the first member on the outer end)
+ *   spiralOf(container): its spiral settings { anchorEnd, openTowards, keepBelowY, cardScale, spacing } (spiralOptions)
  * @returns {{ roots: string[], nodes: Map, containers: Map }}
- *   nodes:      nodeId -> { root, x, y }          position in its root container's frame
+ *   nodes:      nodeId -> { root, x, y, scale }   position in its root container's frame; scale, the card's (cardScale)
  *   containers: id -> { root, label: rect, box: rect, center: {x, y}, closed }  in the root frame
  */
 function containerLayout({ containers, members, labelSize, macroSize, closed, options = {} }) {
@@ -251,8 +290,12 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
         order: Number.isFinite(ch.order) ? ch.order : null, index: -10000 + index,
       });
     }
+    // The spiral's own settings; its cards are spaced at the scale they are
+    // drawn at.
+    const so = spiralOptions(options.spiralOf ? options.spiralOf(c) : null);
+    const ownSpacing = so.spacing !== null ? so.spacing : spacing;
     (members.get(c.id) || []).forEach((m, index) => {
-      units.push({ kind: 'node', id: m.id, w: m.w, h: m.h, order: m.order, date: m.date, index });
+      units.push({ kind: 'node', id: m.id, w: m.w * so.cardScale, h: m.h * so.cardScale, scale: so.cardScale, order: m.order, date: m.date, index });
     });
     units.sort(compareUnits);
 
@@ -267,7 +310,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       const res = hangChain(units, lab, { ...hang, pad, labelGap: gap / 2 });
       const nodes = new Map();
       const placed = units.map((u, k) => {
-        nodes.set(u.id, { x: res.positions[k].x, y: res.positions[k].y });
+        nodes.set(u.id, { x: res.positions[k].x, y: res.positions[k].y, scale: u.scale });
         return rectAt(res.positions[k].x, res.positions[k].y, u.w, u.h);
       });
       const inner = placed.length ? union([res.label, ...placed]) : res.label;
@@ -282,7 +325,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       return { box, nodes, containers: new Map([[c.id, self]]) };
     }
 
-    const labelRect = rectAt(0, 0, lab.w, lab.h);
+    let labelRect = rectAt(0, 0, lab.w, lab.h);
     const nodes = new Map();
     const cmap = new Map();
     const placed = [];
@@ -292,7 +335,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       const first = units[0];
       const fx = 0;
       const fy = lab.h / 2 + gap + first.h / 2;
-      const clear = (rect) => !rectsOverlap(rect, labelRect, gap) && !placed.some((p) => rectsOverlap(rect, p, spacing));
+      const clear = (rect) => !rectsOverlap(rect, labelRect, gap) && !placed.some((p) => rectsOverlap(rect, p, ownSpacing));
       const hasChildContainers = units.some((u) => u.kind === 'container');
       const ordered = units.some((u) => Number.isFinite(u.order));
       const arrangement = hasChildContainers ? (mode === 'scatter' ? 'scatter' : 'beside')
@@ -310,44 +353,158 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
         // mirrored, so the first member sits on the outer end (where the eye
         // lands first, at the top) and the order winds clockwise and inward
         // to the last one beside the label.
+        //
+        // The curve can be turned by theta about the first member it is
+        // laid out from (the label stays above that member); each unit is
+        // still placed at the first spot along it that clears the rest, so a
+        // turned spiral is packed as tightly as an upright one.
         const inward = options.direction === 'inward';
-        if (inward) units.reverse();
-        const sy = lab.h / 2 + gap + units[0].h / 2;
-        const maxSide = Math.max(...units.map((u) => Math.max(u.w, u.h)));
+        const order = inward ? units.slice().reverse() : units;
+        const sy = lab.h / 2 + gap + order[0].h / 2;
+        const maxSide = Math.max(...order.map((u) => Math.max(u.w, u.h)));
         const a = options.startRadius != null ? options.startRadius : maxSide * 0.65;
-        const cx0 = fx;
-        const cy0 = sy + a;
         const t0 = -Math.PI / 2;
-        const at = (t) => {
-          const r = a * Math.exp(SPIRAL_B * (t - t0));
-          return { x: cx0 + r * Math.cos(t), y: cy0 + r * Math.sin(t) };
-        };
-        spiral = { cx: cx0, cy: cy0, a, b: SPIRAL_B };
-        let t = t0;
-        units.forEach((u, k) => {
-          let p = { x: fx, y: sy };
-          if (k > 0) {
-            // Walk along the curve, a few pixels at a time, to the first spot
-            // where this unit clears the label and every unit already placed:
-            // one unit size plus spacing from the previous one.
-            for (let guard = 0; guard < 200000; guard++) {
-              const r = a * Math.exp(SPIRAL_B * (t - t0));
-              t += 3 / (r * Math.sqrt(1 + SPIRAL_B * SPIRAL_B));
-              p = at(t);
-              if (clear(rectAt(p.x, p.y, u.w, u.h))) break;
+        const walk = (theta) => {
+          const cos = Math.cos(theta), sin = Math.sin(theta);
+          const rot = (x, y) => ({ x: x * cos - y * sin, y: x * sin + y * cos });
+          const c0 = rot(0, a);
+          const cx0 = fx + c0.x;
+          const cy0 = sy + c0.y;
+          const at = (t) => {
+            const r = a * Math.exp(SPIRAL_B * (t - t0));
+            const d = rot(Math.cos(t), Math.sin(t));
+            return { x: cx0 + r * d.x, y: cy0 + r * d.y };
+          };
+          const pos = [];
+          const rects = [];
+          const free = (rect) => !rectsOverlap(rect, labelRect, gap) && !rects.some((p) => rectsOverlap(rect, p, ownSpacing));
+          let t = t0;
+          order.forEach((u, k) => {
+            let p = { x: fx, y: sy };
+            if (k > 0) {
+              // Walk along the curve, a few pixels at a time, to the first spot
+              // where this unit clears the label and every unit already placed:
+              // one unit size plus spacing from the previous one.
+              for (let guard = 0; guard < 200000; guard++) {
+                const r = a * Math.exp(SPIRAL_B * (t - t0));
+                t += 3 / (r * Math.sqrt(1 + SPIRAL_B * SPIRAL_B));
+                p = at(t);
+                if (free(rectAt(p.x, p.y, u.w, u.h))) break;
+              }
             }
+            pos.push(p);
+            rects.push(rectAt(p.x, p.y, u.w, u.h));
+          });
+          let sp = { cx: cx0, cy: cy0, a, b: SPIRAL_B, theta };
+          if (inward) {
+            pos.reverse();
+            rects.reverse();
+            for (const p of pos) p.x = -p.x;
+            for (const r of rects) { const x0 = -r.x1; r.x1 = -r.x0; r.x0 = x0; }
+            sp = { ...sp, cx: -sp.cx, mirrored: true, inward: true };
           }
-          positions.push(p);
-          placed.push(rectAt(p.x, p.y, u.w, u.h));
-        });
-        if (inward) {
-          units.reverse();
-          positions.reverse();
-          placed.reverse();
-          for (const p of positions) p.x = -p.x;
-          for (const r of placed) { const x0 = -r.x1; r.x1 = -r.x0; r.x0 = x0; }
-          spiral = { ...spiral, mirrored: true, inward: true };
+          return { pos, rects, sp };
+        };
+        // The direction from the last member to the first.
+        const opening = (res) => {
+          const f = res.pos[0], l = res.pos[res.pos.length - 1];
+          return Math.atan2(f.y - l.y, f.x - l.x);
+        };
+        // Turned by theta, then moved so the last member is at the origin.
+        const outerEnd = so.anchorEnd === 'outer';
+        const shifted = (theta) => {
+          const res = walk(theta);
+          const last = res.pos[res.pos.length - 1];
+          const dx = outerEnd ? -last.x : 0, dy = outerEnd ? -last.y : 0;
+          return { ...res, dx, dy };
+        };
+        let theta = 0;
+        let res = shifted(theta);
+        if (outerEnd && order.length > 1) {
+          // Turn the curve until its first member lies from its last toward
+          // openTowards. Mirrored (inward), a turn of the curve turns the
+          // result the other way.
+          const want = SPIRAL_TOWARDS[so.openTowards];
+          const sign = inward ? -1 : 1;
+          const miss = (r) => Math.abs(angleDiff(want, opening(r)));
+          for (let i = 0; i < 16; i++) {
+            const err = angleDiff(want, opening(res));
+            if (Math.abs(err) < 0.002) break;
+            theta += sign * err;
+            res = shifted(theta);
+          }
+          // A turn can move a member past the label to another spot, so the
+          // steps above need not settle: then search, every 3 degrees round,
+          // and finer about the best.
+          if (miss(res) >= 0.002) {
+            let best = { theta, res };
+            const tryAt = (th) => {
+              const r = shifted(th);
+              if (miss(r) < miss(best.res)) best = { theta: th, res: r };
+            };
+            for (let s = 0; s < 120; s++) tryAt((s * Math.PI) / 60);
+            for (let span = Math.PI / 60; span > 0.0005; span /= 3) {
+              const c0 = best.theta;
+              for (let s = -3; s <= 3; s++) tryAt(c0 + (s * span) / 3);
+            }
+            theta = best.theta;
+            res = best.res;
+          }
+          // What is left (a few degrees where the packing jumps) is taken
+          // up by turning the placed centres, and the label's, about the last
+          // member: as far as they go without any two meeting.
+          const rest = angleDiff(want, opening(res));
+          if (Math.abs(rest) >= 0.002 && Math.abs(rest) < (15 * Math.PI) / 180) {
+            const L = res.pos[res.pos.length - 1];
+            const turnBy = (ang) => {
+              const cos = Math.cos(ang), sin = Math.sin(ang);
+              const turn = (p) => ({ x: L.x + (p.x - L.x) * cos - (p.y - L.y) * sin, y: L.y + (p.x - L.x) * sin + (p.y - L.y) * cos });
+              const pos = res.pos.map(turn);
+              const rects = res.rects.map((r, k) => rectAt(pos[k].x, pos[k].y, r.x1 - r.x0, r.y1 - r.y0));
+              const lc = turn({ x: (labelRect.x0 + labelRect.x1) / 2, y: (labelRect.y0 + labelRect.y1) / 2 });
+              const lr = rectAt(lc.x, lc.y, labelRect.x1 - labelRect.x0, labelRect.y1 - labelRect.y0);
+              const sc = turn({ x: res.sp.cx, y: res.sp.cy });
+              const ok = rects.every((r, i) => !rectsOverlap(r, lr, gap / 2) && rects.every((q, j) => j <= i || !rectsOverlap(r, q, ownSpacing / 4)));
+              return ok ? { ...res, pos, rects, lab: lr, sp: { ...res.sp, cx: sc.x, cy: sc.y } } : null;
+            };
+            let lo = 0, hi = 1, done = turnBy(rest);
+            if (!done) {
+              for (let i = 0; i < 12; i++) {
+                const mid = (lo + hi) / 2;
+                const r = turnBy(rest * mid);
+                if (r) { lo = mid; done = r; } else hi = mid;
+              }
+            }
+            if (done) res = done;
+          }
         }
+        // Nothing above keepBelowY: the top of the cards (and the label),
+        // padded as the hull pads them, allowing for its curve.
+        let drop = 0;
+        if (so.keepBelowY !== null) {
+          const bulge = paddingOf(c, depth) * 1.25;
+          const topOf = (r) => Math.min((r.lab || labelRect).y0, ...r.rects.map((q) => q.y0)) + r.dy - bulge;
+          if (topOf(res) < so.keepBelowY) {
+            // The smallest turn either way that clears it, up to a quarter
+            // turn; past that, the spiral as it was, moved down.
+            let found = null;
+            for (let step = 1; step <= 18 && !found; step++) {
+              for (const s of [1, -1]) {
+                const r = shifted(theta + s * step * (Math.PI / 36));
+                if (topOf(r) >= so.keepBelowY) { found = r; break; }
+              }
+            }
+            if (found) res = found;
+            else drop = so.keepBelowY - topOf(res);
+          }
+        }
+        const dx = res.dx, dy = res.dy + drop;
+        res.pos.forEach((p, k) => { positions[k] = { x: p.x + dx, y: p.y + dy }; });
+        res.rects.forEach((r) => placed.push({ x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy }));
+        const lr = res.lab || labelRect;
+        labelRect = { x0: lr.x0 + dx, y0: lr.y0 + dy, x1: lr.x1 + dx, y1: lr.y1 + dy };
+        spiral = { ...res.sp, cx: res.sp.cx + dx, cy: res.sp.cy + dy };
+        if (outerEnd) spiral = { ...spiral, anchorEnd: 'outer', openTowards: so.openTowards, drop };
       } else if (arrangement === 'ring') {
         // One ring per container, its label in the middle. The radius gives
         // every member a card's diagonal plus spacing of arc, and clears the
@@ -424,12 +581,12 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
         const cx = positions[k].x;
         const cy = positions[k].y;
         if (u.kind === 'node') {
-          nodes.set(u.id, { x: cx, y: cy });
+          nodes.set(u.id, { x: cx, y: cy, scale: u.scale });
         } else {
           // Place the child so its box is centred on the unit.
           const ox = cx - (u.sub.box.x0 + u.sub.box.x1) / 2;
           const oy = cy - (u.sub.box.y0 + u.sub.box.y1) / 2;
-          for (const [id, p] of u.sub.nodes) nodes.set(id, { x: p.x + ox, y: p.y + oy });
+          for (const [id, p] of u.sub.nodes) nodes.set(id, { x: p.x + ox, y: p.y + oy, scale: p.scale });
           for (const [id, info] of u.sub.containers) {
             const shift = (r) => ({ x0: r.x0 + ox, y0: r.y0 + oy, x1: r.x1 + ox, y1: r.y1 + oy });
             cmap.set(id, {
@@ -460,7 +617,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
     const res = layoutOne(byId.get(rootId), 0, new Set());
     if (!res) continue;
     for (const [id, p] of res.nodes) {
-      if (!outNodes.has(id)) outNodes.set(id, { root: rootId, x: p.x, y: p.y });
+      if (!outNodes.has(id)) outNodes.set(id, { root: rootId, x: p.x, y: p.y, scale: p.scale || 1 });
     }
     for (const [id, info] of res.containers) outContainers.set(id, { root: rootId, ...info });
   }
@@ -468,6 +625,6 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
 }
 
 module.exports = {
-  containerLayout, rectsOverlap, compareUnits, hangChain, hangOptions, hangRows,
+  containerLayout, rectsOverlap, compareUnits, hangChain, hangOptions, hangRows, spiralOptions,
   containerLayoutOf, hullDrawn, closedPillScaleOf,
 };

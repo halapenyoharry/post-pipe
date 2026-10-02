@@ -812,7 +812,7 @@ async function main() {
     // settings.containers.<id> carries per-container extras: a status line
     // such as "soon"; an anchor, where the container rests on the cover's
     // art ({ x, y }, fractions of the art); labelPosition (center, top or
-    // hidden); and layout, hang and hull (below). Each wins over the same
+    // hidden); and layout, hang, hull and spiral (below). Each wins over the same
     // field on the containment entry.
     // Keyed by the full id ("container:act-2") or the bare one ("act-2").
     const extras = SETTINGS.containers || {};
@@ -835,6 +835,10 @@ async function main() {
       if (hang && typeof hang === 'object') out.hang = { ...hang }; else delete out.hang;
       const hull = extra.hull != null ? extra.hull : c.hull;
       if (hull === false || (hull && typeof hull === 'object')) out.hull = hull === false ? false : { ...hull }; else delete out.hull;
+      // spiral: the container's own spiral settings over graph.spiral
+      // ({ anchorEnd, openTowards, keepBelow, cardScale, spacing }).
+      const spiral = extra.spiral != null ? extra.spiral : c.spiral;
+      if (spiral && typeof spiral === 'object') out.spiral = { ...spiral }; else delete out.spiral;
       return out;
     });
   }

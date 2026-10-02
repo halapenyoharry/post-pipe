@@ -274,7 +274,16 @@ function openingConfig(settings) {
     startOn: ['remembered', 'art', 'graph'].includes(o.startOn) ? o.startOn : DEFAULTS.startOn,
     snapMs: Math.max(0, num(o.snapMs, DEFAULTS.snapMs)),
     title: titleConfig(o.title),
+    // Where the roots' crown is on the art, as a fraction of its height
+    // (the stem meets the roots there): the line spiral.keepBelow 'crown'
+    // keeps an act's cards and hull under. null when not set.
+    crownY: crownYOf(o.crownY),
   };
+}
+
+function crownYOf(v) {
+  const y = num(v, NaN);
+  return Number.isFinite(y) && y >= 0 && y <= 1 ? y : null;
 }
 
 // opening.graph.hiddenUntilMove: on a load that starts on the art, the graph

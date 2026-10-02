@@ -228,14 +228,15 @@ function anchorsOf(feed) {
   return out;
 }
 
-// Each container's own layout settings ({ layout, hang, hull }), for the
-// layout key.
+// Each container's own layout settings ({ layout, hang, hull, spiral }), for
+// the layout key.
 function layoutsOf(feed) {
   const out = {};
   for (const c of (feed && feed.containers) || []) {
     const own = {};
     if (c.layout) own.layout = c.layout;
     if (c.hang && typeof c.hang === 'object') own.hang = c.hang;
+    if (c.spiral && typeof c.spiral === 'object') own.spiral = c.spiral;
     if (c.hull === false || (c.hull && typeof c.hull === 'object')) own.hull = c.hull;
     if (Object.keys(own).length) out[c.id] = own;
   }
@@ -1252,6 +1253,7 @@ export function GraphViewer({
           padding: hullPadOf,
           layoutOf: (c) => (layoutRef.current === 'force' ? containerLayoutOf(c, GS) : null),
           hangOf: (c) => ({ ...(GS.hang || {}), ...(c.hang || {}) }),
+          spiralOf,
         },
       });
       // Two passes: the label's size depends on how wide its container ends
@@ -1274,7 +1276,34 @@ export function GraphViewer({
       }
       res = run();
       CL = res;
+      // Each laid-out card is drawn at its container's cardScale.
+      for (const n of data.nodes) {
+        const p = CL.nodes.get(n.id);
+        n._cardScale = p && p.scale > 0 ? p.scale : 1;
+      }
     }
+
+    // A container's spiral settings: containers.<id>.spiral over
+    // graph.spiral (containerLayout.js spiralOptions). keepBelow 'crown'
+    // becomes keepBelowY, the crown's line in the container's frame: with
+    // anchors, the frame's origin is the anchor, so the line is how far
+    // above the anchor the crown falls on the art, through the home view.
+    function spiralOf(c) {
+      const s = { ...(GS.spiral || {}), ...((c && c.spiral) || {}) };
+      return { ...s, keepBelowY: keepBelowYOf(c, s) };
+    }
+    function keepBelowYOf(c, s) {
+      if (s.keepBelow !== 'crown' || !c || !ANCHORS.has(c.id)) return null;
+      if (!(coverFrame && coverFrame.art && Number.isFinite(coverFrame.crownY))) return null;
+      if (layoutRef.current !== 'force') return null;
+      const view = homeView(HOME_K);
+      const origin = graphOrigin();
+      const a = anchorWorld(ANCHORS.get(c.id), coverFrame.art, view, origin);
+      const crown = anchorWorld({ x: 0.5, y: coverFrame.crownY }, coverFrame.art, view, origin);
+      return crown.y - a.y;
+    }
+    const keepBelowUsed = () => [GS.spiral, ...(data.containers || []).map((c) => c.spiral)]
+      .some((s) => s && s.keepBelow === 'crown');
 
     // Where each top-level container's frame currently sits: the mean offset
     // between its members' positions and their targets.
@@ -1421,6 +1450,20 @@ export function GraphViewer({
         }
       }
     }
+    // An anchored container's members onto the layout's arrangement, round
+    // where its frame is now (placeAnchors then moves it onto its anchor).
+    function snapToLayout(cId) {
+      const off = containerOffset(cId);
+      if (!off) return;
+      for (const slug of getAllMemberSlugs(cId)) {
+        if (anchoredOf.get(slug) !== cId) continue;
+        const p = CL.nodes.get(slug);
+        const n = nodeBySlug.get(slug);
+        if (!p || !n || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
+        n.x = off.x + p.x; n.y = off.y + p.y;
+        n.vx = 0; n.vy = 0;
+      }
+    }
     function placeAnchors(ids = [...ANCHORS.keys()]) {
       if (!anchorsOn()) return false;
       const targets = anchorTargets();
@@ -1519,7 +1562,7 @@ export function GraphViewer({
       let simNodes = [];
       const getHalfSize = (n) => {
         if (n.type === 'article') {
-          return Math.hypot(n._size?.width || CARD.width, n._size?.height || CARD.height) / 2;
+          return (Math.hypot(n._size?.width || CARD.width, n._size?.height || CARD.height) / 2) * (n._cardScale || 1);
         }
         return (n._r || (n.size || 60) / 2);
       };
@@ -1595,7 +1638,7 @@ export function GraphViewer({
       simulation.force('collide').radius((d) => {
         if (hiddenByClosed.has(d.id)) return 0;
         if (CL.nodes.has(d.id) && d.type === 'article') {
-          return Math.min(d._size?.width || CARD.width, d._size?.height || CARD.height) / 2;
+          return (Math.min(d._size?.width || CARD.width, d._size?.height || CARD.height) / 2) * (d._cardScale || 1);
         }
         return (d._r || (d.type === 'article' ? Math.hypot(CARD.width, CARD.height) / 2 : d.size / 2)) + SIM.collidePadding;
       });
@@ -1768,8 +1811,9 @@ export function GraphViewer({
         });
 
         for (const n of openMemberNodes) {
-          const w = n._size?.width || (n.type === 'article' ? CARD.width : n.size);
-          const h = n._size?.height || (n.type === 'article' ? CARD.height : n.size);
+          const s = n._cardScale || 1;
+          const w = (n._size?.width || (n.type === 'article' ? CARD.width : n.size)) * s;
+          const h = (n._size?.height || (n.type === 'article' ? CARD.height : n.size)) * s;
           const halfW = w / 2 + pad;
           const halfH = h / 2 + pad;
           points.push(
@@ -2015,7 +2059,8 @@ export function GraphViewer({
       const lod = getLOD(zoomScaleRef.current);
       if (lod === 'marker' && !hovered && !pinned) return { w: 8, h: 8 };
       const size = n._size || cardSizeFor({ hovered, pinned, lod });
-      return { w: size.width / 2, h: size.height / 2 };
+      const s = n._cardScale || 1;
+      return { w: (size.width / 2) * s, h: (size.height / 2) * s };
     }
 
     function linkEndpoints(l) {
@@ -2371,7 +2416,7 @@ export function GraphViewer({
             .attr('transform', 'translate(' + event.x + ',' + event.y + ')' + upright());
           if (articleNodes) {
             articleNodes.filter(nd => nd.id === d.id)
-              .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px) rotate(var(--gv-unrot, 0deg))`);
+              .style('transform', `translate3d(${event.x}px, ${event.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`);
           }
           if (connectorUpdateRef.current) connectorUpdateRef.current();
           links.each(function(l) {
@@ -2931,7 +2976,7 @@ export function GraphViewer({
       redrawLinks();
       nodes.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')' + upright());
       if (articleNodes) {
-        articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px) rotate(var(--gv-unrot, 0deg))`);
+        articleNodes.style('transform', d => `translate3d(${d.x}px, ${d.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`);
       }
       updateContainers();
       if (rootsUpdateRef.current) rootsUpdateRef.current();
@@ -3081,6 +3126,14 @@ export function GraphViewer({
       // would only drag whatever is not pinned away after the pinned mass.
       simulation.force('center', null);
       const pinned = [...ANCHORS.keys()].filter((cId) => anchorsPending.has(cId) || !isDetached(cId));
+      // Where the crown falls against each anchor depends on the frame, so
+      // a spiral kept below it is laid out again, and the pinned ones take
+      // the new arrangement before they go onto their anchors.
+      if (keepBelowUsed()) {
+        computeContainerLayout();
+        refreshContainerForces();
+        for (const cId of pinned) snapToLayout(cId);
+      }
       const dropped = placeDrops();
       if (pinned.length) placeAnchors(pinned);
       if (pinned.length || dropped) applyPositions();
@@ -3107,7 +3160,8 @@ export function GraphViewer({
         if (d.type !== 'article' || !pinnedIdsRef.current.has(d.id) || d._closedHidden) continue;
         if (!Number.isFinite(d.x) || !Number.isFinite(d.y)) continue;
         const size = d._size || cardSizeFor({ hovered: false, pinned: true });
-        rects.push({ id: d.id, x: d.x, y: d.y, w: size.width, h: size.height });
+        const s = d._cardScale || 1;
+        rects.push({ id: d.id, x: d.x, y: d.y, w: size.width * s, h: size.height * s });
       }
       if (rects.length < 2) return false;
       const moved = separateOpen(rects, { gap: 12 });
@@ -3208,8 +3262,10 @@ export function GraphViewer({
           const d = nodeBySlug.get(slug);
           if (!d || d.type !== 'article' || d._closedHidden || !Number.isFinite(d.x) || !Number.isFinite(d.y)) continue;
           const size = d._size || cardSizeFor({ hovered: false, pinned: pinnedIdsRef.current.has(d.id) });
-          out.x0 = Math.min(out.x0, d.x - size.width / 2); out.x1 = Math.max(out.x1, d.x + size.width / 2);
-          out.y0 = Math.min(out.y0, d.y - size.height / 2); out.y1 = Math.max(out.y1, d.y + size.height / 2);
+          const s = d._cardScale || 1;
+          const hw = (size.width / 2) * s, hh = (size.height / 2) * s;
+          out.x0 = Math.min(out.x0, d.x - hw); out.x1 = Math.max(out.x1, d.x + hw);
+          out.y0 = Math.min(out.y0, d.y - hh); out.y1 = Math.max(out.y1, d.y + hh);
         }
         return out;
       };
