@@ -13155,22 +13155,22 @@ var ms = /* @__PURE__ */ o(((e, t) => {
 		return t ? `'${t}', sans-serif` : null;
 	}
 	function o(e, t) {
-		let o = e && e.look && typeof e.look == "object" ? e.look : {}, s = t && n(t.color) ? t : null, c = i(e), l = n(s ? s.color : o.fill), u = n(s ? s.color : o.stroke), d = l ? r(s ? s.fillOpacity : o.fillOpacity) : null, f = u || c;
+		let o = e && e.look && typeof e.look == "object" ? e.look : {}, s = t && n(t.color) ? t : null, c = !!s && n(s.color).toLowerCase() === "none", l = i(e), u = c ? "transparent" : n(s ? s.color : o.fill), d = c ? "none" : n(s ? s.color : o.stroke), f = c ? 0 : u ? r(s ? s.fillOpacity : o.fillOpacity) : null, p = d || l;
 		return {
 			closed: {
-				fill: l || `color-mix(in srgb, ${c} 16%, var(--pp-macro-base, #151826))`,
-				fillOpacity: d,
-				stroke: f,
-				glow: f === "none" ? null : f
+				fill: u || `color-mix(in srgb, ${l} 16%, var(--pp-macro-base, #151826))`,
+				fillOpacity: f,
+				stroke: p,
+				glow: p === "none" ? null : p
 			},
 			open: {
-				fill: l || e && e.fill || "rgba(212, 175, 55, 0.03)",
-				fillOpacity: d,
-				stroke: u || e && e.stroke || "rgba(212, 175, 55, 0.45)"
+				fill: u || e && e.fill || "rgba(212, 175, 55, 0.03)",
+				fillOpacity: f,
+				stroke: d || e && e.stroke || "rgba(212, 175, 55, 0.45)"
 			},
 			label: {
 				face: a(o.labelFace),
-				color: (s ? n(s.labelColor) || n(s.color) : n(o.labelColor)) || null
+				color: (c ? n(s.labelColor) || n(o.labelColor) : s ? n(s.labelColor) || n(s.color) : n(o.labelColor)) || null
 			}
 		};
 	}
@@ -14841,7 +14841,7 @@ function dc({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 		}, rt = (0, Ls.nodePaletteFor)(f, nt()), it = (e) => e && e._look || (0, Is.containerLook)(e, rt);
 		for (let e of a.containers || []) e._look = (0, Is.containerLook)(e, rt);
 		let at = () => {
-			rt ? t.style.setProperty("--pp-node-color", rt.color) : t.style.removeProperty("--pp-node-color");
+			rt && String(rt.color).toLowerCase() !== "none" ? t.style.setProperty("--pp-node-color", rt.color) : t.style.removeProperty("--pp-node-color");
 		};
 		at(), tt.append("path").attr("class", "container-hull").attr("stroke-width", (e) => e.strokeWidth || 1.5).attr("stroke-dasharray", (e) => e.strokeDasharray || (e.parent ? null : "6 6")), tt.append("path").attr("class", "container-hull-ghost");
 		let ot = typeof document < "u" && document.documentElement.getAttribute("data-pp-theme") === "sketchbook", st = () => (0, Ws.initiallyClosed)(e.containers || [], f), ct = new Set(st()), lt = /* @__PURE__ */ new Map(), ut = /* @__PURE__ */ new Map(), dt = 1.05, ft = (0, zs.showContainerCount)(f);
@@ -20516,7 +20516,11 @@ function Ul({ viewState: e, feedData: t, subject: n, readerOpen: r, where: i = "
 							className: J.paletteSwatch,
 							"data-palette-swatch": t.id,
 							"aria-hidden": "true",
-							style: {
+							style: String(t.color).toLowerCase() === "none" ? {
+								borderColor: "currentColor",
+								borderStyle: "dashed",
+								background: "transparent"
+							} : {
 								borderColor: t.color,
 								background: t.fillOpacity === null ? t.color : `color-mix(in srgb, ${t.color} ${Math.round(t.fillOpacity * 100)}%, transparent)`
 							}
