@@ -213,6 +213,7 @@ async function follow(s, act) {
   const nav = s.page.waitForURL((u) => String(u) !== before, { timeout: 4000 }).then(() => true).catch(() => false);
   await act();
   const [np, moved] = await Promise.all([popup, nav]);
+  if (moved) await landed(s.page);
   let opened = null;
   if (np) {
     await np.waitForLoadState('domcontentloaded').catch(() => {});
@@ -221,6 +222,12 @@ async function follow(s, act) {
   }
   return { opened, here: moved ? s.page.url() : null };
 }
+
+// A page this tab went to, done loading before the tab goes on: WebKit
+// logs a fetch that a navigation cuts off (the main site's roots and
+// contributions, caught by the page) as a JavaScript error, which Playwright
+// reports as a page error.
+const landed = (page) => page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
 async function freshAuthor(s) {
   await s.page.goto(AUTHOR);
@@ -321,6 +328,7 @@ async function checkAuthor(s, record) {
   // A link node's own page sends the visitor on.
   await s.page.goto(`${AUTHOR}${home.id}.html`);
   await s.page.waitForURL(homeUrl, { timeout: 5000 }).catch(() => {});
+  await landed(s.page);
   record(`1 ${home.id}.html sends the visitor to ${homeUrl}`, s.page.url() === homeUrl, s.page.url());
   await s.page.goto(`${AUTHOR}${away.id}.html`);
   await s.page.waitForURL(norm(away.link), { timeout: 5000 }).catch(() => {});

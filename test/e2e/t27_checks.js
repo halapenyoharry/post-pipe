@@ -34,6 +34,16 @@ const PORT = 39453;
 const BASE = `http://localhost:${PORT}/`;
 const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1]);
+// On branches (graph.containerLayout branches, T37) an act is its label
+// alone, resting on its main root, not on the anchor the site names, with no
+// closed shape: the checks against the anchor, and the drag timed frame by
+// frame through the closed shape, are skipped there (test/e2e/t37_checks.js
+// checks the branch layout, and a dragged label's root following it); the
+// rest run, reading the act as its label.
+const BRANCHES = ((SETTINGS.graph || {}).containerLayout) === 'branches';
+const SKIPPED = [];
+const skip = (label, why) => { SKIPPED.push(label); console.log(`SKIP  ${label}  (${why})`); };
+const NO_ANCHOR = 'branches: an act is its label on its main root, not a closed shape on containers.<id>.anchor';
 const REACH = reachConfig(SETTINGS.opening);
 const BACKDROP = backdropConfig(SETTINGS.opening);
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
@@ -89,6 +99,20 @@ const measure = (page) => page.evaluate(({ acts, book }) => {
   const outline = (id) => {
     const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"]`);
     if (!g || getComputedStyle(g).display === 'none') return null;
+    // On branches: the act is its label, open or closed; its outline the
+    // label's box.
+    const badge0 = g.querySelector('.container-badge');
+    if (badge0 && badge0.getAttribute('data-label-position') === 'branches') {
+      const r = g.querySelector('.container-badge-hit').getBoundingClientRect();
+      const bm = badge0.getScreenCTM();
+      const c = [[r.left, r.top], [r.right, r.top], [r.right, r.bottom], [r.left, r.bottom], [r.left, r.top]];
+      const pts = [];
+      for (let i = 0; i < 240; i++) {
+        const t = (i / 240) * 4, k = Math.floor(t), f = t - k;
+        pts.push({ x: c[k][0] + (c[k + 1][0] - c[k][0]) * f, y: c[k][1] + (c[k + 1][1] - c[k][1]) * f });
+      }
+      return { closed: badge0.getAttribute('data-closed') === 'true', pts, centre: { x: bm.e, y: bm.f }, label: { x: bm.e, y: bm.f }, last: null };
+    }
     const macro = g.querySelector('.container-macro-node');
     const closed = !!macro && getComputedStyle(macro).display !== 'none';
     const path = g.querySelector(closed ? '.container-macro-bg' : '.container-hull');
@@ -284,8 +308,13 @@ async function run(bt, name, size, record) {
       `${m.rootlets.filter((r) => r.drawn === 'drawn').length} of ${m.rootlets.length} drawn`);
 
     const anchorOff = ACTS.map((a) => ({ id: a.id, closed: m.acts[a.id] && m.acts[a.id].closed, d: offAnchor(m.acts[a.id], anchorAt(m, a)) }));
-    record('fresh: the acts start open or closed as the site says, each on its anchor', anchorOff.every((a) => a.closed === startsClosed(a.id) && a.d <= 2),
-      anchorOff.map((a) => `${a.id.replace('container:', '')} ${a.closed ? 'closed' : 'open'} ${r1(a.d)} px off`).join(', '));
+    if (BRANCHES) {
+      skip('fresh: each act on its anchor', NO_ANCHOR);
+      record('fresh: the acts start open or closed as the site says', anchorOff.every((a) => a.closed === startsClosed(a.id)), anchorOff.map((a) => `${a.id.replace('container:', '')} ${a.closed ? 'closed' : 'open'}`).join(', '));
+    } else {
+      record('fresh: the acts start open or closed as the site says, each on its anchor', anchorOff.every((a) => a.closed === startsClosed(a.id) && a.d <= 2),
+        anchorOff.map((a) => `${a.id.replace('container:', '')} ${a.closed ? 'closed' : 'open'} ${r1(a.d)} px off`).join(', '));
+    }
     record('fresh: the graph rests at the home view', Math.abs(m.k - m.homeK) < 1e-6, `k ${m.k}, homeK ${m.homeK}`);
 
     const counts = ACTS.map((a) => m.rootlets.filter((r) => r.c === a.id).length);
@@ -310,43 +339,46 @@ async function run(bt, name, size, record) {
       `roots ${m.roots}, rootlets ${m.layer}, small plant ${m.keep}`);
     await shot(s, 'closed');
 
-    // A drag: the ends lag, then arrive within lagMs + 100 of the act's
-    // last move. Timed in the page, frame by frame.
-    const act = ACTS.find((x) => m.acts[x.id] && m.acts[x.id].closed) || ACTS[0];
-    const c0 = m.acts[act.id].centre;
-    await p.evaluate((id) => {
-      const t0 = performance.now();
-      const log = window.__lag = { lastMove: null, settled: null, behind: 0, frames: 0 };
-      let prev = null;
-      const tick = () => {
-        const now = performance.now() - t0;
-        const mm = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"] .container-macro-node`).getScreenCTM();
-        const at = `${mm.e.toFixed(2)},${mm.f.toFixed(2)}`;
-        if (prev !== null && at !== prev) { log.lastMove = now; log.settled = null; }
-        prev = at;
-        let worst = 0;
-        for (const g of document.querySelectorAll(`[data-reach-container="${CSS.escape(id)}"]`)) {
-          const n = (g.querySelector('.reach-main').getAttribute('d').match(/-?[\d.]+/g) || []).map(Number);
-          const t = (g.getAttribute('data-target') || '').split(',').map(Number);
-          if (n.length < 4 || !Number.isFinite(t[1]) || g.style.visibility === 'hidden') continue;
-          worst = Math.max(worst, Math.hypot(n[n.length - 2] - t[0], n[n.length - 1] - t[1]));
-        }
-        if (log.lastMove !== null && now - log.lastMove < 20) log.behind = Math.max(log.behind, worst);
-        if (log.lastMove !== null && log.settled === null && worst <= 0.5) log.settled = now;
-        log.frames++;
-        if (now < 3500) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }, act.id);
-    await drag(p, c0, { x: 50, y: 30 });
-    await p.waitForTimeout(2600);
-    const lag = await p.evaluate(() => window.__lag);
-    const done = await measure(p);
-    const moved = done.acts[act.id].centre;
-    const took = lag.settled !== null && lag.lastMove !== null ? lag.settled - lag.lastMove : Infinity;
-    const ssd = checkStopShort(done, [act.id]);
-    await reachRecord(s, record, `drag: the rootlets re-aim with a lag, arriving within lagMs + 100 (${REACH.lagMs + 100} ms) of the act's last move`, off(moved, c0) > 40 && lag.behind > 2 && took <= REACH.lagMs + 100 && ssd.ok,
-      `${act.id.replace('container:', '')} moved ${r1(off(moved, c0))} px; the ends up to ${r1(lag.behind)} px behind as it stopped; on target ${Math.round(took)} ms after its last move; gaps ${ssd.gaps.map(r1).join(', ')}`);
+    if (BRANCHES) skip('drag: the act timed frame by frame through its closed shape, the rootlets re-aiming', NO_ANCHOR);
+    else {
+      // A drag: the ends lag, then arrive within lagMs + 100 of the act's
+      // last move. Timed in the page, frame by frame.
+      const act = ACTS.find((x) => m.acts[x.id] && m.acts[x.id].closed) || ACTS[0];
+      const c0 = m.acts[act.id].centre;
+      await p.evaluate((id) => {
+        const t0 = performance.now();
+        const log = window.__lag = { lastMove: null, settled: null, behind: 0, frames: 0 };
+        let prev = null;
+        const tick = () => {
+          const now = performance.now() - t0;
+          const mm = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"] .container-macro-node`).getScreenCTM();
+          const at = `${mm.e.toFixed(2)},${mm.f.toFixed(2)}`;
+          if (prev !== null && at !== prev) { log.lastMove = now; log.settled = null; }
+          prev = at;
+          let worst = 0;
+          for (const g of document.querySelectorAll(`[data-reach-container="${CSS.escape(id)}"]`)) {
+            const n = (g.querySelector('.reach-main').getAttribute('d').match(/-?[\d.]+/g) || []).map(Number);
+            const t = (g.getAttribute('data-target') || '').split(',').map(Number);
+            if (n.length < 4 || !Number.isFinite(t[1]) || g.style.visibility === 'hidden') continue;
+            worst = Math.max(worst, Math.hypot(n[n.length - 2] - t[0], n[n.length - 1] - t[1]));
+          }
+          if (log.lastMove !== null && now - log.lastMove < 20) log.behind = Math.max(log.behind, worst);
+          if (log.lastMove !== null && log.settled === null && worst <= 0.5) log.settled = now;
+          log.frames++;
+          if (now < 3500) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }, act.id);
+      await drag(p, c0, { x: 50, y: 30 });
+      await p.waitForTimeout(2600);
+      const lag = await p.evaluate(() => window.__lag);
+      const done = await measure(p);
+      const moved = done.acts[act.id].centre;
+      const took = lag.settled !== null && lag.lastMove !== null ? lag.settled - lag.lastMove : Infinity;
+      const ssd = checkStopShort(done, [act.id]);
+      await reachRecord(s, record, `drag: the rootlets re-aim with a lag, arriving within lagMs + 100 (${REACH.lagMs + 100} ms) of the act's last move`, off(moved, c0) > 40 && lag.behind > 2 && took <= REACH.lagMs + 100 && ssd.ok,
+        `${act.id.replace('container:', '')} moved ${r1(off(moved, c0))} px; the ends up to ${r1(lag.behind)} px behind as it stopped; on target ${Math.round(took)} ms after its last move; gaps ${ssd.gaps.map(r1).join(', ')}`);
+    }
 
     // A zoom: the targets move, the ends follow and stop short again.
     const before = await measure(p);
@@ -375,7 +407,10 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(1300);
     const rs = (await waitSettled(p, 1500)).m;
     const back = ACTS.map((a) => offAnchor(rs.acts[a.id], anchorAt(rs, a)));
-    record('Reset: the acts back on their anchors, the view at home', back.every((d) => d <= 2) && Math.abs(rs.k - rs.homeK) < 1e-6, back.map(r1).join(', ') + ' px off; k ' + rs.k);
+    if (BRANCHES) {
+      skip('Reset: the acts back on their anchors', NO_ANCHOR);
+      record('Reset: the view at home', Math.abs(rs.k - rs.homeK) < 1e-6, `k ${rs.k}`);
+    } else record('Reset: the acts back on their anchors, the view at home', back.every((d) => d <= 2) && Math.abs(rs.k - rs.homeK) < 1e-6, back.map(r1).join(', ') + ' px off; k ' + rs.k);
 
     // Zoom in: the roots and the rootlets fade to the floor; the plant stays.
     const z25 = await zoomTo(s, 2.5);
@@ -412,7 +447,10 @@ async function run(bt, name, size, record) {
     const inPlace = o && !o.closed ? offAnchor(o, anchorAt(op, a1)) : Infinity;
     const sso = checkStopShort(op, [a1.id]);
     const n1 = op.rootlets.filter((r) => r.c === a1.id).length;
-    record(`open: the act opens in place, its ${OPEN_ON} on its anchor`, inPlace <= (OUTER ? 8 : 3), `${a1.id.replace('container:', '')} ${OPEN_ON} ${r1(inPlace)} px from its anchor`);
+    if (BRANCHES) {
+      skip(`open: the act opens in place, its ${OPEN_ON} on its anchor`, NO_ANCHOR);
+      record('open: a click on the act\'s label opens it', !!o && !o.closed, o ? (o.closed ? 'still closed' : 'open') : 'missing');
+    } else record(`open: the act opens in place, its ${OPEN_ON} on its anchor`, inPlace <= (OUTER ? 8 : 3), `${a1.id.replace('container:', '')} ${OPEN_ON} ${r1(inPlace)} px from its anchor`);
     await reachRecord(s, record, 'open: the rootlets reach to the open hull\'s near edge, stopping short', n1 >= 1 && sso.ok, `${n1} rootlets, gaps ${sso.gaps.map(r1).join(', ')}`);
     for (const a of ACTS) if (a.id !== a1.id) await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } })), a.id);
     await p.waitForTimeout(1500);
@@ -442,8 +480,13 @@ async function run(bt, name, size, record) {
     const r = await measure(p);
     const kept = off(r.acts[a3.id].centre, dragged);
     const others = ACTS.filter((a) => a.id !== a3.id).map((a) => offAnchor(r.acts[a.id], anchorAt(r, a)));
-    record('saved positions: a dragged act comes back where the reader left it, the others on their anchors', kept <= 3 && others.every((d) => d <= 3),
-      `${a3.id.replace('container:', '')} ${r1(kept)} px from where it was left (${r1(off(dragged, c0))} px from its anchor); others ${others.map(r1).join(', ')} px off`);
+    if (BRANCHES) {
+      skip('saved positions: the others on their anchors', NO_ANCHOR);
+      record('saved positions: a dragged act comes back where the reader left it', kept <= 3, `${a3.id.replace('container:', '')} ${r1(kept)} px from where it was left`);
+    } else {
+      record('saved positions: a dragged act comes back where the reader left it, the others on their anchors', kept <= 3 && others.every((d) => d <= 3),
+        `${a3.id.replace('container:', '')} ${r1(kept)} px from where it was left (${r1(off(dragged, c0))} px from its anchor); others ${others.map(r1).join(', ')} px off`);
+    }
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1200);
     for (const a of ACTS) await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:open-container', { detail: { id } })), a.id);
@@ -546,7 +589,7 @@ async function run(bt, name, size, record) {
   const pass = results.filter((r) => r.ok).length;
   const fail = results.filter((r) => !r.ok).length;
   const notRun = runs.filter((r) => !r.ran).length;
-  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run`);
+  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run${SKIPPED.length ? `, ${SKIPPED.length} SKIPPED (${NO_ANCHOR})` : ''}`);
   if (process.env.PP_E2E_JSON) fs.writeFileSync(process.env.PP_E2E_JSON, JSON.stringify({ results, runs }, null, 2));
   process.exit(fail ? 1 : 0);
 })();

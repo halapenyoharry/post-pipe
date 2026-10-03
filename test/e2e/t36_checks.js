@@ -71,6 +71,16 @@ const TEAL = PALETTES[0], BERRY = PALETTES[1];
 const RIGHTS = SETTINGS.rights || {};
 const BRIGHT = OPENING.graph && OPENING.graph.rootsBrightness;
 const CROWN = OPENING.crownY;
+// On branches (graph.containerLayout branches, T37) an act is its label
+// alone: no closed shape, no hull, no outline, resting on its main root, not
+// on the root tip a closed shape sat on. The checks of those are skipped
+// there (test/e2e/t37_checks.js checks the branch layout: its labels, cards
+// on tips, the zoom about each tip, the roots following a dragged label);
+// the rest run as they are.
+const BRANCHES = GS.containerLayout === 'branches';
+const SKIPPED = [];
+const skip = (label, why) => { SKIPPED.push(label); console.log(`SKIP  ${label}  (${why})`); };
+const NO_SHAPE = 'branches: an act is its label alone, with no closed shape, hull or outline';
 
 if (GS.zoomMode !== 'grow-in-place' || ACTS.length < 3 || PALETTES.length < 2 || RIGHTS.position !== 'bottom-edge'
   || !(OPENING.byline && OPENING.byline.graphScale > 0) || !(OPENING.art && OPENING.art.rootsFollowMs > 0) || !(BRIGHT > 0 && BRIGHT < 1)) {
@@ -172,6 +182,19 @@ function pageHelpers() {
   window.__act = (id) => {
     const g = group(id);
     if (!g || getComputedStyle(g).display === 'none') return null;
+    // On branches: the act is its label, open or closed.
+    const badge = g.querySelector('.container-badge');
+    if (badge && badge.getAttribute('data-label-position') === 'branches') {
+      const hit = g.querySelector('.container-badge-hit');
+      const text = g.querySelector('.container-badge-text');
+      const ts = getComputedStyle(text);
+      const m = badge.getScreenCTM();
+      return {
+        id, closed: badge.getAttribute('data-closed') === 'true', box: box(hit.getBoundingClientRect()), centre: { x: m.e, y: m.f },
+        segs: 0, stroke: 'none', fill: 'none', fillOpacity: 0,
+        labelFace: ts.fontFamily, labelFill: ts.fill, labelOpacity: Number(text.getAttribute('opacity') || 1), labelText: text.textContent,
+      };
+    }
     const macro = g.querySelector('.container-macro-node');
     const closed = !!macro && getComputedStyle(macro).display !== 'none';
     const el = closed ? macro.querySelector('.container-macro-bg') : g.querySelector('.container-hull');
@@ -368,6 +391,8 @@ async function run(bt, name, size, record, shots) {
   const ids = ACTS.map((a) => a.id);
   const byName = (n) => ACTS.find((a) => a.name === n);
   const titleColour = hexRgb(OPENING.title.color);
+  // A check of the act's closed shape, hull or outline (skipped on branches).
+  const shape = (label, ok, detail) => (BRANCHES ? skip(label, NO_SHAPE) : record(label, ok, detail));
 
   // ── Part 3: the byline, in the art state ──
   const bylineNow = () => page.evaluate(() => {
@@ -401,7 +426,10 @@ async function run(bt, name, size, record, shots) {
   const want = OPENING.byline.graphScale * b1.graphTitlePx;
   record(tag(`part 3 graph: the byline ${OPENING.byline.graphScale} of the graph title's size`), Math.abs(b1.size / want - 1) <= 0.03, `${r1(b1.size)} px against ${r1(want)} (the title ${r1(b1.graphTitlePx)} px); art state ${r1(b0.size)} px`);
   record(tag('part 3 graph: the byline under the title, at its left edge'), b1.y0 >= b1.lastGraph.y0 + 0.5 * (b1.lastGraph.y1 - b1.lastGraph.y0) && Math.abs(b1.x0 - b1.lastGraph.x0) <= 3, `byline ${r1(b1.x0)},${r1(b1.y0)}; line ${r1(b1.lastGraph.x0)}, ${r1(b1.lastGraph.y0)}-${r1(b1.lastGraph.y1)}`);
-  record(tag('part 3 graph: lower case, the title\'s face and colour, a link to the jacket'), b1.text === b1.text.toLowerCase() && /Dela Gothic One/.test(b1.face) && b1.color === titleColour && /eoej-about\.html$/.test(b1.href || ''),
+  // The page the byline names (opening.byline.href, standing requirement
+  // 28: the author page since 2026-10-02), else the jacket.
+  const bylineTo = OPENING.byline.href ? (h) => h === OPENING.byline.href || h.endsWith(`/${OPENING.byline.href}`) : (h) => /eoej-about\.html$/.test(h);
+  record(tag(`part 3 graph: lower case, the title\'s face and colour, a link to ${OPENING.byline.href || 'the jacket'}`), b1.text === b1.text.toLowerCase() && /Dela Gothic One/.test(b1.face) && b1.color === titleColour && bylineTo(b1.href || ''),
     `"${b1.text}", ${b1.face.split(',')[0]}, ${b1.color}, ${b1.href}`);
 
   // ── Part 1: the closed acts ──
@@ -410,10 +438,11 @@ async function run(bt, name, size, record, shots) {
   const an0 = await anchors(page);
   for (const a of ACTS) {
     const x = m0[a.id];
-    record(tag(`part 1 ${a.name} closed: the engine's own soft shape (14 segments; the blob had 24)`), !!x && x.closed && x.segs === 14, x ? `${x.segs} segments` : 'missing');
-    record(tag(`part 1 ${a.name} closed: outline and fill in the title's teal, the fill at ${TEAL.fillOpacity}`), !!x && x.stroke === teal && x.fill === teal && Math.abs(x.fillOpacity - TEAL.fillOpacity) < 0.005, x ? `${x.stroke}, ${x.fill} at ${x.fillOpacity}` : '');
+    shape(tag(`part 1 ${a.name} closed: the engine's own soft shape (14 segments; the blob had 24)`), !!x && x.closed && x.segs === 14, x ? `${x.segs} segments` : 'missing');
+    shape(tag(`part 1 ${a.name} closed: outline and fill in the title's teal, the fill at ${TEAL.fillOpacity}`), !!x && x.stroke === teal && x.fill === teal && Math.abs(x.fillOpacity - TEAL.fillOpacity) < 0.005, x ? `${x.stroke}, ${x.fill} at ${x.fillOpacity}` : '');
     record(tag(`part 1 ${a.name} closed: label in the title's face, the lighter teal`), !!x && /Dela Gothic One/.test(x.labelFace) && x.labelFill === tealLabel, x ? `${x.labelFace.split(',')[0]}, ${x.labelFill}` : '');
-    record(tag(`part 2 ${a.name} at rest: on its root tip`), !!x && dist(x.centre, an0[a.id]) <= 2, x ? `${r1(dist(x.centre, an0[a.id]))} px off` : '');
+    if (BRANCHES) skip(tag(`part 2 ${a.name} at rest: on its root tip`), 'branches: an act rests on its main root, its cards on the tips');
+    else record(tag(`part 2 ${a.name} at rest: on its root tip`), !!x && dist(x.centre, an0[a.id]) <= 2, x ? `${r1(dist(x.centre, an0[a.id]))} px off` : '');
   }
   shots.closed = await shot('closed');
 
@@ -437,99 +466,103 @@ async function run(bt, name, size, record, shots) {
   }
   shots.roots = rs;
 
-  // ── Part 2: the zoom grows the acts in place ──
-  const zoomCheck = async (label, act) => {
-    const a0 = await acts(page), t0 = await tips(page), an = await anchors(page);
-    const r0 = await page.evaluate(() => window.__zoom());
-    await act();
-    await page.waitForTimeout(800);
-    const a1 = await acts(page), t1 = await tips(page);
-    const r = await page.evaluate(() => window.__zoom());
-    const off = ACTS.map((x) => (a1[x.id] && a0[x.id] ? dist(a1[x.id].centre, a0[x.id].centre) : Infinity));
-    const onTip = ACTS.filter((x) => a0[x.id].closed).map((x) => dist(a1[x.id].centre, an[x.id]));
-    const growth = ACTS.map((x) => a1[x.id].box.w / a0[x.id].box.w);
-    const W = phone ? 390 : 1280, H = phone ? 844 : 800;
-    const onScreen = ACTS.filter((x) => a1[x.id].closed).every((x) => { const c = a1[x.id].centre; return c.x >= 0 && c.x <= W && c.y >= 0 && c.y <= H; });
-    const rootsStill = ACTS.every((x) => !t0[x.id] || dist(t0[x.id], t1[x.id]) <= 1);
-    record(tag(`part 2 ${label}: every act stays where it was (closed ones on their tips) within 2 px`), Math.max(...off) <= 2 && Math.max(0, ...onTip) <= 2, `zoom ${r2(r)}x; moved ${off.map(r1).join(', ')} px`);
-    record(tag(`part 2 ${label}: each act's width grows by the zoom (within 2%)`), growth.every((gw) => Math.abs(gw / (r / r0) - 1) <= 0.02 || Math.abs(gw - 1) < 0.005 && Math.abs(r - 1) < 0.005), growth.map(r2).join(', '));
-    record(tag(`part 2 ${label}: every closed act still on the screen, and the roots where they were`), onScreen && rootsStill, `${onScreen ? 'on' : 'off'}; roots ${rootsStill ? 'still' : 'moved'}`);
-    return { r, a1 };
-  };
-  const at1 = phone ? { x: 330, y: 844 - 110 } : { x: 1200, y: 760 };
-  const at2 = phone ? { x: 60, y: 844 - 200 } : { x: 120, y: 700 };
-  await page.mouse.move(at1.x, at1.y);
-  const zw = await zoomCheck('ten wheel steps low on the right', async () => { for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); } });
-  const capClosed = zw.r;
-  const g1 = leastGap(zw.a1, false);
-  record(tag('part 2: at the furthest zoom no two acts come within 16 px'), g1.least >= 15.5, `stopped at ${r2(capClosed)}x; the closest, ${g1.pair}, ${r1(g1.least)} px apart`);
-  shots.zoomCap = await shot('zoom-cap');
-  await reset(page);
-  await page.mouse.move(at2.x, at2.y);
-  await zoomCheck('ten wheel steps low on the left', async () => { for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); } });
-  await reset(page);
-  await zoomCheck('the + key', async () => { await page.keyboard.press('='); await page.waitForTimeout(350); });
-  await reset(page);
-  if (phone) {
-    await zoomCheck('a pinch low on the left', () => page.evaluate(async ({ x, y }) => {
-      const el = document.elementFromPoint(x, y);
-      let d = 64;
-      el.dispatchEvent(window.__touchEvent('touchstart', el, [[x - d / 2, y], [x + d / 2, y]]));
-      for (let i = 0; i < 8; i += 1) {
-        d += 2;
-        await new Promise((r) => setTimeout(r, 30));
-        el.dispatchEvent(window.__touchEvent('touchmove', el, [[x - d / 2, y], [x + d / 2, y]]));
-      }
-      el.dispatchEvent(window.__touchEvent('touchend', el, [], [[x - d / 2, y], [x + d / 2, y]]));
-    }, { x: 90, y: 844 - 160 }));
-    await reset(page);
-  }
-  await page.keyboard.press('='); await page.waitForTimeout(350);
-  await zoomCheck('Zoom to fit', async () => { await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:zoom-to-fit'))); await page.waitForTimeout(400); });
-  // Reset from a zoom in: part way and at the end, every act where it was.
-  await page.keyboard.press('='); await page.keyboard.press('='); await page.waitForTimeout(600);
-  const ar0 = await acts(page);
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
-  await page.waitForTimeout(330);
-  const arMid = await acts(page);
-  await page.waitForTimeout(1300);
-  const ar1 = await acts(page);
-  const zr = await page.evaluate(() => window.__zoom());
-  const midOff = Math.max(...ACTS.map((x) => dist(arMid[x.id].centre, ar0[x.id].centre)));
-  const endOff = Math.max(...ACTS.map((x) => dist(ar1[x.id].centre, ar0[x.id].centre)));
-  record(tag('part 2 Reset: back to the home zoom, every act on its tip part way and at the end'), Math.abs(zr - 1) < 1e-6 && midOff <= 2 && endOff <= 2, `zoom ${r2(zr)}; part way ${r1(midOff)} px, at the end ${r1(endOff)} px`);
-
-  // Act One open: its last chapter stays, its hull grows by the zoom.
   const one = byName('Act One');
-  await page.evaluate((id) => window.PostPipeGraph.openContainer(id), one.id);
-  await page.waitForTimeout(1300);
-  const o0 = await acts(page);
-  await page.mouse.move(at1.x, at1.y);
-  for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); }
-  await page.waitForTimeout(800);
-  const o1 = await acts(page);
-  const capOne = await page.evaluate(() => window.__zoom());
-  const lastMoved = o0[one.id] && o1[one.id] && o0[one.id].centre && o1[one.id].centre ? dist(o0[one.id].centre, o1[one.id].centre) : Infinity;
-  const hullGrew = o1[one.id].box.w / o0[one.id].box.w;
-  record(tag('part 2 Act One open: ten wheel steps in, its last chapter stays where it rests (within 2 px)'), lastMoved <= 2, `zoom ${r2(capOne)}x; moved ${r1(lastMoved)} px`);
-  record(tag('part 2 Act One open: its hull grows by the zoom (within 3%)'), Math.abs(hullGrew / capOne - 1) <= 0.03, `${r2(hullGrew)} against ${r2(capOne)}`);
-  const go = leastGap(o1, true);
-  record(tag('part 2 Act One open, zoomed in: it meets no other act, 16 px apart at the least'), go.least >= 15.5, `${go.pair}: ${r1(go.least)} px`);
-  shots.oneOpen = await shot('act-one-open-zoomed');
-  await reset(page);
+  if (BRANCHES) {
+    skip(tag('part 2: the zoom grows each act about its root tip, the cap, Reset, Act One open and every act open zoomed'), 'branches: an act rests on its main root and each card grows about its own tip (checked by T37)');
+  } else {
+    // ── Part 2: the zoom grows the acts in place ──
+    const zoomCheck = async (label, act) => {
+      const a0 = await acts(page), t0 = await tips(page), an = await anchors(page);
+      const r0 = await page.evaluate(() => window.__zoom());
+      await act();
+      await page.waitForTimeout(800);
+      const a1 = await acts(page), t1 = await tips(page);
+      const r = await page.evaluate(() => window.__zoom());
+      const off = ACTS.map((x) => (a1[x.id] && a0[x.id] ? dist(a1[x.id].centre, a0[x.id].centre) : Infinity));
+      const onTip = ACTS.filter((x) => a0[x.id].closed).map((x) => dist(a1[x.id].centre, an[x.id]));
+      const growth = ACTS.map((x) => a1[x.id].box.w / a0[x.id].box.w);
+      const W = phone ? 390 : 1280, H = phone ? 844 : 800;
+      const onScreen = ACTS.filter((x) => a1[x.id].closed).every((x) => { const c = a1[x.id].centre; return c.x >= 0 && c.x <= W && c.y >= 0 && c.y <= H; });
+      const rootsStill = ACTS.every((x) => !t0[x.id] || dist(t0[x.id], t1[x.id]) <= 1);
+      record(tag(`part 2 ${label}: every act stays where it was (closed ones on their tips) within 2 px`), Math.max(...off) <= 2 && Math.max(0, ...onTip) <= 2, `zoom ${r2(r)}x; moved ${off.map(r1).join(', ')} px`);
+      record(tag(`part 2 ${label}: each act's width grows by the zoom (within 2%)`), growth.every((gw) => Math.abs(gw / (r / r0) - 1) <= 0.02 || Math.abs(gw - 1) < 0.005 && Math.abs(r - 1) < 0.005), growth.map(r2).join(', '));
+      record(tag(`part 2 ${label}: every closed act still on the screen, and the roots where they were`), onScreen && rootsStill, `${onScreen ? 'on' : 'off'}; roots ${rootsStill ? 'still' : 'moved'}`);
+      return { r, a1 };
+    };
+    const at1 = phone ? { x: 330, y: 844 - 110 } : { x: 1200, y: 760 };
+    const at2 = phone ? { x: 60, y: 844 - 200 } : { x: 120, y: 700 };
+    await page.mouse.move(at1.x, at1.y);
+    const zw = await zoomCheck('ten wheel steps low on the right', async () => { for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); } });
+    const capClosed = zw.r;
+    const g1 = leastGap(zw.a1, false);
+    record(tag('part 2: at the furthest zoom no two acts come within 16 px'), g1.least >= 15.5, `stopped at ${r2(capClosed)}x; the closest, ${g1.pair}, ${r1(g1.least)} px apart`);
+    shots.zoomCap = await shot('zoom-cap');
+    await reset(page);
+    await page.mouse.move(at2.x, at2.y);
+    await zoomCheck('ten wheel steps low on the left', async () => { for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); } });
+    await reset(page);
+    await zoomCheck('the + key', async () => { await page.keyboard.press('='); await page.waitForTimeout(350); });
+    await reset(page);
+    if (phone) {
+      await zoomCheck('a pinch low on the left', () => page.evaluate(async ({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        let d = 64;
+        el.dispatchEvent(window.__touchEvent('touchstart', el, [[x - d / 2, y], [x + d / 2, y]]));
+        for (let i = 0; i < 8; i += 1) {
+          d += 2;
+          await new Promise((r) => setTimeout(r, 30));
+          el.dispatchEvent(window.__touchEvent('touchmove', el, [[x - d / 2, y], [x + d / 2, y]]));
+        }
+        el.dispatchEvent(window.__touchEvent('touchend', el, [], [[x - d / 2, y], [x + d / 2, y]]));
+      }, { x: 90, y: 844 - 160 }));
+      await reset(page);
+    }
+    await page.keyboard.press('='); await page.waitForTimeout(350);
+    await zoomCheck('Zoom to fit', async () => { await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:zoom-to-fit'))); await page.waitForTimeout(400); });
+    // Reset from a zoom in: part way and at the end, every act where it was.
+    await page.keyboard.press('='); await page.keyboard.press('='); await page.waitForTimeout(600);
+    const ar0 = await acts(page);
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
+    await page.waitForTimeout(330);
+    const arMid = await acts(page);
+    await page.waitForTimeout(1300);
+    const ar1 = await acts(page);
+    const zr = await page.evaluate(() => window.__zoom());
+    const midOff = Math.max(...ACTS.map((x) => dist(arMid[x.id].centre, ar0[x.id].centre)));
+    const endOff = Math.max(...ACTS.map((x) => dist(ar1[x.id].centre, ar0[x.id].centre)));
+    record(tag('part 2 Reset: back to the home zoom, every act on its tip part way and at the end'), Math.abs(zr - 1) < 1e-6 && midOff <= 2 && endOff <= 2, `zoom ${r2(zr)}; part way ${r1(midOff)} px, at the end ${r1(endOff)} px`);
 
-  // Every act open: the furthest zoom, and no two meet.
-  await page.evaluate(() => window.PostPipeGraph.openAllContainers());
-  await page.waitForTimeout(1300);
-  await page.mouse.move(at1.x, at1.y);
-  for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); }
-  await page.waitForTimeout(800);
-  const capAll = await page.evaluate(() => window.__zoom());
-  const ao = await acts(page);
-  const ga = leastGap(ao, true);
-  record(tag('part 2 every act open, ten wheel steps in: no two meet, 16 px apart at the least'), ga.least >= 15.5, `stopped at ${r2(capAll)}x; ${ga.pair}: ${r1(ga.least)} px`);
-  console.log(`      the zoom stops at: ${r2(capClosed)}x every act closed, ${r2(capOne)}x Act One open, ${r2(capAll)}x every act open`);
-  shots.caps = { closed: capClosed, one: capOne, all: capAll };
+    // Act One open: its last chapter stays, its hull grows by the zoom.
+    await page.evaluate((id) => window.PostPipeGraph.openContainer(id), one.id);
+    await page.waitForTimeout(1300);
+    const o0 = await acts(page);
+    await page.mouse.move(at1.x, at1.y);
+    for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); }
+    await page.waitForTimeout(800);
+    const o1 = await acts(page);
+    const capOne = await page.evaluate(() => window.__zoom());
+    const lastMoved = o0[one.id] && o1[one.id] && o0[one.id].centre && o1[one.id].centre ? dist(o0[one.id].centre, o1[one.id].centre) : Infinity;
+    const hullGrew = o1[one.id].box.w / o0[one.id].box.w;
+    record(tag('part 2 Act One open: ten wheel steps in, its last chapter stays where it rests (within 2 px)'), lastMoved <= 2, `zoom ${r2(capOne)}x; moved ${r1(lastMoved)} px`);
+    record(tag('part 2 Act One open: its hull grows by the zoom (within 3%)'), Math.abs(hullGrew / capOne - 1) <= 0.03, `${r2(hullGrew)} against ${r2(capOne)}`);
+    const go = leastGap(o1, true);
+    record(tag('part 2 Act One open, zoomed in: it meets no other act, 16 px apart at the least'), go.least >= 15.5, `${go.pair}: ${r1(go.least)} px`);
+    shots.oneOpen = await shot('act-one-open-zoomed');
+    await reset(page);
+
+    // Every act open: the furthest zoom, and no two meet.
+    await page.evaluate(() => window.PostPipeGraph.openAllContainers());
+    await page.waitForTimeout(1300);
+    await page.mouse.move(at1.x, at1.y);
+    for (let i = 0; i < 10; i++) { await s.wheel(-100); await page.waitForTimeout(60); }
+    await page.waitForTimeout(800);
+    const capAll = await page.evaluate(() => window.__zoom());
+    const ao = await acts(page);
+    const ga = leastGap(ao, true);
+    record(tag('part 2 every act open, ten wheel steps in: no two meet, 16 px apart at the least'), ga.least >= 15.5, `stopped at ${r2(capAll)}x; ${ga.pair}: ${r1(ga.least)} px`);
+    console.log(`      the zoom stops at: ${r2(capClosed)}x every act closed, ${r2(capOne)}x Act One open, ${r2(capAll)}x every act open`);
+    shots.caps = { closed: capClosed, one: capOne, all: capAll };
+  }
 
   // ── Part 4: faded while a card is under it ──
   await reset(page);
@@ -562,7 +595,7 @@ async function run(bt, name, size, record, shots) {
   const op = await acts(page);
   for (const a of ACTS) {
     const x = op[a.id];
-    record(tag(`part 1 ${a.name} open: hull outline and fill in the teal, the fill at ${TEAL.fillOpacity}`), !!x && !x.closed && x.stroke === teal && x.fill === teal && Math.abs(x.fillOpacity - TEAL.fillOpacity) < 0.005, x ? `${x.stroke}, ${x.fill} at ${x.fillOpacity}` : '');
+    shape(tag(`part 1 ${a.name} open: hull outline and fill in the teal, the fill at ${TEAL.fillOpacity}`), !!x && !x.closed && x.stroke === teal && x.fill === teal && Math.abs(x.fillOpacity - TEAL.fillOpacity) < 0.005, x ? `${x.stroke}, ${x.fill} at ${x.fillOpacity}` : '');
     record(tag(`part 1 ${a.name} open: its title in the title's face and the lighter teal, as the closed act's`), !!x && /Dela Gothic One/.test(x.labelFace) && x.labelFill === tealLabel && x.labelOpacity === 1, x ? `${x.labelFace.split(',')[0]}, ${x.labelFill} at ${x.labelOpacity}` : '');
   }
   const cardsTeal = await page.evaluate(() => window.__cards());
@@ -573,74 +606,78 @@ async function run(bt, name, size, record, shots) {
   shots.oneOpenRest = await shot('act-one-open');
   await reset(page);
 
-  // ── Part 2b: the roots answer the act ──
-  const follow = async (label, act, { ahead }) => {
-    // Recorded at every frame: the act as drawn (its node's origin) and its
-    // root's tip, along the drag's line (x).
-    await page.evaluate((id) => {
-      window.__rec = [];
-      window.__recOn = true;
-      const macro = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"] .container-macro-node`);
-      const loop = () => {
-        if (!window.__recOn) return;
-        const m = macro.getScreenCTM();
-        const t = window.__tip(id);
-        window.__rec.push({ t: performance.now(), x: m.e, y: m.f, tx: t ? t.x : NaN, ty: t ? t.y : NaN });
+  if (BRANCHES) {
+    skip(tag('part 2b: the roots answer a dragged closed act and Reset, frame by frame'), 'branches: the act is its label, not a closed shape (the label dragged, its root following, is checked by T37)');
+  } else {
+    // ── Part 2b: the roots answer the act ──
+    const follow = async (label, act, { ahead }) => {
+      // Recorded at every frame: the act as drawn (its node's origin) and its
+      // root's tip, along the drag's line (x).
+      await page.evaluate((id) => {
+        window.__rec = [];
+        window.__recOn = true;
+        const macro = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"] .container-macro-node`);
+        const loop = () => {
+          if (!window.__recOn) return;
+          const m = macro.getScreenCTM();
+          const t = window.__tip(id);
+          window.__rec.push({ t: performance.now(), x: m.e, y: m.f, tx: t ? t.x : NaN, ty: t ? t.y : NaN });
+          requestAnimationFrame(loop);
+        };
         requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-    }, two.id);
-    const t0 = await act();
-    await page.waitForTimeout(1000);
-    const rec = await page.evaluate(() => { window.__recOn = false; return window.__rec; });
-    return { rec, t0 };
-  };
-  const two = byName('Act Two');
-  const dragOnce = async (label) => {
-    const start = (await acts(page))[two.id].centre;
-    const tipStart = (await tips(page))[two.id];
-    const { rec, t0 } = await follow(label, async () => {
-      await page.mouse.move(start.x, start.y);
-      await page.mouse.down();
-      for (let i = 1; i <= 12; i++) { await page.mouse.move(start.x + 10 * i, start.y); await page.waitForTimeout(40); }
-      await page.mouse.up();
-      return page.evaluate(() => performance.now());
-    }, { ahead: false });
-    const rows = rec.map((r) => ({ t: r.t, act: r.x - start.x, root: r.tx - tipStart.x })).filter((r) => Number.isFinite(r.root));
-    const behind = rows.every((r) => r.root <= r.act + 0.5);
-    const lagged = rows.filter((r) => r.t < t0 && r.act - r.root >= 3).length;
-    const after = rows.filter((r) => r.t >= t0);
-    const caught = after.find((r, i) => after.slice(i).every((q) => Math.abs(q.act - q.root) <= 2));
-    const worst = Math.max(...rows.map((r) => r.root - r.act));
-    record(tag(`part 2b ${label}: Act Two dragged 120 px, at every frame its root has moved no further than the act as drawn`), behind && rows.length > 10, `${rows.length} frames; the root ahead by ${r1(Math.max(0, worst))} px at most`);
-    record(tag(`part 2b ${label}: mid-drag the root measurably behind`), lagged >= 2, `${lagged} frames 3 px or more behind; most ${r1(Math.max(...rows.map((r) => r.act - r.root)))} px`);
-    record(tag(`part 2b ${label}: after the release the root is on the act within 300 ms`), !!caught && caught.t - t0 <= 300, caught ? `${r1(caught.t - t0)} ms` : 'never');
-    return { start, tipStart };
-  };
-  await dragOnce('first drag');
-  // Reset: the act goes back to its tip, its root after it.
-  {
-    const nowAct = (await acts(page))[two.id].centre;
-    const home = (await anchors(page))[two.id];
-    const tipNow = (await tips(page))[two.id];
-    const { rec, t0 } = await follow('Reset', async () => {
-      const t = await page.evaluate(() => performance.now());
-      await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
-      return t;
-    }, { ahead: true });
-    // Distance from home along x: the root never nearer home than the act.
-    const span = nowAct.x - home.x;
-    const tipHome = tipNow.x - span;
-    const rows = rec.map((r) => ({ t: r.t, act: r.x - home.x, root: r.tx - tipHome })).filter((r) => Number.isFinite(r.root) && r.t >= t0);
-    const behind = rows.every((r) => r.root >= r.act - 0.5);
-    const lagged = rows.filter((r) => r.root - r.act >= 3).length;
-    const end = rows[rows.length - 1];
-    record(tag('part 2b Reset: the act goes back first, its root after it, never ahead'), behind && lagged >= 2, `${rows.length} frames, ${lagged} 3 px or more behind; ahead by ${r1(Math.max(0, ...rows.map((r) => r.act - r.root)))} px at most`);
-    record(tag('part 2b Reset: both back home'), !!end && Math.abs(end.act) <= 1 && Math.abs(end.root) <= 1.5, end ? `act ${r1(end.act)}, root ${r1(end.root)} px from home` : 'no frames');
+      }, two.id);
+      const t0 = await act();
+      await page.waitForTimeout(1000);
+      const rec = await page.evaluate(() => { window.__recOn = false; return window.__rec; });
+      return { rec, t0 };
+    };
+    const two = byName('Act Two');
+    const dragOnce = async (label) => {
+      const start = (await acts(page))[two.id].centre;
+      const tipStart = (await tips(page))[two.id];
+      const { rec, t0 } = await follow(label, async () => {
+        await page.mouse.move(start.x, start.y);
+        await page.mouse.down();
+        for (let i = 1; i <= 12; i++) { await page.mouse.move(start.x + 10 * i, start.y); await page.waitForTimeout(40); }
+        await page.mouse.up();
+        return page.evaluate(() => performance.now());
+      }, { ahead: false });
+      const rows = rec.map((r) => ({ t: r.t, act: r.x - start.x, root: r.tx - tipStart.x })).filter((r) => Number.isFinite(r.root));
+      const behind = rows.every((r) => r.root <= r.act + 0.5);
+      const lagged = rows.filter((r) => r.t < t0 && r.act - r.root >= 3).length;
+      const after = rows.filter((r) => r.t >= t0);
+      const caught = after.find((r, i) => after.slice(i).every((q) => Math.abs(q.act - q.root) <= 2));
+      const worst = Math.max(...rows.map((r) => r.root - r.act));
+      record(tag(`part 2b ${label}: Act Two dragged 120 px, at every frame its root has moved no further than the act as drawn`), behind && rows.length > 10, `${rows.length} frames; the root ahead by ${r1(Math.max(0, worst))} px at most`);
+      record(tag(`part 2b ${label}: mid-drag the root measurably behind`), lagged >= 2, `${lagged} frames 3 px or more behind; most ${r1(Math.max(...rows.map((r) => r.act - r.root)))} px`);
+      record(tag(`part 2b ${label}: after the release the root is on the act within 300 ms`), !!caught && caught.t - t0 <= 300, caught ? `${r1(caught.t - t0)} ms` : 'never');
+      return { start, tipStart };
+    };
+    await dragOnce('first drag');
+    // Reset: the act goes back to its tip, its root after it.
+    {
+      const nowAct = (await acts(page))[two.id].centre;
+      const home = (await anchors(page))[two.id];
+      const tipNow = (await tips(page))[two.id];
+      const { rec, t0 } = await follow('Reset', async () => {
+        const t = await page.evaluate(() => performance.now());
+        await page.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
+        return t;
+      }, { ahead: true });
+      // Distance from home along x: the root never nearer home than the act.
+      const span = nowAct.x - home.x;
+      const tipHome = tipNow.x - span;
+      const rows = rec.map((r) => ({ t: r.t, act: r.x - home.x, root: r.tx - tipHome })).filter((r) => Number.isFinite(r.root) && r.t >= t0);
+      const behind = rows.every((r) => r.root >= r.act - 0.5);
+      const lagged = rows.filter((r) => r.root - r.act >= 3).length;
+      const end = rows[rows.length - 1];
+      record(tag('part 2b Reset: the act goes back first, its root after it, never ahead'), behind && lagged >= 2, `${rows.length} frames, ${lagged} 3 px or more behind; ahead by ${r1(Math.max(0, ...rows.map((r) => r.act - r.root)))} px at most`);
+      record(tag('part 2b Reset: both back home'), !!end && Math.abs(end.act) <= 1 && Math.abs(end.root) <= 1.5, end ? `act ${r1(end.act)}, root ${r1(end.root)} px from home` : 'no frames');
+    }
+    await page.waitForTimeout(600);
+    await dragOnce('after a Reset');
+    await reset(page);
   }
-  await page.waitForTimeout(600);
-  await dragOnce('after a Reset');
-  await reset(page);
 
   // A pan: reported.
   {
@@ -664,7 +701,8 @@ async function run(bt, name, size, record, shots) {
     if (!row) return null;
     return [...row.querySelectorAll('[role="radio"]')].map((b) => ({ id: b.dataset.value, label: b.textContent.trim(), on: b.getAttribute('aria-checked') === 'true', swatch: !!b.querySelector('[data-palette-swatch]') }));
   });
-  record(tag('part 4b: the panel offers the node colour, two labelled swatches, teal chosen'), !!choice && choice.length === 2 && choice[0].label === TEAL.label && choice[1].label === BERRY.label && choice.every((c) => c.swatch) && choice[0].on,
+  // As many as the site lists (teal, berry, and none since requirement 32).
+  record(tag(`part 4b: the panel offers the node colour, ${PALETTES.length} labelled swatches, teal chosen`), !!choice && choice.length === PALETTES.length && choice[0].label === TEAL.label && choice[1].label === BERRY.label && choice.every((c) => c.swatch) && choice[0].on,
     choice ? choice.map((c) => `${c.label}${c.on ? ' (on)' : ''}`).join(', ') : 'missing');
   shots.panel = await shot('panel-node-colour');
   const textBefore = cardsTeal.map((c) => c.text);
@@ -674,13 +712,13 @@ async function run(bt, name, size, record, shots) {
   await page.waitForTimeout(300);
   const berry = hexRgb(BERRY.color), berryLabel = hexRgb(BERRY.labelColor || BERRY.color);
   const closedB = await acts(page);
-  record(tag('part 4b berry: every closed act\'s outline, fill and label in berry'), ACTS.every((a) => closedB[a.id].stroke === berry && closedB[a.id].fill === berry && closedB[a.id].labelFill === berryLabel),
+  record(tag(`part 4b berry: every closed act's ${BRANCHES ? 'label (on branches, the act)' : 'outline, fill and label'} in berry`), ACTS.every((a) => (BRANCHES || (closedB[a.id].stroke === berry && closedB[a.id].fill === berry)) && closedB[a.id].labelFill === berryLabel),
     ACTS.map((a) => `${closedB[a.id].stroke}/${closedB[a.id].labelFill}`).join('; '));
   await page.evaluate(() => window.PostPipeGraph.openAllContainers());
   await page.waitForTimeout(1300);
   const openB = await acts(page);
   const cardsB = await page.evaluate(() => window.__cards());
-  record(tag('part 4b berry: every open hull and title in berry'), ACTS.every((a) => openB[a.id].stroke === berry && openB[a.id].fill === berry && openB[a.id].labelFill === berryLabel),
+  record(tag(`part 4b berry: every open ${BRANCHES ? 'act\'s label' : 'hull and title'} in berry`), ACTS.every((a) => (BRANCHES || (openB[a.id].stroke === berry && openB[a.id].fill === berry)) && openB[a.id].labelFill === berryLabel),
     ACTS.map((a) => `${openB[a.id].stroke}/${openB[a.id].labelFill}`).join('; '));
   record(tag('part 4b berry: every card\'s outline in berry, its text as it was'), cardsB.length > 10 && cardsB.every((c) => c.outline === berry) && cardsB.every((c, i) => c.text === textBefore[i] || textBefore[i] === undefined),
     `${cardsB.length} cards, outlines ${[...new Set(cardsB.map((c) => c.outline))].join(', ')}; teal before: ${[...new Set(cardsTeal.map((c) => c.outline))].join(', ')}`);
@@ -691,7 +729,8 @@ async function run(bt, name, size, record, shots) {
   await ready(page);
   await scrollOnce(s);
   const kept = await acts(page);
-  record(tag('part 4b: a reload keeps berry'), ACTS.every((a) => kept[a.id] && kept[a.id].stroke === berry), ACTS.map((a) => kept[a.id] && kept[a.id].stroke).join('; '));
+  const look = (x) => (x ? (BRANCHES ? x.labelFill : x.stroke) : null);
+  record(tag('part 4b: a reload keeps berry'), ACTS.every((a) => look(kept[a.id]) === (BRANCHES ? berryLabel : berry)), ACTS.map((a) => look(kept[a.id])).join('; '));
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { where: 'graph', open: true } })));
   await page.waitForTimeout(500);
   await page.click('[data-forget-ask]');
@@ -700,7 +739,7 @@ async function run(bt, name, size, record, shots) {
   await ready(page);
   await scrollOnce(s);
   const after = await acts(page);
-  record(tag('part 4b: Forget goes back to teal'), ACTS.every((a) => after[a.id] && after[a.id].stroke === teal), ACTS.map((a) => after[a.id] && after[a.id].stroke).join('; '));
+  record(tag('part 4b: Forget goes back to teal'), ACTS.every((a) => look(after[a.id]) === (BRANCHES ? tealLabel : teal)), ACTS.map((a) => look(after[a.id])).join('; '));
 
   // ── Part 4b: the art state's roots untouched ──
   await page.evaluate(() => window.PostPipeCover.go('art'));
@@ -832,6 +871,6 @@ async function strip(file, items) {
   for (const [k, t] of Object.entries(tally)) console.log(`  ${k}: ${t.notRun ? 'NOT RUN' : `${t.pass} pass, ${t.fail} fail`}`);
   const failed = results.filter((r) => !r.ok).length;
   const notRun = Object.values(tally).filter((t) => t.notRun).length;
-  console.log(`\n${results.length - failed} PASS, ${failed} FAIL${notRun ? `, ${notRun} NOT RUN` : ''}`);
+  console.log(`\n${results.length - failed} PASS, ${failed} FAIL${notRun ? `, ${notRun} NOT RUN` : ''}${SKIPPED.length ? `, ${SKIPPED.length} SKIPPED (${NO_SHAPE})` : ''}`);
   process.exit(failed || notRun ? 1 : 0);
 })();

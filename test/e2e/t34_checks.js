@@ -41,6 +41,16 @@ const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1]);
 const GS = SETTINGS.graph || {};
 const OPENING = SETTINGS.opening || {};
+// On branches (graph.containerLayout branches, T37) there are no pills, no
+// hulls and no spirals: an act is its label alone on its main root, its
+// chapters on the tips of its branches. Those checks are skipped there
+// (test/e2e/t37_checks.js checks the branch layout); the rest (nothing
+// above the crown, the zoom about the roots' middle, the pan, Reset, no book
+// hull) run as they are.
+const BRANCHES = GS.containerLayout === 'branches';
+const SKIPPED = [];
+const skip = (label, why) => { SKIPPED.push(label); console.log(`SKIP  ${label}  (${why})`); };
+const NO_SPIRAL = 'branches: no pill, hull or spiral; an act is its label, its chapters on its tips';
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
 const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
 const MOCKUPS = path.resolve(__dirname, '../../_handoff');
@@ -238,6 +248,7 @@ function checkAll(record, tag, m) {
 
 // A closed act: its pill centred on its tip.
 function checkPill(record, tag, m, act) {
+  if (BRANCHES) { skip(`${tag}: ${act.name} closed, a pill on its tip`, NO_SPIRAL); return; }
   const a = m.acts[act.id];
   const at = artPoint(act.anchor, m.art);
   if (!a || !a.pill) { record(`${tag}: ${act.name} closed, a pill`, false, a ? 'open' : 'not drawn'); return; }
@@ -248,6 +259,7 @@ function checkPill(record, tag, m, act) {
 // An open act: its last chapter on its tip, its spiral opening toward its
 // side, its cards apart and titled, inside its hull.
 function checkOpen(record, tag, m, act) {
+  if (BRANCHES) { skip(`${tag}: ${act.name} open: its hull, its spiral from its tip, its cards in it`, NO_SPIRAL); return null; }
   const a = m.acts[act.id];
   const at = artPoint(act.anchor, m.art);
   if (!a || !a.hull) { record(`${tag}: ${act.name} open with its hull`, false, 'no hull'); return null; }
@@ -291,7 +303,8 @@ async function run(bt, name, size, record, shots) {
   checkAll(record, tag, m);
   for (const a of ACTS) checkPill(record, tag, m, a);
   const offPills = ACTS.filter((a) => !(m.acts[a.id] && m.acts[a.id].pill && pillOnScreen(m.acts[a.id].pill, m)));
-  record(`${tag}: the three pills on the screen`, offPills.length === 0, offPills.map((a) => a.name).join(', '));
+  if (BRANCHES) skip(`${tag}: the three pills on the screen`, NO_SPIRAL);
+  else record(`${tag}: the three pills on the screen`, offPills.length === 0, offPills.map((a) => a.name).join(', '));
   record(`${tag}: no chapter cards`, m.cards.length === 0, `${m.cards.length} shown`);
   shots.closed = await shot(s, 'default-closed');
   shots.closedArt = m.art;
@@ -349,6 +362,7 @@ async function run(bt, name, size, record, shots) {
     // would meet another is pushed the way it opens, so its last chapter is
     // on its tip or straight along openTowards from it.
     const pushed = last && pushedAlong(last, at, act.towards);
+    if (BRANCHES) { skip(`${tag}: ${act.name}'s last chapter within 8 px of its tip, or pushed the way it opens`, NO_SPIRAL); continue; }
     record(`${tag}: ${act.name}'s last chapter within 8 px of its tip, or pushed the way it opens`, !!(a && a.hull && last) && (Math.hypot(last.x - at.x, last.y - at.y) <= 8 || pushed),
       last ? `off ${r1(Math.hypot(last.x - at.x, last.y - at.y))}${pushed ? ', along its way' : ''}` : 'no cards');
   }
@@ -389,7 +403,8 @@ async function run(bt, name, size, record, shots) {
       ratio >= (GROW ? Math.min(wantRatio, 1.2) : wantRatio) && drift(b, a) <= 2, `zoom ${r1(ratio)}x, moved ${r1(drift(b, a))} px`);
     record(`${tagOf('zoom')}: ${label}: the crown on the art stays where it was (within 2 px)`, Math.abs(crownAt(mm) - crownAt(m0)) <= 2
       && Math.abs(mm.art.left - m0.art.left) <= 2, `crown at ${r1(crownAt(mm))}, was ${r1(crownAt(m0))}`);
-    if (pillsCheck === 'all' || GROW) record(`${tagOf('zoom')}: ${label}: every closed pill on the screen${GROW ? ' (its centre, on its tip)' : ''}`, off.length === 0, off.length ? `off: ${off.join(', ')}` : `at ${r1(ratio)}x`);
+    if (BRANCHES) skip(`${tagOf('zoom')}: ${label}: every closed pill on the screen`, NO_SPIRAL);
+    else if (pillsCheck === 'all' || GROW) record(`${tagOf('zoom')}: ${label}: every closed pill on the screen${GROW ? ' (its centre, on its tip)' : ''}`, off.length === 0, off.length ? `off: ${off.join(', ')}` : `at ${r1(ratio)}x`);
     else console.log(`      ${label}: at ${r1(ratio)}x, pills off the screen: ${off.length ? off.join(', ') : 'none'}`);
     return { b, a, mm };
   };
@@ -553,6 +568,6 @@ async function composite(size, shots) {
   for (const [k, t] of Object.entries(tally)) console.log(`  ${k}: ${t.notRun ? 'NOT RUN' : `${t.pass} pass, ${t.fail} fail`}`);
   const failed = results.filter((r) => !r.ok).length;
   const notRun = Object.values(tally).filter((t) => t.notRun).length;
-  console.log(`\n${results.length - failed} PASS, ${failed} FAIL${notRun ? `, ${notRun} NOT RUN` : ''}`);
+  console.log(`\n${results.length - failed} PASS, ${failed} FAIL${notRun ? `, ${notRun} NOT RUN` : ''}${SKIPPED.length ? `, ${SKIPPED.length} SKIPPED (${NO_SPIRAL})` : ''}`);
   process.exit(failed || notRun ? 1 : 0);
 })();

@@ -189,8 +189,12 @@ const actCentre = (page, id) => page.evaluate((id) => {
   const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"]`);
   if (!g) return null;
   const macro = g.querySelector('.container-macro-node');
-  const closed = !!macro && getComputedStyle(macro).display !== 'none';
-  const m = (closed ? macro : g.querySelector('.container-badge')).getScreenCTM();
+  const badge = g.querySelector('.container-badge');
+  // On branches (graph.containerLayout branches) an act is its label, open
+  // or closed, and says which.
+  const onBranches = badge && badge.getAttribute('data-label-position') === 'branches';
+  const closed = onBranches ? badge.getAttribute('data-closed') === 'true' : !!macro && getComputedStyle(macro).display !== 'none';
+  const m = (closed && !onBranches ? macro : badge).getScreenCTM();
   return { closed, x: m.e, y: m.f };
 }, id);
 

@@ -44,6 +44,14 @@ const BASE = `http://localhost:${PORT}/`;
 const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS_TEXT = HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1];
 const SETTINGS = JSON.parse(SETTINGS_TEXT);
+// On branches (graph.containerLayout branches, T37) an act rests where its
+// label goes on its main root, not on the anchor the site names: the checks
+// against that anchor are skipped there (test/e2e/t37_checks.js checks the
+// branch layout); the rest run as they are.
+const BRANCHES = ((SETTINGS.graph || {}).containerLayout) === 'branches';
+const SKIPPED = [];
+const skip = (label, why) => { SKIPPED.push(label); console.log(`SKIP  ${label}  (${why})`); };
+const NO_ANCHOR = 'branches: an act rests on its main root, not on containers.<id>.anchor';
 const OPENING = openingConfig(SETTINGS);
 const TOP = topBarConfig(SETTINGS);
 const GROUP = dimensionGroupLabel(SETTINGS);
@@ -420,7 +428,7 @@ async function run(bt, name, size, record) {
     await go(s, 'graph');
     m = await measure(p);
     const startOk = ACTS.every((a) => m.acts[a.id] && m.acts[a.id].closed === startsClosed(a.id));
-    record(`4 fresh: the acts start ${START_TEXT}, each on its anchor`, startOk && ACTS.every((a) => anchorOff(m, a) <= 2),
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)(`4 fresh: the acts start ${START_TEXT}, each on its anchor`, startOk && ACTS.every((a) => anchorOff(m, a) <= 2),
       ACTS.map((a) => `${a.id.replace('container:', '')} ${m.acts[a.id] && (m.acts[a.id].closed ? 'closed' : 'open')} ${r1(anchorOff(m, a))} px off`).join('; '));
     const tg = await plantTop(p, 'graph');
     const ctrl2 = Math.max(m.pill ? m.pill.bottom : 0, m.gear ? m.gear.bottom : 0, m.page ? m.page.bottom : 0);
@@ -484,7 +492,7 @@ async function run(bt, name, size, record) {
     const o1 = await measure(p);
     await p.waitForTimeout(2200);
     const o2 = await measure(p);
-    record('4 open an act: it opens centred on its anchor and stays there',
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)('4 open an act: it opens centred on its anchor and stays there',
       // Since T35 an open act that would meet another is pushed the way it
       // opens until clear (open acts never overlap).
       !o2.acts[a1.id].closed && (anchorOff(o1, a1) <= 2 || pushedAway(o1, a1)) && (anchorOff(o2, a1) <= 2 || pushedAway(o2, a1)),
@@ -500,7 +508,7 @@ async function run(bt, name, size, record) {
     else await p.evaluate((id) => window.PostPipeGraph.closeContainer(id), a1.id);
     await p.waitForTimeout(1500);
     const c1 = await measure(p);
-    record('4 close it again: back on its anchor', c1.acts[a1.id].closed && anchorOff(c1, a1) <= 2, `${c1.acts[a1.id].closed ? 'closed' : 'still open'}, ${r1(anchorOff(c1, a1))} px off; ${tappable ? 'its title tapped' : `its title off the screen (${r1(tgt.x)}, ${r1(tgt.y)}), closed by PostPipeGraph.closeContainer`}`);
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)('4 close it again: back on its anchor', c1.acts[a1.id].closed && anchorOff(c1, a1) <= 2, `${c1.acts[a1.id].closed ? 'closed' : 'still open'}, ${r1(anchorOff(c1, a1))} px off; ${tappable ? 'its title tapped' : `its title off the screen (${r1(tgt.x)}, ${r1(tgt.y)}), closed by PostPipeGraph.closeContainer`}`);
     await shot(s, 'graph');
 
     // 4. Drag one: it stays where dropped, opens there, and comes back there.
@@ -510,7 +518,7 @@ async function run(bt, name, size, record) {
     await p.waitForTimeout(1500);
     const d1 = await measure(p);
     const dropped = d1.acts[a2.id];
-    record('4 drag an act: it stays where it was dropped', off(dropped, { x: from.x + by.x, y: from.y + by.y }) <= 3 && anchorOff(d1, a2) > 30,
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)('4 drag an act: it stays where it was dropped', off(dropped, { x: from.x + by.x, y: from.y + by.y }) <= 3 && anchorOff(d1, a2) > 30,
       `${a2.id.replace('container:', '')} ${r1(off(dropped, { x: from.x + by.x, y: from.y + by.y }))} px from the drop, ${r1(anchorOff(d1, a2))} px from its anchor`);
     if (d1.acts[a2.id].closed) await tapAt(s, dropped);
     await p.waitForTimeout(2500);
@@ -529,13 +537,13 @@ async function run(bt, name, size, record) {
     await ready(p);
     await go(s, 'graph');
     const d3 = await measure(p);
-    record('4 after a reload the dragged act is where the reader left it, the others on their anchors',
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)('4 after a reload the dragged act is where the reader left it, the others on their anchors',
       off(d3.acts[a2.id], dropped) <= 3 && ACTS.filter((a) => a.id !== a2.id).every((a) => anchorOff(d3, a) <= 2),
       `${a2.id.replace('container:', '')} ${r1(off(d3.acts[a2.id], dropped))} px from where it was left (kept as dragged: ${marks.join(', ') || 'none'}); others ${ACTS.filter((a) => a.id !== a2.id).map((a) => r1(anchorOff(d3, a))).join(', ')} px off`);
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1800);
     const rs = await measure(p);
-    record('4 Reset: every act back on its anchor, open or closed as it started', ACTS.every((a) => anchorOff(rs, a) <= 2 && rs.acts[a.id].closed === startsClosed(a.id)),
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)('4 Reset: every act back on its anchor, open or closed as it started', ACTS.every((a) => anchorOff(rs, a) <= 2 && rs.acts[a.id].closed === startsClosed(a.id)),
       ACTS.map((a) => `${r1(anchorOff(rs, a))}`).join(', ') + ' px off');
 
     // 5. The page opens from the graph state too.
@@ -643,7 +651,7 @@ async function run(bt, name, size, record) {
       const dx = c.x - at.x, dy = c.y - at.y;
       return Math.abs(dx * dir[1] - dy * dir[0]) <= 2 && dx * dir[0] + dy * dir[1] > 0;
     };
-    record('4 variant containersStart open: the acts start open, each on its anchor or pushed the way it opens',
+    (BRANCHES ? (x) => skip(x, NO_ANCHOR) : record)('4 variant containersStart open: the acts start open, each on its anchor or pushed the way it opens',
       ACTS.every((a) => m.acts[a.id] && !m.acts[a.id].closed && (anchorOff(m, a) <= 2 || along(a))),
       ACTS.map((a) => `${a.id.replace('container:', '')} ${m.acts[a.id] && (m.acts[a.id].closed ? 'closed' : 'open')} ${r1(anchorOff(m, a))} px off`).join('; '));
     record('variant: no page errors', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
@@ -680,7 +688,7 @@ async function run(bt, name, size, record) {
   const pass = results.filter((r) => r.ok).length;
   const fail = results.filter((r) => !r.ok).length;
   const notRun = runs.filter((r) => !r.ran).length;
-  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run`);
+  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run${SKIPPED.length ? `, ${SKIPPED.length} SKIPPED (${NO_ANCHOR})` : ''}`);
   if (process.env.PP_E2E_JSON) fs.writeFileSync(process.env.PP_E2E_JSON, JSON.stringify({ results, runs }, null, 2));
   process.exit(fail ? 1 : 0);
 })();
