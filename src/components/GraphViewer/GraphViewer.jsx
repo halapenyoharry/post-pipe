@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
 import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
-import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf } from './containerLayout';
+import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf, compareUnits } from './containerLayout';
 import { containerLook } from './containerLook';
 import { nodePaletteFor } from '../../lib/nodePalettes';
 import { actsApart } from './actsApart';
@@ -17,6 +17,8 @@ import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, clo
 import { createTapGate } from './tapGate';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
+import { growBranches, actSpaces, pathToTip, placeCards, placeLabels, mainRoots, skeletonInfo, cardRoom } from './branchLayout';
+import { parseRoots, rootsModel } from '../../lib/rootsVector';
 import { layoutKey } from './layoutKey';
 import { fraction, anchorWorld, homeView, artPoint } from '../../lib/reach';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
@@ -233,8 +235,8 @@ function anchorsOf(feed) {
   return out;
 }
 
-// Each container's own layout settings ({ layout, hang, hull, spiral }), for
-// the layout key.
+// Each container's own layout settings ({ layout, hang, hull, spiral,
+// branches }), for the layout key.
 function layoutsOf(feed) {
   const out = {};
   for (const c of (feed && feed.containers) || []) {
@@ -243,6 +245,7 @@ function layoutsOf(feed) {
     if (c.hang && typeof c.hang === 'object') own.hang = c.hang;
     if (c.spiral && typeof c.spiral === 'object') own.spiral = c.spiral;
     if (c.hull === false || (c.hull && typeof c.hull === 'object')) own.hull = c.hull;
+    if (Array.isArray(c.branches) && c.branches.length) own.branches = c.branches;
     if (Object.keys(own).length) out[c.id] = own;
   }
   return out;
@@ -1041,8 +1044,12 @@ export function GraphViewer({
       .attr('opacity', 0.55)
       .attr('font-size', (d) => (!d.parent ? '64px' : '52px'));
       
+    // graph.containerLayout 'branches' (branchLayout.js): a container that
+    // names its tips (containers.<id>.branches) puts its items on them; it
+    // is drawn as its label alone, open and closed, on its main root.
+    const isBranchAct = (c) => containerLayoutOf(c, GS) === 'branches';
     containerBadgeTexts.each(function(d) {
-      buildWrappedLabel(d3.select(this), d);
+      buildWrappedLabel(d3.select(this), d, isBranchAct(d) ? { status: closedPillOf(GS).status } : {});
     });
     // An open container's title in its own face (containers.<id>.labelFace),
     // measured in it too.
@@ -1421,13 +1428,16 @@ export function GraphViewer({
           layoutOf: (c) => (layoutRef.current === 'force' ? containerLayoutOf(c, GS) : null),
           hangOf: (c) => ({ ...(GS.hang || {}), ...(c.hang || {}) }),
           spiralOf,
+          placedOf: (c) => (layoutRef.current === 'force' && isBranchAct(c) ? branchPlacedOf(c) : null),
         },
       });
       // Two passes: the label's size depends on how wide its container ends
-      // up, and the container's width depends on the label.
+      // up, and the container's width depends on the label. A container on
+      // branches has its label's size from the branch layout.
       for (const c of data.containers) c._fs = LABEL_MIN;
       let res = run();
       for (const c of data.containers) {
+        if (layoutRef.current === 'force' && isBranchAct(c)) { c._fs = branchLabelSize(c); continue; }
         const info = res.containers.get(c.id);
         const w = info ? info.box.x1 - info.box.x0 : 0;
         const max = LABEL_MAX * Math.pow(LABEL_NESTED, depthOf(c));
@@ -1443,10 +1453,12 @@ export function GraphViewer({
       }
       res = run();
       CL = res;
-      // Each laid-out card is drawn at its container's cardScale.
+      // Each laid-out card is drawn at its container's cardScale; a card on
+      // a branch knows how far it sits from its tip, which it grows about.
       for (const n of data.nodes) {
         const p = CL.nodes.get(n.id);
         n._cardScale = p && p.scale > 0 ? p.scale : 1;
+        n._tipOff = p && p.tipOffset ? p.tipOffset : null;
       }
     }
 
@@ -1525,6 +1537,10 @@ export function GraphViewer({
     // it can be dragged on its own, and opens and closes in place. Saved
     // positions work as before; the anchors are part of their key.
     const ANCHORS = new Map(Object.entries(anchorsOf(feedData)).filter(([id]) => containerById.has(id)));
+    // A container on branches is anchored where its label goes (worked out
+    // once its skeleton is read, below); until then, where the site rests it,
+    // or the art's middle.
+    for (const c of (data.containers || [])) if (isBranchAct(c) && !ANCHORS.has(c.id)) ANCHORS.set(c.id, { x: 0.5, y: 0.5 });
     let coverFrame = typeof window !== 'undefined' ? window.PostPipeCoverFrame || null : null;
     const anchorsOn = () => ANCHORS.size > 0 && !!(coverFrame && coverFrame.art)
       && spiralOn() && layoutRef.current === 'force' && CL.containers.size > 0;
@@ -1568,6 +1584,7 @@ export function GraphViewer({
     // reader); a card dragged inside it does not move it.
     const growCentres = new Map();
     let growShifts = new Map();
+    let growAt = null; // { P, r } while grown
     function growOn() { return GROW && homeK > 0 && anchorsOn(); }
     // The world point under the pivot at the home view.
     function pivotWorld() {
@@ -1586,18 +1603,26 @@ export function GraphViewer({
     const growCentreOf = (cId) => growCentres.get(cId) || centreOf(cId);
     function refreshGrow() {
       growShifts = new Map();
+      growAt = null;
       if (!growOn()) return;
       const r = view.k / homeK;
       if (Math.abs(r - 1) < 1e-9) return;
       const P = pivotWorld();
+      growAt = { P, r };
       for (const cId of ANCHORS.keys()) {
         const G = growCentreOf(cId);
         if (G) growShifts.set(cId, growShift(G, P, r));
       }
     }
     const NO_SHIFT = { x: 0, y: 0 };
-    // A node's offset: its innermost anchored container's.
-    const shiftOfNode = (n) => (growShifts.size && n ? growShifts.get(anchoredOf.get(n.id)) || NO_SHIFT : NO_SHIFT);
+    // A node's offset: its innermost anchored container's; a card on a
+    // branch (branchLayout.js) grows about its own tip instead, which is
+    // _tipOff from its centre.
+    const shiftOfNode = (n) => {
+      if (!growShifts.size || !n) return NO_SHIFT;
+      if (n._tipOff && growAt) return growShift({ x: n.x - n._tipOff.x, y: n.y - n._tipOff.y }, growAt.P, growAt.r);
+      return growShifts.get(anchoredOf.get(n.id)) || NO_SHIFT;
+    };
     // A container's offset: its own when it is anchored, else its nearest
     // anchored ancestor's, else none.
     function shiftOfContainer(c) {
@@ -1622,7 +1647,8 @@ export function GraphViewer({
       for (const cId of ANCHORS.keys()) {
         const info = CL.containers.get(cId);
         const c = containerById.get(cId);
-        if (!info || !c || hasClosedAncestor(c)) continue;
+        // A container on branches has no cap: its cards grow on their tips.
+        if (!info || !c || hasClosedAncestor(c) || info.branches) continue;
         const G = (centres && centres.get(cId)) || growCentreOf(cId);
         if (!G) continue;
         const ox = G.x - info.center.x, oy = G.y - info.center.y;
@@ -1725,7 +1751,8 @@ export function GraphViewer({
       for (const cId of ANCHORS.keys()) {
         const info = CL.containers.get(cId);
         const c = targets.get(cId) || centreOf(cId);
-        if (!info || !c) continue;
+        // Acts on branches are kept apart by the branch layout itself.
+        if (!info || !c || info.branches) continue;
         const ox = c.x - info.center.x, oy = c.y - info.center.y;
         // An open hull's smoothed curve can reach a little past the box the
         // layout gives it (measured: up to 15 px at rest on a phone): a
@@ -1763,6 +1790,193 @@ export function GraphViewer({
       return true;
     }
 
+    // ── Branches (graph.containerLayout 'branches', branchLayout.js) ───────
+    // The skeleton (graph.branches.source, else the cover's
+    // opening.art.rootsVector) is read once. Each container on branches has
+    // its tips put in the order its items take them, and branches grown for
+    // the items it has no tip for (the same on every load for the same
+    // skeleton and counts; the cover draws them with its own roots). Then,
+    // whenever the cover places its art, every act's cards and label are
+    // placed through the home view, as if every act were open: each card on
+    // its tip, none meeting another, the label on its main root as large as
+    // fits. An act's anchor is its label's centre, so it opens, closes, is
+    // dragged and goes back as any anchored container does, its cards laid
+    // out round it.
+    const BR = GS.branches && typeof GS.branches === 'object' ? GS.branches : {};
+    const branchActs = (data.containers || []).filter(isBranchAct);
+    const positive = (v, d) => (v !== null && v !== '' && v !== undefined && Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
+    // The cards' full scale: graph.branches.cardScale, else the spiral's
+    // (the container's, then graph.spiral's), else 1.
+    const branchCardScale = (c) => positive(BR.cardScale, positive(((c && c.spiral) || {}).cardScale, positive((GS.spiral || {}).cardScale, 1)));
+    const BRANCH_MIN_W = positive(BR.minCardWidth, 50);
+    const BRANCH_GAP = positive(BR.gap, 3);
+    const branchSource = () => {
+      if (BR.source) return String(BR.source);
+      const S = typeof window !== 'undefined' ? window.SETTINGS : null;
+      const art = S && S.opening && S.opening.art;
+      return art && art.rootsVector ? String(art.rootsVector) : '';
+    };
+    let branchSkeleton = null;
+    let branchGrowth = null;
+    let branchSpaces = null;
+    let branchPlan = null;
+    let branchesDisposed = false;
+    // An act's members in reading order.
+    function branchMembers(c) {
+      return (layoutMembers().get(c.id) || []).map((u, index) => ({ ...u, index })).sort(compareUnits);
+    }
+    function growNow() {
+      if (!branchSkeleton) return;
+      const acts = branchActs.map((c) => ({ id: c.id, tips: c.branches, count: branchMembers(c).length }));
+      branchSpaces = actSpaces(branchSkeleton, acts);
+      const S = typeof window !== 'undefined' ? window.SETTINGS : null;
+      const crown = S && S.opening && Number.isFinite(Number(S.opening.crownY)) ? Number(S.opening.crownY) * branchSkeleton.h : undefined;
+      branchGrowth = growBranches(branchSkeleton, acts, { spaces: branchSpaces, crownY: crown });
+      // For the cover, which draws them: kept, and said.
+      if (typeof window !== 'undefined') {
+        const detail = { source: branchSource(), grown: branchGrowth.grown };
+        window.PostPipeGraphBranches = detail;
+        window.dispatchEvent(new CustomEvent('graph:branches', { detail }));
+      }
+    }
+    // Every act's label and cards in the world, through the home view; true
+    // when there was a skeleton and an art to place them on.
+    function planBranches() {
+      if (!branchGrowth || !branchActs.length || !(coverFrame && coverFrame.art) || layoutRef.current !== 'force') return false;
+      const model = branchGrowth.model;
+      const art = coverFrame.art;
+      const k = HOME_K;
+      const origin = graphOrigin();
+      const toWorld = (p) => anchorWorld({ x: p.x / model.w, y: p.y / model.h }, art, homeView(k), origin);
+      const toArt = (x, y) => ({ x: ((x * k + origin.x - art.left) / art.width) * model.w, y: ((y * k + origin.y - art.top) / art.height) * model.h });
+      const actAt = (x, y) => { const a = toArt(x, y); return branchSpaces.actAt(a.x, a.y); };
+      // On the screen at the home view, under the crown.
+      const box = containerRef.current ? containerRef.current.getBoundingClientRect() : { left: 0, right: width, bottom: height };
+      const shift = (typeof window !== 'undefined' && window.PostPipeCover && window.PostPipeCover.shift) || 0;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : width;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : height;
+      const crownS = Number.isFinite(coverFrame.crownY)
+        ? art.top + coverFrame.crownY * art.height
+        : art.top + (skeletonInfo(model).crown.y / model.h) * art.height;
+      const m = 6;
+      const bounds = {
+        x0: (Math.max(box.left, 0) + m - origin.x) / k,
+        x1: (Math.min(box.right, vw) - m - origin.x) / k,
+        y0: (crownS + m - origin.y) / k,
+        y1: (Math.min(box.bottom - shift, vh) - m - origin.y) / k,
+      };
+      const slots = [];
+      const tips = [];
+      branchActs.forEach((c, ai) => {
+        const names = branchGrowth.order.get(c.id) || [];
+        const cs = branchCardScale(c);
+        branchMembers(c).forEach((u, rank) => {
+          const tip = names[Math.min(rank, names.length - 1)];
+          const path = tip ? pathToTip(model, tip) : null;
+          if (!path || path.length < 2) return;
+          const L = path.reduce((t, q, i) => (i ? t + Math.hypot(q.x - path[i - 1].x, q.y - path[i - 1].y) : 0), 0);
+          const w = u.w * cs, h = u.h * cs;
+          const world = path.map(toWorld);
+          slots.push({ id: u.id, act: c.id, rank, ai, tip, L, path: world, w, h, cs, minScale: Math.min(1, BRANCH_MIN_W / Math.max(1, w)) });
+          tips.push(world[world.length - 1]);
+        });
+      });
+      slots.sort((a, b) => a.L - b.L || a.ai - b.ai || a.rank - b.rank);
+      // The labels first, clear of each card's least room on its tip; then
+      // the cards, round the labels.
+      const labels = placeLabels(branchActs.map((c) => ({
+        id: c.id,
+        roots: mainRoots(model, branchSpaces.owner, c.id).map((poly) => poly.map(toWorld)),
+        size: (f) => labelBlockSize(c, f, { status: PILL.status, family: faceOf(c) }),
+      })), {
+        bounds, actAt, tips, tipPad: 4 / k, obstacles: cardRoom(slots),
+        gap: BRANCH_GAP / k, min: 8 / k, max: 400,
+      });
+      const placed = placeCards(slots, { gap: BRANCH_GAP / k, bounds, actAt, obstacles: [...labels.values()].map((l) => l.rect) });
+      const bySlot = new Map(slots.map((sl) => [sl.id, sl]));
+      const acts = new Map();
+      for (const c of branchActs) {
+        const l = labels.get(c.id);
+        if (!l) continue;
+        const members = new Map();
+        for (const [id, q] of placed.cards) {
+          if (q.act !== c.id) continue;
+          const sl = bySlot.get(id);
+          members.set(id, {
+            x: q.cx - l.cx, y: q.cy - l.cy, scale: sl.cs * q.scale,
+            tipOffset: { x: q.cx - q.anchor.x, y: q.cy - q.anchor.y },
+            tip: sl.tip, slid: q.slid, fit: q.scale, unresolved: q.unresolved,
+          });
+        }
+        const hw = (l.rect.x1 - l.rect.x0) / 2, hh = (l.rect.y1 - l.rect.y0) / 2;
+        acts.set(c.id, { size: l.size, label: { x0: -hw, y0: -hh, x1: hw, y1: hh }, members, along: l.along, relaxed: l.relaxed });
+        // The act rests where its label is.
+        const a = toArt(l.cx, l.cy);
+        ANCHORS.set(c.id, { x: a.x / model.w, y: a.y / model.h });
+      }
+      branchPlan = { acts, stats: placed.stats };
+      return true;
+    }
+    function branchLabelSize(c) {
+      const p = branchPlan && branchPlan.acts.get(c.id);
+      return p ? p.size : (PILL.labelSize || CLOSED_FONT) * PILL_SCALE;
+    }
+    // What the container layout takes for an act on branches; before its
+    // skeleton is read, its label alone, its cards under it.
+    function branchPlacedOf(c) {
+      const p = branchPlan && branchPlan.acts.get(c.id);
+      if (p) return { label: p.label, members: p.members };
+      const b = labelBlockSize(c, branchLabelSize(c), { status: PILL.status, family: faceOf(c) });
+      return { label: { x0: -b.w / 2, y0: -b.h / 2, x1: b.w / 2, y1: b.h / 2 }, members: new Map() };
+    }
+    // What is placed where, on the screen now: for checks and the page.
+    function branchesSnapshot() {
+      if (!branchGrowth) return null;
+      const rect = containerRef.current ? containerRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+      const scr = (x, y) => { const q = toScreen(x, y); return { x: q[0] + rect.left, y: q[1] + rect.top }; };
+      const acts = branchActs.map((c) => {
+        const p = branchPlan && branchPlan.acts.get(c.id);
+        const names = branchGrowth.order.get(c.id) || [];
+        const cards = branchMembers(c).map((u, rank) => {
+          const n = nodeBySlug.get(u.id);
+          const mm = p && p.members.get(u.id);
+          if (!n || !mm) return { id: u.id, rank, tip: names[rank] || null, placed: false };
+          const at = drawnAt(n);
+          const off = n._tipOff || mm.tipOffset;
+          const t = branchGrowth.model.tips.get(mm.tip) || {};
+          return {
+            id: u.id, rank, tip: mm.tip, grown: !!t.grown, placed: true, hidden: !!n._closedHidden,
+            slidPx: mm.slid * HOME_K, fit: mm.fit, scale: mm.scale, unresolved: mm.unresolved,
+            centre: scr(at.x, at.y), anchor: scr(at.x - off.x, at.y - off.y),
+          };
+        });
+        const st = branchPlan && branchPlan.stats.get(c.id);
+        return {
+          id: c.id, closed: closedContainers.has(c.id), tips: names, cards,
+          labelSize: p ? p.size : null, labelPx: p ? p.size * HOME_K : null, labelAlongPx: p ? p.along * HOME_K : null, labelRelaxed: p ? p.relaxed : null,
+          stats: st ? { cards: st.cards, shrunk: st.shrunk, slid: st.slid, unresolved: st.unresolved, fits: st.scales, slidesPx: st.slides.map((d) => d * HOME_K) } : null,
+        };
+      });
+      return {
+        source: branchSource(), homeK: HOME_K, minCardWidth: BRANCH_MIN_W,
+        grown: branchGrowth.grown.map((e) => ({ e: e.e, tip: e.tip, act: e.act, host: e.host, parts: e.parts.map((q) => ({ pts: q.pts, width: q.width, stroke: q.stroke })) })),
+        levels: Object.fromEntries(branchGrowth.levels), style: branchGrowth.style, acts,
+      };
+    }
+    if (branchActs.length && typeof fetch !== 'undefined') {
+      const src = branchSource();
+      if (src) {
+        fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => {
+          if (branchesDisposed) return;
+          const model = rootsModel(parseRoots(text));
+          if (!model) return;
+          branchSkeleton = model;
+          growNow();
+          if (positionsReady) onCoverFrame();
+        }).catch(() => {});
+      }
+    }
+
     // ── The graph's world, for the page around it ─────────────────────────
     // The cover's rootlets (src/components/Opening) reach for containers
     // drawn here. window.PostPipeGraphWorld.snapshot() gives, in screen px,
@@ -1794,7 +2008,7 @@ export function GraphViewer({
     // any move it is easing over (its transform's transition), an open one
     // where its members are.
     function drawnCentre(id, closed, group) {
-      if (!closed) return centreOf(id);
+      if (!closed || isBranchAct(containerById.get(id))) return centreOf(id);
       const macro = group.select('.container-macro-node').node();
       const gEl = group.node();
       const m = macro && macro.getScreenCTM ? macro.getScreenCTM() : null;
@@ -1802,6 +2016,12 @@ export function GraphViewer({
       if (!m || !gm) return centreOf(id);
       const inv = gm.inverse();
       return { x: inv.a * m.e + inv.c * m.f + inv.e, y: inv.b * m.e + inv.d * m.f + inv.f };
+    }
+    // A rectangle's outline, its corners and the middles of its sides.
+    function rectOutline(el) {
+      const x = Number(el.getAttribute('x')) || 0, y = Number(el.getAttribute('y')) || 0;
+      const w = Number(el.getAttribute('width')) || 0, h = Number(el.getAttribute('height')) || 0;
+      return [[x, y], [x + w / 2, y], [x + w, y], [x + w, y + h / 2], [x + w, y + h], [x + w / 2, y + h], [x, y + h], [x, y + h / 2]];
     }
     function worldSnapshot() {
       const out = [];
@@ -1813,9 +2033,11 @@ export function GraphViewer({
         const el = group.node();
         if (!el || el.style.display === 'none') continue;
         const closed = closedContainers.has(id);
-        const path = group.select(closed ? '.container-macro-bg' : '.container-hull').node();
-        if (!path || (!closed && path.style.display === 'none')) continue;
-        const local = outlineOf(path);
+        // An act on branches is its label, open or closed.
+        const onBranches = isBranchAct(containerById.get(id));
+        const path = group.select(onBranches ? '.container-badge-hit' : closed ? '.container-macro-bg' : '.container-hull').node();
+        if (!path || (!closed && !onBranches && path.style.display === 'none')) continue;
+        const local = onBranches ? rectOutline(path) : outlineOf(path);
         const m = path.getScreenCTM();
         if (!m || local.length < 3) continue;
         const hull = local.map(([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }));
@@ -1842,7 +2064,7 @@ export function GraphViewer({
       if (typeof window === 'undefined') return;
       window.dispatchEvent(new CustomEvent('graph:world'));
     }
-    if (typeof window !== 'undefined') window.PostPipeGraphWorld = { snapshot: worldSnapshot };
+    if (typeof window !== 'undefined') window.PostPipeGraphWorld = { snapshot: worldSnapshot, branches: () => branchesSnapshot() };
 
     function createContainerLayoutForce() {
       function force(alpha) {
@@ -2085,6 +2307,27 @@ export function GraphViewer({
         group.attr('transform', gs.x || gs.y ? `translate(${gs.x}, ${gs.y})` : null);
         const drawn = (p) => (p && (gs.x || gs.y) ? { x: p.x + gs.x, y: p.y + gs.y } : p);
         const local = (n) => { const q = drawnAt(n); return { x: q.x - gs.x, y: q.y - gs.y }; };
+
+        // On branches: the label alone, open and closed, on its main root;
+        // no hull, no outline, no closed shape. It stays the act's control.
+        if (f && f.info.branches) {
+          const L = f.info.label;
+          const at = { x: f.off.x + (L.x0 + L.x1) / 2, y: f.off.y + (L.y0 + L.y1) / 2 };
+          containerCentroids.set(c.id, drawn(at));
+          containerAnchor.set(c.id, drawn(at));
+          group.style('display', null);
+          group.select('.container-hull').style('display', 'none').attr('d', '');
+          group.select('.container-hull-ghost').attr('d', '');
+          group.select('.container-macro-node').style('display', 'none');
+          const size = c._fs || branchLabelSize(c);
+          const badge = group.select('.container-badge').style('display', null)
+            .attr('data-label-position', 'branches').attr('data-closed', isClosed ? 'true' : 'false');
+          badge.select('.container-badge-text').attr('font-size', `${size}px`);
+          const blk = labelBlockSize(c, size, { status: PILL.status, family: faceOf(c) });
+          badge.select('.container-badge-hit').attr('x', -blk.w / 2).attr('y', -blk.h / 2).attr('width', blk.w).attr('height', blk.h);
+          badge.attr('transform', `translate(${at.x}, ${at.y})${upright()}`);
+          return;
+        }
 
         if (isClosed) {
           const pos = macroPos(c);
@@ -2332,6 +2575,8 @@ export function GraphViewer({
     let relaidCentres = null;
     function relayoutContainers() {
       if (!data.containers || data.containers.length === 0) return;
+      // The acts on branches placed again (a label's face may have loaded).
+      planBranches();
       const anchors = new Map(CL.roots.map((r) => [r, rootOffset(r)]));
       // An anchored container keeps its anchor as its centre, or, once the
       // reader has dragged it, its centre where it is.
@@ -3502,8 +3747,10 @@ export function GraphViewer({
       const pinned = [...ANCHORS.keys()].filter((cId) => anchorsPending.has(cId) || !isDetached(cId));
       // Where the crown falls against each anchor depends on the frame, so
       // a spiral kept below it is laid out again, and the pinned ones take
-      // the new arrangement before they go onto their anchors.
-      if (keepBelowUsed()) {
+      // the new arrangement before they go onto their anchors. So are the
+      // acts on branches, which are placed through the frame.
+      const replanned = planBranches();
+      if (keepBelowUsed() || replanned) {
         computeContainerLayout();
         refreshContainerForces();
         for (const cId of pinned) snapToLayout(cId);
@@ -3938,6 +4185,29 @@ export function GraphViewer({
           const c = containerById.get(cId);
           if (!c || hasClosedAncestor(c)) continue;
           const group = containerGroups.filter((x) => x.id === cId);
+          // On branches: its label about its centre, and each open card
+          // about its own tip.
+          if (isBranchAct(c)) {
+            const hit = group.select('.container-badge-hit').node();
+            const G = growCentreOf(cId);
+            if (hit && G) {
+              const b = hit.getBoundingClientRect();
+              const sh = shiftOfContainer(c);
+              const q = toScreen(G.x + sh.x, G.y + sh.y);
+              if (b.width && b.height) items.push({ box: { x0: b.left - box.left, y0: b.top - box.top, x1: b.right - box.left, y1: b.bottom - box.top }, at: { x: q[0], y: q[1] } });
+            }
+            if (!closedContainers.has(cId)) {
+              articleNodes.each(function (d) {
+                if (anchoredOf.get(d.id) !== cId || d._closedHidden || !d._tipOff) return;
+                const b = this.getBoundingClientRect();
+                if (!b.width || !b.height) return;
+                const at = drawnAt(d);
+                const q = toScreen(at.x - d._tipOff.x, at.y - d._tipOff.y);
+                items.push({ box: { x0: b.left - box.left, y0: b.top - box.top, x1: b.right - box.left, y1: b.bottom - box.top }, at: { x: q[0], y: q[1] } });
+              });
+            }
+            continue;
+          }
           const el = group.select(closedContainers.has(cId) ? '.container-macro-bg' : '.container-hull').node();
           if (!el || !(el.getAttribute('d') || '').length) continue;
           const b = el.getBoundingClientRect();
@@ -4092,6 +4362,8 @@ export function GraphViewer({
     for (const [name, fn] of Object.entries(containerEvents)) window.addEventListener(name, fn);
 
     return () => {
+      branchesDisposed = true;
+      if (typeof window !== 'undefined' && branchGrowth && window.PostPipeGraphBranches && window.PostPipeGraphBranches.grown === branchGrowth.grown) delete window.PostPipeGraphBranches;
       renderAllArticleBodiesRef.current = null;
       rootsUpdateRef.current = null;
       paletteUpdateRef.current = null;

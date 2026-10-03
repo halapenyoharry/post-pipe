@@ -337,6 +337,11 @@ function openingConfig(settings) {
       // How far behind its act each act's roots follow it, in ms (the
       // roots' spring's time constant, createFollow); 0: at once.
       rootsFollowMs: Math.max(0, Math.min(2000, num(art.rootsFollowMs, 0))),
+      // The graph's own skeleton for its branch layout
+      // (graph.branches.source), when it is another file than rootsVector:
+      // the cover draws it too, in the same way. Only when there is one.
+      ...(graphState && branchesSourceOf(settings.graph, str(art.rootsVector))
+        ? { branchesSource: branchesSourceOf(settings.graph, str(art.rootsVector)) } : {}),
     },
     // The acts the roots belong to: each container with an anchor, and its
     // rootTips (the tips of its roots, by name in the roots' SVG).
@@ -390,6 +395,15 @@ function openingConfig(settings) {
     // { x, y }, fractions of the art. null when not set.
     zoomPivot: pivotOf(o.zoomPivot),
   };
+}
+
+// graph.branches.source for graph.containerLayout 'branches', unless it is
+// the cover's own rootsVector ('' then, or without one).
+function branchesSourceOf(graph, rootsVector) {
+  const g = graph && typeof graph === 'object' ? graph : {};
+  if (g.containerLayout !== 'branches' || !g.branches || typeof g.branches !== 'object') return '';
+  const src = typeof g.branches.source === 'string' ? g.branches.source.trim() : '';
+  return src && src !== rootsVector ? src : '';
 }
 
 function actsOf(containers) {

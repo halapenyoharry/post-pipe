@@ -857,6 +857,10 @@ async function main() {
       // ({ anchorEnd, openTowards, keepBelow, cardScale, spacing }).
       const spiral = extra.spiral != null ? extra.spiral : c.spiral;
       if (spiral && typeof spiral === 'object') out.spiral = { ...spiral }; else delete out.spiral;
+      // branches: the tips of the skeleton the container owns, by name
+      // (graph.containerLayout 'branches'), its items on them easiest first.
+      const branches = extra.branches != null ? extra.branches : c.branches;
+      if (Array.isArray(branches)) out.branches = branches.filter((t) => typeof t === 'string' && t); else delete out.branches;
       // The container's own look, closed and open alike: fill (a colour) at
       // fillOpacity, stroke, its label in labelFace (a family the site's
       // fonts carry) and labelColor (containerLook.js). Kept apart as look,

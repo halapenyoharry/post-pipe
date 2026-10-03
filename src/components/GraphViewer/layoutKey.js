@@ -6,8 +6,9 @@
 // size it spaces by, the force simulation, and graph.layoutVersion, which a
 // site bumps to retire saved positions on purpose, and the containers'
 // anchors (where a site rests them on its cover's art), and how the containers
-// are laid out (graph.containerLayout, graph.hang, graph.hull.padding, and each
-// container's own layout, hang, hull and spiral). So the key is the layout's
+// are laid out (graph.containerLayout, graph.hang, graph.hull.padding,
+// graph.branches, and each container's own layout, hang, hull, spiral and
+// branches). So the key is the layout's
 // name plus a short signature of those settings. When any of them changes,
 // positions saved under the old key are no longer read (they stay in storage
 // until Forget clears them), and the layout places the nodes afresh.
@@ -69,6 +70,7 @@ function layoutSignature(graphSettings, { anchors, layouts } = {}) {
   if (g.containerLayout) sig.containerLayout = g.containerLayout;
   if (g.hang && typeof g.hang === 'object') sig.hang = pick(g.hang, ['direction', 'firstAt', 'columns', 'gap']);
   if (g.hull && typeof g.hull === 'object' && g.hull.padding != null) sig.hullPadding = g.hull.padding;
+  if (g.containerLayout === 'branches' && g.branches && typeof g.branches === 'object') sig.branches = pick(g.branches, ['source', 'cardScale', 'minCardWidth', 'gap']);
   const l = containerPart(layouts);
   if (l) sig.layouts = l;
   return JSON.stringify(sig);

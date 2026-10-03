@@ -27,6 +27,12 @@
 //     far side, round, and up the near side, so one end of the chain is low
 //     and the other is at the top, under the anchor (hangChain below).
 //
+//   - placed (options.placedOf(container) gives { label, members }): the
+//     branch layout (branchLayout.js) has already put the container's label
+//     and each of its members in the container's frame (the label's centre
+//     at the origin); they are taken as they are, and the box is theirs,
+//     with no hull round them. Closed, the container is its label alone.
+//
 //   - the spiral's own settings (options.spiralOf(container), spiralOptions
 //     below): anchorEnd 'outer' puts the spiral's outer end, its last member,
 //     at the frame's origin (the container's anchor), turned so the first
@@ -77,9 +83,12 @@ function compareUnits(a, b) {
 
 // How a container is laid out: containers.<id>.layout, else
 // graph.containerLayout. 'hang' hangs it from its anchor (containerLayout.js);
-// anything else, the spiral.
+// 'branches' puts its items on the tips of a skeleton (branchLayout.js),
+// for a container that names its tips (containers.<id>.branches); anything
+// else, the spiral.
 function containerLayoutOf(c, GS) {
   const l = (c && c.layout) || (GS && GS.containerLayout);
+  if (l === 'branches') return c && Array.isArray(c.branches) && c.branches.length ? 'branches' : null;
   return l === 'hang' ? 'hang' : null;
 }
 
@@ -260,6 +269,8 @@ function hangChain(units, lab, opts = {}) {
  *   mode: 'path' (default) | 'scatter' | 'ring'; startRadius: the spiral's radius at its first member;
  *   direction: 'outward' (default, the first member beside the label) | 'inward' (the first member on the outer end)
  *   spiralOf(container): its spiral settings { anchorEnd, openTowards, keepBelowY, cardScale, spacing } (spiralOptions)
+ *   placedOf(container): { label: rect, members: Map id -> { x, y, scale, tipOffset } } when the branch
+ *     layout placed it (label centred on the origin), else null
  * @returns {{ roots: string[], nodes: Map, containers: Map }}
  *   nodes:      nodeId -> { root, x, y, scale }   position in its root container's frame; scale, the card's (cardScale)
  *   containers: id -> { root, label: rect, box: rect, center: {x, y}, closed }  in the root frame
@@ -286,6 +297,27 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       for (const { c: ch } of childrenOf.get(id) || []) out.push(...descendantsOf(ch.id));
       return out;
     };
+
+    // Placed by the branch layout: its label and members as given.
+    const given = options.placedOf ? options.placedOf(c) : null;
+    if (given) {
+      const label = given.label || rectAt(0, 0, 0, 0);
+      if (closedSet.has(c.id)) {
+        const nodes = new Map(descendantsOf(c.id).map((id) => [id, { x: 0, y: 0 }]));
+        return { box: label, nodes, containers: new Map([[c.id, { label, box: label, center: { x: 0, y: 0 }, closed: true, branches: true }]]) };
+      }
+      const nodes = new Map();
+      const rects = [label];
+      for (const id of descendantsOf(c.id)) {
+        const p = given.members && given.members.get(id);
+        if (!p) { nodes.set(id, { x: 0, y: 0 }); continue; }
+        nodes.set(id, { x: p.x, y: p.y, scale: p.scale, tipOffset: p.tipOffset || null });
+        const m = (members.get(c.id) || []).find((u) => u.id === id);
+        if (m) rects.push(rectAt(p.x, p.y, m.w * (p.scale || 1), m.h * (p.scale || 1)));
+      }
+      const box = union(rects);
+      return { box, nodes, containers: new Map([[c.id, { label, box, center: { x: 0, y: 0 }, closed: false, spiral: null, branches: true }]]) };
+    }
 
     if (closedSet.has(c.id)) {
       const m = (macroSize && macroSize(c)) || { w: 260, h: 90 };
@@ -602,7 +634,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
           // Place the child so its box is centred on the unit.
           const ox = cx - (u.sub.box.x0 + u.sub.box.x1) / 2;
           const oy = cy - (u.sub.box.y0 + u.sub.box.y1) / 2;
-          for (const [id, p] of u.sub.nodes) nodes.set(id, { x: p.x + ox, y: p.y + oy, scale: p.scale });
+          for (const [id, p] of u.sub.nodes) nodes.set(id, { x: p.x + ox, y: p.y + oy, scale: p.scale, ...(p.tipOffset ? { tipOffset: p.tipOffset } : {}) });
           for (const [id, info] of u.sub.containers) {
             const shift = (r) => ({ x0: r.x0 + ox, y0: r.y0 + oy, x1: r.x1 + ox, y1: r.y1 + oy });
             cmap.set(id, {
@@ -633,7 +665,7 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
     const res = layoutOne(byId.get(rootId), 0, new Set());
     if (!res) continue;
     for (const [id, p] of res.nodes) {
-      if (!outNodes.has(id)) outNodes.set(id, { root: rootId, x: p.x, y: p.y, scale: p.scale || 1 });
+      if (!outNodes.has(id)) outNodes.set(id, { root: rootId, x: p.x, y: p.y, scale: p.scale || 1, ...(p.tipOffset ? { tipOffset: p.tipOffset } : {}) });
     }
     for (const [id, info] of res.containers) outContainers.set(id, { root: rootId, ...info });
   }

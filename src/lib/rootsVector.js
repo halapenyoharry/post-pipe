@@ -10,6 +10,9 @@
 //   data-loop  an edge that closes a loop (off the way from the crown)
 //   data-free  an edge not joined to the crown
 //   stroke, stroke-width, d (M x,y L x,y ...)
+// A model can also carry grown edges (branchLayout.js withGrown): each with
+// host { e, part, k }, the point of another edge it grows from, which it
+// moves with when that bends.
 // and <circle data-tip cx cy> for every tip, in the art's own px (its
 // viewBox is the art's natural size).
 //
@@ -219,6 +222,15 @@ function bentRoots(model, roots, drifts) {
         f[pi][k][0] += wt * d.dx; f[pi][k][1] += wt * d.dy;
       }));
     }
+  }
+  // A grown edge (src/components/GraphViewer/branchLayout.js) moves with
+  // the point on the edge it grows from; grown edges come after their hosts.
+  for (const edge of model.edges) {
+    if (!edge.host || !any) continue;
+    const hf = field.get(edge.host.e);
+    const hv = hf && hf[edge.host.part] && hf[edge.host.part][edge.host.k];
+    if (!hv || (!hv[0] && !hv[1])) continue;
+    field.get(edge.e).forEach((row) => row.forEach((q) => { q[0] += hv[0]; q[1] += hv[1]; }));
   }
   for (const edge of model.edges) {
     const f = field.get(edge.e);

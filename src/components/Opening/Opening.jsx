@@ -3,6 +3,7 @@ import styles from './Opening.module.css';
 import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor, rootsBrightnessAt } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 import { parseRoots, rootsModel, actRoots, bentRoots, pathD, createFollow } from '../../lib/rootsVector';
+import { withGrown } from '../GraphViewer/branchLayout';
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
@@ -264,6 +265,7 @@ function createRootsVector(svg, model, roots) {
       el.setAttribute('data-e', String(edge.e));
       el.setAttribute('data-part', String(i));
       if (edge.tip) el.setAttribute('data-tip', edge.tip);
+      if (edge.grown) el.setAttribute('data-grown', edge.act || '');
       if (actOf.has(edge.e)) el.setAttribute('data-act-root', actOf.get(edge.e));
       frag.appendChild(el);
       return el;
@@ -385,6 +387,7 @@ function Cover({ config, viewState, children }) {
   const reachLayerRef = useRef(null);
   const reachRef = useRef(null);
   const vectorRef = useRef(null);      // the roots' SVG (rootsVector)
+  const branchesVectorRef = useRef(null); // the graph's branch skeleton, when another file
   const rootsRef = useRef(null);       // { draw, acts: Set } once it has loaded
   const followRef = useRef(null);      // the roots following their acts (rootsFollowMs)
   const zoomRef = useRef(null);       // { k, homeK }: the graph's zoom, from its world
@@ -521,6 +524,10 @@ function Cover({ config, viewState, children }) {
     const b = rootsBrightnessAt(config, g.p);
     const filter = b === 1 ? '' : `brightness(${b.toFixed(3)})`;
     if (vectorRef.current && vectorRef.current.style.filter !== filter) vectorRef.current.style.filter = filter;
+    if (branchesVectorRef.current) {
+      if (branchesVectorRef.current.style.filter !== filter) branchesVectorRef.current.style.filter = filter;
+      branchesVectorRef.current.style.opacity = String(g.fade.graph * g.roots);
+    }
     if (roots && roots.style.filter !== filter) roots.style.filter = filter;
     // Drawn as vectors: the image's roots give way to them.
     if (rootsRef.current && vectorRef.current) {
@@ -759,26 +766,74 @@ function Cover({ config, viewState, children }) {
 
   // The roots as vectors: read once (the site's own file), drawn, and from
   // then on bent toward their acts each frame (drawFrame).
+  // With the graph's branch layout, the branches it grew for its acts
+  // (graph:branches) are drawn with them, the same way, and bend with what
+  // they grow from.
   useEffect(() => {
     const src = config.art.rootsVector;
     if (!src || !art || typeof fetch === 'undefined') return undefined;
     let live = true;
     let built = null;
-    fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => {
+    let model = null;
+    const build = () => {
       const svg = vectorRef.current;
-      const model = rootsModel(parseRoots(text));
       if (!live || !svg || !model) return;
-      const roots = actRoots(model, config.acts);
-      built = createRootsVector(svg, model, roots);
+      if (built) built.dispose();
+      const g = window.PostPipeGraphBranches;
+      const drawn = g && g.source === src ? withGrown(model, g.grown) : model;
+      const roots = actRoots(drawn, config.acts);
+      built = createRootsVector(svg, drawn, roots);
       rootsRef.current = { draw: built, acts: new Set(roots.keys()) };
       svg.setAttribute('data-roots-vector', 'ready');
+      svg.setAttribute('data-roots-grown', String(drawn.edges.length - model.edges.length));
       const m = machineRef.current;
       if (m) paintRef.current(m.p);
+      requestFrame();
+    };
+    const onBranches = (e) => { if (e.detail && e.detail.source === src) build(); };
+    window.addEventListener('graph:branches', onBranches);
+    fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => {
+      model = rootsModel(parseRoots(text));
+      build();
     }).catch(() => {});
     return () => {
       live = false;
+      window.removeEventListener('graph:branches', onBranches);
       if (built) built.dispose();
       rootsRef.current = null;
+    };
+  }, [config, art]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The graph's own branch skeleton, when it is another file than the
+  // roots (graph.branches.source): drawn the same way, its grown branches
+  // with it; it does not bend.
+  useEffect(() => {
+    const src = config.art.branchesSource;
+    if (!src || !art || typeof fetch === 'undefined') return undefined;
+    let live = true;
+    let built = null;
+    let model = null;
+    const build = () => {
+      const svg = branchesVectorRef.current;
+      if (!live || !svg || !model) return;
+      if (built) built.dispose();
+      const g = window.PostPipeGraphBranches;
+      const drawn = g && g.source === src ? withGrown(model, g.grown) : model;
+      built = createRootsVector(svg, drawn, new Map());
+      svg.setAttribute('data-roots-vector-extra', 'ready');
+      const m = machineRef.current;
+      if (m) paintRef.current(m.p);
+    };
+    const onBranches = (e) => { if (e.detail && e.detail.source === src) build(); };
+    window.addEventListener('graph:branches', onBranches);
+    fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => {
+      model = rootsModel(parseRoots(text));
+      build();
+    }).catch(() => {});
+    return () => {
+      live = false;
+      window.removeEventListener('graph:branches', onBranches);
+      if (built) built.dispose();
     };
   }, [config, art]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1084,6 +1139,11 @@ function Cover({ config, viewState, children }) {
             )}
             {config.art.rootsVector && (
               <svg ref={vectorRef} className={styles.roots} aria-hidden="true" data-roots-vector="loading"
+                preserveAspectRatio="none" viewBox={art ? `0 0 ${art.w} ${art.h}` : undefined}
+                style={{ opacity: 0, ...keepMask(config.backdrop.keepAbove, 'below') }} />
+            )}
+            {config.art.branchesSource && (
+              <svg ref={branchesVectorRef} className={styles.roots} aria-hidden="true" data-roots-vector-extra="loading"
                 preserveAspectRatio="none" viewBox={art ? `0 0 ${art.w} ${art.h}` : undefined}
                 style={{ opacity: 0, ...keepMask(config.backdrop.keepAbove, 'below') }} />
             )}
