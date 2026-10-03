@@ -12,7 +12,9 @@
 // A node palette the reader chose (graph.nodePalettes, nodePalettes.js)
 // colours every container over its own look: outline and fill in its
 // colour, the fill at its fillOpacity, the labels in its labelColor (else
-// its colour); the face stays the container's own.
+// its colour); the face stays the container's own. A palette whose colour
+// is 'none' takes the fill and the outline away (the fill transparent, so
+// the containers still take taps) and keeps the labels.
 //
 //   containerLook(c, palette) -> {
 //     closed: { fill, fillOpacity, stroke, glow },   fillOpacity null: as given;
@@ -41,10 +43,14 @@ function faceFamily(face) {
 function containerLook(c, palette) {
   const own = (c && c.look && typeof c.look === 'object') ? c.look : {};
   const pal = palette && str(palette.color) ? palette : null;
+  // A palette whose colour is 'none': no fill and no outline on the
+  // containers (the fill kept transparent so they still take taps), the
+  // labels in its labelColor, else the container's own.
+  const none = !!pal && str(pal.color).toLowerCase() === 'none';
   const base = containerColor(c);
-  const fill = pal ? str(pal.color) : str(own.fill);
-  const stroke = pal ? str(pal.color) : str(own.stroke);
-  const fillOpacity = fill ? opacityOf(pal ? pal.fillOpacity : own.fillOpacity) : null;
+  const fill = none ? 'transparent' : pal ? str(pal.color) : str(own.fill);
+  const stroke = none ? 'none' : pal ? str(pal.color) : str(own.stroke);
+  const fillOpacity = none ? 0 : fill ? opacityOf(pal ? pal.fillOpacity : own.fillOpacity) : null;
   const closedStroke = stroke || base;
   return {
     closed: {
@@ -60,7 +66,8 @@ function containerLook(c, palette) {
     },
     label: {
       face: faceFamily(own.labelFace),
-      color: (pal ? str(pal.labelColor) || str(pal.color) : str(own.labelColor)) || null,
+      color: (none ? str(pal.labelColor) || str(own.labelColor)
+        : pal ? str(pal.labelColor) || str(pal.color) : str(own.labelColor)) || null,
     },
   };
 }

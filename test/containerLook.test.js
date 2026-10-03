@@ -57,3 +57,19 @@ test('lookFromSettings: the fields that are set, fillOpacity kept within 0 and 1
   assert.equal(lookFromSettings({ status: 'soon' }), null);
   assert.equal(lookFromSettings(null), null);
 });
+
+test("a palette of colour 'none': no fill or outline, still takes taps, labels kept", () => {
+  const { containerLook } = require('../src/components/GraphViewer/containerLook');
+  const c = { color: '#ff0000', look: { fill: '#00a7a4', fillOpacity: 0.35, stroke: '#00a7a4', labelColor: '#66cfcb', labelFace: 'Dela Gothic One' } };
+  const L = containerLook(c, { id: 'none', color: 'none', labelColor: '#66cfcb' });
+  assert.strictEqual(L.closed.fill, 'transparent');
+  assert.strictEqual(L.closed.fillOpacity, 0);
+  assert.strictEqual(L.closed.stroke, 'none');
+  assert.strictEqual(L.closed.glow, null);
+  assert.strictEqual(L.open.fill, 'transparent');
+  assert.strictEqual(L.open.stroke, 'none');
+  assert.strictEqual(L.label.color, '#66cfcb');
+  assert.ok(L.label.face.includes('Dela Gothic One'));
+  const L2 = containerLook(c, { id: 'none', color: 'NONE' });
+  assert.strictEqual(L2.label.color, '#66cfcb', 'falls back to the container\'s own label colour');
+});

@@ -3,7 +3,9 @@
 // { id, label, color, fillOpacity, labelColor }: the containers (closed and
 // open: their outline, their fill at fillOpacity, their labels in
 // labelColor, else color) and the outlines of the cards inside them take
-// it; the cards' text does not. The first is the one used until a reader
+// it; the cards' text does not. color 'none' takes the fill and outline
+// off the containers (labels in labelColor) and leaves the cards' outlines
+// their own. The first is the one used until a reader
 // chooses (viewState preference nodePalette); Forget goes back to it. Pure,
 // so it can be tested.
 

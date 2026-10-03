@@ -895,7 +895,7 @@ export function GraphViewer({
     for (const c of (data.containers || [])) c._look = containerLook(c, palette);
     // The cards inside the containers take its colour for their outlines.
     const paintCardOutlines = () => {
-      if (palette) container.style.setProperty('--pp-node-color', palette.color);
+      if (palette && String(palette.color).toLowerCase() !== 'none') container.style.setProperty('--pp-node-color', palette.color);
       else container.style.removeProperty('--pp-node-color');
     };
     paintCardOutlines();

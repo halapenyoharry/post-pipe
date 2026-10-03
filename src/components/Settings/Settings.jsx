@@ -324,7 +324,11 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
                   className={styles.paletteSwatch}
                   data-palette-swatch={p.id}
                   aria-hidden="true"
-                  style={{
+                  style={String(p.color).toLowerCase() === 'none' ? {
+                    borderColor: 'currentColor',
+                    borderStyle: 'dashed',
+                    background: 'transparent',
+                  } : {
                     borderColor: p.color,
                     background: p.fillOpacity === null ? p.color : `color-mix(in srgb, ${p.color} ${Math.round(p.fillOpacity * 100)}%, transparent)`,
                   }}
