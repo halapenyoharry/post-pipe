@@ -51,6 +51,13 @@ const PORT = 39472;
 const BASE = `http://localhost:${PORT}/`;
 const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1]);
+// On branches (graph.containerLayout branches, T37) a closed act is its
+// label alone, with no small node, and an open act has no hull: those checks
+// are skipped there (test/e2e/t37_checks.js checks the branch layout).
+const BRANCHES = ((SETTINGS.graph || {}).containerLayout) === 'branches';
+const SKIPPED = [];
+const skip = (label, why) => { SKIPPED.push(label); console.log(`SKIP  ${label}  (${why})`); };
+const NO_NODE = 'branches: a closed act is its label alone, an open one has no hull';
 const FEED = JSON.parse(fs.readFileSync(path.join(SITE, 'feed.json'), 'utf8'));
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
 const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
@@ -224,16 +231,16 @@ async function part1(bt, name, size, record) {
   const actsClosed = ACTS.every((id) => { const c = closed.find((x) => x.id === id); return c && c.groupShown && c.macro && !c.hull; });
   const bookOpen = BOOK.every((id) => { const c = closed.find((x) => x.id === id); return c && c.groupShown && !c.macro; });
   const smallest = Math.max(...closed.filter((c) => ACTS.includes(c.id) && c.macro).map((c) => Math.max(c.macro.w, c.macro.h)));
-  record(`1.1 close all: every act at its closed size (its small node, no hull), the book open`, actsClosed && bookOpen,
+  (BRANCHES ? (l) => skip(l, NO_NODE) : record)(`1.1 close all: every act at its closed size (its small node, no hull), the book open`, actsClosed && bookOpen,
     closed.map((c) => `${c.id.replace('container:', '')} ${c.hull ? `hull ${r1(c.hull.w)}x${r1(c.hull.h)}` : c.macro ? `node ${r1(c.macro.w)}x${r1(c.macro.h)}` : 'none'}`).join(', '));
-  record('1.1 close all: the closed acts are small (under 200 px)', smallest < 200, `largest ${r1(smallest)} px`);
+  (BRANCHES ? (l) => skip(l, NO_NODE) : record)('1.1 close all: the closed acts are small (under 200 px)', smallest < 200, `largest ${r1(smallest)} px`);
   record('1.1 close all: no chapter nodes', (await nodesShown(p)) === 0, `${await nodesShown(p)} shown`);
   await shot(s, 't32-close-all');
 
   await p.click('[data-view-action="graph:open-all-containers"]');
   await p.waitForTimeout(1300);
   const opened = await containers(p);
-  record('1.1 open all: every act open again with its hull', ACTS.every((id) => { const c = opened.find((x) => x.id === id); return c && c.hull && !c.macro; }),
+  (BRANCHES ? (l) => skip(l, NO_NODE) : record)('1.1 open all: every act open again with its hull', ACTS.every((id) => { const c = opened.find((x) => x.id === id); return c && c.hull && !c.macro; }),
     opened.map((c) => `${c.id.replace('container:', '')} ${c.hull ? 'hull' : 'node'}`).join(', '));
   record('1.1 open all: the chapter nodes are back', (await nodesShown(p)) >= total && (await nodesShown(p)) > 0, `${await nodesShown(p)} shown, ${total} at the start`);
   await closePanel(p);
@@ -242,8 +249,13 @@ async function part1(bt, name, size, record) {
   for (const id of ACTS) { await p.evaluate((id) => window.PostPipeGraph.closeContainer(id), id); await p.waitForTimeout(500); }
   await p.waitForTimeout(800);
   const each = await containers(p);
-  record('1.1 closing the acts one by one: each at its closed size, no chapter nodes',
-    ACTS.every((id) => { const c = each.find((x) => x.id === id); return c && c.macro && !c.hull; }) && (await nodesShown(p)) === 0);
+  if (BRANCHES) {
+    skip('1.1 closing the acts one by one: each at its closed size', NO_NODE);
+    record('1.1 closing the acts one by one: no chapter nodes', (await nodesShown(p)) === 0, `${await nodesShown(p)} shown`);
+  } else {
+    record('1.1 closing the acts one by one: each at its closed size, no chapter nodes',
+      ACTS.every((id) => { const c = each.find((x) => x.id === id); return c && c.macro && !c.hull; }) && (await nodesShown(p)) === 0);
+  }
   record('1.1 no page errors while closing and opening', s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
 
   // Zoom. Back home first.
@@ -672,7 +684,7 @@ async function run(bt, name, size, record) {
   const pass = results.filter((r) => r.ok).length;
   const fail = results.filter((r) => !r.ok).length;
   const notRun = runs.filter((r) => !r.ran).length;
-  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run`);
+  console.log(`\n${pass} PASS, ${fail} FAIL, ${notRun} not run${SKIPPED.length ? `, ${SKIPPED.length} SKIPPED (${NO_NODE})` : ''}`);
   if (process.env.PP_E2E_JSON) fs.writeFileSync(process.env.PP_E2E_JSON, JSON.stringify({ results, runs }, null, 2));
   process.exit(fail ? 1 : 0);
 })();

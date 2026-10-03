@@ -241,8 +241,9 @@ async function opensCard(s) {
     const visible = [...document.querySelectorAll('.node-card')].some((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 40);
     if (visible) return;
     // The highest closed act on the screen, so its cards have room under it
-    // (since T35 Act One sits at the screen's foot on a desktop).
-    const macros = [...document.querySelectorAll('.container-group .container-macro-node:not([style*="display: none"])')]
+    // (since T35 Act One sits at the screen's foot on a desktop). On
+    // branches (graph.containerLayout branches) a closed act is its label.
+    const macros = [...document.querySelectorAll('.container-group .container-macro-node:not([style*="display: none"]), .container-group .container-badge[data-label-position="branches"][data-closed="true"]')]
       .map((m) => ({ m, y: m.getBoundingClientRect().top })).sort((a, b) => a.y - b.y);
     const g = macros.length ? macros[0].m : null;
     const id = g && g.closest('.container-group').getAttribute('data-container-id');

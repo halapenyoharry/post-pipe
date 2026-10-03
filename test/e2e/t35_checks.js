@@ -47,6 +47,14 @@ const PORT = 39465;
 const BASE = `http://localhost:${PORT}/`;
 const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1]);
+// On branches (graph.containerLayout branches, T37) an act is its label
+// alone, on its main root: no blob, no hull, no outline, not centred on its
+// anchor. Those checks are skipped there (test/e2e/t37_checks.js checks the
+// branch layout); the rest run, reading the act as its label.
+const BRANCHES = ((SETTINGS.graph || {}).containerLayout) === 'branches';
+const SKIPPED = [];
+const skip = (label, why) => { SKIPPED.push(label); console.log(`SKIP  ${label}  (${why})`); };
+const NO_SHAPE = 'branches: an act is its label alone on its main root, with no blob, hull or outline';
 const OPENING = SETTINGS.opening || {};
 const GS = SETTINGS.graph || {};
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
@@ -205,6 +213,17 @@ const actsNow = (page) => page.evaluate((ids) => {
   for (const id of ids) {
     const g = document.querySelector(`.container-group[data-container-id="${CSS.escape(id)}"]`);
     if (!g) { out[id] = null; continue; }
+    // On branches: the act is its label, open or closed.
+    const badge = g.querySelector('.container-badge');
+    if (badge && badge.getAttribute('data-label-position') === 'branches') {
+      const r = g.querySelector('.container-badge-hit').getBoundingClientRect();
+      const text = g.querySelector('.container-badge-text');
+      const ts = getComputedStyle(text);
+      const mm = badge.getScreenCTM();
+      const pts = [{ x: r.left, y: r.top }, { x: r.right, y: r.top }, { x: r.right, y: r.bottom }, { x: r.left, y: r.bottom }];
+      out[id] = { closed: badge.getAttribute('data-closed') === 'true', pts, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom, centre: { x: mm.e, y: mm.f }, fill: 'none', fillOpacity: 0, stroke: 'none', face: ts.fontFamily, label: text.textContent, labelFill: ts.fill };
+      continue;
+    }
     const macro = g.querySelector('.container-macro-node');
     const closed = !!macro && getComputedStyle(macro).display !== 'none';
     if (closed) {
@@ -325,7 +344,10 @@ async function run(bt, name, size, record, shots) {
   for (const act of ACTS) {
     const m = acts[act.id];
     const at = { x: g.frame.left + act.anchor.x * g.frame.width, y: g.frame.top + act.anchor.y * g.frame.height };
-    record(tag(`${LABELS[act.id]}: closed, centred on its anchor`), !!m && m.closed && Math.hypot(m.centre.x - at.x, m.centre.y - at.y) <= 2, m ? `${r1(Math.hypot(m.centre.x - at.x, m.centre.y - at.y))} px off` : 'missing');
+    if (BRANCHES) {
+      skip(tag(`${LABELS[act.id]}: closed, centred on its anchor`), NO_SHAPE);
+      record(tag(`${LABELS[act.id]}: closed`), !!m && m.closed, m ? (m.closed ? 'closed' : 'open') : 'missing');
+    } else record(tag(`${LABELS[act.id]}: closed, centred on its anchor`), !!m && m.closed && Math.hypot(m.centre.x - at.x, m.centre.y - at.y) <= 2, m ? `${r1(Math.hypot(m.centre.x - at.x, m.centre.y - at.y))} px off` : 'missing');
     if (!m || !m.closed) continue;
     const rgb = /rgb\((\d+), (\d+), (\d+)\)/.exec(m.fill);
     const hex = rgb ? '#' + rgb.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, '0')).join('') : m.fill;
@@ -335,7 +357,7 @@ async function run(bt, name, size, record, shots) {
     const srgb = /rgb\((\d+), (\d+), (\d+)\)/.exec(m.stroke);
     const shex = srgb ? '#' + srgb.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, '0')).join('') : m.stroke;
     const strokeOk = act.stroke ? shex.toLowerCase() === act.stroke.toLowerCase() : m.stroke === 'none';
-    record(tag(`${LABELS[act.id]}: filled with the title's teal at ${act.fillOpacity}, ${act.stroke ? `outlined in ${act.stroke}` : 'no outline'}`), hex.toLowerCase() === String(act.fill).toLowerCase() && Math.abs(m.fillOpacity - act.fillOpacity) < 0.01 && strokeOk, `${hex} at ${m.fillOpacity}, stroke ${m.stroke}`);
+    (BRANCHES ? (l) => skip(l, NO_SHAPE) : record)(tag(`${LABELS[act.id]}: filled with the title's teal at ${act.fillOpacity}, ${act.stroke ? `outlined in ${act.stroke}` : 'no outline'}`), hex.toLowerCase() === String(act.fill).toLowerCase() && Math.abs(m.fillOpacity - act.fillOpacity) < 0.01 && strokeOk, `${hex} at ${m.fillOpacity}, stroke ${m.stroke}`);
     record(tag(`${LABELS[act.id]}: its label "${LABELS[act.id]}" in the title's face`), m.label.trim() === LABELS[act.id] && m.face.includes(act.face), `"${m.label}" in ${m.face}`);
     // A blob, not a capsule: its outline is not symmetric about its centre.
     const c = m.centre;
@@ -354,7 +376,7 @@ async function run(bt, name, size, record, shots) {
       const r = radial(ang), rm = radial(ang + Math.PI);
       if (r && rm) asym = Math.max(asym, Math.abs(r - rm) / Math.max(r, rm));
     }
-    record(tag(`${LABELS[act.id]}: a blob, uneven all round, not a capsule`), asym > 0.04 && (m.x1 - m.x0) / (m.y1 - m.y0) < 2.2, `unevenness ${(asym * 100).toFixed(0)}%, ${r1(m.x1 - m.x0)} by ${r1(m.y1 - m.y0)}`);
+    (BRANCHES ? (l) => skip(l, NO_SHAPE) : record)(tag(`${LABELS[act.id]}: a blob, uneven all round, not a capsule`), asym > 0.04 && (m.x1 - m.x0) / (m.y1 - m.y0) < 2.2, `unevenness ${(asym * 100).toFixed(0)}%, ${r1(m.x1 - m.x0)} by ${r1(m.y1 - m.y0)}`);
     record(tag(`${LABELS[act.id]}: on the screen`), m.x0 >= -0.5 * (m.x1 - m.x0) && m.x1 <= g.W + 0.5 * (m.x1 - m.x0) && m.y1 <= g.H, `${r1(m.x0)}-${r1(m.x1)}, ${r1(m.y0)}-${r1(m.y1)}`);
   }
   const c1 = acts[one.id].centre, c2 = acts[two.id].centre, c3 = acts[three.id].centre;
@@ -379,7 +401,7 @@ async function run(bt, name, size, record, shots) {
   for (const act of ACTS) {
     const t = rv.tips[act.id], m = acts[act.id];
     if (!t || !m) continue;
-    record(tag(`${LABELS[act.id]}: its root's tip under its blob`), t.x >= m.x0 - 4 && t.x <= m.x1 + 4 && t.y >= m.y0 - 4 && t.y <= m.y1 + 4, `tip ${r1(t.x)},${r1(t.y)}; blob ${r1(m.x0)}-${r1(m.x1)}, ${r1(m.y0)}-${r1(m.y1)}`);
+    (BRANCHES ? (l) => skip(l, NO_SHAPE) : record)(tag(`${LABELS[act.id]}: its root's tip under its blob`), t.x >= m.x0 - 4 && t.x <= m.x1 + 4 && t.y >= m.y0 - 4 && t.y <= m.y1 + 4, `tip ${r1(t.x)},${r1(t.y)}; blob ${r1(m.x0)}-${r1(m.x1)}, ${r1(m.y0)}-${r1(m.y1)}`);
   }
   shots.graph = await shot('graph');
 
@@ -458,7 +480,7 @@ async function run(bt, name, size, record, shots) {
     if (d < least) { least = d; pair = `${LABELS[ids[i]]} and ${LABELS[ids[j]]}`; }
   }
   const k = await page.evaluate(() => window.PostPipeGraphWorld.snapshot().k);
-  record(tag('every act open: no two hulls meet, 16 px apart at the least'), least >= 16 * (k / 0.4) - 1.5, `the closest, ${pair}, ${r1(least)} px apart`);
+  (BRANCHES ? (l) => skip(l, `${NO_SHAPE}; T37 checks that no two cards overlap`) : record)(tag('every act open: no two hulls meet, 16 px apart at the least'), least >= 16 * (k / 0.4) - 1.5, `the closest, ${pair}, ${r1(least)} px apart`);
   shots.allOpen = await shot('all-open');
 
   record(tag('no page errors'), s.errors.length === 0, s.errors.slice(0, 2).join(' | '));
@@ -567,6 +589,6 @@ async function composite(size, shots, art) {
   for (const [k, t] of Object.entries(tally)) console.log(`  ${k}: ${t.notRun ? 'NOT RUN' : `${t.pass} pass, ${t.fail} fail`}`);
   const failed = results.filter((r) => !r.ok).length;
   const notRun = Object.values(tally).filter((t) => t.notRun).length;
-  console.log(`\n${results.length - failed} PASS, ${failed} FAIL${notRun ? `, ${notRun} NOT RUN` : ''}`);
+  console.log(`\n${results.length - failed} PASS, ${failed} FAIL${notRun ? `, ${notRun} NOT RUN` : ''}${SKIPPED.length ? `, ${SKIPPED.length} SKIPPED (${NO_SHAPE})` : ''}`);
   process.exit(failed || notRun ? 1 : 0);
 })();
