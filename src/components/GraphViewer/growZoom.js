@@ -26,6 +26,13 @@ function zoomModeOf(graphSettings) {
   return graphSettings && graphSettings.zoomMode === 'grow-in-place' ? 'grow-in-place' : 'geometric';
 }
 
+// graph.growCap (default true): whether a grow-in-place zoom stops where two
+// containers would come within 16 px. false: the reader zooms as far as they
+// like (to the zoom's own limits) and the containers may grow into each other.
+function growCapOn(graphSettings) {
+  return !(graphSettings && graphSettings.growCap === false);
+}
+
 // The world offset a container centred on G is drawn with at ratio r (see
 // above). { x: 0, y: 0 } at r = 1.
 function growShift(G, P, r) {
@@ -95,4 +102,4 @@ function growFitRatio(items, area) {
   return Number.isFinite(r) ? r : null;
 }
 
-module.exports = { zoomModeOf, growShift, growConstrain, growCap, growFitRatio };
+module.exports = { zoomModeOf, growCapOn, growShift, growConstrain, growCap, growFitRatio };

@@ -145,3 +145,11 @@ test('growFitRatio: each box grown about its own centre to fit the area; a centr
   assert.equal(growFitRatio([{ box: { x0: -50, y0: 0, x1: 10, y1: 10 }, at: { x: -20, y: 5 } }], area), null);
   assert.equal(growFitRatio([], area), null);
 });
+
+test('graph.growCap: on by default, off only when false', () => {
+  const { growCapOn } = require('../src/components/GraphViewer/growZoom');
+  assert.strictEqual(growCapOn(undefined), true);
+  assert.strictEqual(growCapOn({}), true);
+  assert.strictEqual(growCapOn({ growCap: true }), true);
+  assert.strictEqual(growCapOn({ growCap: false }), false);
+});

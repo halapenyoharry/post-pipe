@@ -11,7 +11,7 @@ import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
 import { zoomAbout, fitRatioAbout, repivot, zoomPivotMode } from './zoomPivot';
-import { zoomModeOf, growShift, growConstrain, growCap, growFitRatio } from './growZoom';
+import { zoomModeOf, growCapOn, growShift, growConstrain, growCap, growFitRatio } from './growZoom';
 import { minCardScale, homeScale } from './initialScale';
 import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, closeAllPlan } from './closedState';
 import { createTapGate } from './tapGate';
@@ -1617,7 +1617,7 @@ export function GraphViewer({
     // as placed (or as given in `centres`), open hulls with room for their
     // curve as apart() allows. Infinity when not growing.
     function growMaxK(centres) {
-      if (!growOn()) return Infinity;
+      if (!growOn() || !growCapOn(GS)) return Infinity;
       const acts = [];
       for (const cId of ANCHORS.keys()) {
         const info = CL.containers.get(cId);

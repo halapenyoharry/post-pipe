@@ -342,6 +342,7 @@
     "_fonts_note": "The faces offered for the text in the panel. default is the page's own face (Atkinson Hyperlegible) and is always offered. opendyslexic ships as fonts/OpenDyslexic-Regular.woff2 next to the page, with its SIL Open Font License in fonts/OpenDyslexic-OFL.txt; it loads only when chosen."
   },
   "graph": {
+    "_growCap_note": "graph.growCap (default true): with zoomMode grow-in-place, a zoom in stops where two anchored containers would come within 16 px. false lets the reader zoom as far as they like (to the zoom's own limits); the containers then may grow into each other.",
     "_note": "Visual parameters for the graph. Here rather than in the code so they can be tuned without a rebuild, and so a fork can look different without editing components. Not all of these are exposed in the interface, and they do not need to be \u2014 being reachable is the point.",
     "card": {
       "width": 180,
