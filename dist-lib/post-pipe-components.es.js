@@ -5323,7 +5323,10 @@ var is = /* @__PURE__ */ m(((e, t) => {
 	function i(e) {
 		return e && e.zoomMode === "grow-in-place" ? "grow-in-place" : "geometric";
 	}
-	function a(e, t, n) {
+	function a(e) {
+		return !(e && e.growCap === !1);
+	}
+	function o(e, t, n) {
 		if (!e || !t || !(n > 0)) return {
 			x: 0,
 			y: 0
@@ -5337,7 +5340,7 @@ var is = /* @__PURE__ */ m(((e, t) => {
 			y: r * (e.y - t.y)
 		};
 	}
-	function o(e, t, r, i, a = Infinity) {
+	function s(e, t, r, i, a = Infinity) {
 		if (!e || !t || !(e.k > 0) || !(t.k > 0) || Math.abs(t.k - e.k) <= 1e-9 * e.k) return t;
 		let o = t.k;
 		return o > e.k && o > a && (o = Math.max(e.k, a)), Math.abs(o - e.k) <= 1e-9 * e.k ? {
@@ -5346,7 +5349,7 @@ var is = /* @__PURE__ */ m(((e, t) => {
 			k: e.k
 		} : n(e, o / e.k, r, i);
 	}
-	function s(e, { gap: t = 16, homeK: n = 1, floor: r = 1 } = {}) {
+	function c(e, { gap: t = 16, homeK: n = 1, floor: r = 1 } = {}) {
 		let i = t / (n > 0 ? n : 1), a = Infinity, o = (e || []).filter((e) => e && e.centre && e.box);
 		for (let e = 0; e < o.length; e++) for (let t = e + 1; t < o.length; t++) {
 			let n = o[e], r = o[t], s = (e, t, n, r, a, o) => {
@@ -5357,7 +5360,7 @@ var is = /* @__PURE__ */ m(((e, t) => {
 		}
 		return Math.max(r, a);
 	}
-	function c(e, t) {
+	function l(e, t) {
 		let n = Infinity;
 		for (let i of e || []) {
 			if (!i || !i.box || !i.at) continue;
@@ -5368,10 +5371,11 @@ var is = /* @__PURE__ */ m(((e, t) => {
 	}
 	t.exports = {
 		zoomModeOf: i,
-		growShift: a,
-		growConstrain: o,
-		growCap: s,
-		growFitRatio: c
+		growCapOn: a,
+		growShift: o,
+		growConstrain: s,
+		growCap: c,
+		growFitRatio: l
 	};
 })), ps = /* @__PURE__ */ m(((e, t) => {
 	function n(e, t) {
@@ -7228,7 +7232,7 @@ function tc({ feedData: e, onNodeSelect: n, hiddenSources: i, filteredArticleIds
 			};
 		};
 		function bn(e) {
-			if (!dn()) return Infinity;
+			if (!dn() || !(0, Ms.growCapOn)(x)) return Infinity;
 			let t = [];
 			for (let n of tn.keys()) {
 				let r = G.containers.get(n), i = Vt.get(n);
