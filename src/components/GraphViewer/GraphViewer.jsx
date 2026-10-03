@@ -3753,6 +3753,9 @@ export function GraphViewer({
       // the new arrangement before they go onto their anchors. So are the
       // acts on branches, which are placed through the frame.
       const replanned = planBranches();
+      // A relayout still easing toward where the acts were placed before
+      // (a face that loaded first) would take them back there.
+      if (replanned) d3.selection().interrupt('container-relayout');
       if (keepBelowUsed() || replanned) {
         computeContainerLayout();
         refreshContainerForces();
