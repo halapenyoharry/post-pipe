@@ -3196,6 +3196,9 @@ export function GraphViewer({
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
         tagBubbles.forEach(fitBubble);
+        // Cards fitted to their text (graph.card.fit) measure it again in
+        // the faces now loaded.
+        if (CARD.fit === true && renderAllArticleBodiesRef.current) renderAllArticleBodiesRef.current();
       }).catch(() => {});
     }
 

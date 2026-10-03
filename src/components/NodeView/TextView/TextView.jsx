@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { roughRect } from '../../../lib/sketch';
+import { fitCard } from '../../../lib/cardFit';
 
 // Pencil outlines by card and size; a card is drawn many times at one size.
 const sketchCache = new Map();
@@ -132,6 +133,10 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
   const radius = cardSettings?.cornerRadius != null ? cardSettings.cornerRadius : 10;
   const isMarker = viewState.lod === 'marker' && !expanded;
   const sketch = isMarker || !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
+  // graph.card.fit: a card at rest keeps graph.card.padding inside it (6 by
+  // default) and no more; its text is sized to fill the rest (CardContent).
+  const fitPad = fitPadding(cardSettings);
+  const fitting = fitPad !== null && !expanded && !isMarker;
 
   return (
     <div
@@ -144,6 +149,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         // settings.graph.card.cornerRadius; a marker stays a dot.
         ...(cardSettings?.cornerRadius != null && !(viewState.lod === 'marker' && !expanded)
           ? { borderRadius: cardSettings.cornerRadius } : {}),
+        ...(fitting ? { padding: fitPad } : {}),
         // Provenance moves from a full coloured ring to a bar down one edge.
         // Ringing the whole card in a saturated feed colour competed with the
         // content for attention; an edge bar says the same thing quietly.
@@ -278,6 +284,45 @@ function fitFontSize(text, width, height, opts = {}) {
   return Math.round(Math.max(min, Math.min(max, best)));
 }
 
+// graph.card.fit: the padding a card keeps inside it (graph.card.padding,
+// default 6), or null when it is not fitted.
+function fitPadding(cardSettings) {
+  if (!cardSettings || cardSettings.fit !== true) return null;
+  const p = Number(cardSettings.padding);
+  return cardSettings.padding !== null && cardSettings.padding !== '' && Number.isFinite(p) && p >= 0 ? p : 6;
+}
+
+// Text widths in a face, measured on a canvas at 100 px; forgotten when a
+// face finishes loading.
+let measureCanvas = null;
+const widthCache = new Map();
+if (typeof document !== 'undefined' && document.fonts && document.fonts.addEventListener) {
+  document.fonts.addEventListener('loadingdone', () => widthCache.clear());
+}
+function textWidth(text, face, size) {
+  if (!face) return text.length * size * 0.55;
+  const key = `${face.font}|${text}`;
+  let w = widthCache.get(key);
+  if (w === undefined) {
+    if (!measureCanvas && typeof document !== 'undefined') measureCanvas = document.createElement('canvas').getContext('2d');
+    if (!measureCanvas) return text.length * size * 0.55;
+    measureCanvas.font = face.font;
+    w = measureCanvas.measureText(text).width;
+    if (widthCache.size > 4000) widthCache.clear();
+    widthCache.set(key, w);
+  }
+  return (w * size) / 100 + face.spacing * size * text.length;
+}
+// The face an element is drawn in, as a canvas font at 100 px, and its
+// letter-spacing in em.
+function faceOfEl(el) {
+  if (!el || typeof getComputedStyle === 'undefined') return null;
+  const cs = getComputedStyle(el);
+  const fs = parseFloat(cs.fontSize) || 16;
+  const ls = cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0) / fs;
+  return { font: `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`, spacing: ls };
+}
+
 // Below this height, a title pinned above the body costs more than it gives:
 // it takes a third of the card and leaves a slot too short to read in.
 const COMPACT_HEIGHT = 260;
@@ -285,6 +330,21 @@ const COMPACT_HEIGHT = 260;
 // English number words from 0 to 99, shared with the reader's header line.
 
 function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent, cardSettings }) {
+  // graph.card.fit: the faces the title and its line are drawn in, read
+  // once they are drawn, to measure them in.
+  const titleRef = useRef(null);
+  const subRef = useRef(null);
+  const cardBorder = useRef(1);
+  const [faces, setFaces] = useState(null);
+  const fitPad = fitPadding(cardSettings);
+  useLayoutEffect(() => {
+    if (fitPad === null || !titleRef.current) return;
+    const t = faceOfEl(titleRef.current), s = subRef.current ? faceOfEl(subRef.current) : null;
+    const card = titleRef.current.closest('[data-pp-card]');
+    if (card) cardBorder.current = parseFloat(getComputedStyle(card).borderLeftWidth) || 0;
+    const key = JSON.stringify([t, s]);
+    if (!faces || faces.key !== key) setFaces({ key, title: t, subtitle: s });
+  });
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
@@ -340,6 +400,29 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
   const title = (viewState.lod === 'slug')
     ? (article.label || article.labelMedium || article.title || '')
     : (article.title || article.label);
+
+  // Fitted: the title over at most three lines and its line on one, each
+  // as large as the card's inner box takes (src/lib/cardFit.js).
+  if (fitPad !== null) {
+    const inset = 2 * (fitPad + cardBorder.current);
+    const measure = (text, size, which) => textWidth(text, faces && (which === 'title' ? faces.title : faces.subtitle), size);
+    const fit = fitCard({
+      title, subtitle: subtitle || '', width: (width - inset) * 0.97, height: (height - inset) * 0.97, measure,
+      maxLines: 3, lineHeight: 1.05, gap: 3,
+    });
+    return (
+      <div className={styles.cardCenter} style={{ padding: 0 }} data-card-fit="">
+        <div ref={titleRef} className={styles.cardTitle} style={{ fontSize: `${fit.titleSize.toFixed(2)}px` }} data-card-title="">
+          {fit.lines.map((line, i) => <span key={i} style={{ display: 'block', whiteSpace: 'nowrap' }}>{line}</span>)}
+        </div>
+        {subtitle && (
+          <div ref={subRef} className={styles.cardSubtitle} style={{ fontSize: `${fit.subtitleSize.toFixed(2)}px`, whiteSpace: 'nowrap' }} data-card-subtitle="">
+            {subtitle}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const titleFontSize = fitFontSize(title, width, subtitle ? (height - 30) : height, {
     min: cardSettings?.labelMinFontSize ?? 14,

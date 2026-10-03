@@ -359,8 +359,11 @@
       "glowPadding": 16,
       "labelMinFontSize": 14,
       "labelMaxFontSize": 26,
-      "imageMarkSize": 22
+      "imageMarkSize": 22,
+      "fit": false,
+      "padding": 6
     },
+    "_card_fit_note": "card.fit (default false): a card at rest (not open, not a dot) keeps card.padding px inside its edge (default 6, at the card's own scale, before the zoom) and no more, and its title and the line under it (card.subtitle, \"chapter one\") are each set as large as fits what is left: the title wrapped at word breaks over at most three lines, the line on one, never larger than the title, the two stacked within the card. Measured in the faces they are drawn in (the theme's), again once those have loaded. Off, the title is sized from an estimate between labelMinFontSize and labelMaxFontSize, and the line at 0.62 of it.",
     "tag": {
       "fontSize": 22,
       "padding": 11,
