@@ -11,7 +11,9 @@
 //   2. one sliders button in the top bar after the hourglass, no gear; the
 //      hourglass menu holds only the timelines and the bucket size; the main
 //      view's panel holds the look, the time of day switch (no description),
-//      Zoom to fit, Close and Open all, Unpin, Reset sizes, Reset and Forget
+//      Zoom to fit, Close and Open all, Unpin, Reset sizes (only where a card
+//      can be resized: since Harold's note of 2026-10-04 this site's table,
+//      graph.bindings, binds no node.resize, so not there), Reset and Forget
 //      with its confirmation, and nothing of the reader's; the reader's panel
 //      holds reading, paper and listening, and nothing of the main view's;
 //      both panels have the same background;
@@ -51,6 +53,7 @@ const PORT = 39472;
 const BASE = `http://localhost:${PORT}/`;
 const HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
 const SETTINGS = JSON.parse(HTML.match(/window\.SETTINGS = (\{[\s\S]*?\});\n<\/script>/)[1]);
+const { resizeOn } = require('../../src/lib/actions');
 const FEED = JSON.parse(fs.readFileSync(path.join(SITE, 'feed.json'), 'utf8'));
 const ENGINES = (process.env.PP_E2E_ENGINES || 'chromium,webkit').split(',').map((s) => s.trim());
 const SHOTS = process.env.PP_E2E_SHOTS ? path.resolve(process.env.PP_E2E_SHOTS) : null;
@@ -404,8 +407,10 @@ async function part2(bt, name, size, record) {
   await shot(s, 't32-panel-main');
   record('2 the main view\'s panel: its title and groups (look, view, memory)', g.where === 'graph' && g.title === panelTitle(SETTINGS, 'graph') && g.sections.join() === 'look,view,memory', `"${g.title}": ${g.sections.join(', ')}`);
   record('2 ... the switch "narrative time of day background", with no description', !!g.pref && /narrative time of day background/.test(g.pref.text) && !g.pref.hint, g.pref && JSON.stringify(g.pref));
-  const want = ['Zoom to fit', `Close all ${NOUN}`, `Open all ${NOUN}`, 'Unpin all', 'Reset sizes'];
-  record(`2 ... Zoom to fit, Close all ${NOUN}, Open all ${NOUN}, Unpin all, Reset sizes`, want.every((w) => g.actions.includes(w)), g.actions.join(', '));
+  const sizes = resizeOn(SETTINGS.graph || {});
+  const want = ['Zoom to fit', `Close all ${NOUN}`, `Open all ${NOUN}`, 'Unpin all', ...(sizes ? ['Reset sizes'] : [])];
+  record(`2 ... Zoom to fit, Close all ${NOUN}, Open all ${NOUN}, Unpin all, ${sizes ? 'Reset sizes' : 'and no Reset sizes (no card can be resized)'}`,
+    want.every((w) => g.actions.includes(w)) && (sizes || !g.actions.includes('Reset sizes')), g.actions.join(', '));
   await p.click('[data-forget-ask]');
   const confirm = await p.$('[data-forget-confirm]');
   record('2 ... Forget with its confirmation', g.forget && !!confirm);

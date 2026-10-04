@@ -159,6 +159,15 @@ async function drag(page, from, by, steps = 8) {
 async function tapAt(s, p) {
   if (s.phone) await s.page.touchscreen.tap(p.x, p.y); else await s.page.mouse.click(p.x, p.y);
 }
+// What opens and closes an act: a double tap where the site's table
+// (graph.bindings) binds container.toggle to it, as since Harold's note of
+// 2026-10-04; a tap before.
+const ACT_DOUBLE = ((SETTINGS.graph || {}).bindings || []).some((b) => b.target === 'container' && b.gesture === 'doubletap' && b.action === 'container.toggle');
+async function toggleAt(s, p) {
+  if (!ACT_DOUBLE) return tapAt(s, p);
+  if (s.phone) { await s.page.touchscreen.tap(p.x, p.y); await s.page.touchscreen.tap(p.x, p.y); }
+  else await s.page.mouse.dblclick(p.x, p.y);
+}
 
 // Everything measured in one go, in screen px.
 const measure = (page) => page.evaluate(({ acts, book }) => {
@@ -479,7 +488,7 @@ async function run(bt, name, size, record) {
     // the screen's foot on a desktop, where its open title is below it.
     const a2 = ACTS.find((a) => /act-2/.test(a.id)) || ACTS[1];
     const a1 = ACTS.filter((a) => a !== a2).sort((p, q) => p.anchor.y - q.anchor.y)[0];
-    if (m.acts[a1.id].closed) await tapAt(s, m.acts[a1.id]);
+    if (m.acts[a1.id].closed) await toggleAt(s, m.acts[a1.id]);
     await p.waitForTimeout(900);
     const o1 = await measure(p);
     await p.waitForTimeout(2200);
@@ -489,14 +498,15 @@ async function run(bt, name, size, record) {
       // opens until clear (open acts never overlap).
       !o2.acts[a1.id].closed && (anchorOff(o1, a1) <= 2 || pushedAway(o1, a1)) && (anchorOff(o2, a1) <= 2 || pushedAway(o2, a1)),
       `${a1.id.replace('container:', '')} ${a1.outer ? 'last chapter' : 'title'} ${r1(anchorOff(o1, a1))} px from its anchor after 0.9 s, ${r1(anchorOff(o2, a1))} px after 3.1 s`);
-    // A tap on its title closes it (an open act that hangs is measured at
-    // its hull's top, which is not its title).
+    // A tap on its title (a double tap, with the table above) closes it (an
+    // open act that hangs is measured at its hull's top, which is not its
+    // title).
     // Since T35 Act Three sits near a phone's right edge and opens down-right,
     // so its open title can fall off the screen: then it is closed through
     // the graph's own call, and the detail says so.
     const tgt = o2.acts[a1.id].title || o2.acts[a1.id];
     const tappable = tgt.x >= 0 && tgt.x <= s.W && tgt.y >= 0 && tgt.y <= s.H;
-    if (tappable) await tapAt(s, tgt);
+    if (tappable) await toggleAt(s, tgt);
     else await p.evaluate((id) => window.PostPipeGraph.closeContainer(id), a1.id);
     await p.waitForTimeout(1500);
     const c1 = await measure(p);
@@ -512,12 +522,12 @@ async function run(bt, name, size, record) {
     const dropped = d1.acts[a2.id];
     record('4 drag an act: it stays where it was dropped', off(dropped, { x: from.x + by.x, y: from.y + by.y }) <= 3 && anchorOff(d1, a2) > 30,
       `${a2.id.replace('container:', '')} ${r1(off(dropped, { x: from.x + by.x, y: from.y + by.y }))} px from the drop, ${r1(anchorOff(d1, a2))} px from its anchor`);
-    if (d1.acts[a2.id].closed) await tapAt(s, dropped);
+    if (d1.acts[a2.id].closed) await toggleAt(s, dropped);
     await p.waitForTimeout(2500);
     const d2 = await measure(p);
     record('4 a dragged act opens where it was dropped, not on its anchor', !d2.acts[a2.id].closed && off(d2.acts[a2.id], dropped) <= 3,
       `${ACTS.find((a) => a.id === a2.id).outer ? 'last chapter' : 'title'} ${r1(off(d2.acts[a2.id], dropped))} px from where it was dropped`);
-    await tapAt(s, d2.acts[a2.id].title || d2.acts[a2.id]);
+    await toggleAt(s, d2.acts[a2.id].title || d2.acts[a2.id]);
     await p.waitForTimeout(1200);
     const marks = await p.evaluate(() => {
       const nodes = (JSON.parse(localStorage.getItem('post-pipe:viewstate') || '{}').nodes) || {};

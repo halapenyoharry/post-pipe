@@ -396,8 +396,10 @@ async function run(bt, name, size, record) {
     // Open an act: in place, the rootlets reaching to its hull's near edge.
     await p.evaluate(() => window.dispatchEvent(new CustomEvent('graph:reset-all')));
     await p.waitForTimeout(1200);
-    // Act 1, closed first when the site starts it open, so it opens by a tap
-    // as it did when every act started closed.
+    // Act 1, closed first when the site starts it open, so it opens by the
+    // gesture the site's table gives it (graph.bindings: a double tap since
+    // Harold's note of 2026-10-04; a tap before) as it did when every act
+    // started closed.
     const a1 = ACTS.find((a) => /act-1/.test(a.id)) || ACTS[0];
     if (!(await measure(p)).acts[a1.id].closed) {
       await p.evaluate((id) => window.dispatchEvent(new CustomEvent('graph:close-container', { detail: { id } })), a1.id);
@@ -405,7 +407,9 @@ async function run(bt, name, size, record) {
       await waitSettled(p, 1500);
     }
     const pre = await measure(p);
-    await p.mouse.click(pre.acts[a1.id].centre.x, pre.acts[a1.id].centre.y);
+    const opensOnDouble = (GSET.bindings || []).some((b) => b.target === 'container' && b.gesture === 'doubletap' && b.action === 'container.toggle');
+    if (opensOnDouble) await p.mouse.dblclick(pre.acts[a1.id].centre.x, pre.acts[a1.id].centre.y);
+    else await p.mouse.click(pre.acts[a1.id].centre.x, pre.acts[a1.id].centre.y);
     await p.waitForTimeout(1300);
     const op = (await waitSettled(p, 1500)).m;
     const o = op.acts[a1.id];
