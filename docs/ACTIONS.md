@@ -23,7 +23,7 @@ The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the read
 | gesture | what it is |
 |---|---|
 | `tap` | one press and release under 4 to 5 px of movement. It runs only once `graph.doubleTapMs` (default 250 ms) has passed with no second tap, so it never runs as half of a double tap. |
-| `doubletap` | two taps within `graph.doubleTapMs` and 32 px of each other. Neither tap's single action runs. |
+| `doubletap` | two taps within `graph.doubleTapMs` and 32 px of each other. The first tap's target decides: a double tap that starts on a card is a double tap on that card even if the second tap lands just off it. Neither tap's single action runs. |
 | `drag` | a press that moves. |
 | `longpress` | a press held `graph.longPressMs` (default 500 ms) without moving 8 px. Its release is not counted as a tap. The graph listens for it only when a row uses it. |
 
@@ -39,7 +39,7 @@ The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the read
 | `node.openReader` | Opens the reader on the card's piece. | tap, double tap, long press on a card |
 | `node.select` | Opens or closes the card in place (its text inside it) and makes it the card the panel acts on. The reader stays as it is. | tap, double tap, long press on a card |
 | `node.move` | Moves the card, or the container with all it holds, with the pointer or the finger. | drag on a card or a container |
-| `node.resize` | A drag that starts on a card's edge or corner changes its size. | drag on a card |
+| `node.resize` | A drag that starts on a card's edge or corner changes its size. Only while it is bound do the cards have edges to drag (their resize handles), and only then does the panel offer "Reset sizes" and the graph bring back sizes saved on an earlier visit. | drag on a card |
 | `view.pan` | Moves the whole view with the pointer or the finger. | drag on `space` |
 | `view.deselect` | Closes the reader, takes off a highlighted tag, hides an edge's name. | tap, double tap, long press anywhere |
 
@@ -101,7 +101,7 @@ What that table gives, with the engine's rows it leaves in place:
 | target | tap | double tap | drag |
 |---|---|---|---|
 | `container` | nothing (rule 2: `container.toggle` moved to the double tap) | `container.toggle` | `node.move` |
-| `node` | `node.select` (engine's) | `node.zoomToReadable` | `node.move`; no `node.resize` |
+| `node` | `node.select` (engine's) | `node.zoomToReadable` | `node.move`; no `node.resize`, so no card can be resized by any drag and "Reset sizes" is not in the panel |
 | `node.readable` | `node.select` (as `node`) | `node.openReader` | `node.move` (as `node`) |
 | `space` | `view.deselect` (engine's) | `view.zoomInStep` | `view.pan` (engine's) |
 

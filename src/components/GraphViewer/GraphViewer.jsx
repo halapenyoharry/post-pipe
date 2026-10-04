@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
@@ -15,7 +16,8 @@ import { zoomModeOf, growCapOn, growShift, growConstrain, growCap, growFitRatio 
 import { minCardScale, homeScale } from './initialScale';
 import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, closeAllPlan } from './closedState';
 import { createTapGate } from './tapGate';
-import { bindingsOf, resolve as resolveBinding, usesGesture } from '../../lib/actions';
+import { bindingsOf, resolve as resolveBinding, usesGesture, isBound } from '../../lib/actions';
+import { readablePxOf, titleScreenPx, readableZoom, keepUnderFinger } from './readable';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { layoutKey } from './layoutKey';
@@ -455,6 +457,10 @@ export function GraphViewer({
     // see Actions below).
     const BINDINGS = bindingsOf(GS);
     const actionFor = (target, gesture, opts) => resolveBinding(BINDINGS, target, gesture, opts);
+    // Whether a card can be resized at all: with nothing binding
+    // node.resize, the cards have no resize handles, no drag reaches a
+    // card's size, and sizes saved on an earlier visit are not brought back.
+    const RESIZE_ON = isBound(BINDINGS, 'node.resize');
 
     d3.select(container).selectAll('svg').remove();
     d3.select(container).selectAll('.cards-layer').remove();
@@ -695,7 +701,9 @@ export function GraphViewer({
     function runAction(id, ctx = {}) {
       switch (id) {
         case 'container.toggle': if (ctx.c) toggleContainer(ctx.c, ctx.closedNode); return;
+        case 'view.zoomInStep': zoomAboutCentre(ZOOM_STEP); return;
         case 'view.zoomAtPoint': zoomAtPoint(ctx.x, ctx.y, ctx.shift ? 0.5 : 2); return;
+        case 'node.zoomToReadable': if (ctx.d) zoomToReadable(ctx.d, ctx.x, ctx.y); return;
         case 'node.openReader': if (ctx.d) readCard(ctx.d); return;
         case 'node.select': if (ctx.d && ctx.cardEl) togglePinned(ctx.d, ctx.cardEl); return;
         case 'view.deselect': deselect(); return;
@@ -729,8 +737,27 @@ export function GraphViewer({
     }
     function tapOrDouble(ev, single, double) {
       const at = pointOf(ev);
-      tapGate.tap(at.x, at.y, single, double || (() => runAction(actionFor('space', 'doubletap'), at)));
+      const run = double || (() => runAction(actionFor('space', 'doubletap'), at));
+      tapGate.tap(at.x, at.y, single, () => { ghostsAfter(at); run(); });
     }
+    // Once a double tap has run, the click and the double-click the browser
+    // sends for it are not taps of their own. A phone sends them after the
+    // second touch ends, where the finger was, and what the double tap did
+    // may have put something new there (an opened act's cards), which they
+    // would select, or double-tap again. Swallowed for a moment, there.
+    let ghostGuard = null; // { t, x, y }
+    function ghostsAfter(at) { ghostGuard = { t: Date.now(), x: at.x, y: at.y }; }
+    const onGhost = (e) => {
+      if (!ghostGuard) return;
+      if (Date.now() - ghostGuard.t > 450) { ghostGuard = null; return; }
+      const [x, y] = screenPoint(e);
+      if (Math.hypot(x - ghostGuard.x, y - ghostGuard.y) > DOUBLE_TAP_PX) return;
+      if (e.type === 'dblclick') ghostGuard = null;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    container.addEventListener('click', onGhost, true);
+    container.addEventListener('dblclick', onGhost, true);
 
     // Two fingers down and up again without moving is a two-finger tap; two
     // of those in quick succession zoom out at their midpoint.
@@ -798,7 +825,8 @@ export function GraphViewer({
             press = null;
             longPressAt = Date.now();
             tapGate.cancel();
-            runAction(actionFor(hit.target, 'longpress'), { ...hit.ctx, ...at });
+            const target = hit.ctx.d ? cardTarget(hit.ctx.d) : hit.target;
+            runAction(actionFor(target, 'longpress'), { ...hit.ctx, ...at });
           }, LONG_MS),
         };
       };
@@ -866,7 +894,7 @@ export function GraphViewer({
           // overlapping cards apart.
           if (!saved.auto) { d.fx = saved.x; d.fy = saved.y; }
         }
-        if (savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
+        if (RESIZE_ON && savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
           d._size = { width: savedSize.w, height: savedSize.h };
         }
       }
@@ -883,7 +911,7 @@ export function GraphViewer({
       // Positions rejected, but a card the reader resized is still their work.
       for (const d of data.nodes) {
         const savedSize = viewStateRef.current.nodeState(persistKey(d));
-        if (savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
+        if (RESIZE_ON && savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
           d._size = { width: savedSize.w, height: savedSize.h };
         }
       }
@@ -2831,7 +2859,7 @@ export function GraphViewer({
           // gesture, same handler; only the thing it changes differs.
           const target = event.sourceEvent && event.sourceEvent.target;
           const edge = Boolean(target && target.closest && target.closest('[data-resize="1"]'));
-          const action = d.type === 'article' ? actionFor('node', 'drag', { edge }) : 'node.move';
+          const action = d.type === 'article' ? actionFor(cardTarget(d), 'drag', { edge }) : 'node.move';
           d._dragMoves = action === 'node.move';
           d._resizing = action === 'node.resize';
           if (d._resizing) {
@@ -3168,7 +3196,8 @@ export function GraphViewer({
           },
           fullContent: d._fullContent || null,
           cardSettings: CARD,
-          onResize: ({ width: newW, height: newH }) => {
+          // No handles and no resizing unless the table binds node.resize.
+          onResize: RESIZE_ON ? ({ width: newW, height: newH }) => {
             d._customWidth = newW;
             d._customHeight = newH;
             d._size = { width: newW, height: newH };
@@ -3178,7 +3207,7 @@ export function GraphViewer({
             entry.wrapper.style.marginTop = (-newH / 2) + 'px';
             d._r = Math.max(newW, newH) / 2;
             renderArticleBody(d);
-          }
+          } : undefined,
         })
       );
       // Keep the collision radius on the resting footprint. Growing it on
@@ -3335,14 +3364,87 @@ export function GraphViewer({
         const cardEl = event.currentTarget;
         const at = pointOf(event);
         tapOrDouble(event,
-          () => runAction(actionFor('node', 'tap'), { d, cardEl, ...at }),
+          () => runAction(actionFor(cardTarget(d), 'tap'), { d, cardEl, ...at }),
           () => cardDouble(d, cardEl, at));
       });
 
     let lastCardDouble = 0;
     function cardDouble(d, cardEl, at) {
       lastCardDouble = Date.now();
-      runAction(actionFor('node', 'doubletap'), { d, cardEl, ...at });
+      runAction(actionFor(cardTarget(d), 'doubletap'), { d, cardEl, ...at });
+    }
+
+    // ── Readable cards (node.readable, node.zoomToReadable) ───────────────
+    // A card is readable when its title renders at graph.readablePx CSS px
+    // or more (default 16, readable.js): its font as the card draws it,
+    // times the zoom and the card's own scale. A card far out draws no
+    // title (a marker) and is not readable. The card is drawn first for
+    // the state it is in (a hover or a tap may have changed it a moment
+    // ago, and React draws later), so the title measured is the one it
+    // shows: a card under the pointer or a finger shows its text with a
+    // smaller title than at rest.
+    const READABLE_PX = readablePxOf(GS);
+    function titleFontOf(d) {
+      const entry = reactRoots.get(d.id);
+      if (!entry) return 0;
+      try { flushSync(() => renderArticleBody(d)); } catch (_) { /* inside a render: as drawn */ }
+      const el = entry.wrapper.querySelector('[data-card-title]');
+      return el ? parseFloat(getComputedStyle(el).fontSize) || 0 : 0;
+    }
+    const titlePxOf = (d) => titleScreenPx(titleFontOf(d), view.k, d._cardScale || 1);
+    const cardTarget = (d) => (titlePxOf(d) >= READABLE_PX ? 'node.readable' : 'node');
+    // Where a card's centre is on the screen at the view v, drawn as the
+    // site's zoom mode draws it there (grown in place: its act about its
+    // anchor).
+    function cardScreenAt(d, v) {
+      let p = { x: d.x, y: d.y };
+      const cId = growOn() ? anchoredOf.get(d.id) : null;
+      const G = cId && ANCHORS.has(cId) ? growCentreOf(cId) : null;
+      if (G && homeK > 0) {
+        const sh = growShift(G, pivotWorld(), v.k / homeK);
+        p = { x: p.x + sh.x, y: p.y + sh.y };
+      }
+      const q = viewToScreen(v, rotation, p.x, p.y);
+      return { x: q[0], y: q[1] };
+    }
+    // Zoom in, in the site's zoom mode and about the point every zoom keeps
+    // still, until the card's title renders at READABLE_PX. When the card
+    // would then not lie wholly on the screen, the view also pans so the
+    // point of it under the finger (fx, fy) stays under the finger. Measured
+    // again once the zoom is over (the card may have changed size, losing a
+    // hover, say, or drawn its title for the first time) and taken further
+    // when it is still short.
+    function zoomToReadable(d, fx, fy, round = 0) {
+      const entry = reactRoots.get(d.id);
+      if (!entry || round > 2) return;
+      const cs = d._cardScale || 1;
+      // Far out a card draws no title: the smallest it can draw it at.
+      const font = titleFontOf(d) || (Number.isFinite(CARD.labelMinFontSize) ? CARD.labelMinFontSize : 14);
+      const t = d3.zoomTransform(svg.node());
+      let k = readableZoom(t.k, titleScreenPx(font, t.k, cs), READABLE_PX, ZOOM_MAX);
+      if (growOn()) k = Math.min(k, Math.max(t.k, growMaxK()));
+      if (!(k > t.k * (1 + 1e-9))) return;
+      const [px, py] = zoomCentre();
+      const v = zoomAbout(t, k / t.k, px, py);
+      const w = parseFloat(entry.wrapper.style.width) || CARD.width;
+      const h = parseFloat(entry.wrapper.style.height) || CARD.height;
+      const inset = chromeInsets(height);
+      const pan = keepUnderFinger({
+        finger: Number.isFinite(fx) && Number.isFinite(fy) ? { x: fx, y: fy } : null,
+        before: cardScreenAt(d, t),
+        after: cardScreenAt(d, v),
+        ratio: k / t.k,
+        half: { w: (w / 2) * k * cs, h: (h / 2) * k * cs },
+        area: { x0: 0, y0: inset.top, x1: width, y1: height - inset.bottom },
+      });
+      const transform = d3.zoomIdentity.translate(v.x + pan.x, v.y + pan.y).scale(v.k);
+      userMovedView = true;
+      focusActive = false;
+      svg.transition('key-zoom').duration(320).ease(d3.easeCubicOut)
+        .call(zoom.transform, transform, [px, py])
+        .on('end', () => setTimeout(() => {
+          if (titlePxOf(d) < READABLE_PX) zoomToReadable(d, fx, fy, round + 1);
+        }, 80));
     }
     function readCard(d) {
       lastCardDouble = Date.now();
@@ -4031,6 +4133,11 @@ export function GraphViewer({
     // LayoutControls dispatches these from outside the component. They reach
     // into the closure that owns the simulation, the zoom, and the data.
 
+    // One step of the + and - keys (view.zoomInStep), and how far in and
+    // out the keys, the buttons and a zoom to a readable card go.
+    const ZOOM_STEP = 1.25;
+    const ZOOM_MIN = 0.04;
+    const ZOOM_MAX = 8;
     // Zoom about the middle of the viewport, or about the art's pivot with
     // graph.zoomPivot 'art' (src/components/GraphViewer/zoomPivot.js), never
     // re-centring on the graph: what hangs from the cover's art stays over
@@ -4040,7 +4147,7 @@ export function GraphViewer({
     function zoomAboutCentre(ratio, animate = true) {
       if (!Number.isFinite(ratio) || ratio <= 0) return;
       const t = d3.zoomTransform(svg.node());
-      let k = Math.max(0.04, Math.min(8, t.k * ratio));
+      let k = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, t.k * ratio));
       // Growing in place: no further in than the containers can grow.
       if (k > t.k && growOn()) k = Math.min(k, Math.max(t.k, growMaxK()));
       if (Math.abs(k - t.k) <= 1e-9 * t.k) return;
@@ -4115,7 +4222,7 @@ export function GraphViewer({
       const outKey = e.key === '-' || e.key === '_';
       if (!inKey && !outKey) return;
       e.preventDefault();
-      zoomAboutCentre(inKey ? 1.25 : 0.8);
+      zoomAboutCentre(inKey ? ZOOM_STEP : 1 / ZOOM_STEP);
     };
     window.addEventListener('keydown', handleZoomKey);
 
@@ -4242,6 +4349,8 @@ export function GraphViewer({
       container.removeEventListener('touchmove', onTwoTapMove, { capture: true });
       container.removeEventListener('touchend', onTwoTapEnd, { capture: true });
       stopLongPress();
+      container.removeEventListener('click', onGhost, true);
+      container.removeEventListener('dblclick', onGhost, true);
       tapGate.cancel();
       window.removeEventListener('graph:reset-all', handleResetAll);
       window.removeEventListener('postpipe:cover-frame', onCoverFrame);
