@@ -118,7 +118,7 @@
 
     <h3>Show</h3>
     <div id="relchecks"></div>
-    <div class="row"><input type="checkbox" id="emergent" checked><label for="emergent">tags earned from text (dashed chips)</label></div>
+    <div class="row"><input type="checkbox" id="emergent" checked><label for="emergent">tags earned or discovered from text (dashed)</label></div>
     <h3>Legend</h3>
     <div id="legend" class="muted"></div>
   </aside>
@@ -234,8 +234,9 @@ const neighborIds = () => {
 const sid = (x) => (typeof x === 'object' ? x.id : x);
 let near = new Set();
 
+const discoveredOnly = (n) => !!(concept.get(n.concept) || {}).discovered;
 function nodeBase(n) {
-  if (n.type === 'concept') return n.unmapped ? '#8d97ab' : n.merged ? '#ffd166' : '#efe9d6';
+  if (n.type === 'concept') return n.unmapped ? '#8d97ab' : n.merged ? '#ffd166' : discoveredOnly(n) ? '#b9a0d6' : '#efe9d6';
   return sourceColor[n.source] || '#9aa';
 }
 G.nodeColor((n) => (state.sel && !near.has(n.id) ? 'rgba(80,92,118,0.28)' : nodeBase(n)));
@@ -245,7 +246,7 @@ G.linkColor((l) => {
   if (state.sel && !hot) return 'rgba(80,92,118,0.12)';
   if (l.relation) return REL_COLOR[l.type] || '#888';
   if (l.type === 'shared') return hot ? 'rgba(255,209,102,.8)' : 'rgba(170,182,206,.45)';
-  return l.origin === 'emergent' ? 'rgba(110,200,240,.5)' : hot ? 'rgba(255,255,255,.6)' : 'rgba(165,176,200,.32)';
+  return l.origin && l.origin !== 'explicit' ? 'rgba(110,200,240,.5)' : hot ? 'rgba(255,255,255,.6)' : 'rgba(165,176,200,.32)';
 });
 G.linkWidth((l) => (l.relation ? 0.8 + l.weight * 2 : l.type === 'shared' ? Math.min(3.2, 0.4 + l.weight * 0.35) : 0.25));
 
@@ -255,7 +256,7 @@ function tip(n) {
     return `<div style="font:12px system-ui"><b>${esc(n.label)}</b><br>${c.variants.length} spelling${c.variants.length > 1 ? 's' : ''} · ${c.n + c.nEmergent} items<br><span style="opacity:.7">${esc(c.variants.map((v) => v.label).join(' · '))}</span></div>`;
   }
   if (n.type === 'term') return `<div style="font:12px system-ui"><b>${esc(n.label)}</b><br>as written in ${esc(n.source)} · ${n.count}×</div>`;
-  return `<div style="font:12px system-ui;max-width:280px"><b>${esc(n.label)}</b><br><span style="opacity:.7">${esc(n.source)}</span></div>`;
+  return `<div style="font:12px system-ui;max-width:280px"><b>${esc(n.label)}</b><br><span style="opacity:.7">${esc([n.source, ...(n.alsoIn || [])].join(' + '))}</span></div>`;
 }
 
 // ---------- (re)projection --------------------------------------------------------------------
@@ -387,7 +388,7 @@ function conceptPanel(c) {
   const items = U.items.filter((i) => i.tags.some((t) => t.c === c.id));
   const bySrc = Object.entries(c.sources);
   return `<h2>${esc(winner)}</h2>
-    <div class="muted">${c.variants.length > 1 ? `<span class="badge gold">${c.variants.length} spellings merged</span>` : ''}${c.pinned ? '<span class="badge">pinned by you</span>' : ''}${c.locked ? '<span class="badge">locked merge</span>' : ''}${c.unmapped ? '<span class="badge">not in stone</span>' : ''}${c.n} tagged · ${c.nEmergent} from text</div>
+    <div class="muted">${c.variants.length > 1 ? `<span class="badge gold">${c.variants.length} spellings merged</span>` : ''}${c.pinned ? '<span class="badge">pinned by you</span>' : ''}${c.locked ? '<span class="badge">locked merge</span>' : ''}${c.unmapped ? '<span class="badge">not in stone</span>' : ''}${c.discovered ? '<span class="badge" title="no human wrote this tag; it was proposed from recurring phrases">discovered</span>' : ''}${c.n} tagged · ${c.nEmergent} from text</div>
     <p style="margin:8px 0 0">${bySrc.map(([s, n]) => `<span class="chip plain"><span class="dot" style="background:${sourceColor[s]}"></span> ${esc(s)} ×${n}</span>`).join('')}</p>
     <p style="margin:10px 0 0"><button id="explore"${state.focus === c.id ? ' disabled' : ''}>Explore this tag ⟶ ${state.hops} hops</button></p>
     <h3>Why this name</h3>
@@ -395,16 +396,19 @@ function conceptPanel(c) {
     <h3>What each tag-system calls it</h3>
     ${bySrc.map(([s]) => `<div style="margin:5px 0"><span class="dot" style="background:${sourceColor[s]}"></span> <b>${esc(s)}</b> <span class="muted">writes it as</span> ${variants.flatMap(({ v }) => Object.entries((v.formsBySource || {})[s] || {})).sort((a, b) => b[1] - a[1]).map(([f, n]) => `<span class="chip plain">${esc(f)}${n > 1 ? ` <span class="muted">×${n}</span>` : ''}</span>`).join('')}</div>`).join('') || '<span class="muted">—</span>'}
     ${rels.length ? `<h3>Relations</h3><ul class="list">${rels.map((r) => { const other = r.a === c.id ? r.b : r.a; const dir = r.type === 'broader' ? (r.a === c.id ? 'broader than' : 'narrower than') : r.type; return `<li data-c="${esc(other)}" title="${esc(REL_TEXT[r.type] || '')}"><span class="rel" style="background:${REL_COLOR[r.type] || '#888'}">${esc(dir)}</span><span class="t">${esc(lab(other))}</span><span class="w">${r.locked ? '🔒 ' : ''}${r.weight.toFixed(2)}</span></li>`; }).join('')}</ul>` : ''}
-    <h3>Items (${items.length})</h3><ul class="list">${items.slice(0, 60).map((i) => { const t = i.tags.find((x) => x.c === c.id); return `<li data-i="${esc(i.key)}"><span class="dot" style="background:${sourceColor[i.source]};margin-top:4px"></span><span class="t">${esc(i.title)}</span>${t.origin === 'emergent' ? '<span class="w" title="' + esc(t.why || '') + '">text</span>' : ''}</li>`; }).join('')}</ul>`;
+    <h3>Items (${items.length})</h3><ul class="list">${items.slice(0, 60).map((i) => { const t = i.tags.find((x) => x.c === c.id); return `<li data-i="${esc(i.key)}" title="${esc([i.source, ...(i.alsoIn || [])].join(' + '))}"><span class="dot" style="background:${sourceColor[i.source]};margin-top:4px"></span><span class="t">${esc(i.title)}</span>${t.origin !== 'explicit' ? '<span class="w" title="' + esc(t.why || '') + '">' + (t.origin === 'discovered' ? 'found' : 'text') + '</span>' : ''}</li>`; }).join('')}</ul>`;
 }
 
 function itemPanel(it) {
+  const systems = [it.source, ...(it.alsoIn || [])];
+  const via = (t) => (t.raw || []).map((r) => `${r.l} (${r.s})`).join(', ');
   return `<h2>${esc(it.title)}</h2>
-    <div><span class="chip plain"><span class="dot" style="background:${sourceColor[it.source]}"></span> ${esc(it.source)}</span>${it.kind ? `<span class="badge">${esc(it.kind)}</span>` : ''}</div>
+    <div>${systems.map((s) => `<span class="chip plain"><span class="dot" style="background:${sourceColor[s]}"></span> ${esc(s)}</span>`).join('')}${it.kind ? `<span class="badge">${esc(it.kind)}</span>` : ''}</div>
+    ${systems.length > 1 ? '<p class="hint">the same item in several tag-systems: its tags below are all of their vocabularies together</p>' : ''}
     ${it.excerpt ? `<p class="muted">${esc(it.excerpt)}${it.excerpt.length >= 280 ? '…' : ''}</p>` : ''}
     ${it.url ? `<p class="muted" style="word-break:break-all">${esc(it.url)}</p>` : ''}
     <h3>Tags</h3>
-    ${it.tags.length ? it.tags.map((t) => t.origin === 'explicit' ? chip(t.c, `title="written as: ${esc(t.raw.map((r) => r.l).join(', '))}"`) : chip(t.c, `title="${esc(t.why || 'earned from text')}"`, 'em')).join('') : '<span class="muted">no tags, and nothing in the text matches a known concept</span>'}
+    ${it.tags.length ? it.tags.map((t) => t.origin === 'explicit' ? chip(t.c, `title="written as: ${esc(via(t))}"`) : chip(t.c, `title="${esc(t.why || 'earned from text')}"`, 'em')).join('') : '<span class="muted">no tags, and nothing in the text matches a known concept</span>'}
     ${it.tags.some((t) => t.origin !== 'explicit') ? '<p class="hint">dashed = earned from the text, not written by anyone; hover for the reason</p>' : ''}`;
 }
 
@@ -440,7 +444,7 @@ function buildControls() {
   $('relchecks').innerHTML = RELATION_TYPES.filter((t) => present.has(t)).map((t) => `<div class="row"><input type="checkbox" id="r_${t}" data-r="${t}" checked><span class="swatch" style="background:${REL_COLOR[t]}"></span><label for="r_${t}" title="${esc(REL_TEXT[t])}">${t} <span class="muted">${U.relations.filter((r) => r.type === t).length}</span></label></div>`).join('');
   $('relchecks').onchange = (e) => { const t = e.target.dataset.r; if (!t) return; e.target.checked ? state.relTypes.add(t) : state.relTypes.delete(t); project(false); };
   $('emergent').onchange = (e) => { state.emergent = e.target.checked; project(false); };
-  $('legend').innerHTML = `<div><span class="dot" style="background:#ffd166"></span> concept that merged several spellings</div><div><span class="dot" style="background:#efe9d6"></span> concept with one spelling</div><div><span class="dot" style="background:#8d97ab"></span> tag the stone has not seen</div>${present.has('broader') ? '<div>arrow points broader → narrower</div>' : ''}<div><span class="swatch" style="background:#6ec8f0"></span> tag earned from text</div>`;
+  $('legend').innerHTML = `<div><span class="dot" style="background:#ffd166"></span> concept that merged several spellings</div><div><span class="dot" style="background:#efe9d6"></span> concept with one spelling</div><div><span class="dot" style="background:#b9a0d6"></span> discovered from text only (no human wrote it)</div><div><span class="dot" style="background:#8d97ab"></span> tag the stone has not seen</div>${present.has('broader') ? '<div>arrow points broader → narrower</div>' : ''}<div><span class="swatch" style="background:#6ec8f0"></span> tag earned / discovered from text</div>`;
 }
 
 document.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => {

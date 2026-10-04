@@ -69,3 +69,22 @@ test('single short words and stopwords are never phrase-matched', () => {
   const s = buildStone(recs, {});
   assert.equal(emerge(s, recs).length, 0, '"art" is 3 letters: too short to match on its own');
 });
+
+test('a generic single word needs context: it must read like the items that carry the tag', () => {
+  const recs = [
+    ...rec('Mine', { m1: ['water'], m2: ['water'] }, {
+      m1: { title: 'Data centers drink the grid', text: 'cooling water consumption for hyperscale data centers and the municipal water supply' },
+      m2: { title: 'Who owns the aquifer', text: 'water rights, aquifer depletion and municipal water supply politics' },
+    }),
+    ...rec('Wire', { w1: [], w2: [] }, {
+      w1: { title: 'Mars rover finds ancient lakes', text: 'the rover found evidence of water in a crater lake bed' },
+      w2: { title: 'Cooling demand strains municipal water supply', text: 'data centers draw heavily on municipal water supply and aquifer reserves' },
+    }),
+    // unrelated filler so "water" is not on every item (the common-phrase gate would reject it first)
+    ...rec('Filler', Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`f${i}`, []]))),
+  ];
+  const s = buildStone(recs, {});
+  const hit = emerge(s, recs).filter((t) => t.source === 'Wire');
+  assert.deepEqual(hit.map((t) => t.item), ['w2'], 'w2 reads like the water essays; the Mars article only contains the word');
+  assert.match(hit[0].why, /reads like its other items/);
+});

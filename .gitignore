@@ -3,3 +3,6 @@ out/
 *.log
 .DS_Store
 node_modules/
+
+# private run configs and output (contain paths/text from the real corpus)
+local/

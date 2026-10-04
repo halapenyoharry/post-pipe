@@ -8,7 +8,8 @@ const { universe: U, stone } = syntheticUniverse();
 const cid = (label) => stone.concepts.find((c) => c.variants.some((v) => v.norm === label)).id;
 
 test('universe carries every item, concept and relation, with emergent tags marked', () => {
-  assert.equal(U.items.length, 43);
+  assert.equal(U.stats.itemRecords, 43);
+  assert.equal(U.items.length, 40, 'three Archive items are the same articles as Wire items (shared URL) and merge');
   assert.equal(U.concepts.length, stone.concepts.length);
   assert.ok(U.stats.emergentTags > 10);
   const s3 = U.items.find((i) => i.key === 'Science::s3');
@@ -106,4 +107,21 @@ test('tags newer than the stone become unmapped singleton concepts instead of va
   const g = projectGraph(u, 'hyper');
   assert.ok(g.nodes.some((n) => n.unmapped && n.n === 2));
   assert.ok(u.items.find((i) => i.key === 'Fresh::n1').tags.some((t) => t.c === cid('ai')), 'known spellings still resolve');
+});
+
+test('the same article in two tag-systems is one item carrying both vocabularies', () => {
+  const w3 = U.items.find((i) => i.key === 'Wire::w3');
+  assert.deepEqual(w3.alsoIn, ['Archive']);
+  assert.ok(!U.items.some((i) => i.key === 'Archive::a1'), 'the Archive copy is folded into the Wire item');
+  const labels = w3.tags.flatMap((t) => t.raw.map((r) => `${r.s}:${r.l}`)).sort();
+  assert.ok(labels.includes('Wire:Artificial Intelligence') && labels.includes('Archive:A.I.') && labels.includes('Archive:courts'));
+  const ai = w3.tags.find((t) => t.c === cid('ai'));
+  assert.deepEqual([...ai.sys].sort(), ['Archive', 'Wire'], 'both systems agree this is AI; the tag knows who said so');
+});
+
+test('hiding one tag-system keeps a shared item but drops that system\'s tags', () => {
+  const g = projectGraph(U, 'raw', { hiddenSources: new Set(['Archive']) });
+  assert.ok(g.nodes.some((n) => n.id === 'i:Wire::w3'));
+  assert.ok(!g.nodes.some((n) => n.type === 'term' && n.source === 'Archive'));
+  assert.ok(g.nodes.some((n) => n.type === 'term' && n.source === 'Wire'));
 });

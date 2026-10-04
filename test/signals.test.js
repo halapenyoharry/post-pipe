@@ -96,3 +96,9 @@ test('text: tags used on similar texts, at least twice each, produce capped evid
   assert.ok(hit.score <= cfg.signals.text);
   assert.ok(!find(out, 'cats', 'dogs', 'text'));
 });
+
+test('acronym: a phrase that already contains the acronym is not what it abbreviates', () => {
+  const s = sig(rec('A', { 1: ['ai'], 2: ['ai infrastructure', 'artificial intelligence'] }), ['acronym']);
+  assert.ok(!find(s, 'ai', 'ai infrastructure', 'acronym'), '"ai infrastructure" contains "ai"');
+  assert.ok(find(s, 'ai', 'artificial intelligence', 'acronym'));
+});

@@ -159,3 +159,27 @@ test('synthetic corpus is the documented size', () => {
   assert.equal(stone.stats.tags, 52);
   assert.equal(stone.stats.concepts, 47);
 });
+
+// ---- regressions found by running on a real corpus ----------------------------------------
+test('review queue: similar usage alone never qualifies; a spelling or strong anchor does', () => {
+  const t = 'felines purr nap sunbeam whiskers';
+  const records = [
+    ...rec('A', { 1: ['labor', 'cats'], 2: ['labor', 'cats'] }, { 1: { title: 'one', text: t }, 2: { title: 'two', text: t } }),
+    ...rec('B', { 3: ['labour', 'felines'], 4: ['labour', 'felines'] }, { 3: { title: 'three', text: t }, 4: { title: 'four', text: t } }),
+  ];
+  const s = buildStone(records, {});
+  const pairs = s.relations.filter((r) => r.type === 'near').map((r) => r.evidence.terms.slice().sort().join(' ~ '));
+  assert.ok(pairs.includes('labor ~ labour'), 'spelling variants are review candidates');
+  assert.ok(!pairs.some((p) => p.includes('cats') && p.includes('felines')), 'cats/felines share only usage: adjacent at most');
+});
+
+test('the same essay under two vocabularies counts once: no identical-text flood of adjacent relations', () => {
+  const text = 'a long essay about frobnication and its discontents in modern society';
+  const mk = (source, tags) => [
+    { type: 'item', source, id: 'e1', title: 'On Frobnication And Its Discontents', text, url: '', date: '', kind: '' },
+    ...tags.map((label) => ({ type: 'tag', source, item: 'e1', label, weight: 1 })),
+  ];
+  const s = buildStone([...mk('Tags', ['alpha', 'beta']), ...mk('Topology', ['gamma', 'delta'])], {});
+  assert.equal(s.relations.filter((r) => r.type === 'adjacent').length, 0, 'they share one essay: that is co-tagging, not adjacency');
+  assert.ok(s.relations.filter((r) => r.type === 'related').length === 0, 'one shared essay is not enough support for related either');
+});

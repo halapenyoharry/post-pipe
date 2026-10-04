@@ -10,7 +10,7 @@ import { cli, die, log } from '../lib/io.js';
 
 const usage = `rtz-build — run the whole pipeline from one config file
 
-usage: rtz-build --config rtz.config.json [-o OUTDIR] [--no-view] [--no-emerge]
+usage: rtz-build --config rtz.config.json [-o OUTDIR] [--no-view] [--no-emerge] [--discover]
 
 rtz.config.json (paths are relative to the config file; ~ is expanded):
   {
@@ -24,17 +24,19 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
     "overrides": "overrides.json",     optional, human decisions
     "seeds": [],                       optional extra seed files
     "noSeed": false,
-    "emerge": true,                    earn tags from item text
+    "discover": false,                 propose new tags for untagged items from recurring phrases
+    "emerge": true,                    earn tags from item text (concepts the stone already knows)
     "engine": { "mergeThreshold": 0.7 }   optional overrides of lib/config.js defaults
   }
 
-Writes to OUTDIR: records.jsonl, stone.json, records.all.jsonl, universe.json, view.html, build.json`;
+Writes to OUTDIR: records.jsonl, [records.discovered.jsonl], stone.json, records.all.jsonl, universe.json, view.html, build.json`;
 
 const { values } = cli('rtz-build', usage, {
   config: { type: 'string' },
   o: { type: 'string', short: 'o' },
   'no-view': { type: 'boolean' },
   'no-emerge': { type: 'boolean' },
+  discover: { type: 'boolean' },
 });
 if (!values.config) die(usage, 2);
 
@@ -74,17 +76,23 @@ if (config.engine) {
   fs.writeFileSync(path.join(out, 'engine.json'), JSON.stringify(config.engine, null, 1));
   engineFile = ['--config', path.join(out, 'engine.json')];
 }
-const stoneArgs = [path.join(out, 'records.jsonl'), '-o', path.join(out, 'stone.json'), ...engineFile];
+let baseRecords = path.join(out, 'records.jsonl');
+if (config.discover || values.discover) {
+  log('discover');
+  baseRecords = path.join(out, 'records.discovered.jsonl');
+  stage('discover', 'rtz-discover', [path.join(out, 'records.jsonl'), '--all', '-o', baseRecords, ...engineFile]);
+}
+const stoneArgs = [baseRecords, '-o', path.join(out, 'stone.json'), ...engineFile];
 if (config.overrides && fs.existsSync(resolve(config.overrides))) stoneArgs.push('--overrides', resolve(config.overrides));
 if (config.noSeed) stoneArgs.push('--no-seed');
 for (const f of config.seeds ?? []) stoneArgs.push('--seed', resolve(f));
 log('stone');
 stage('stone', 'rtz-stone', stoneArgs);
 
-let finalRecords = path.join(out, 'records.jsonl');
+let finalRecords = baseRecords;
 if (config.emerge !== false && !values['no-emerge']) {
   log('emerge');
-  stage('emerge', 'rtz-emerge', [path.join(out, 'stone.json'), path.join(out, 'records.jsonl'), '--all', '-o', path.join(out, 'records.all.jsonl'), ...engineFile]);
+  stage('emerge', 'rtz-emerge', [path.join(out, 'stone.json'), baseRecords, '--all', '-o', path.join(out, 'records.all.jsonl'), ...engineFile]);
   finalRecords = path.join(out, 'records.all.jsonl');
 }
 log('universe');
