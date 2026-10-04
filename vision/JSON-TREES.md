@@ -17,6 +17,13 @@ His answers the same day:
 - The idea of several views gets **a separate doc** ([VIEWS.md](VIEWS.md)).
 - The core lives in post-pipe; **exoskeleton hosts the same component** as a panel (section 7).
 
+Harold's answers to the open questions (2026-10-04, verbatim):
+
+> 1 you are absolutely correct, thanks for that.
+> 2 general slot you can use my current for starters
+> 3 the chapters should be blobs, the shape around them becomes what it can around the text that is shown.
+> 4 a site can name it and while center is primary, ther ecan be branches that look like they are from the base of the plant but are equal but not central, idk how to reserve that. other than if it has a next and no previous, perhaps.
+
 ## 2. Requirements
 
 Each requirement quotes Harold, then states the rule it sets.
@@ -31,6 +38,8 @@ Each requirement quotes Harold, then states the rule it sets.
 | R6 | "it's child roots ... only show up when you open the container by clicking on the name of the root" (answer: hidden until opened) | At first only the tap root, the main roots and their names show. Clicking a root's name opens the container: its child roots and items grow in. Clicking again closes it. |
 | R7 | "There is areaa for banner above the graph of roots, for image or text (this is like our second frame)" | A banner slot above the roots that holds an image or text, as the site's second frame holds the small plant and the title. |
 | R8 | "if you zoom in the root system zooms in to but becomes lighter as n ot to distract too much, but does this smoothlyu and blends into the top so it meets the image, if there is one that matches up" | The roots zoom with everything else, and grow lighter as the zoom goes in, smoothly, never in a step. At the top the roots fade into the banner, so a banner image whose bottom matches the roots (as the cover's plant meets its roots) reads as one picture. |
+| R9 | "the chapters should be blobs, the shape around them becomes what it can around the text that is shown" | Each item in an open container is a blob: no fixed card, its outline forms around the text it shows at that zoom (the name; more text as the zoom allows), so the shape changes as the text does. |
+| R10 | "a site can name it and while center is primary, there can be branches that look like they are from the base of the plant but are equal but not central ... if it has a next and no previous, perhaps" | The tap root is named by the site. Besides the central tap root, equal roots may grow from the base, beside it rather than off it. Proposed rule (Harold's): an item that has a next and no previous (a story start with nothing before it) grows its own root from the base. |
 
 Carried over from the standing requirements (kept locally in `_handoff/HAROLD-STANDING-REQUIREMENTS.md`, numbers as there):
 - The reader controls the zoom (31): nothing the layout does caps it.
@@ -56,7 +65,7 @@ Carried over from the standing requirements (kept locally in `_handoff/HAROLD-ST
 
 The main root is the line of the present, and flashbacks and parallel threads grow off it as side roots. The shape shows where the story leaves time's order.
 
-**For Harold to confirm:** this rule (the alternative is that every jump starts a new root off the one the story is on, so the roots form a chain and never rejoin), and what happens to items with no date (proposed: they stay on the root of the item before them).
+**Confirmed by Harold** (2026-10-04: "you are absolutely correct"): side roots that rejoin the present, as above. Still proposed: an item with no date stays on the root of the item before it.
 
 ## 4. Input
 
@@ -113,9 +122,14 @@ Exoskeleton (Tauri 2 + React 19, AGPL-3.0-or-later) has a JSON suite: one JSON d
   - path-based ids (section 4), since exoskeleton's tree conversion gives nodes names but no ids.
 - **Licences:** exoskeleton is AGPL; post-pipe's code is harold young's own (see [LICENSE](../LICENSE) and [COMMERCIAL.md](../COMMERCIAL.md)), so he may use it in both.
 
-## 8. Open questions for Harold
+## 8. Settled, and still open
 
-1. The branching rule in section 3: side roots that rejoin the present (proposed), or a chain of breaks that never rejoins?
-2. The banner: the site's second-frame art (the small plant and the title), or a new slot a site fills with any image or text?
-3. Inside an open container: items as cards at the root tips (as on `branch-layout`), or as names along the roots?
-4. Is the tap root the feed (the book) for every site, or can a site name it?
+Settled on 2026-10-04:
+1. The branching rule: side roots that rejoin the present (section 3).
+2. The banner is a general slot for any image or text; a site starts with its current second-frame art (for epicofelinorjones.com, the small plant and the title).
+3. Inside an open container, items are blobs whose shape forms around the text shown (R9).
+4. A site names the tap root; equal roots may grow from the base beside the central one (R10).
+
+Still open:
+- How a site marks a root as one of the equal base roots, beyond Harold's "a next and no previous" rule: whether a container or item can also say so in its settings.
+- Items with no date (proposed in section 3).
