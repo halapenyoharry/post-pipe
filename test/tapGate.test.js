@@ -39,6 +39,22 @@ test('two taps close together are a double and nothing single runs', () => {
   assert.deepStrictEqual(log, ['double']);
 });
 
+test('the double is the first tap\'s: what was double-tapped is where the two taps began', () => {
+  const c = clock();
+  const gate = createTapGate({ ms: 250, px: 32, now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer });
+  const log = [];
+  gate.tap(10, 10, () => log.push('card single'), () => log.push('card double'));
+  c.advance(120);
+  gate.tap(30, 20, () => log.push('space single'), () => log.push('space double'));
+  c.advance(1000);
+  assert.deepStrictEqual(log, ['card double']);
+  gate.tap(10, 10, () => log.push('a'));
+  c.advance(100);
+  gate.tap(10, 10, () => log.push('b'), () => log.push('second double'));
+  c.advance(1000);
+  assert.deepStrictEqual(log, ['card double', 'second double'], 'the second\'s when the first gave none');
+});
+
 test('a second tap far away or late settles the first as single', () => {
   const c = clock();
   const gate = createTapGate({ ms: 250, px: 32, now: c.now, setTimer: c.setTimer, clearTimer: c.clearTimer });

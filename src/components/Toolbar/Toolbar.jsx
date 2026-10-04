@@ -1,7 +1,7 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import styles from './Toolbar.module.css';
 import { dimensionLabels, layerLabels, dimensionGroupLabel } from '../../lib/dimensionLabels';
-import { VIEW_ACTIONS, RESET_TITLE, hasGranularity as axisHasGranularity, toggleDimension, nextGranularity, menuModel, menuMove } from '../../lib/toolbar';
+import { viewActionsFor, RESET_TITLE, hasGranularity as axisHasGranularity, toggleDimension, nextGranularity, menuModel, menuMove } from '../../lib/toolbar';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
 import { SettingsButton } from '../Settings/Settings';
@@ -185,7 +185,7 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
             <div className={styles.section}>
               <div className={styles.sectionTitle}>View</div>
               <div className={styles.wrapRow}>
-                {VIEW_ACTIONS.map((a) => (
+                {viewActionsFor(S).map((a) => (
                   <button
                     key={a.event}
                     className={styles.action}

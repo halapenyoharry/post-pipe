@@ -34,7 +34,8 @@ import { numberToLowercaseWords } from '../../../lib/readerHeader';
  *     hovered/pinned promote the card to "expanded" (scrollable text)
  *   fullContent: optional pre-fetched article HTML; when present and pinned,
  *     replaces the summary as the scrollable body
- *   onResize: optional callback ({ width, height }) => void
+ *   onResize: optional callback ({ width, height }) => void; without it the
+ *     card has no resize handles (the graph's table binds no node.resize)
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
@@ -228,7 +229,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         <div className={styles.readMark} title="Read to the end" aria-hidden="true">✓</div>
       )}
       {pinned && <PopoutButton />}
-      {showHandles && (
+      {showHandles && onResize && (
         <ResizeHandles
           width={width}
           height={height}
@@ -297,7 +298,7 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     if (height && height < COMPACT_HEIGHT) {
       return (
         <div className={`${styles.scroll} ${styles.scrollFull} ${useFullArticle ? styles.full : ''} rp-scroll`}>
-          <div className={styles.titleScrolling}>{title}</div>
+          <div className={styles.titleScrolling} data-card-title>{title}</div>
           {body && <div dangerouslySetInnerHTML={{ __html: body }} />}
         </div>
       );
@@ -305,7 +306,7 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
 
     return (
       <>
-        <div className={styles.title}>
+        <div className={styles.title} data-card-title>
           {title}
         </div>
         {body && (
@@ -354,6 +355,7 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
       <div
         className={styles.cardTitle}
         style={{ fontSize: `${titleFontSize}px` }}
+        data-card-title
       >
         {title}
       </div>
@@ -460,16 +462,18 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale
           backgroundImage: `url('${article.image}')`
         }}
       />
-      <div className={styles.imageCaption}>
+      <div className={styles.imageCaption} data-card-title>
         {article.short_title || article.title || article.label}
       </div>
       {pinned && <PopoutButton />}
-      <ResizeHandles
-        width={width}
-        height={height}
-        zoomScale={zoomScale}
-        onResize={onResize}
-      />
+      {onResize && (
+        <ResizeHandles
+          width={width}
+          height={height}
+          zoomScale={zoomScale}
+          onResize={onResize}
+        />
+      )}
     </div>
   );
 }

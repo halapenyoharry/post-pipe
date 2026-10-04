@@ -83,3 +83,12 @@ test('menu keys: arrows move and wrap, Home and End go to the ends, others do no
   assert.strictEqual(menuMove(2, 'a', 5), null);
   assert.strictEqual(menuMove(0, 'ArrowDown', 0), null);
 });
+
+test('"Reset sizes" is offered only while a card can be resized', () => {
+  const { viewActionsFor } = require('../src/lib/toolbar');
+  const events = (s) => viewActionsFor(s).map((a) => a.event);
+  assert.ok(events(null).includes('graph:reset-sizes'), 'the engine\'s table resizes from a card\'s edge');
+  assert.ok(events({ graph: {} }).includes('graph:reset-sizes'));
+  const noResize = { graph: { bindings: [{ target: 'node', gesture: 'drag', action: 'node.move' }] } };
+  assert.deepStrictEqual(events(noResize), ['graph:zoom-to-fit', 'graph:unpin-all']);
+});

@@ -10,6 +10,8 @@
 // panel, where the view actions and the layout (when shown) are. show: each
 // group on unless set false.
 
+const { resizeOn } = require('./actions');
+
 const GRANULARITIES = ['auto', 'day', 'week', 'month', 'year'];
 
 const VIEW_ACTIONS = [
@@ -17,6 +19,14 @@ const VIEW_ACTIONS = [
   { event: 'graph:unpin-all', label: 'Unpin all', title: 'Release every dragged node' },
   { event: 'graph:reset-sizes', label: 'Reset sizes', title: 'Return every card to its default size' },
 ];
+
+// The view actions a site's panel and bar offer: "Reset sizes" only while a
+// card can be resized at all (graph.bindings binds node.resize,
+// src/lib/actions.js).
+function viewActionsFor(settings) {
+  const graph = settings && settings.graph && typeof settings.graph === 'object' ? settings.graph : {};
+  return VIEW_ACTIONS.filter((a) => a.event !== 'graph:reset-sizes' || resizeOn(graph));
+}
 
 const RESET_TITLE = 'Reset: layout, zoom, rotation, open and closed containers, and selection, back to how the site starts (Undo brings the arrangement back)';
 
@@ -83,4 +93,4 @@ function menuMove(index, key, count) {
   return null;
 }
 
-module.exports = { GRANULARITIES, VIEW_ACTIONS, RESET_TITLE, toolbarConfig, hasGranularity, toggleDimension, nextGranularity, menuModel, menuMove };
+module.exports = { GRANULARITIES, VIEW_ACTIONS, viewActionsFor, RESET_TITLE, toolbarConfig, hasGranularity, toggleDimension, nextGranularity, menuModel, menuMove };

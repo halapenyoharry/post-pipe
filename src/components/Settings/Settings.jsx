@@ -8,7 +8,7 @@ import { isLinkItem } from '../../lib/linkNode';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
 import { panelGroups, panelTitle, modeInReader, whereOf } from '../../lib/panels';
-import { toolbarConfig, VIEW_ACTIONS } from '../../lib/toolbar';
+import { toolbarConfig, viewActionsFor } from '../../lib/toolbar';
 import { colorKeysInUse } from '../../lib/graphColors';
 import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
@@ -382,7 +382,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           <button className={styles.choiceBtn} data-view-action="graph:close-all-containers" onClick={() => fire('graph:close-all-containers')}>Close all {noun}</button>
           <button className={styles.choiceBtn} data-view-action="graph:open-all-containers" onClick={() => fire('graph:open-all-containers')}>Open all {noun}</button>
         </>)}
-        {VIEW_ACTIONS.filter((a) => a.event !== 'graph:zoom-to-fit').map((a) => (
+        {viewActionsFor(S).filter((a) => a.event !== 'graph:zoom-to-fit').map((a) => (
           <button key={a.event} className={styles.choiceBtn} data-view-action={a.event} title={a.title} onClick={() => fire(a.event)}>{a.label}</button>
         ))}
       </span>
