@@ -1,0 +1,10 @@
+{
+  "out": "../../out/synthetic",
+  "sources": [
+    { "adapter": "jsonfeed", "path": "journal.feed.json" },
+    { "adapter": "jsonfeed", "path": "wire.feed.json" },
+    { "adapter": "jsonfeed", "path": "science.feed.json" },
+    { "adapter": "pairs", "path": "archive.tsv", "source": "Archive" }
+  ],
+  "emerge": true
+}

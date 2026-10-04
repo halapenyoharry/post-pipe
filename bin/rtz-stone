@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+import { cli, die, readText, parseJSONL, writeOut, log, readJSON } from '../lib/io.js';
+import { buildStone } from '../lib/stone.js';
+import { loadSeeds, loadJSONIfExists } from '../lib/seeds.js';
+import fs from 'node:fs';
+
+const usage = `rtz-stone — records on stdin -> stone.json (concepts, canonical labels, relations)
+
+usage: rtz-stone [records.jsonl] [--overrides FILE] [--seed FILE]… [--no-seed]
+                 [--pairs FILE]… [--no-builtin] [--config FILE] [-o FILE] [-q]
+
+  --overrides FILE  human decisions (pin/same/notSame/relations/ignore/sourceWeights/canon).
+                    Never written by the engine. Default: ./overrides.json if present.
+  --pairs FILE      extra pair evidence JSONL from rtz-pairs or any external scorer ("-" = stdin is taken)
+  --no-builtin      use ONLY --pairs evidence (the fully piped form: rtz-pairs | rtz-stone …)
+  --seed / --no-seed  extra seed files / drop the shipped seed
+  -q                quiet (no summary on stderr)`;
+
+const { values, positionals } = cli('rtz-stone', usage, {
+  overrides: { type: 'string' },
+  seed: { type: 'string', multiple: true },
+  'no-seed': { type: 'boolean' },
+  pairs: { type: 'string', multiple: true },
+  'no-builtin': { type: 'boolean' },
+  config: { type: 'string' },
+  o: { type: 'string', short: 'o' },
+  q: { type: 'boolean', short: 'q' },
+});
+
+try {
+  const records = parseJSONL(await readText(positionals[0]), positionals[0] ?? 'stdin');
+  const overridesFile = values.overrides ?? (fs.existsSync('overrides.json') ? 'overrides.json' : null);
+  const extraSignals = (values.pairs ?? []).flatMap((f) => parseJSONL(fs.readFileSync(f, 'utf8'), f));
+  const stone = buildStone(records, {
+    cfg: loadJSONIfExists(values.config),
+    overrides: overridesFile ? readJSON(overridesFile) : {},
+    seeds: loadSeeds({ files: values.seed ?? [], none: values['no-seed'] }),
+    extraSignals,
+    builtin: !values['no-builtin'],
+    now: new Date().toISOString(),
+  });
+  writeOut(JSON.stringify(stone, null, 1) + '\n', values.o);
+  if (!values.q) {
+    const s = stone.stats;
+    log(`rtz-stone: ${s.tags} tags -> ${s.concepts} concepts (${s.tagsFolded} folded into ${s.merged} merged concepts), ${s.relations} relations, ${s.items} items`);
+  }
+} catch (e) {
+  die(`rtz-stone: ${e.message}`);
+}

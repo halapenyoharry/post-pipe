@@ -1,0 +1,17 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Journal",
+  "items": [
+    { "id": "j1", "url": "https://example.org/journal/machine-does-not-dream", "title": "The Machine Does Not Dream", "summary": "An essay on whether artificial intelligence can sustain a point of view, and why the question says more about us than about the machine.", "tags": ["ai", "consciousness", "philosophy"] },
+    { "id": "j2", "url": "https://example.org/journal/who-tends-the-algorithm", "title": "Who Tends the Algorithm", "summary": "Nurses and care workers meet automated scheduling. Machine learning decides who rests and who covers the night shift.", "tags": ["ai", "labor", "care-work", "machine-learning"] },
+    { "id": "j3", "url": "https://example.org/journal/general-strike", "title": "A General Strike for Everyone Else", "summary": "Collective action when the work itself is being automated away, and what leverage remains.", "tags": ["labor", "general-strike", "political"] },
+    { "id": "j4", "url": "https://example.org/journal/loops-all-the-way-down", "title": "Loops All the Way Down", "summary": "Feedback, delay, and the thinking tools that let us see a system instead of its parts.", "tags": ["systems-thinking", "feedback-loops", "philosophy"] },
+    { "id": "j5", "url": "https://example.org/journal/the-dread-signal", "title": "The Dread Signal", "summary": "Creative resistance as information: what the dread before the blank page is trying to say.", "tags": ["creativity", "resistance", "process", "writing"] },
+    { "id": "j6", "url": "https://example.org/journal/prisons-cannot-be-fixed", "title": "Why Prisons Cannot Be Fixed from Inside", "summary": "Incarceration as a system whose incentives resist reform at every level.", "tags": ["prison", "systems-thinking", "political"] },
+    { "id": "j7", "url": "https://example.org/journal/the-heat-we-argue-about", "title": "The Heat We Argue About", "summary": "Climate change as a coordination failure, not a knowledge gap.", "tags": ["climate", "political", "systems-thinking"] },
+    { "id": "j8", "url": "https://example.org/journal/agi-rescue", "title": "AGI and the Promise of Rescue", "summary": "Artificial general intelligence as a secular salvation story, and who profits from telling it.", "tags": ["ai", "agi", "power", "philosophy"] },
+    { "id": "j9", "url": "https://example.org/journal/erasure-of-the-expert", "title": "The Erasure of the Expert", "summary": "How manufactured doubt makes expertise look like opinion.", "tags": ["epistemology", "expertise", "media", "truth"] },
+    { "id": "j10", "url": "https://example.org/journal/embodied-knowing", "title": "Embodied Knowing", "summary": "Knowledge that lives in the hands and the gut before it reaches words.", "tags": ["embodiment", "process", "creativity", "consciousness"] },
+    { "id": "j11", "url": "https://example.org/journal/limits-of-planning", "title": "Complex Systems and the Limits of Planning", "summary": "Why top-down plans fail in complex systems, and what to do instead.", "tags": ["complex-systems", "systems-thinking", "political"] }
+  ]
+}

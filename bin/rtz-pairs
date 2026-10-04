@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+import { cli, die, readText, parseJSONL, toJSONL, writeOut } from '../lib/io.js';
+import { loadCorpus } from '../lib/corpus.js';
+import { computeSignals, SIGNAL_GROUPS } from '../lib/signals/index.js';
+import { makeConfig } from '../lib/config.js';
+import { loadSeeds, loadJSONIfExists } from '../lib/seeds.js';
+
+const usage = `rtz-pairs — records on stdin -> pair evidence JSONL on stdout
+
+  {"a":"ai","b":"artificial intelligence","signal":"seed","score":0.95,"why":"…"}
+
+usage: rtz-pairs [records.jsonl] [--only lexical,acronym,seed,text,anchor] [--seed FILE]… [--no-seed] [--config FILE] [-o FILE]
+
+Any other program (an embedding model, an LLM, a hand-written script) can emit the same
+records; feed them to rtz-stone with --pairs. Signal groups: ${Object.keys(SIGNAL_GROUPS).join(', ')}`;
+
+const { values, positionals } = cli('rtz-pairs', usage, {
+  only: { type: 'string' },
+  seed: { type: 'string', multiple: true },
+  'no-seed': { type: 'boolean' },
+  config: { type: 'string' },
+  o: { type: 'string', short: 'o' },
+});
+
+try {
+  const records = parseJSONL(await readText(positionals[0]), positionals[0] ?? 'stdin');
+  const cfg = makeConfig(loadJSONIfExists(values.config));
+  const corpus = loadCorpus(records);
+  const signals = computeSignals(corpus, cfg, {
+    seeds: loadSeeds({ files: values.seed ?? [], none: values['no-seed'] }),
+    only: values.only ? values.only.split(',') : null,
+  });
+  signals.sort((x, y) => (x.a + x.b + x.signal < y.a + y.b + y.signal ? -1 : 1));
+  writeOut(toJSONL(signals.map((s) => ({ ...s, score: Number(s.score.toFixed(4)) }))), values.o);
+} catch (e) {
+  die(`rtz-pairs: ${e.message}`);
+}

@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+import { cli, die, readJSON, writeOut } from '../lib/io.js';
+import { projectGraph, MODES } from '../lib/graph.js';
+import { normalizeLabel } from '../lib/normalize.js';
+
+const usage = `rtz-graph — universe.json -> {nodes, links} for any force-graph renderer
+
+usage: rtz-graph <universe.json> --mode ${MODES.join('|')} [--focus LABEL] [--hops N]
+                 [--no-relations] [--no-emergent] [--types broader,related,…] [--neighbors N] [-o FILE]
+
+  raw       items + one node per (tag-system, spelling): the duplication before the stone
+  hyper     items + one node per concept: tags as vertices
+  dyadic    items only; each tag becomes the LABEL on an item-to-item edge
+  concepts  concepts only, joined by relations
+
+  --focus LABEL   cut the k-hop neighbourhood around the concept that LABEL belongs to (any spelling)`;
+
+const { values, positionals } = cli('rtz-graph', usage, {
+  mode: { type: 'string', default: 'hyper' },
+  focus: { type: 'string' },
+  hops: { type: 'string', default: '2' },
+  'no-relations': { type: 'boolean' },
+  'no-emergent': { type: 'boolean' },
+  types: { type: 'string' },
+  neighbors: { type: 'string', default: '6' },
+  o: { type: 'string', short: 'o' },
+});
+const [file] = positionals;
+if (!file) die(usage, 2);
+try {
+  const U = readJSON(file);
+  let focus = null;
+  if (values.focus) {
+    const norm = normalizeLabel(values.focus).norm;
+    const hit = U.concepts.find((c) => c.variants.some((v) => v.norm === norm));
+    if (!hit) die(`rtz-graph: no concept contains "${values.focus}"`);
+    focus = hit.id;
+  }
+  const graph = projectGraph(U, values.mode, {
+    focus,
+    hops: Number(values.hops),
+    relations: !values['no-relations'],
+    emergent: !values['no-emergent'],
+    relationTypes: values.types ? new Set(values.types.split(',')) : null,
+    neighbors: Number(values.neighbors),
+  });
+  writeOut(JSON.stringify(graph) + '\n', values.o);
+} catch (e) {
+  die(`rtz-graph: ${e.message}`);
+}

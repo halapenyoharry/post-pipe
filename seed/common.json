@@ -1,0 +1,24 @@
+{
+  "_about": "Shipped seed evidence: label groups that are the same thing in almost every corpus. Seeds are EVIDENCE (they feed the same scoring as everything else), not commands; your overrides.json always wins. Drop with --no-seed. Only labels actually present in your data are used.",
+  "same": [
+    ["ai", "artificial intelligence", "a.i."],
+    ["ml", "machine learning"],
+    ["llm", "large language model", "large language models"],
+    ["agi", "artificial general intelligence"],
+    ["nlp", "natural language processing"],
+    ["ui", "user interface"],
+    ["ux", "user experience"],
+    ["ubi", "universal basic income"],
+    ["us", "usa", "united states", "united states of america"],
+    ["uk", "united kingdom"],
+    ["eu", "european union"],
+    ["climate change", "global warming"]
+  ],
+  "broader": [
+    ["artificial intelligence", "machine learning"],
+    ["machine learning", "deep learning"],
+    ["machine learning", "neural networks"],
+    ["artificial intelligence", "artificial general intelligence"]
+  ],
+  "related": []
+}

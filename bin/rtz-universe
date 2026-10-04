@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+import { cli, die, readText, parseJSONL, writeOut, readJSON } from '../lib/io.js';
+import { buildUniverse } from '../lib/universe.js';
+
+const usage = `rtz-universe — join a stone to the records it describes -> universe.json
+
+usage: rtz-universe <stone.json> [records.jsonl] [-o FILE]
+
+The universe is the single document every projection (rtz-graph, rtz-view, exoskeleton, …) reads.
+Records may include emergent tags (rtz-emerge --all). Tags the stone has never seen are kept as
+singleton "unmapped" concepts, so an out-of-date stone still produces a usable universe.`;
+
+const { values, positionals } = cli('rtz-universe', usage, { o: { type: 'string', short: 'o' } });
+const [stoneFile, input] = positionals;
+if (!stoneFile) die(usage, 2);
+try {
+  const records = parseJSONL(await readText(input), input ?? 'stdin');
+  writeOut(JSON.stringify(buildUniverse(readJSON(stoneFile), records)) + '\n', values.o);
+} catch (e) {
+  die(`rtz-universe: ${e.message}`);
+}

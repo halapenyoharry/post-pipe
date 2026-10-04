@@ -1,0 +1,18 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Science",
+  "items": [
+    { "id": "s1", "url": "https://example.org/science/protein-folds", "title": "Neural network model predicts protein folds faster", "summary": "A deep learning system trained on structural data predicts how proteins fold in minutes, a task machine learning had long struggled with." },
+    { "id": "s2", "url": "https://example.org/science/warming-oceans-fish", "title": "Warming oceans shift fish ranges", "summary": "Climate change is pushing commercial fish stocks toward the poles, and fisheries are racing to adapt." },
+    { "id": "s3", "url": "https://example.org/science/language-models-reasoning", "title": "Language models show uneven reasoning", "summary": "Large language models, a form of artificial intelligence, solve some puzzles easily and fail at near-identical ones." },
+    { "id": "s4", "url": "https://example.org/science/prison-crowding-infection", "title": "Prison health study links crowding to infection", "summary": "Overcrowding in prisons drives outbreaks, and incarceration policy sets the conditions for them." },
+    { "id": "s5", "url": "https://example.org/science/tree-rings-drought", "title": "Tree rings reveal a century of drought", "summary": "Records from old trees show how global warming has stretched dry spells across the continent." },
+    { "id": "s6", "url": "https://example.org/science/coral-collapse-model", "title": "Complex systems approach predicts coral collapse", "summary": "Researchers used a complex systems model with feedback loops to forecast when reefs tip over." },
+    { "id": "s7", "url": "https://example.org/science/robots-fold-laundry", "title": "Robots learn to fold laundry", "summary": "Reinforcement learning, a branch of machine learning, lets a robot arm handle soft fabric, with consequences for automation of household work." },
+    { "id": "s8", "url": "https://example.org/science/sleep-loss-decisions", "title": "Sleep loss changes decision making", "summary": "Volunteers deprived of sleep took bigger risks in a gambling task." },
+    { "id": "s9", "url": "https://example.org/science/battery-chemistry-range", "title": "New battery chemistry doubles range", "summary": "A sodium-based cell stores more energy per kilogram than lithium." },
+    { "id": "s10", "url": "https://example.org/science/ai-sepsis", "title": "AI model spots early signs of sepsis", "summary": "An AI tool flagged sepsis hours earlier than staff in a hospital trial, raising questions about health care workflows." },
+    { "id": "s11", "url": "https://example.org/science/wildfire-smoke-health", "title": "Wildfire smoke linked to health outcomes", "summary": "Climate-driven fires are filling clinics, and health care systems are struggling with the load." },
+    { "id": "s12", "url": "https://example.org/science/gut-microbiome-stability", "title": "Feedback loops stabilise gut microbiome", "summary": "Microbial populations hold steady through feedback loops that resemble engineered control systems." }
+  ]
+}
