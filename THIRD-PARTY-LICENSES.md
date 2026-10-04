@@ -2,6 +2,8 @@
 
 What the engine ships that others made, and the terms it ships under.
 
+post-pipe's own code is harold young's, under [LICENSE](LICENSE) and [COMMERCIAL.md](COMMERCIAL.md). Everything listed here keeps its own licence.
+
 ## Fonts
 
 In `fonts/`:

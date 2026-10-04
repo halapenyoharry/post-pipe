@@ -2,6 +2,16 @@ I think the new name of this project would be something like "Blobz" and it's an
 
 ---
 
+## Licence, and what's coming
+
+post-pipe is free for creators and for non-commercial use, under the [PolyForm Noncommercial License 1.0.0](LICENSE) and an [additional permission](COMMERCIAL.md) from its author: creative work is free, and commercial use is free until it brings in US$10,000 a year; above that, or to sell or host post-pipe itself, ask by opening an issue titled "commercial licence".
+
+post-pipe is a work in progress, and this is the beginning. A platform built on this technology is coming.
+
+Fonts and icons it ships keep their own licences: see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
+
+---
+
 ## Embedding Post-Pipe
 
 Post-Pipe (Blobz) can be compiled into a single, highly-configurable, self-contained Javascript and CSS bundle that you can drop onto any webpage. This "Embed Mode" allows you to integrate the viewer into your own sites without needing a build step on the host site.

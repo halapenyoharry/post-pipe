@@ -2,6 +2,7 @@
   "name": "post-pipe",
   "version": "1.0.0",
   "description": "markdown in → platform post out",
+  "license": "SEE LICENSE IN LICENSE",
   "main": "index.js",
   "bin": {
     "post-pipe": "./index.js"
