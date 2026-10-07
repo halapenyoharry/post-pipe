@@ -19274,41 +19274,84 @@ var q = {
 	resultHint: "_resultHint_5m33t_544",
 	intro: "_intro_5m33t_555"
 }, fl = (/* @__PURE__ */ o(((e, t) => {
-	var { siteIcon: n } = kc(), r = (e) => typeof e == "string" ? e.trim() : "";
-	function i(e) {
-		let t = r(e);
+	var { siteIcon: n } = kc(), { isLinkItem: r } = Is(), i = (e) => typeof e == "string" ? e.trim() : "";
+	function a(e) {
+		let t = i(e);
 		return t ? /^(https?:|mailto:)/i.test(t) ? t : /^[a-z][a-z0-9+.-]*:/i.test(t) ? "" : t : "";
 	}
-	function a(e) {
+	function o(e) {
 		let t = e && e.topBar && typeof e.topBar == "object" ? e.topBar : {};
 		return {
-			pages: (Array.isArray(t.pages) ? t.pages : []).filter((e) => e && typeof e == "object" && r(e.id)).map((e) => {
+			pages: (Array.isArray(t.pages) ? t.pages : []).filter((e) => e && typeof e == "object" && i(e.id)).map((e) => {
 				let t = n(e.icon);
 				return {
-					id: r(e.id),
-					label: r(e.label) || r(e.id),
+					id: i(e.id),
+					label: i(e.label) || i(e.id),
 					hideFromGraph: e.hideFromGraph === !0,
 					icon: t,
 					showLabel: !t || e.showLabel !== !1
 				};
 			}),
-			links: (Array.isArray(t.links) ? t.links : []).filter((e) => e && typeof e == "object" && i(e.href) && (r(e.label) || r(e.id))).map((e, t) => {
-				let a = n(e.icon), o = r(e.label) || r(e.id);
+			links: (Array.isArray(t.links) ? t.links : []).filter((e) => e && typeof e == "object" && a(e.href) && (i(e.label) || i(e.id))).map((e, t) => {
+				let r = n(e.icon), o = i(e.label) || i(e.id);
 				return {
-					id: r(e.id) || `link-${t + 1}`,
+					id: i(e.id) || `link-${t + 1}`,
 					label: o,
-					href: i(e.href),
-					icon: a,
+					href: a(e.href),
+					icon: r,
 					newTab: e.newTab === !0,
-					showLabel: !a || e.showLabel === !0
+					showLabel: !r || e.showLabel === !0
 				};
 			}),
-			subscribe: s(t.subscribe),
+			subscribe: d(t.subscribe),
 			addFeed: t.addFeed !== !1,
-			showSourcePills: t.showSourcePills !== !1
+			showSourcePills: t.showSourcePills !== !1,
+			resume: s(t.resume),
+			order: Array.isArray(t.order) ? t.order.map(i).filter(Boolean) : []
 		};
 	}
-	var o = {
+	function s(e) {
+		if (!e || typeof e != "object") return null;
+		let t = n(e.icon);
+		return {
+			id: "resume",
+			label: i(e.label) || "read",
+			icon: t,
+			showLabel: !t || e.showLabel === !0,
+			start: i(e.start)
+		};
+	}
+	function c(e) {
+		let t = e || {}, n = [];
+		t.resume && n.push("resume");
+		for (let e of t.pages || []) n.push(`page:${e.id}`);
+		for (let e of t.links || []) n.push(`link:${e.id}`);
+		t.subscribe && n.push("subscribe");
+		let r = (e) => e === "resume" || e === "subscribe" ? e : n.includes(`page:${e}`) ? `page:${e}` : n.includes(`link:${e}`) ? `link:${e}` : null, i = [];
+		for (let e of t.order || []) {
+			let t = r(e);
+			t && n.includes(t) && !i.includes(t) && i.push(t);
+		}
+		for (let e of n) i.includes(e) || i.push(e);
+		return i;
+	}
+	function l(e, t, n) {
+		let i = Array.isArray(e) ? e : [], a = new Set((n && n.pages || []).map((e) => e.id)), o = (e) => a.has(e.id) || a.has(m(e)), s = (e) => r(e), c = i.filter((e) => e && e.id && !o(e) && !s(e)), l = t && typeof t == "object" ? t : {}, u = null, d = -Infinity;
+		for (let e of c) {
+			let t = l[e.id];
+			if (!t) continue;
+			let n = Number(t.max) > 0 || Number(t.at) > 0 || Number(t.scroll) > 0, r = Number(t.t);
+			n && Number.isFinite(r) && r > d && (d = r, u = e);
+		}
+		if (u) return u;
+		let f = n && n.resume && n.resume.start;
+		if (f) {
+			let e = c.find((e) => e.id === f || m(e) === f);
+			if (e) return e;
+		}
+		return c[0] || null;
+	}
+	var u = {
 		method: "POST",
 		field: "email",
 		label: "Subscribe",
@@ -19316,24 +19359,24 @@ var q = {
 		thanks: "Thank you.",
 		error: "Something went wrong. Please try again."
 	};
-	function s(e) {
+	function d(e) {
 		if (!e || typeof e != "object") return null;
-		let t = i(e.action);
+		let t = a(e.action);
 		if (!t || /^mailto:/i.test(t)) return null;
-		let a = r(e.method).toUpperCase();
+		let r = i(e.method).toUpperCase();
 		return {
 			action: t,
-			method: /^(POST|PUT|PATCH)$/.test(a) ? a : o.method,
-			field: r(e.field) || o.field,
-			label: r(e.label) || o.label,
+			method: /^(POST|PUT|PATCH)$/.test(r) ? r : u.method,
+			field: i(e.field) || u.field,
+			label: i(e.label) || u.label,
 			icon: n(e.icon),
-			placeholder: r(e.placeholder) || o.placeholder,
-			thanks: r(e.thanks) || o.thanks,
-			error: r(e.error) || o.error,
+			placeholder: i(e.placeholder) || u.placeholder,
+			thanks: i(e.thanks) || u.thanks,
+			error: i(e.error) || u.error,
 			newTab: e.newTab === !0
 		};
 	}
-	function c(e, t, n) {
+	function f(e, t, n) {
 		return t >= 200 && t < 300 ? {
 			ok: !0,
 			message: e.thanks
@@ -19342,11 +19385,11 @@ var q = {
 			message: (n && typeof n == "object" && typeof n.error == "string" ? n.error.trim() : "") || e.error
 		};
 	}
-	async function l(e, t, n) {
+	async function p(e, t, n) {
 		let r = n || (typeof fetch < "u" ? fetch : null);
 		if (!e || !r) return {
 			ok: !1,
-			message: e && e.error || o.error
+			message: e && e.error || u.error
 		};
 		let i;
 		try {
@@ -19370,22 +19413,22 @@ var q = {
 		} catch {
 			a = null;
 		}
-		return c(e, i.status, a);
+		return f(e, i.status, a);
 	}
-	var u = (e) => String(e && (e.url || e.id) || "").split("/").pop().replace(/\.html$/, "");
-	function d(e, t) {
+	var m = (e) => String(e && (e.url || e.id) || "").split("/").pop().replace(/\.html$/, "");
+	function h(e, t) {
 		let n = e || [];
-		return n.find((e) => e && e.id === t) || n.find((e) => e && u(e) === t) || null;
+		return n.find((e) => e && e.id === t) || n.find((e) => e && m(e) === t) || null;
 	}
-	function f(e, t) {
+	function g(e, t) {
 		return (e && e.pages || []).map((e) => ({
 			...e,
-			item: d(t, e.id)
+			item: h(t, e.id)
 		})).filter((e) => e.item);
 	}
-	function p(e, t) {
+	function _(e, t) {
 		if (!e) return e;
-		let n = new Set(f(t, e.items).filter((e) => e.hideFromGraph).map((e) => e.item.id));
+		let n = new Set(g(t, e.items).filter((e) => e.hideFromGraph).map((e) => e.item.id));
 		if (!n.size) return e;
 		let r = new Set((e.items || []).filter((e) => n.has(e.id)).map((e) => e.url).filter(Boolean)), i = (e) => n.has(e) || r.has(e);
 		return {
@@ -19395,15 +19438,18 @@ var q = {
 		};
 	}
 	t.exports = {
-		topBarConfig: a,
-		findItem: d,
-		resolvePages: f,
-		graphFeed: p,
-		slugOf: u,
-		safeHref: i,
-		subscribeConfig: s,
-		subscribeResult: c,
-		subscribe: l
+		topBarConfig: o,
+		findItem: h,
+		resolvePages: g,
+		graphFeed: _,
+		slugOf: m,
+		safeHref: a,
+		subscribeConfig: d,
+		subscribeResult: f,
+		subscribe: p,
+		resumeConfig: s,
+		topBarOrder: c,
+		resumeTarget: l
 	};
 })))();
 function pl({ config: e }) {
@@ -19499,75 +19545,106 @@ function pl({ config: e }) {
 }
 //#endregion
 //#region src/components/FeedZ/FeedZ.jsx
-function ml({ sources: e, hiddenSources: t, onToggleSource: n, viewState: r, showCount: i = !0, pages: a = [], onOpenPage: o, links: s = [], subscribe: c = null, showAddButton: l = !0, intro: u = "", controls: d = null, showSources: f = !0 }) {
-	let p = (0, _.useRef)(null), m = Array.isArray(a) && a.length > 0, h = Array.isArray(s) && s.length > 0, g = !!d;
+function ml({ sources: e, hiddenSources: t, onToggleSource: n, viewState: r, showCount: i = !0, pages: a = [], onOpenPage: o, links: s = [], subscribe: c = null, resume: l = null, onResume: u, order: d = null, showAddButton: f = !0, intro: p = "", controls: m = null, showSources: h = !0 }) {
+	let g = (0, _.useRef)(null), v = Array.isArray(a) && a.length > 0, y = Array.isArray(s) && s.length > 0, b = !!m;
 	if ((0, _.useLayoutEffect)(() => {
-		g && p.current && _l(p.current);
+		b && g.current && _l(g.current);
 	}), (0, _.useEffect)(() => {
-		if (!g) return;
+		if (!b) return;
 		let e = () => {
-			p.current && _l(p.current);
+			g.current && _l(g.current);
 		};
 		return window.addEventListener("resize", e), typeof document < "u" && document.fonts && document.fonts.ready && document.fonts.ready.then(e), () => window.removeEventListener("resize", e);
-	}, [g]), f === !1 && (e = []), (!e || e.length === 0) && !m && !h && !c && !u && !d) return null;
-	let v = t || /* @__PURE__ */ new Set();
+	}, [b]), h === !1 && (e = []), (!e || e.length === 0) && !v && !y && !c && !l && !p && !m) return null;
+	let x = t || /* @__PURE__ */ new Set(), S = Array.isArray(d) && d.length ? d : [
+		...l ? ["resume"] : [],
+		...v ? a.map((e) => `page:${e.id}`) : [],
+		...y ? s.map((e) => `link:${e.id}`) : [],
+		...c ? ["subscribe"] : []
+	], C = (e) => /* @__PURE__ */ (0, H.jsxs)("button", {
+		type: "button",
+		className: `${q.pill} ${q.pagePill} ${e.icon && !e.showLabel ? q.iconOnly : ""}`,
+		"data-top-pages": !0,
+		"data-top-page": e.id,
+		"data-has-icon": e.icon ? "" : void 0,
+		"aria-label": e.icon ? e.label : void 0,
+		title: e.item && e.item.title ? e.item.title : e.label,
+		onClick: () => o && o(e.item),
+		children: [e.icon && /* @__PURE__ */ (0, H.jsx)(Oc, {
+			body: e.icon,
+			size: 15,
+			className: q.pillIcon
+		}), e.showLabel !== !1 && /* @__PURE__ */ (0, H.jsx)("span", {
+			className: `${q.title} ${q.pageLabel}`,
+			children: e.label
+		})]
+	}, e.id), w = (e) => /* @__PURE__ */ (0, H.jsxs)("a", {
+		href: e.href,
+		className: `${q.pill} ${q.pagePill} ${q.linkPill} ${e.icon && !e.showLabel ? q.iconOnly : ""}`,
+		"data-top-link": e.id,
+		"data-has-icon": e.icon ? "" : void 0,
+		"aria-label": e.label,
+		title: e.label,
+		...e.newTab ? {
+			target: "_blank",
+			rel: "noopener"
+		} : {},
+		children: [e.icon && /* @__PURE__ */ (0, H.jsx)(Oc, {
+			body: e.icon,
+			size: 15,
+			className: q.pillIcon
+		}), e.showLabel && /* @__PURE__ */ (0, H.jsx)("span", {
+			className: `${q.title} ${q.pageLabel}`,
+			children: e.label
+		})]
+	}, e.id), T = () => l ? /* @__PURE__ */ (0, H.jsxs)("button", {
+		type: "button",
+		className: `${q.pill} ${q.pagePill} ${l.icon && !l.showLabel ? q.iconOnly : ""}`,
+		"data-top-resume": !0,
+		"data-has-icon": l.icon ? "" : void 0,
+		"aria-label": l.label,
+		title: l.label,
+		onClick: () => u && u(),
+		children: [l.icon && /* @__PURE__ */ (0, H.jsx)(Oc, {
+			body: l.icon,
+			size: 15,
+			className: q.pillIcon
+		}), l.showLabel && /* @__PURE__ */ (0, H.jsx)("span", {
+			className: `${q.title} ${q.pageLabel}`,
+			children: l.label
+		})]
+	}, "resume") : null;
 	return /* @__PURE__ */ (0, H.jsxs)("div", {
-		ref: p,
+		ref: g,
 		className: q.bar,
 		"data-feeds": !0,
 		children: [
 			(e || []).map((e) => /* @__PURE__ */ (0, H.jsx)(vl, {
 				source: e,
-				hidden: v.has(e.id),
+				hidden: x.has(e.id),
 				onToggle: () => n && n(e.id),
 				viewState: r,
 				showCount: i
 			}, e.id)),
-			m && a.map((e) => /* @__PURE__ */ (0, H.jsxs)("button", {
-				type: "button",
-				className: `${q.pill} ${q.pagePill} ${e.icon && !e.showLabel ? q.iconOnly : ""}`,
-				"data-top-pages": !0,
-				"data-top-page": e.id,
-				"data-has-icon": e.icon ? "" : void 0,
-				"aria-label": e.icon ? e.label : void 0,
-				title: e.item && e.item.title ? e.item.title : e.label,
-				onClick: () => o && o(e.item),
-				children: [e.icon && /* @__PURE__ */ (0, H.jsx)(Oc, {
-					body: e.icon,
-					size: 15,
-					className: q.pillIcon
-				}), e.showLabel !== !1 && /* @__PURE__ */ (0, H.jsx)("span", {
-					className: `${q.title} ${q.pageLabel}`,
-					children: e.label
-				})]
-			}, e.id)),
-			h && s.map((e) => /* @__PURE__ */ (0, H.jsxs)("a", {
-				href: e.href,
-				className: `${q.pill} ${q.pagePill} ${q.linkPill} ${e.icon && !e.showLabel ? q.iconOnly : ""}`,
-				"data-top-link": e.id,
-				"data-has-icon": e.icon ? "" : void 0,
-				"aria-label": e.label,
-				title: e.label,
-				...e.newTab ? {
-					target: "_blank",
-					rel: "noopener"
-				} : {},
-				children: [e.icon && /* @__PURE__ */ (0, H.jsx)(Oc, {
-					body: e.icon,
-					size: 15,
-					className: q.pillIcon
-				}), e.showLabel && /* @__PURE__ */ (0, H.jsx)("span", {
-					className: `${q.title} ${q.pageLabel}`,
-					children: e.label
-				})]
-			}, e.id)),
-			c && /* @__PURE__ */ (0, H.jsx)(pl, { config: c }),
-			l !== !1 && /* @__PURE__ */ (0, H.jsx)(Sl, {}),
-			d,
-			u && /* @__PURE__ */ (0, H.jsx)("div", {
+			S.map((e) => {
+				if (e === "resume") return T();
+				if (e === "subscribe") return c ? /* @__PURE__ */ (0, H.jsx)(pl, { config: c }, "subscribe") : null;
+				if (e.startsWith("page:")) {
+					let t = a.find((t) => `page:${t.id}` === e);
+					return t ? C(t) : null;
+				}
+				if (e.startsWith("link:")) {
+					let t = s.find((t) => `link:${t.id}` === e);
+					return t ? w(t) : null;
+				}
+				return null;
+			}),
+			f !== !1 && /* @__PURE__ */ (0, H.jsx)(Sl, {}),
+			m,
+			p && /* @__PURE__ */ (0, H.jsx)("div", {
 				className: q.intro,
 				"data-graph-intro": !0,
-				dangerouslySetInnerHTML: { __html: u }
+				dangerouslySetInnerHTML: { __html: p }
 			})
 		]
 	});
@@ -23443,5 +23520,5 @@ function Ru(e, t) {
 	};
 }
 //#endregion
-var zu = rc.followLink, Bu = fl.graphFeed, Vu = rc.isLinkItem, Hu = rc.linkOf, Uu = fl.resolvePages, Wu = Fl.toolbarConfig, Gu = fl.topBarConfig;
-export { $l as ConfigPanel, ml as FeedZ, gc as GraphViewer, Lu as Opening, _ as React, v as ReactDOM, nl as ReaderPanel, Jl as Settings, ul as TTS, gu as Theme, mu as TimeOfDay, au as TimeOverlay, lu as Toolbar, zu as followLink, Bu as graphFeed, Vu as isLinkItem, Hu as linkOf, Uu as resolvePages, Wu as toolbarConfig, Gu as topBarConfig, Ru as useContributions };
+var zu = rc.followLink, Bu = fl.graphFeed, Vu = rc.isLinkItem, Hu = rc.linkOf, Uu = fl.resolvePages, Wu = fl.resumeTarget, Gu = Fl.toolbarConfig, Ku = fl.topBarConfig, qu = fl.topBarOrder;
+export { $l as ConfigPanel, ml as FeedZ, gc as GraphViewer, Lu as Opening, _ as React, v as ReactDOM, nl as ReaderPanel, Jl as Settings, ul as TTS, gu as Theme, mu as TimeOfDay, au as TimeOverlay, lu as Toolbar, zu as followLink, Bu as graphFeed, Vu as isLinkItem, Hu as linkOf, Uu as resolvePages, Wu as resumeTarget, Gu as toolbarConfig, Ku as topBarConfig, qu as topBarOrder, Ru as useContributions };
