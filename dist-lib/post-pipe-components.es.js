@@ -11981,9 +11981,9 @@ var Z = {
 		let r = e && e.theme && e.theme.name;
 		return n[r] ? r : "default";
 	}
-	function i(e, t, r) {
-		let i = (n[e] || n.default).modes;
-		return t && i.includes(t) ? t : i.length === 1 ? i[0] : r ? "dark" : "light";
+	function i(e, t, r, i) {
+		let a = (n[e] || n.default).modes;
+		return t && a.includes(t) ? t : a.length === 1 ? a[0] : i && a.includes(i) ? i : r ? "dark" : "light";
 	}
 	t.exports = {
 		THEMES: n,
@@ -14372,14 +14372,14 @@ function cu({ settings: e, viewState: t }) {
 			i.removeEventListener ? i.removeEventListener("change", e) : i.removeListener(e);
 		};
 	}, []);
-	let s = (0, Sl.themeName)(e, t && t.preference ? t.preference("theme") : null), l = (0, Sl.themeMode)(s, t && t.preference ? t.preference("mode") : null, a), u = (0, su.openingConfig)(e), d = u && u.ground === "dark" ? "dark" : l;
+	let s = (0, Sl.themeName)(e, t && t.preference ? t.preference("theme") : null), l = e && e.theme && e.theme.mode, u = (0, Sl.themeMode)(s, t && t.preference ? t.preference("mode") : null, a, l), d = (0, su.openingConfig)(e), f = d && d.ground === "dark" ? "dark" : u;
 	return r(() => {
 		let e = document.documentElement;
-		e.getAttribute("data-pp-theme") !== s && e.setAttribute("data-pp-theme", s), e.getAttribute("data-pp-mode") !== d && e.setAttribute("data-pp-mode", d), e.getAttribute("data-pp-reader-mode") !== l && e.setAttribute("data-pp-reader-mode", l), e.style.colorScheme = d;
+		e.getAttribute("data-pp-theme") !== s && e.setAttribute("data-pp-theme", s), e.getAttribute("data-pp-mode") !== f && e.setAttribute("data-pp-mode", f), e.getAttribute("data-pp-reader-mode") !== u && e.setAttribute("data-pp-reader-mode", u), e.style.colorScheme = f;
 	}, [
 		s,
-		l,
-		d
+		u,
+		f
 	]), null;
 }
 var lu = {

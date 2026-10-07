@@ -19999,9 +19999,9 @@ var J = {
 		let r = e && e.theme && e.theme.name;
 		return n[r] ? r : "default";
 	}
-	function i(e, t, r) {
-		let i = (n[e] || n.default).modes;
-		return t && i.includes(t) ? t : i.length === 1 ? i[0] : r ? "dark" : "light";
+	function i(e, t, r, i) {
+		let a = (n[e] || n.default).modes;
+		return t && a.includes(t) ? t : a.length === 1 ? a[0] : i && a.includes(i) ? i : r ? "dark" : "light";
 	}
 	t.exports = {
 		THEMES: n,
@@ -22396,14 +22396,14 @@ function gu({ settings: e, viewState: t }) {
 			r.removeEventListener ? r.removeEventListener("change", e) : r.removeListener(e);
 		};
 	}, []);
-	let o = (0, Nl.themeName)(e, t && t.preference ? t.preference("theme") : null), s = (0, Nl.themeMode)(o, t && t.preference ? t.preference("mode") : null, i), c = (0, hu.openingConfig)(e), l = c && c.ground === "dark" ? "dark" : s;
+	let o = (0, Nl.themeName)(e, t && t.preference ? t.preference("theme") : null), s = e && e.theme && e.theme.mode, c = (0, Nl.themeMode)(o, t && t.preference ? t.preference("mode") : null, i, s), l = (0, hu.openingConfig)(e), u = l && l.ground === "dark" ? "dark" : c;
 	return (0, _.useEffect)(() => {
 		let e = document.documentElement;
-		e.getAttribute("data-pp-theme") !== o && e.setAttribute("data-pp-theme", o), e.getAttribute("data-pp-mode") !== l && e.setAttribute("data-pp-mode", l), e.getAttribute("data-pp-reader-mode") !== s && e.setAttribute("data-pp-reader-mode", s), e.style.colorScheme = l;
+		e.getAttribute("data-pp-theme") !== o && e.setAttribute("data-pp-theme", o), e.getAttribute("data-pp-mode") !== u && e.setAttribute("data-pp-mode", u), e.getAttribute("data-pp-reader-mode") !== c && e.setAttribute("data-pp-reader-mode", c), e.style.colorScheme = u;
 	}, [
 		o,
-		s,
-		l
+		c,
+		u
 	]), null;
 }
 var _u = {
