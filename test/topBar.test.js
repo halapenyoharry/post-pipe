@@ -18,7 +18,7 @@ const feed = {
 };
 
 test('settings: pages with an id, a label (the id when none), hideFromGraph only when true', () => {
-  assert.deepStrictEqual(topBarConfig({}), { pages: [], links: [], subscribe: null, addFeed: true, showSourcePills: true });
+  assert.deepStrictEqual(topBarConfig({}), { pages: [], links: [], subscribe: null, addFeed: true, showSourcePills: true, resume: null, order: [] });
   assert.deepStrictEqual(topBarConfig({ topBar: { pages: [{ id: 'about', label: 'About', hideFromGraph: true }, { id: ' ' }, null, { id: 'x' }] } }).pages,
     [{ id: 'about', label: 'About', hideFromGraph: true, icon: '', showLabel: true }, { id: 'x', label: 'x', hideFromGraph: false, icon: '', showLabel: true }]);
 });

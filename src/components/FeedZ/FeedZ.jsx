@@ -34,6 +34,12 @@ import { Subscribe } from './Subscribe';
  *                    goes to its address, its label as its name
  *   subscribe      — optional; the top bar's email sign-up
  *                    (settings.topBar.subscribe): after the links
+ *   resume         — optional; the top bar's resume button
+ *                    (settings.topBar.resume): opens the reader where this
+ *                    reader was, through onResume
+ *   order          — optional; the buttons' order as keys ('resume',
+ *                    'page:<id>', 'link:<id>', 'subscribe'), from
+ *                    topBarOrder (settings.topBar.order)
  *   showAddButton  — optional, default true; false leaves out the "+"
  *   showSources    — optional, default true; false leaves out the source
  *                    pills (settings.topBar.showSourcePills)
@@ -48,7 +54,7 @@ import { Subscribe } from './Subscribe';
  *                    the first pill's text gives way (an ellipsis; its whole
  *                    text stays its name)
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, showAddButton = true, intro = '', controls = null, showSources = true }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
@@ -62,24 +68,21 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     return () => window.removeEventListener('resize', run);
   }, [fit]);
   if (showSources === false) sources = [];
-  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !intro && !controls) return null;
+  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !resume && !intro && !controls) return null;
 
   const hidden = hiddenSources || new Set();
 
-  return (
-    <div ref={barRef} className={styles.bar} data-feeds>
-      {(sources || []).map(src => (
-        <FeedPill
-          key={src.id}
-          source={src}
-          hidden={hidden.has(src.id)}
-          onToggle={() => onToggleSource && onToggleSource(src.id)}
-          viewState={viewState}
-          showCount={showCount}
-        />
-      ))}
-      {hasPages && pages.map((pg) => (
-        <button
+  // The buttons after the source pills, in the site's order (topBar.order,
+  // src/lib/topBar.js topBarOrder); without one, resume, pages, links, then
+  // the sign-up.
+  const buttonOrder = Array.isArray(order) && order.length ? order : [
+    ...(resume ? ['resume'] : []),
+    ...(hasPages ? pages.map((p) => `page:${p.id}`) : []),
+    ...(hasLinks ? links.map((l) => `link:${l.id}`) : []),
+    ...(subscribe ? ['subscribe'] : []),
+  ];
+  const renderPage = (pg) => (
+      <button
           key={pg.id}
           type="button"
           className={`${styles.pill} ${styles.pagePill} ${pg.icon && !pg.showLabel ? styles.iconOnly : ''}`}
@@ -93,9 +96,9 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
           {pg.icon && <Icon body={pg.icon} size={15} className={styles.pillIcon} />}
           {pg.showLabel !== false && <span className={`${styles.title} ${styles.pageLabel}`}>{pg.label}</span>}
         </button>
-      ))}
-      {hasLinks && links.map((l) => (
-        <a
+  );
+  const renderLink = (l) => (
+      <a
           key={l.id}
           href={l.href}
           className={`${styles.pill} ${styles.pagePill} ${styles.linkPill} ${l.icon && !l.showLabel ? styles.iconOnly : ''}`}
@@ -108,8 +111,43 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
           {l.icon && <Icon body={l.icon} size={15} className={styles.pillIcon} />}
           {l.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{l.label}</span>}
         </a>
+  );
+  // topBar.resume: opens the reader where this reader was, or at the start.
+  const renderResume = () => (resume ? (
+    <button
+      key="resume"
+      type="button"
+      className={`${styles.pill} ${styles.pagePill} ${resume.icon && !resume.showLabel ? styles.iconOnly : ''}`}
+      data-top-resume
+      data-has-icon={resume.icon ? '' : undefined}
+      aria-label={resume.label}
+      title={resume.label}
+      onClick={() => onResume && onResume()}
+    >
+      {resume.icon && <Icon body={resume.icon} size={15} className={styles.pillIcon} />}
+      {resume.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{resume.label}</span>}
+    </button>
+  ) : null);
+
+  return (
+    <div ref={barRef} className={styles.bar} data-feeds>
+      {(sources || []).map(src => (
+        <FeedPill
+          key={src.id}
+          source={src}
+          hidden={hidden.has(src.id)}
+          onToggle={() => onToggleSource && onToggleSource(src.id)}
+          viewState={viewState}
+          showCount={showCount}
+        />
       ))}
-      {subscribe && <Subscribe config={subscribe} />}
+      {buttonOrder.map((k) => {
+        if (k === 'resume') return renderResume();
+        if (k === 'subscribe') return subscribe ? <Subscribe key="subscribe" config={subscribe} /> : null;
+        if (k.startsWith('page:')) { const pg = pages.find((p) => `page:${p.id}` === k); return pg ? renderPage(pg) : null; }
+        if (k.startsWith('link:')) { const l = links.find((x) => `link:${x.id}` === k); return l ? renderLink(l) : null; }
+        return null;
+      })}
       {showAddButton !== false && <AddPill />}
       {controls}
       {intro && <div className={styles.intro} data-graph-intro dangerouslySetInnerHTML={{ __html: intro }} />}

@@ -480,7 +480,7 @@ ${reactJs}
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, toolbarConfig, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, topBarOrder, resumeTarget, toolbarConfig, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
 
     // The top bar's pages (settings.topBar.pages): buttons beside the source
     // pills that open an item in the reader. An item kept out of the graph
@@ -714,6 +714,12 @@ ${reactJs}
             pages: TOP_PAGES,
             links: TOP_BAR.links,
             subscribe: TOP_BAR.subscribe,
+            resume: TOP_BAR.resume,
+            order: topBarOrder(TOP_BAR),
+            onResume: function () {
+              var it = resumeTarget(feed.items || [], viewState && viewState.state ? viewState.state.reading : null, TOP_BAR);
+              if (it && (!selectedRef.current || selectedRef.current.id !== it.id)) selectArticle(it);
+            },
             showAddButton: TOP_BAR.addFeed,
             showSources: TOP_BAR.showSourcePills,
             intro: window.PP_INTRO_HTML || '',

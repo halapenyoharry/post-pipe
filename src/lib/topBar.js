@@ -19,8 +19,21 @@
 //               "links": [ { "id": "support", "label": "Support", "href": "https://...", "icon": "<path .../>", "newTab": true } ],
 //               "subscribe": { "action": "/api/subscribe", "label": "Notify me", "icon": "<path .../>" },
 //               "addFeed": false, "showSourcePills": false }
+//
+// resume: a button that opens the reader where this reader was: the item
+// they read most recently (the last one with reading progress, by its last
+// touch in the view state), else the site's start (an item id or slug), else
+// the first item. The top bar's own pages (an about page, say) and link
+// items never count as where the reader was. The reader itself returns to
+// the place in the item it was left at.
+//   "resume": { "label": "read", "icon": "<path .../>", "start": "<item id or slug>" }
+// order: the buttons' order, by id ("resume", a page's id, a link's id,
+// "subscribe"); any left out follow in the default order (resume, pages,
+// links, subscribe).
+//   "order": ["resume", "coffee", "about", "subscribe"]
 
 const { siteIcon } = require('./icons');
+const { isLinkItem } = require('./linkNode');
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
@@ -50,7 +63,60 @@ function topBarConfig(settings) {
       const label = str(l.label) || str(l.id);
       return { id: str(l.id) || `link-${i + 1}`, label, href: safeHref(l.href), icon, newTab: l.newTab === true, showLabel: !icon || l.showLabel === true };
     });
-  return { pages, links, subscribe: subscribeConfig(t.subscribe), addFeed: t.addFeed !== false, showSourcePills: t.showSourcePills !== false };
+  return {
+    pages, links, subscribe: subscribeConfig(t.subscribe), addFeed: t.addFeed !== false, showSourcePills: t.showSourcePills !== false,
+    resume: resumeConfig(t.resume),
+    order: Array.isArray(t.order) ? t.order.map(str).filter(Boolean) : [],
+  };
+}
+
+// topBar.resume with its defaults, or null when the site has none.
+function resumeConfig(v) {
+  if (!v || typeof v !== 'object') return null;
+  const icon = siteIcon(v.icon);
+  return { id: 'resume', label: str(v.label) || 'read', icon, showLabel: !icon || v.showLabel === true, start: str(v.start) };
+}
+
+// The top bar's buttons in order: keys 'resume', 'page:<id>', 'link:<id>',
+// 'subscribe', those named in config.order first, then the rest in the
+// default order. Only buttons the config has.
+function topBarOrder(config) {
+  const c = config || {};
+  const all = [];
+  if (c.resume) all.push('resume');
+  for (const p of c.pages || []) all.push(`page:${p.id}`);
+  for (const l of c.links || []) all.push(`link:${l.id}`);
+  if (c.subscribe) all.push('subscribe');
+  const keyOf = (id) => (id === 'resume' || id === 'subscribe') ? id
+    : all.includes(`page:${id}`) ? `page:${id}` : all.includes(`link:${id}`) ? `link:${id}` : null;
+  const out = [];
+  for (const id of c.order || []) { const k = keyOf(id); if (k && all.includes(k) && !out.includes(k)) out.push(k); }
+  for (const k of all) if (!out.includes(k)) out.push(k);
+  return out;
+}
+
+// Where the resume button opens the reader (see resume above). items: the
+// feed's items; reading: the view state's reading memory (id -> { at, max,
+// scroll, t }); config: topBarConfig's result.
+function resumeTarget(items, reading, config) {
+  const list = Array.isArray(items) ? items : [];
+  const pageIds = new Set(((config && config.pages) || []).map((p) => p.id));
+  const isPage = (it) => pageIds.has(it.id) || pageIds.has(slugOf(it));
+  const isLink = (it) => isLinkItem(it);
+  const eligible = list.filter((it) => it && it.id && !isPage(it) && !isLink(it));
+  const mem = reading && typeof reading === 'object' ? reading : {};
+  let best = null, bestT = -Infinity;
+  for (const it of eligible) {
+    const r = mem[it.id];
+    if (!r) continue;
+    const read = Number(r.max) > 0 || Number(r.at) > 0 || Number(r.scroll) > 0;
+    const t = Number(r.t);
+    if (read && Number.isFinite(t) && t > bestT) { bestT = t; best = it; }
+  }
+  if (best) return best;
+  const start = config && config.resume && config.resume.start;
+  if (start) { const s = eligible.find((it) => it.id === start || slugOf(it) === start); if (s) return s; }
+  return eligible[0] || null;
 }
 
 // topBar.subscribe: an email sign-up, off unless action is set. An icon
@@ -146,4 +212,4 @@ function graphFeed(feed, config) {
   };
 }
 
-module.exports = { topBarConfig, findItem, resolvePages, graphFeed, slugOf, safeHref, subscribeConfig, subscribeResult, subscribe };
+module.exports = { topBarConfig, findItem, resolvePages, graphFeed, slugOf, safeHref, subscribeConfig, subscribeResult, subscribe, resumeConfig, topBarOrder, resumeTarget };
