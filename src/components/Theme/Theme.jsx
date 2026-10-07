@@ -24,7 +24,8 @@ export function Theme({ settings, viewState }) {
     return () => { if (mq.removeEventListener) mq.removeEventListener('change', on); else mq.removeListener(on); };
   }, []);
   const name = themeName(settings, viewState && viewState.preference ? viewState.preference('theme') : null);
-  const mode = themeMode(name, viewState && viewState.preference ? viewState.preference('mode') : null, prefersDark);
+  const siteMode = settings && settings.theme && settings.theme.mode;
+  const mode = themeMode(name, viewState && viewState.preference ? viewState.preference('mode') : null, prefersDark, siteMode);
   const cover = openingConfig(settings);
   const page = cover && cover.ground === 'dark' ? 'dark' : mode;
   useEffect(() => {

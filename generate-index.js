@@ -455,7 +455,8 @@ window.PP_INTRO_HTML = ${JSON.stringify(introHtml(introConfig(SETTINGS), (md) =>
     var name = themes[p.theme] ? p.theme : (S.theme && themes[S.theme.name] ? S.theme.name : 'default');
     var modes = themes[name];
     var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true;
-    var mode = modes.indexOf(p.mode) >= 0 ? p.mode : (modes.length === 1 ? modes[0] : (dark ? 'dark' : 'light'));
+    var siteMode = S.theme && modes.indexOf(S.theme.mode) >= 0 ? S.theme.mode : null;
+    var mode = modes.indexOf(p.mode) >= 0 ? p.mode : (modes.length === 1 ? modes[0] : (siteMode || (dark ? 'dark' : 'light')));
     // A cover with a dark ground (settings.opening) keeps the page dark; the
     // reader's own mode is kept for the reader (src/components/Theme).
     var o = S.opening || {};

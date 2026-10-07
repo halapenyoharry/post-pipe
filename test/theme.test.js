@@ -15,3 +15,11 @@ test('a two-mode theme follows the device unless the viewer picks', () => {
   assert.strictEqual(themeMode('sketchbook', 'light', true), 'light');
   assert.strictEqual(themeMode('default', 'light', false), 'dark');
 });
+
+test('settings.theme.mode is the site default for a two-mode theme; the viewer still wins', () => {
+  assert.strictEqual(themeMode('sketchbook', null, false, 'dark'), 'dark');
+  assert.strictEqual(themeMode('sketchbook', null, true, 'light'), 'light');
+  assert.strictEqual(themeMode('sketchbook', 'light', true, 'dark'), 'light');
+  assert.strictEqual(themeMode('sketchbook', null, true, 'sepia'), 'dark');
+  assert.strictEqual(themeMode('default', null, false, 'light'), 'dark');
+});
