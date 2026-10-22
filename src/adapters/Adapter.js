@@ -9,7 +9,7 @@
 // The aggregator combines outputs from multiple adapters into one corpus.
 //
 // Implementations live alongside this file:
-//   - LocalFolderAdapter.js   (the user's content folder, e.g. ~/Posts/)
+//   - LocalFolderAdapter.js   (the user's content folder, e.g. items/)
 //   - RssAdapter.js           (future)
 //   - AtomAdapter.js          (future)
 //   - JsonFeedAdapter.js      (future)
@@ -35,7 +35,7 @@
 /**
  * @typedef {Object} FeedMeta
  * Metadata about the source itself (not its items).
- *   id           — stable identifier (e.g. 'local://~/Posts' or 'https://x.com/feed.xml')
+ *   id           — stable identifier (e.g. 'local://items' or 'https://x.com/feed.xml')
  *   title        — display name
  *   home_page_url — optional; for color detection in a later step
  *   favicon      — optional

@@ -509,7 +509,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
-  let authorName = (settings?.author?.name || settings?.author?.display || 'harold young').toLowerCase();
+  let authorName = (settings?.author?.name || settings?.author?.display || '').replace(/\s*\[humxn\]/i, '').trim().toLowerCase();
   let authorLink = settings?.author?.url;
 
   if (article.authors && article.authors.length > 0 && article.authors[0].name) {
@@ -699,7 +699,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               <div className={styles.articleKicker}>{header.kicker}</div>
             )}
             <h1 className={styles.articleTitle}>{article.title || article.label}</h1>
-            {header.byline && (
+            {header.byline && authorName && (
               <div className={styles.articleByline}>
                 by {authorLink ? (
                   <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
@@ -745,7 +745,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <span className={styles.pillIcon}><Icon body={iconBody('bookmark')} size={18} /></span>
           <span className={styles.pillLabel}>
             <span className={styles.pillTitle}>{article.title || article.label}</span>
-            <span className={styles.pillAuthor}>by {authorName}</span>
+            {authorName && <span className={styles.pillAuthor}>by {authorName}</span>}
           </span>
           <span className={styles.pillAction}>Restore</span>
         </div>

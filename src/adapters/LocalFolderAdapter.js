@@ -1,5 +1,5 @@
 // LocalFolderAdapter — produces JSON Feed items from a user-pointed content
-// folder (default: ~/Posts/).
+// folder.
 //
 // Wraps the lower-level folder walker in ingest.js (which produces project-
 // specific `Content` objects) and turns those into normalized JSON Feed
@@ -14,7 +14,7 @@ const fs   = require('fs');
 const path = require('path');
 const { marked } = require('marked');
 
-const { ingestFolder } = require('../../ingest');
+const { ingestFolder, siteAuthor } = require('../../ingest');
 const { stripFrontMatter, commitTimes } = require('../lib/frontMatter');
 const { redirectPage } = require('../lib/linkNode');
 
@@ -22,13 +22,15 @@ const ID = 'local';
 
 /**
  * @param {{
- *   id: string,            // OPML xmlUrl, e.g. 'local://~/Posts'
+ *   id: string,            // OPML xmlUrl, e.g. 'local://items'
  *   title: string,         // display name for the feed
  *   path: string,          // filesystem path or ~/-prefixed
  *   pagesBase: string,     // canonical site URL (for generating per-item URLs)
  *   coversDir: string,     // where to copy cover images for the static site
  *   pagesDir?: string      // where to write per-item HTML pages
  *   rights?: object        // settings.rights, shown on every page
+ *   settings?: object      // site settings (for author fallback)
+ *   author?: string        // explicit default author
  * }} config
  * @returns {Promise<{items, feedMeta}>}
  */
@@ -39,7 +41,11 @@ async function load(config) {
     fs.mkdirSync(coversDir, { recursive: true });
   }
 
-  const { contents } = ingestFolder(rootPath);
+  const defaultAuthor = config.author !== undefined
+    ? String(config.author || '').replace(/\s*\[humxn\]/i, '').trim().toLowerCase()
+    : siteAuthor(config.settings);
+
+  const { contents } = ingestFolder(rootPath, { settings: config.settings, author: config.author });
   
   const hiddenSlugs = new Set();
   const visibleContents = [];
@@ -60,7 +66,7 @@ async function load(config) {
       c.connected_to = c.connected_to.filter(slug => !hiddenSlugs.has(slug));
     }
     generateItemPage(c, rootPath, pagesDir, hiddenSlugs, config.rights);
-    return contentToItem(c, rootPath, pagesBase, coversDir, config.commits || {});
+    return contentToItem(c, rootPath, pagesBase, coversDir, config.commits || {}, defaultAuthor);
   });
 
   return {
@@ -77,7 +83,7 @@ async function load(config) {
 // existing extension fields. Field shapes match the legacy output exactly
 // so this adapter is a drop-in for the inlined loadLocalContent() that
 // used to live in generate-index.js.
-function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}) {
+function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, defaultAuthor = '') {
   const hideMeta = commitSettings.hideMeta !== false;
   const isTitleOnly = c.posted === 'title';
   const imageUrl = copyCoverIfPresent(c, rootPath, coversDir);
@@ -85,6 +91,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}) {
   const bucket   = statusBucket(c);
 
   const tags = c.tags || [];
+  const itemAuthor = (c.author ? c.author.replace(/\s*\[humxn\]/i, '').trim() : defaultAuthor).toLowerCase();
 
   return {
     id: pagesUrl,
@@ -96,8 +103,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}) {
     image: imageUrl,
     date_published: c.written ? toIsoDate(c.written) : undefined,
     reading_time: c.reading_time || '',
-    author: (c.author ? c.author.replace(/\s*\[humxn\]/i, '').trim() : 'harold young').toLowerCase(),
-    authors: [{ name: (c.author ? c.author.replace(/\s*\[humxn\]/i, '').trim() : 'harold young').toLowerCase(), url: c.syndication?.canonical || pagesUrl }],
+    author: itemAuthor,
+    authors: itemAuthor ? [{ name: itemAuthor, url: c.syndication?.canonical || pagesUrl }] : [],
     tags,
     series: c.series || '',
     series_part: c.series_part || null,

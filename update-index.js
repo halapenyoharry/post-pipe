@@ -1,22 +1,26 @@
-require('dotenv').config({ path: require('path').join(__dirname, 'auth', '.env') });
 const fs = require('fs');
 const path = require('path');
+const { siteRoot, loadSiteEnv } = require('./src/lib/siteRoot');
+
+const SITE_ROOT = siteRoot();
+loadSiteEnv(SITE_ROOT);
+
 const { pushFile } = require('./platforms/github-pages.js');
 
 async function main() {
   console.log('Pushing feed.json...');
-  const feedContent = fs.readFileSync(path.join(__dirname, '_site', 'feed.json'));
+  const feedContent = fs.readFileSync(path.join(SITE_ROOT, '_site', 'feed.json'));
   await pushFile('feed.json', feedContent);
 
   console.log('Pushing index.html...');
-  const indexContent = fs.readFileSync(path.join(__dirname, '_site', 'index.html'), 'utf8');
+  const indexContent = fs.readFileSync(path.join(SITE_ROOT, '_site', 'index.html'), 'utf8');
   await pushFile('index.html', indexContent);
   
   console.log('Done.');
 }
 
 async function pushCovers() {
-  const coversDir = path.join(__dirname, '_site', 'covers');
+  const coversDir = path.join(SITE_ROOT, '_site', 'covers');
   if (!fs.existsSync(coversDir)) return;
   
   const files = fs.readdirSync(coversDir);

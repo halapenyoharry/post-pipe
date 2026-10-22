@@ -9,7 +9,7 @@
 //
 // `layer` is the toggle/color axis: 'authored' | 'tag' | 'topology' | 'sequence'
 // | 'containment'.
-// Authored edges are the ones Harold wrote by hand; inferred ones are derived
+// Authored edges are the ones the author wrote by hand; inferred ones are derived
 // from shared vocabulary. They are deliberately separable.
 
 function slugOf(item) {

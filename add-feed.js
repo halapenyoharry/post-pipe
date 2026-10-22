@@ -17,6 +17,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { siteRoot } = require('./src/lib/siteRoot');
 
 function parseArgs(argv) {
   const out = { url: '', title: '', color: '' };
@@ -26,6 +27,18 @@ function parseArgs(argv) {
     else if (!arg.startsWith('--'))   out.url = arg;
   }
   return out;
+}
+
+function resolveOpmlPath(site) {
+  const settingsPath = path.join(site, 'settings.json');
+  let opmlRel = 'feeds.opml';
+  if (fs.existsSync(settingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      if (settings && settings.feeds_opml_path) opmlRel = settings.feeds_opml_path;
+    } catch (_) {}
+  }
+  return path.resolve(site, opmlRel);
 }
 
 function main() {
@@ -38,7 +51,8 @@ function main() {
   try { new URL(url); }
   catch { console.error(`Invalid URL: ${url}`); process.exit(1); }
 
-  const opmlPath = path.join(__dirname, 'feeds.opml');
+  const site = siteRoot();
+  const opmlPath = resolveOpmlPath(site);
   if (!fs.existsSync(opmlPath)) {
     console.error(`feeds.opml not found at ${opmlPath}`);
     process.exit(1);
@@ -47,7 +61,7 @@ function main() {
   const existing = fs.readFileSync(opmlPath, 'utf8');
   if (existing.includes(`xmlUrl="${url}"`)) {
     console.log(`Already present in feeds.opml: ${url}`);
-    runBuild();
+    runBuild(site);
     return;
   }
 
@@ -59,14 +73,15 @@ function main() {
   fs.writeFileSync(opmlPath, updated);
   console.log(`Added to feeds.opml: ${label} (${url})`);
 
-  runBuild();
+  runBuild(site);
 }
 
-function runBuild() {
+function runBuild(site) {
   console.log('Running generate-index.js...');
   try {
     execSync('node generate-index.js', {
       cwd: __dirname,
+      env: { ...process.env, POSTPIPE_SITE: site },
       stdio: 'inherit',
     });
   } catch (err) {

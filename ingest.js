@@ -1,5 +1,5 @@
 // ingest.js
-// Walks a content root (e.g. ~/Posts), produces Content[] — substrate-agnostic,
+// Walks a content root, produces Content[] — substrate-agnostic,
 // metadata-graceful. Each folder becomes one Content object regardless of how
 // much metadata is filled in.
 
@@ -162,7 +162,15 @@ function findMedia(dir, files) {
 
 // ─── Content builders ───────────────────────────────────────────────────────
 
-function buildFromFrontmatterJson(id, fm, files, dir) {
+function cleanAuthor(a) {
+  return String(a || '').replace(/\s*\[humxn\]/i, '').trim().toLowerCase();
+}
+
+function siteAuthor(settings) {
+  return cleanAuthor(settings?.author?.name || settings?.author?.display || '');
+}
+
+function buildFromFrontmatterJson(id, fm, files, dir, defaultAuthor = '') {
   const substrate = detectSubstrate(files, fm.idea?.substrate);
   const body = findBody(dir, files, fm.body?.file);
   return {
@@ -179,7 +187,7 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
     written:        fm.meta?.written || null,
     updated:        fm.meta?.updated || null,
     reading_time:   fm.meta?.reading_time || null,
-    author:         (fm.meta?.author || 'harold young').replace(/\s*\[humxn\]/i, '').trim().toLowerCase(),
+    author:         cleanAuthor(fm.meta?.author) || defaultAuthor,
     tags:           fm.tags || [],
     series:         fm.series || null,
     series_part:    fm.series_part ?? null,
@@ -206,7 +214,7 @@ function buildFromFrontmatterJson(id, fm, files, dir) {
   };
 }
 
-function buildFromQmd(id, yaml, files, dir) {
+function buildFromQmd(id, yaml, files, dir, defaultAuthor = '') {
   return {
     id,
     kind:           'essay',
@@ -221,7 +229,7 @@ function buildFromQmd(id, yaml, files, dir) {
     written:        yaml.publish_date || null,
     updated:        yaml.updated_date || null,
     reading_time:   yaml.reading_time || null,
-    author:         yaml.author || 'harold young',
+    author:         yaml.author || defaultAuthor,
     tags:           yaml.tags || [],
     series:         yaml.series || null,
     series_part:    yaml.series_part ?? null,
@@ -247,7 +255,7 @@ function buildFromQmd(id, yaml, files, dir) {
   };
 }
 
-function buildFromUnstructured(id, files, dir) {
+function buildFromUnstructured(id, files, dir, defaultAuthor = '') {
   const substrate = detectSubstrate(files, null);
   const title = id.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   return {
@@ -264,7 +272,7 @@ function buildFromUnstructured(id, files, dir) {
     written:        null,
     updated:        null,
     reading_time:   null,
-    author:         'harold young',
+    author:         defaultAuthor,
     tags:           [],
     series:         null,
     series_part:    null,
@@ -306,7 +314,10 @@ function withFrontMatter(c, data) {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-function ingestFolder(rootPath) {
+function ingestFolder(rootPath, options = {}) {
+  const defaultAuthor = options.author !== undefined
+    ? cleanAuthor(options.author)
+    : siteAuthor(options.settings);
   const resolved = rootPath.startsWith('~')
     ? path.join(process.env.HOME, rootPath.slice(1))
     : path.resolve(rootPath);
@@ -326,20 +337,20 @@ function ingestFolder(rootPath) {
 
     const fm = readFrontmatterJson(dir);
     if (fm) {
-      const c = buildFromFrontmatterJson(entry.name, fm, files, dir);
+      const c = buildFromFrontmatterJson(entry.name, fm, files, dir, defaultAuthor);
       const own = readBodyParts(dir, c.body);
       contents.push(asLinkPiece(c, { ...(own.data || {}), ...fm }, c.body ? (own.body ?? 'text') : ''));
       continue;
     }
 
     const yaml = readQmdFrontmatter(dir);
-    if (yaml) { contents.push(buildFromQmd(entry.name, yaml, files, dir)); continue; }
+    if (yaml) { contents.push(buildFromQmd(entry.name, yaml, files, dir, defaultAuthor)); continue; }
 
-    const c = buildFromUnstructured(entry.name, files, dir);
+    const c = buildFromUnstructured(entry.name, files, dir, defaultAuthor);
     const own = readBodyParts(dir, c.body);
     contents.push(own.data ? asLinkPiece(withFrontMatter(c, own.data), own.data, own.body) : c);
   }
   return { root: resolved, contents };
 }
 
-module.exports = { ingestFolder, detectSubstrate };
+module.exports = { ingestFolder, detectSubstrate, siteAuthor };

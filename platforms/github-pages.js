@@ -2,27 +2,36 @@
 // Push self-contained articles to GitHub Pages via the Contents API
 // Flat structure: {slug}.html at the repo root. Everything is baked into the HTML.
 
-require('dotenv').config({ path: require('path').join(__dirname, '..', 'auth', '.env') });
 const path = require('path');
 const fs   = require('fs');
+const { siteRoot, loadSiteEnv } = require('../src/lib/siteRoot');
+
+loadSiteEnv(siteRoot());
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_OWNER = process.env.GITHUB_OWNER || 'halapenyoharry';
-const GITHUB_REPO  = process.env.GITHUB_REPO  || 'haroldyoung-human-posts';
-const PAGES_BASE   = `https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}`;
+const GITHUB_OWNER = process.env.GITHUB_OWNER;
+const GITHUB_REPO  = process.env.GITHUB_REPO;
+const PAGES_BASE   = GITHUB_OWNER && GITHUB_REPO ? `https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}` : '';
 
 // ─── Push a single file to the repo ──────────────────────────────────────────
 
 async function pushFile(repoPath, content) {
-  if (!GITHUB_TOKEN) throw new Error('GITHUB_TOKEN missing from auth/.env');
+  const token = process.env.GITHUB_TOKEN || GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER || GITHUB_OWNER;
+  const repo  = process.env.GITHUB_REPO  || GITHUB_REPO;
 
-  const apiUrl  = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`;
+  if (!token) throw new Error('GITHUB_TOKEN missing from auth/.env');
+  if (!owner) throw new Error('GITHUB_OWNER environment variable is required when publishing to GitHub Pages');
+  if (!repo)  throw new Error('GITHUB_REPO environment variable is required when publishing to GitHub Pages');
+
+  const pagesBase = `https://${owner}.github.io/${repo}`;
+  const apiUrl  = `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}`;
   const encoded = Buffer.from(content).toString('base64');
 
   // Check if file exists (need SHA for update)
   let sha;
   const check = await fetch(apiUrl, {
-    headers: { Authorization: `token ${GITHUB_TOKEN}`, 'User-Agent': 'post-pipe' }
+    headers: { Authorization: `token ${token}`, 'User-Agent': 'post-pipe' }
   });
   if (check.ok) {
     sha = (await check.json()).sha;
@@ -34,7 +43,7 @@ async function pushFile(repoPath, content) {
   const res = await fetch(apiUrl, {
     method:  'PUT',
     headers: {
-      Authorization:  `token ${GITHUB_TOKEN}`,
+      Authorization:  `token ${token}`,
       'Content-Type': 'application/json',
       'User-Agent':   'post-pipe',
     },
@@ -46,7 +55,7 @@ async function pushFile(repoPath, content) {
     throw new Error(`GitHub API error pushing ${repoPath}: ${err}`);
   }
 
-  return `${PAGES_BASE}/${repoPath}`;
+  return `${pagesBase}/${repoPath}`;
 }
 
 // ─── Push a self-contained article ───────────────────────────────────────────

@@ -6,7 +6,10 @@
 const fs   = require('fs');
 const path = require('path');
 
-require('dotenv').config({ path: path.join(__dirname, 'auth/.env') });
+const { siteRoot, loadSiteEnv } = require('./src/lib/siteRoot');
+
+const SITE_ROOT    = siteRoot();
+loadSiteEnv(SITE_ROOT);
 
 const LocalFolderAdapter = require('./src/adapters/LocalFolderAdapter');
 const RssAdapter         = require('./src/adapters/RssAdapter');
@@ -15,15 +18,6 @@ const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
 const { loadCorpus }     = require('./src/aggregator');
 const { parseOpml }      = require('./src/lib/opml');
 
-function expandHome(p) {
-  if (!p) return p;
-  if (p.startsWith('~')) {
-    return path.resolve(path.join(process.env.HOME || '', p.slice(1)));
-  }
-  return path.resolve(p);
-}
-
-const SITE_ROOT    = process.env.POSTPIPE_SITE ? expandHome(process.env.POSTPIPE_SITE) : __dirname;
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
 const SITE_DIR     = path.join(SITE_ROOT, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
@@ -43,7 +37,7 @@ const ADAPTERS = {
 
 // Read feeds.opml and turn each entry into an {adapter, config} pair the
 // aggregator can consume. The local entry's xmlUrl is parsed as a path:
-// 'local://~/Posts' → '~/Posts'.
+// 'local://items' → 'items'.
 function buildAdapterEntries() {
   if (!fs.existsSync(OPML_PATH)) {
     throw new Error(`feeds.opml not found at ${OPML_PATH}`);
@@ -79,6 +73,7 @@ function configFor(entry) {
       visibilityDefault: SETTINGS.visibility?.default || 'public',
       commits: { hideMeta: SETTINGS.commits?.hideMeta !== false },
       rights: SETTINGS.rights || null,
+      settings: SETTINGS,
 
       path: localPath,
       pagesBase: PAGES_BASE,
@@ -250,12 +245,13 @@ function geminiConfigBlock() {
 // ─── Build feed.json ─────────────────────────────────────────────────────────
 
 function buildFeed(articles) {
+  const authorName = SETTINGS.author?.name || SETTINGS.author?.display || '';
   const f = {
     version: 'https://jsonfeed.org/version/1.1',
     title: SETTINGS.site.title,
     home_page_url: PAGES_BASE,
     feed_url: `${PAGES_BASE}/feed.json`,
-    authors: [{ name: SETTINGS.author.name }],
+    authors: authorName ? [{ name: authorName }] : [],
     items: articles,
   };
   if (SETTINGS.rights) {
@@ -819,7 +815,7 @@ async function main() {
   console.log(`Aggregated ${items.length} item(s) from ${sources.length} source(s)`);
   const withTodos = items.filter(a => (a.todos || []).length).length;
   if (withTodos) {
-    console.log(`  (${withTodos} flagged with TODO files — see ~/Posts/_MIGRATION-GUIDE.md + _METADATA-GUIDE.md)`);
+    console.log(`  (${withTodos} flagged with TODO files in the site's content folder)`);
   }
 
   // Nodes come only from content on disk. The engine never synthesizes items:
