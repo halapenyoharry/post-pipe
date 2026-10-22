@@ -10761,7 +10761,7 @@ function Jc({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 		year: "numeric",
 		month: "long",
 		day: "numeric"
-	}) : "", e.reading_time].filter(Boolean), Fe = (n?.author?.name || n?.author?.display || "harold young").toLowerCase(), Ie = n?.author?.url;
+	}) : "", e.reading_time].filter(Boolean), Fe = (n?.author?.name || n?.author?.display || "").replace(/\s*\[humxn\]/i, "").trim().toLowerCase(), Ie = n?.author?.url;
 	e.authors && e.authors.length > 0 && e.authors[0].name ? (Fe = e.authors.map((e) => e.name).join(", ").toLowerCase(), Ie = e.authors[0].url || e.canonical_url || e.url) : e.author && (Fe = e.author.replace(/\s*\[humxn\]/i, "").trim().toLowerCase(), Ie = e.canonical_url || e.url);
 	let Le = (0, qo.readerHeader)(n, e), Re = (0, mc.progressBarMode)(n), ze = (0, mc.allowDownload)(n), Be = (0, Ys.rightsLine)(n && n.rights);
 	return /* @__PURE__ */ m(f, { children: [
@@ -10982,7 +10982,7 @@ function Jc({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 									className: q.articleTitle,
 									children: e.title || e.label
 								}),
-								Le.byline && /* @__PURE__ */ m("div", {
+								Le.byline && Fe && /* @__PURE__ */ m("div", {
 									className: q.articleByline,
 									children: ["by ", Ie ? /* @__PURE__ */ p("a", {
 										href: Ie,
@@ -11046,7 +11046,7 @@ function Jc({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 					children: [/* @__PURE__ */ p("span", {
 						className: q.pillTitle,
 						children: e.title || e.label
-					}), /* @__PURE__ */ m("span", {
+					}), Fe && /* @__PURE__ */ m("span", {
 						className: q.pillAuthor,
 						children: ["by ", Fe]
 					})]
