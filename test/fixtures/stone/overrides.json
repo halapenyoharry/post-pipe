@@ -1,0 +1,10 @@
+{
+  "ignore": ["untagged"],
+  "pin": {
+    "ml": "Machine Learning",
+    "act-1": "Wrong Override For Act 1"
+  },
+  "same": [
+    ["ai", "artificial intelligence"]
+  ]
+}

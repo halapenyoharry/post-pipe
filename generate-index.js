@@ -810,7 +810,11 @@ function siteLang() {
 async function main() {
   console.log(`Site root: ${SITE_ROOT}`);
   const entries = buildAdapterEntries();
-  const { items, sources } = await loadCorpus(entries);
+  const { items, sources, stone } = await loadCorpus(entries, {
+    stone: SETTINGS.stone,
+    siteRoot: SITE_ROOT,
+    containment: SETTINGS.containment,
+  });
 
   console.log(`Aggregated ${items.length} item(s) from ${sources.length} source(s)`);
   const withTodos = items.filter(a => (a.todos || []).length).length;
@@ -876,6 +880,7 @@ async function main() {
     });
   }
   feed._sources = sources;
+  if (stone) feed._stone = stone;
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 

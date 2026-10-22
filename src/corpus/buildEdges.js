@@ -71,13 +71,20 @@ function buildEdges(items, options = {}) {
         itemContainers.push(container);
       } else {
         // Regular tag -> normal undirected tag edge
-        edges.push({
+        const edge = {
           source,
           target: `tag:${tag}`,
           directed: false,
           role: 'tagged',
           layer: 'tag',
-        });
+        };
+        const ref = Array.isArray(item._references)
+          ? item._references.find((r) => r && r.type === 'tag' && r.value === tag)
+          : null;
+        if (ref && ref.concept !== undefined && ref.weight !== undefined && ref.origin !== undefined) {
+          edge.attrs = { concept: ref.concept, weight: ref.weight, origin: ref.origin };
+        }
+        edges.push(edge);
       }
     }
 

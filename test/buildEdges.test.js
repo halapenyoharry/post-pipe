@@ -149,3 +149,16 @@ test('connected_to that is not a series neighbour stays', () => {
   assert.strictEqual(authored[0].target, 'https://example.test/ch3.html');
   assert.strictEqual(edges.filter((e) => e.layer === 'sequence').length, 2);
 });
+
+test('tag edges carry concept, weight, and origin attrs from _references when present', () => {
+  const items = [
+    item('a', {
+      tags: ['Artificial Intelligence'],
+      _references: [
+        { type: 'tag', value: 'Artificial Intelligence', concept: 'c_ai', weight: 1, origin: 'explicit' },
+      ],
+    }),
+  ];
+  const [edge] = buildEdges(items);
+  assert.deepStrictEqual(edge.attrs, { concept: 'c_ai', weight: 1, origin: 'explicit' });
+});

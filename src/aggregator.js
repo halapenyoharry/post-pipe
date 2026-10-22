@@ -2,12 +2,16 @@
 
 const { detectExplicitFeedColor, hashFeedColor } = require('./adapters/detectFeedColor');
 const { ColorCache }      = require('./lib/colorCache');
+const { runStonePhase }   = require('./lib/stone');
 
 /**
  * @param {Array<{ adapter, config }>} entries
  * @param {Object} [options]
  * @param {string} [options.colorCachePath]  defaults to './.feed-cache/colors.json'
- * @returns {Promise<{ items: JsonFeedItem[], sources: Source[] }>}
+ * @param {Object} [options.stone]           site stone settings (settings.stone)
+ * @param {string} [options.siteRoot]        site root path
+ * @param {Array}  [options.containment]     site containment entries (settings.containment)
+ * @returns {Promise<{ items: JsonFeedItem[], sources: Source[], stone?: Object }>}
  */
 async function loadCorpus(entries, options = {}) {
   const cache = new ColorCache(options.colorCachePath || './.feed-cache/colors.json');
@@ -51,6 +55,10 @@ async function loadCorpus(entries, options = {}) {
     cache.set(r.feedMeta.id || r.config.id, r.color);
   }
 
+  // Stone phase: translate tags across systems after colours are resolved and
+  // before provenance is stamped.
+  const stoneResult = await runStonePhase(results, options);
+
   // Phase 3: build the sources list (what FeedZ shows) and stamp every
   // item with its source provenance.
   const sources = results.map(({ adapter, config, feedMeta, color, items, ok }) => ({
@@ -82,7 +90,11 @@ async function loadCorpus(entries, options = {}) {
     return db - da;
   });
 
-  return { items: stamped, sources };
+  const out = { items: stamped, sources };
+  if (stoneResult && stoneResult.ran && stoneResult.stone) {
+    out.stone = stoneResult.stone;
+  }
+  return out;
 }
 
 module.exports = { loadCorpus };

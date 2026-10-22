@@ -1,0 +1,334 @@
+{
+  "schema": "rosetta-tagz/universe@1",
+  "generated": "2026-10-22T12:00:00.000Z",
+  "canon": {
+    "weights": { "freq": 0.35, "cover": 0.25, "trust": 0.25, "quality": 0.15 },
+    "prefer": "expanded"
+  },
+  "sourceWeights": {},
+  "stats": {
+    "tags": 5,
+    "concepts": 4,
+    "merged": 2,
+    "tagsFolded": 2,
+    "relations": 0,
+    "items": 4,
+    "itemRecords": 5,
+    "unmapped": 1,
+    "emergentTags": 2
+  },
+  "sources": [
+    { "name": "Posts", "color": "#2ecc71", "weight": 1, "items": 2, "tagged": 2 },
+    { "name": "ScienceWire", "color": "#3498db", "weight": 1, "items": 2, "tagged": 1 },
+    { "name": "Journal", "color": "#e67e22", "weight": 1, "items": 1, "tagged": 1 }
+  ],
+  "concepts": [
+    {
+      "id": "c_act_1",
+      "canonical": "act-1",
+      "pinned": true,
+      "locked": false,
+      "discovered": false,
+      "items": 1,
+      "n": 1,
+      "nEmergent": 0,
+      "sources": { "Posts": 1 },
+      "variants": [
+        {
+          "norm": "act 1",
+          "label": "act-1",
+          "forms": { "act-1": 1 },
+          "formsBySource": { "Posts": { "act-1": 1 } },
+          "count": 1,
+          "explicit": 1,
+          "bySource": { "Posts": 1 },
+          "acronym": false,
+          "tokens": 2
+        }
+      ],
+      "rank": [
+        {
+          "norm": "act 1",
+          "label": "act-1",
+          "score": 0.75,
+          "parts": { "freq": 1, "cover": 0.33, "trust": 0.33, "quality": 0.82 }
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c_ai",
+      "canonical": "Artificial Intelligence",
+      "pinned": false,
+      "locked": true,
+      "discovered": false,
+      "items": 2,
+      "n": 2,
+      "nEmergent": 1,
+      "sources": { "Posts": 1, "ScienceWire": 1, "Journal": 1 },
+      "variants": [
+        {
+          "norm": "artificial intelligence",
+          "label": "Artificial Intelligence",
+          "forms": { "artificial intelligence": 1 },
+          "formsBySource": { "Posts": { "artificial intelligence": 1 } },
+          "count": 1,
+          "explicit": 1,
+          "bySource": { "Posts": 1 },
+          "acronym": false,
+          "tokens": 2
+        },
+        {
+          "norm": "ai",
+          "label": "AI",
+          "forms": { "AI": 2, "A.I.": 1 },
+          "formsBySource": { "Posts": { "AI": 1 }, "ScienceWire": { "A.I.": 1 }, "Journal": { "AI": 1 } },
+          "count": 3,
+          "explicit": 3,
+          "bySource": { "Posts": 1, "ScienceWire": 1, "Journal": 1 },
+          "acronym": true,
+          "tokens": 1
+        }
+      ],
+      "rank": [
+        {
+          "norm": "artificial intelligence",
+          "label": "Artificial Intelligence",
+          "score": 0.84,
+          "parts": { "freq": 0.65, "cover": 0.67, "trust": 0.8, "quality": 1 }
+        },
+        {
+          "norm": "ai",
+          "label": "AI",
+          "score": 0.79,
+          "parts": { "freq": 1, "cover": 1, "trust": 1, "quality": 0.75 }
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c_machine_learning",
+      "canonical": "Machine Learning",
+      "pinned": true,
+      "locked": false,
+      "discovered": false,
+      "items": 3,
+      "n": 3,
+      "nEmergent": 1,
+      "sources": { "Posts": 1, "ScienceWire": 1, "Journal": 1 },
+      "variants": [
+        {
+          "norm": "machine learning",
+          "label": "Machine Learning",
+          "forms": { "machine-learning": 1, "Machine Learning": 1 },
+          "formsBySource": { "Posts": { "machine-learning": 1 }, "ScienceWire": { "Machine Learning": 1 } },
+          "count": 2,
+          "explicit": 2,
+          "bySource": { "Posts": 1, "ScienceWire": 1 },
+          "acronym": false,
+          "tokens": 2
+        },
+        {
+          "norm": "ml",
+          "label": "ML",
+          "forms": { "ML": 1 },
+          "formsBySource": { "Journal": { "ML": 1 } },
+          "count": 1,
+          "explicit": 1,
+          "bySource": { "Journal": 1 },
+          "acronym": true,
+          "tokens": 1
+        }
+      ],
+      "rank": [
+        {
+          "norm": "machine learning",
+          "label": "Machine Learning",
+          "score": 0.88,
+          "parts": { "freq": 1, "cover": 0.67, "trust": 0.67, "quality": 1 }
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c_unused",
+      "canonical": "Unused Concept",
+      "pinned": false,
+      "locked": false,
+      "discovered": false,
+      "items": 0,
+      "n": 0,
+      "nEmergent": 0,
+      "sources": {},
+      "variants": [],
+      "rank": [],
+      "links": []
+    },
+    {
+      "id": "u_neural_hardware",
+      "canonical": "neural hardware",
+      "pinned": false,
+      "locked": false,
+      "unmapped": true,
+      "items": 1,
+      "n": 0,
+      "nEmergent": 1,
+      "sources": { "ScienceWire": 1 },
+      "variants": [
+        {
+          "norm": "neural hardware",
+          "label": "neural hardware",
+          "forms": { "neural hardware": 1 },
+          "formsBySource": {},
+          "count": 1,
+          "bySource": { "ScienceWire": 1 },
+          "acronym": false,
+          "tokens": 2
+        }
+      ],
+      "rank": [
+        {
+          "norm": "neural hardware",
+          "label": "neural hardware",
+          "score": 1,
+          "parts": { "freq": 1, "cover": 1, "trust": 1, "quality": 1 }
+        }
+      ],
+      "links": []
+    }
+  ],
+  "relations": [],
+  "items": [
+    {
+      "key": "ScienceWire::wire-1",
+      "source": "ScienceWire",
+      "id": "wire-1",
+      "alsoIn": ["Posts"],
+      "title": "Thinking With Artificial Intelligence",
+      "excerpt": "A wire copy of the shared article about artificial intelligence and machine learning in modern research laboratories.",
+      "url": "https://www.EXAMPLE.test/shared-article/?utm=1#top",
+      "kind": "text",
+      "date": "2026-10-03T00:00:00Z",
+      "tags": [
+        {
+          "c": "c_act_1",
+          "w": 1,
+          "origin": "explicit",
+          "raw": [{ "l": "act-1", "n": "act 1", "s": "Posts" }],
+          "sys": ["Posts"],
+          "via": "known"
+        },
+        {
+          "c": "c_ai",
+          "w": 1,
+          "origin": "explicit",
+          "raw": [
+            { "l": "artificial intelligence", "n": "artificial intelligence", "s": "Posts" },
+            { "l": "AI", "n": "ai", "s": "Posts" },
+            { "l": "A.I.", "n": "ai", "s": "ScienceWire" }
+          ],
+          "sys": ["Posts", "ScienceWire"],
+          "via": "known"
+        },
+        {
+          "c": "c_machine_learning",
+          "w": 1,
+          "origin": "explicit",
+          "raw": [{ "l": "Machine Learning", "n": "machine learning", "s": "ScienceWire" }],
+          "sys": ["ScienceWire"],
+          "via": "known"
+        }
+      ]
+    },
+    {
+      "key": "Posts::https://example.test/post-2.html",
+      "source": "Posts",
+      "id": "https://example.test/post-2.html",
+      "alsoIn": [],
+      "title": "On Machine Learning and Systems",
+      "excerpt": "Exploring machine learning models and neural architectures.",
+      "url": "https://example.test/post-2.html",
+      "kind": "essay",
+      "date": "2026-10-02T00:00:00Z",
+      "tags": [
+        {
+          "c": "c_machine_learning",
+          "w": 1,
+          "origin": "explicit",
+          "raw": [{ "l": "machine-learning", "n": "machine learning", "s": "Posts" }],
+          "sys": ["Posts"],
+          "via": "known"
+        }
+      ]
+    },
+    {
+      "key": "ScienceWire::wire-2",
+      "source": "ScienceWire",
+      "id": "wire-2",
+      "alsoIn": [],
+      "title": "Breakthrough in Artificial Intelligence Hardware",
+      "excerpt": "Researchers studying artificial intelligence and machine learning report new neural hardware architectures.",
+      "url": "https://wire.test/orphan-1",
+      "kind": "text",
+      "date": "2026-10-04T00:00:00Z",
+      "tags": [
+        {
+          "c": "c_ai",
+          "w": 0.7,
+          "origin": "emergent",
+          "raw": [],
+          "sys": ["ScienceWire"],
+          "via": "known",
+          "why": "text mentions \"artificial intelligence\" ×2 (in title)"
+        },
+        {
+          "c": "c_machine_learning",
+          "w": 0.5,
+          "origin": "emergent",
+          "raw": [],
+          "sys": ["ScienceWire"],
+          "via": "known",
+          "why": "text mentions \"machine learning\" ×1"
+        },
+        {
+          "c": "u_neural_hardware",
+          "w": 0.5,
+          "origin": "discovered",
+          "raw": [],
+          "sys": ["ScienceWire"],
+          "via": "unmapped",
+          "why": "recurs in 2 of 4 items"
+        }
+      ]
+    },
+    {
+      "key": "Journal::j-1",
+      "source": "Journal",
+      "id": "j-1",
+      "alsoIn": [],
+      "title": "Review of Machine Learning",
+      "excerpt": "Annual review of machine learning and AI.",
+      "url": "https://journal.test/ml-review",
+      "kind": "text",
+      "date": "2026-10-05T00:00:00Z",
+      "tags": [
+        {
+          "c": "c_ai",
+          "w": 1,
+          "origin": "explicit",
+          "raw": [{ "l": "AI", "n": "ai", "s": "Journal" }],
+          "sys": ["Journal"],
+          "via": "known"
+        },
+        {
+          "c": "c_machine_learning",
+          "w": 1,
+          "origin": "explicit",
+          "raw": [{ "l": "ML", "n": "ml", "s": "Journal" }],
+          "sys": ["Journal"],
+          "via": "known"
+        }
+      ]
+    }
+  ]
+}

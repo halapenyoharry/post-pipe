@@ -1,0 +1,95 @@
+{
+  "systems": [
+    {
+      "id": "local://~/Posts",
+      "title": "Posts",
+      "color": "#2ecc71",
+      "items": [
+        {
+          "id": "https://example.test/post-1.html",
+          "url": "https://example.test/shared-article",
+          "title": "Thinking With Artificial Intelligence",
+          "content_html": "<p>Notes on <b>artificial intelligence</b> &amp; human memory.<script>bad()</script><style>body{}</style> &#39;quoted&#39; &#65;</p>",
+          "date_published": "2026-10-01T00:00:00Z",
+          "kind": "essay",
+          "tags": ["act-1", "artificial intelligence", "AI", "untagged"],
+          "_references": [
+            { "type": "image", "value": "covers/post-1.png" },
+            { "type": "tag", "value": "act-1" },
+            { "type": "tag", "value": "artificial intelligence" },
+            { "type": "tag", "value": "AI" },
+            { "type": "tag", "value": "untagged" }
+          ]
+        },
+        {
+          "id": "https://example.test/post-1.html",
+          "url": "https://example.test/post-1-dup.html",
+          "title": "Duplicate ID That Must Be Skipped",
+          "summary": "Duplicate",
+          "date_published": "2026-10-01T00:00:00Z",
+          "kind": "essay",
+          "tags": ["ignored-dup"]
+        },
+        {
+          "id": "https://example.test/post-2.html",
+          "url": "https://example.test/post-2.html",
+          "title": "On Machine Learning and Systems",
+          "summary": "Exploring machine learning models and neural architectures.",
+          "date_published": "2026-10-02T00:00:00Z",
+          "kind": "essay",
+          "tags": ["machine-learning"]
+        }
+      ]
+    },
+    {
+      "id": "https://wire.test/rss",
+      "title": "ScienceWire",
+      "color": "#3498db",
+      "items": [
+        {
+          "id": "wire-1",
+          "url": "https://www.EXAMPLE.test/shared-article/?utm=1#top",
+          "title": "Thinking With Artificial Intelligence",
+          "summary": "A wire copy of the shared article about artificial intelligence and machine learning in modern research laboratories.",
+          "date_published": "2026-10-03T00:00:00Z",
+          "kind": "text",
+          "tags": ["A.I.", "Machine Learning"]
+        },
+        {
+          "id": "wire-2",
+          "url": "https://wire.test/orphan-1",
+          "title": "Breakthrough in Artificial Intelligence Hardware",
+          "content_text": "Researchers studying artificial intelligence and machine learning report new neural hardware architectures.",
+          "date_published": "2026-10-04T00:00:00Z",
+          "kind": "text",
+          "tags": []
+        }
+      ]
+    },
+    {
+      "id": "https://journal.test/atom",
+      "title": "Journal",
+      "color": "#e67e22",
+      "items": [
+        {
+          "id": "j-1",
+          "url": "https://journal.test/ml-review",
+          "title": "Review of Machine Learning",
+          "summary": "Annual review of machine learning and AI.",
+          "date_published": "2026-10-05T00:00:00Z",
+          "kind": "text",
+          "tags": ["ML", "AI"]
+        },
+        {
+          "id": "j-unjoined",
+          "url": "",
+          "title": "Short note",
+          "summary": "Untranslated note.",
+          "date_published": "2026-10-06T00:00:00Z",
+          "kind": "text",
+          "tags": ["raw-only"]
+        }
+      ]
+    }
+  ]
+}
