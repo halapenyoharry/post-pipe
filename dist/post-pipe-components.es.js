@@ -18779,8 +18779,8 @@ function al({ article: e, onClose: t, settings: n, viewState: r, targetParagraph
 		year: "numeric",
 		month: "long",
 		day: "numeric"
-	}) : "", e.reading_time].filter(Boolean), Me = (n?.author?.name || n?.author?.display || "").replace(/\s*\[humxn\]/i, "").trim().toLowerCase(), Ne = n?.author?.url;
-	e.authors && e.authors.length > 0 && e.authors[0].name ? (Me = e.authors.map((e) => e.name).join(", ").toLowerCase(), Ne = e.authors[0].url || e.canonical_url || e.url) : e.author && (Me = e.author.replace(/\s*\[humxn\]/i, "").trim().toLowerCase(), Ne = e.canonical_url || e.url);
+	}) : "", e.reading_time].filter(Boolean), Me = (n?.author?.name || n?.author?.display || "").trim().toLowerCase(), Ne = n?.author?.url;
+	e.authors && e.authors.length > 0 && e.authors[0].name ? (Me = e.authors.map((e) => e.name).join(", ").toLowerCase(), Ne = e.authors[0].url || e.canonical_url || e.url) : e.author && (Me = e.author.trim().toLowerCase(), Ne = e.canonical_url || e.url);
 	let Pe = (0, is.readerHeader)(n, e), Fe = (0, Tc.progressBarMode)(n), Ie = (0, Tc.allowDownload)(n), Le = (0, oc.rightsLine)(n && n.rights);
 	return /* @__PURE__ */ (0, H.jsxs)(H.Fragment, { children: [
 		/* @__PURE__ */ (0, H.jsx)("div", {

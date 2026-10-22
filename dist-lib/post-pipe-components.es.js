@@ -10761,8 +10761,8 @@ function Jc({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 		year: "numeric",
 		month: "long",
 		day: "numeric"
-	}) : "", e.reading_time].filter(Boolean), Fe = (n?.author?.name || n?.author?.display || "").replace(/\s*\[humxn\]/i, "").trim().toLowerCase(), Ie = n?.author?.url;
-	e.authors && e.authors.length > 0 && e.authors[0].name ? (Fe = e.authors.map((e) => e.name).join(", ").toLowerCase(), Ie = e.authors[0].url || e.canonical_url || e.url) : e.author && (Fe = e.author.replace(/\s*\[humxn\]/i, "").trim().toLowerCase(), Ie = e.canonical_url || e.url);
+	}) : "", e.reading_time].filter(Boolean), Fe = (n?.author?.name || n?.author?.display || "").trim().toLowerCase(), Ie = n?.author?.url;
+	e.authors && e.authors.length > 0 && e.authors[0].name ? (Fe = e.authors.map((e) => e.name).join(", ").toLowerCase(), Ie = e.authors[0].url || e.canonical_url || e.url) : e.author && (Fe = e.author.trim().toLowerCase(), Ie = e.canonical_url || e.url);
 	let Le = (0, qo.readerHeader)(n, e), Re = (0, mc.progressBarMode)(n), ze = (0, mc.allowDownload)(n), Be = (0, Ys.rightsLine)(n && n.rights);
 	return /* @__PURE__ */ m(f, { children: [
 		/* @__PURE__ */ p("div", {
