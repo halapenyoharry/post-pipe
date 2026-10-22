@@ -23,7 +23,7 @@ const SITE = {
     graph: { artStateOpacity: 0, rootsFit: 'width' },
     title: {
       fit: 'width',
-      art: { lines: [{ x: 0.27, y: 0.45, width: 0.46, spans: [{ text: 'Elinor', size: 0.14 }] }, { x: 0.27, y: 0.5, width: 0.47, spans: [{ text: 'Jones', size: 0.13 }] }] },
+      art: { lines: [{ x: 0.27, y: 0.45, width: 0.46, spans: [{ text: 'Morning', size: 0.14 }] }, { x: 0.27, y: 0.5, width: 0.47, spans: [{ text: 'River', size: 0.13 }] }] },
       graph: { lines: [{ x: 0.1, y: 0.61, width: 0.75, spans: [{ text: 'The', size: 0.03, rise: 0.03 }, { text: ' Epic', size: 0.06 }] }] },
     },
   },
@@ -113,7 +113,7 @@ test('the graph is not shown in the art state when artStateOpacity is 0, and at 
 
 test('title fit width: each line scaled to its width as measured; the byline set to the last line width, under it', () => {
   const c = openingConfig(SITE);
-  // As drawn at their set sizes: Elinor 400 px, Jones 500 px, the graph line 700 px.
+  // As drawn at their set sizes: Morning 400 px, River 500 px, the graph line 700 px.
   const fitted = fitTitle(c.title, { art: [400, 500], graph: [700] }, ART.w);
   const k0 = (0.46 * 1045) / 400, k1 = (0.47 * 1045) / 500, kg = (0.75 * 1045) / 700;
   assert.ok(close(fitted.art.lines[0].spans[0].size, 0.14 * k0));

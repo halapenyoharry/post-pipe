@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const { bookmarkLabel, placedParagraph } = require('../src/lib/bookmarkPlace');
 
 test('a bookmark is named by its chapter and first words', () => {
-  assert.strictEqual(bookmarkLabel({ item: 'x/berry-thief.html', quote: 'No one called' }, 'Berry Thief'), 'Berry Thief · “No one called…”');
+  assert.strictEqual(bookmarkLabel({ item: 'x/a-walk.html', quote: 'The rain fell' }, 'A Walk'), 'A Walk · “The rain fell…”');
   assert.strictEqual(bookmarkLabel({ item: 'x/night-shift.html', para: 2 }), 'night shift · paragraph 3');
 });
 

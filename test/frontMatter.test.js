@@ -7,8 +7,8 @@ const { paragraphTexts } = require('../src/lib/paragraphMap');
 const BODY = 'First paragraph.\n\nSecond paragraph.\n\n---\n\nThird, after a break.\n';
 
 test('a leading YAML block is stripped and parsed', () => {
-  const r = splitFrontMatter('---\ntitle: Berry Thief\nstatus: drafted\n---\n\n' + BODY);
-  assert.deepStrictEqual(r.data, { title: 'Berry Thief', status: 'drafted' });
+  const r = splitFrontMatter('---\ntitle: A Walk\nstatus: drafted\n---\n\n' + BODY);
+  assert.deepStrictEqual(r.data, { title: 'A Walk', status: 'drafted' });
   assert.strictEqual(r.body, BODY);
 });
 

@@ -372,7 +372,7 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
 
 test('stone: real engine integration builds universe.json and merges concepts across forms', async (t) => {
   const envEngine = process.env.POSTPIPE_STONE_ENGINE;
-  const fallbackEngine = '/Users/harold/Projects/post-pipe/rosetta-tagz';
+  const fallbackEngine = path.join(__dirname, '..', 'rosetta-tagz');
   const engineDir = envEngine || fallbackEngine;
   const engineBin = path.join(engineDir, 'bin', 'rtz-build');
 

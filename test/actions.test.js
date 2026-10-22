@@ -7,8 +7,7 @@ const path = require('path');
 
 const { ACTIONS, defaultBindings, bindingsOf, resolve, isBound, usesGesture, resizeOn } = require('../src/lib/actions');
 
-// The table on epicofelinorjones.com (its settings.json), from Harold's
-// note of 2026-10-04.
+// An example site's table (its settings.json).
 const SITE = [
   { target: 'container', gesture: 'doubletap', action: 'container.toggle' },
   { target: 'space', gesture: 'doubletap', action: 'view.zoomInStep' },
@@ -57,7 +56,7 @@ test('collapseGesture still picks the gesture that opens a container', () => {
   assert.equal(resolve(other, 'container', 'tap'), 'container.toggle', 'anything else is the default, tap');
 });
 
-test('a site\'s rows go over the engine\'s: Harold\'s table', () => {
+test('a site\'s rows go over the engine\'s: an example site\'s table', () => {
   const t = bindingsOf({ collapseGesture: 'tap', bindings: SITE }, { warn: quiet });
   assert.equal(resolve(t, 'container', 'doubletap'), 'container.toggle');
   assert.equal(resolve(t, 'container', 'tap'), 'none', 'the site moved container.toggle to the double tap, so a single tap no longer opens');

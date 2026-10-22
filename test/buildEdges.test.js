@@ -52,9 +52,9 @@ test('tags and topology are separate layers with separate roles', () => {
 test('a series becomes an ordered path, not a cluster', () => {
   // The relation a serialized novel needs. Chapters arrive out of order.
   const items = [
-    item('ch3', { series: 'elinor', series_part: 3 }),
-    item('ch1', { series: 'elinor', series_part: 1 }),
-    item('ch2', { series: 'elinor', series_part: 2 }),
+    item('ch3', { series: 'series-a', series_part: 3 }),
+    item('ch1', { series: 'series-a', series_part: 1 }),
+    item('ch2', { series: 'series-a', series_part: 2 }),
   ];
   const seq = buildEdges(items).filter((e) => e.layer === 'sequence');
   assert.strictEqual(seq.length, 2, 'n chapters produce n-1 links, not n^2');

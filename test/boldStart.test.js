@@ -9,8 +9,8 @@ const bolded = (t) => boldStartSegments(t).filter((s) => s.bold).map((s) => s.te
 
 test('about the first half of each word is bold, at least one letter', () => {
   assert.deepStrictEqual([1, 2, 3, 4, 5, 8, 9].map(boldLength), [1, 1, 2, 2, 3, 4, 5]);
-  assert.deepStrictEqual(bolded('No one called her Elinor.'), ['N', 'on', 'cal', 'he', 'Eli']);
-  assert.deepStrictEqual(bolded("Eli didn't plan"), ['El', 'did', 'pl']);
+  assert.deepStrictEqual(bolded('The rain fell across London.'), ['Th', 'ra', 'fe', 'acr', 'Lon']);
+  assert.deepStrictEqual(bolded("Tea didn't boil"), ['Te', 'did', 'bo']);
   assert.deepStrictEqual(bolded('a I'), ['a', 'I']);
 });
 
@@ -20,7 +20,7 @@ test('numbers and punctuation are left alone', () => {
 
 test('the pieces join back to exactly the text', () => {
   const texts = [
-    'No one called her Elinor. Eli didn\'t plan on stealing an AI.',
+    'The rain fell across London. The kettle didn\'t boil on the stove.',
     '  spaced\tout\n\nlines ',
     '«Agarita», café — naïve; ’tis',
     '',

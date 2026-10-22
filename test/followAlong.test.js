@@ -8,17 +8,17 @@ const { sentenceSpans, wordAt, spanAt } = require('../src/lib/followAlong');
 const cut = (t, sp) => (sp ? t.slice(sp[0], sp[1]) : null);
 
 test('sentences end at their stop and keep closing quotes', () => {
-  const t = 'No one called her Elinor. "THERE YOU ARE!" she said. And then';
+  const t = 'The rain fell across London. "WATCH THE STEP!" the sign said. Along the way';
   assert.deepStrictEqual(sentenceSpans(t).map((sp) => cut(t, sp)),
-    ['No one called her Elinor.', '"THERE YOU ARE!"', 'she said.', 'And then']);
+    ['The rain fell across London.', '"WATCH THE STEP!"', 'the sign said.', 'Along the way']);
 });
 
 test('the sentence and word under an offset', () => {
-  const t = "Eli didn't plan on stealing an AI. Life is mostly made up of things.";
+  const t = "The kettle didn't whistle on the stove. Morning is mostly made up of light.";
   const at = (i) => { const r = spanAt(t, i); return [cut(t, r.sentence), cut(t, r.word)]; };
-  assert.deepStrictEqual(at(t.indexOf('didn')), ['Eli didn\'t plan on stealing an AI.', "didn't"]);
-  assert.deepStrictEqual(at(t.indexOf('stealing') + 3), ['Eli didn\'t plan on stealing an AI.', 'stealing']);
-  assert.deepStrictEqual(at(t.indexOf('mostly')), ['Life is mostly made up of things.', 'mostly']);
+  assert.deepStrictEqual(at(t.indexOf('didn')), ["The kettle didn't whistle on the stove.", "didn't"]);
+  assert.deepStrictEqual(at(t.indexOf('whistle') + 3), ["The kettle didn't whistle on the stove.", 'whistle']);
+  assert.deepStrictEqual(at(t.indexOf('mostly')), ['Morning is mostly made up of light.', 'mostly']);
 });
 
 test('a space or a stop has no word but still has its sentence', () => {

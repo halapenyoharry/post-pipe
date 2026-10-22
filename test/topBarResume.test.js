@@ -13,7 +13,7 @@ const items = [
 const cfg = topBarConfig({ topBar: {
   resume: { label: 'read', icon: '<path d="M1 1"/>', start: 'c1' },
   pages: [{ id: 'eoej-about', label: 'about', hideFromGraph: true }],
-  links: [{ id: 'coffee', label: 'coffee', href: 'https://example.org/coffee' }, { id: 'hy', label: 'harold young', href: 'haroldyoung/' }],
+  links: [{ id: 'coffee', label: 'coffee', href: 'https://example.org/coffee' }, { id: 'hy', label: 'author', href: 'author/' }],
   subscribe: { action: '/api/subscribe' },
   order: ['resume', 'coffee', 'eoej-about', 'hy', 'subscribe'],
 } });
