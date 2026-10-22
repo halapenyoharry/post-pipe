@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Example site</title>
+  </head>
+  <body>
+    <outline text="Example pieces" title="Example pieces" type="local" xmlUrl="local://pieces"/>
+  </body>
+</opml>

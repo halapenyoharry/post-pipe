@@ -1,0 +1,23 @@
+{
+  "title": "Spring in the Kitchen Garden",
+  "short_title": "Kitchen Garden",
+  "idea": {
+    "tldr": "Turning the soil in early spring and planting the first hardy greens before the last frost.",
+    "substrate": "essay"
+  },
+  "meta": {
+    "status": "published",
+    "written": "2026-03-12",
+    "reading_time": "2 min",
+    "author": "Example Author"
+  },
+  "tags": [
+    "outdoors",
+    "seasons",
+    "making"
+  ],
+  "connected_to": [
+    "river-bend"
+  ],
+  "posted": true
+}

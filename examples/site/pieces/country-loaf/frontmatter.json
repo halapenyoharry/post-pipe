@@ -1,0 +1,20 @@
+{
+  "title": "A Country Loaf",
+  "short_title": "Country Loaf",
+  "idea": {
+    "tldr": "Mixing flour, water, and salt in the evening so a slow overnight rise does most of the work.",
+    "substrate": "essay"
+  },
+  "meta": {
+    "status": "published",
+    "written": "2026-03-20",
+    "reading_time": "2 min",
+    "author": "Example Author"
+  },
+  "tags": [
+    "making",
+    "craft"
+  ],
+  "connected_to": [],
+  "posted": true
+}
