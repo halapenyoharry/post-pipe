@@ -27,6 +27,7 @@ import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOf
 import { countsByChapter, connectionEdges } from '../../lib/contributions';
 import { isLinkItem, linkOf, followLink } from '../../lib/linkNode';
 import { rightsOverCards } from '../../lib/rights';
+import { tagForms, tagFormsLines } from '../../lib/tagForms';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -3015,6 +3016,12 @@ export function GraphViewer({
         .attr('width', inkW + TAG.padding * 2)
         .attr('height', (inkBottom - inkTop) + TAG.padding * 2);
 
+      if (entry.formsEl) {
+        const formsX = inkW / 2 + TAG.padding + 8;
+        entry.formsEl.attr('x', formsX);
+        entry.formsEl.selectAll('tspan').attr('x', formsX);
+      }
+
       d._r = Math.hypot(inkW + TAG.padding * 2, (inkBottom - inkTop) + TAG.padding * 2) / 2;
     }
 
@@ -3082,7 +3089,32 @@ export function GraphViewer({
           .attr('rx', TAG.cornerRadius).attr('ry', TAG.cornerRadius)
           .attr('fill', 'var(--gv-' + (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') + ')')
           .attr('opacity', TAG.opacity);
-        const entry = { d, textEl, rectEl, lines, fontSize, lineH: effLineH };
+
+        let formsEl = null;
+        const formLines = d.type === 'tag'
+          ? tagFormsLines(tagForms(feedData._stone, d.label, feedData.items))
+          : [];
+        if (formLines.length) {
+          const formFontSize = Math.round(fontSize * 0.65);
+          const formLineH = formFontSize * 1.25;
+          formsEl = el.append('text')
+            .attr('class', 'tag-forms')
+            .attr('text-anchor', 'start')
+            .attr('dominant-baseline', 'central')
+            .style('font-family', TAG_FONT_FAMILY)
+            .style('font-size', formFontSize + 'px')
+            .style('font-weight', String(TAG_WEIGHT))
+            .style('fill', 'var(--text, #ccc)')
+            .style('pointer-events', 'none')
+            .style('display', 'none');
+          formLines.forEach((line, i) => {
+            formsEl.append('tspan')
+              .attr('y', (i - (formLines.length - 1) / 2) * formLineH)
+              .text(line);
+          });
+        }
+
+        const entry = { d, textEl, rectEl, formsEl, lines, fontSize, lineH: effLineH };
         tagBubbles.push(entry);
         fitBubble(entry);
 
@@ -3480,6 +3512,22 @@ export function GraphViewer({
     // Bubble click (tag, topology, or placeholder): highlight only — no
     // rearrangement, no simulation restart.
     let activeTag = null;
+    let hoveredTag = null;
+    function updateTagForms() {
+      nodes.select('.tag-forms')
+        .style('display', (d) => (d && (d.id === activeTag || d.id === hoveredTag) ? null : 'none'));
+    }
+    nodes.filter(d => d.type === 'tag')
+      .on('mouseenter', (event, d) => {
+        hoveredTag = d.id;
+        updateTagForms();
+      })
+      .on('mouseleave', (event, d) => {
+        if (hoveredTag === d.id) {
+          hoveredTag = null;
+          updateTagForms();
+        }
+      });
     nodes.filter(d => d.type !== 'article')
       .on('click', (event, d) => {
         event.stopPropagation();
@@ -3514,6 +3562,7 @@ export function GraphViewer({
           return sid === d.id || tid === d.id;
         });
       }
+      updateTagForms();
     }
 
     // A tap on the canvas (empty space, or an open container's hull): the
@@ -3530,6 +3579,7 @@ export function GraphViewer({
         nodes.classed('dimmed', false).classed('tag-active', false);
         articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
+        updateTagForms();
       }
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
     }
@@ -4281,8 +4331,10 @@ export function GraphViewer({
       focusNode(null);
       hideEdgeLabel();
       activeTag = null;
+      hoveredTag = null;
       hoveredIdRef.current = null;
       nodes.classed('dimmed', false).classed('tag-active', false);
+      updateTagForms();
       articleNodes.classed('dimmed', false).style('z-index', null);
       links.classed('highlighted', false);
       pinnedIdsRef.current.clear();
