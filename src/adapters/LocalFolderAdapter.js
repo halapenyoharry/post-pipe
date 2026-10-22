@@ -42,7 +42,7 @@ async function load(config) {
   }
 
   const defaultAuthor = config.author !== undefined
-    ? String(config.author || '').replace(/\s*\[humxn\]/i, '').trim().toLowerCase()
+    ? String(config.author || '').trim().toLowerCase()
     : siteAuthor(config.settings);
 
   const { contents } = ingestFolder(rootPath, { settings: config.settings, author: config.author });
@@ -91,7 +91,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, d
   const bucket   = statusBucket(c);
 
   const tags = c.tags || [];
-  const itemAuthor = (c.author ? c.author.replace(/\s*\[humxn\]/i, '').trim() : defaultAuthor).toLowerCase();
+  const itemAuthor = (c.author ? c.author.trim() : defaultAuthor).toLowerCase();
 
   return {
     id: pagesUrl,

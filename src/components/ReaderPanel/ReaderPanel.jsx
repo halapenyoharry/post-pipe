@@ -509,14 +509,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
-  let authorName = (settings?.author?.name || settings?.author?.display || '').replace(/\s*\[humxn\]/i, '').trim().toLowerCase();
+  let authorName = (settings?.author?.name || settings?.author?.display || '').trim().toLowerCase();
   let authorLink = settings?.author?.url;
 
   if (article.authors && article.authors.length > 0 && article.authors[0].name) {
     authorName = article.authors.map(a => a.name).join(', ').toLowerCase();
     authorLink = article.authors[0].url || article.canonical_url || article.url;
   } else if (article.author) {
-    authorName = article.author.replace(/\s*\[humxn\]/i, '').trim().toLowerCase();
+    authorName = article.author.trim().toLowerCase();
     authorLink = article.canonical_url || article.url;
   }
 

@@ -188,3 +188,38 @@ test('author fallback: piece with no author takes site author (name, else displa
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
 });
+
+test('author suffix kept: an author written as \'Harold Young [humxn]\' comes out as \'harold young [humxn]\'', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-author-humxn-'));
+  const contentDir = path.join(tmpRoot, 'items');
+  const coversDir = path.join(tmpRoot, 'covers');
+  const pagesDir = path.join(tmpRoot, 'pages');
+
+  try {
+    fs.mkdirSync(path.join(contentDir, 'with-author'), { recursive: true });
+    fs.writeFileSync(
+      path.join(contentDir, 'with-author', 'frontmatter.json'),
+      JSON.stringify({ title: 'Piece', meta: { author: 'Harold Young [humxn]' }, posted: true })
+    );
+
+    const { contents } = ingestFolder(contentDir);
+    assert.strictEqual(contents[0].author, 'harold young [humxn]');
+
+    const { items } = await LocalFolderAdapter.load({
+      id: 'local://items',
+      title: 'Items',
+      path: contentDir,
+      pagesBase: 'https://example.test',
+      coversDir,
+      pagesDir,
+      visibilityDefault: 'public',
+      settings: {},
+    });
+
+    assert.strictEqual(items[0].author, 'harold young [humxn]');
+    assert.strictEqual(items[0].authors[0].name, 'harold young [humxn]');
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+

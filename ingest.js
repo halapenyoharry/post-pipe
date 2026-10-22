@@ -163,7 +163,7 @@ function findMedia(dir, files) {
 // ─── Content builders ───────────────────────────────────────────────────────
 
 function cleanAuthor(a) {
-  return String(a || '').replace(/\s*\[humxn\]/i, '').trim().toLowerCase();
+  return String(a || '').trim().toLowerCase();
 }
 
 function siteAuthor(settings) {
