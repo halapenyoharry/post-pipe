@@ -38,3 +38,11 @@ node_modules
 _local/
 _handoff/
 .claude/
+
+# local to this mac: editor and tool settings, droid task notes, personal drops (2026-10-23)
+/tasks/
+/inbox/
+/post-pipe.code-workspace
+/.project-bible.json
+.vscode/
+test/_test_visibility_pages/
