@@ -39,7 +39,7 @@ import { numberToLowercaseWords } from '../../../lib/readerHeader';
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
-export function TextView({ article, width, height, viewState, fullContent, onResize, cardSettings }) {
+export function TextView({ article, width, height, viewState, fullContent, onResize, cardSettings, sourceColor: feedColor }) {
   const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
@@ -53,7 +53,13 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     article._status === 'bloomed' ||
     !!(article.syndication && article.syndication.canonical)
   );
-  const sourceColor = article.containerColor || article.color || (article._source && article._source.color);
+  // The glow's colour, in order: the container the piece is in; its feed,
+  // as the reader coloured it or as the build did (the sourceColor prop,
+  // resolved by the GraphViewer; a host without it falls to the piece's
+  // own _source.color); else the theme's published or draft colour, as a
+  // card glowed before any feed had a colour.
+  const sourceColor = article.containerColor || feedColor || (article._source && article._source.color)
+    || (isDraft ? 'var(--nv-draft)' : 'var(--nv-published)');
   // Readers' contributions attached to this piece (settings.contributions):
   // a quiet count, apart from the reader's own bookmarks.
   const contributionCount = viewState?.contributionCount || 0;

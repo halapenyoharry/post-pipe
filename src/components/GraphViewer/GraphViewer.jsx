@@ -8,6 +8,7 @@ import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dime
 import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf } from './containerLayout';
 import { containerLook } from './containerLook';
 import { nodePaletteFor } from '../../lib/nodePalettes';
+import { tightened } from '../../lib/tightness';
 import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
@@ -28,6 +29,8 @@ import { countsByChapter, connectionEdges } from '../../lib/contributions';
 import { isLinkItem, linkOf, followLink } from '../../lib/linkNode';
 import { rightsOverCards } from '../../lib/rights';
 import { tagForms, tagFormsLines } from '../../lib/tagForms';
+import { blendColors } from '../../lib/blendColors';
+import { wheelDelta } from '../../lib/wheelZoom';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -53,7 +56,6 @@ function feedToGraph(feed, config = {}) {
 
   for (const item of feed.items) {
     const slug = item.url.split('/').pop().replace('.html', '');
-    const status = item._status || 'draft';
     idToSlug.set(item.id, slug);
     articleSlugs.add(slug);
 
@@ -93,9 +95,13 @@ function feedToGraph(feed, config = {}) {
       syndication: item.syndication || {},
       size: 60,
       containerColor,
-      // A variable, not a value: the card resolves it, so the theme and the
-      // reader's color profile both reach it without a rebuild.
-      color: containerColor || (status === 'published' ? 'var(--nv-published)' : 'var(--nv-draft)'),
+      // The colour of the container the piece is in, when it is in one. Not
+      // the published or draft colour: set here, it reached the card's glow
+      // before the feed's colour could, so every card outside a container
+      // glowed alike (99db425). The card reads --nv-published/--nv-draft
+      // itself, by its status, for its border; the glow is the feed's
+      // (TextView sourceColor).
+      color: containerColor || null,
       kind: item.kind || 'essay',
       substrate: item.substrate || 'essay',
       seed: item.seed || '',
@@ -176,14 +182,80 @@ function feedToGraph(feed, config = {}) {
   return { nodes, links, containmentEdges, containers };
 }
 
+// The colour a piece's feed shows as: the reader's own choice for that feed
+// (viewState.sourceColor, as the top bar's pills use it), else the one the
+// build gave it (_source.color). Null for a piece without a feed.
+function feedColorOf(d, sourceColorOf) {
+  const src = d && d._source;
+  if (!src) return null;
+  return (sourceColorOf && sourceColorOf(src.id)) || src.color || null;
+}
+
+// The nodes drawn, by id.
+function nodesById(svg) {
+  const byId = new Map();
+  svg.selectAll('.node').each((d) => { if (d) byId.set(d.id, d); });
+  return byId;
+}
+
+// The article nodes each tag node joins, by the tag's id, read from the
+// drawn edges of layer 'tag'. An edge's ends are ids until the simulation
+// binds them to nodes, so both forms are resolved through the nodes drawn.
+function piecesByTag(svg, byId) {
+  const pieces = new Map();
+  svg.selectAll('.link').each((l) => {
+    if (!l || l.layer !== 'tag') return;
+    const s = typeof l.source === 'object' ? l.source : byId.get(l.source);
+    const t = typeof l.target === 'object' ? l.target : byId.get(l.target);
+    const tag = t && t.type === 'tag' ? t : (s && s.type === 'tag' ? s : null);
+    const piece = tag === t ? s : t;
+    if (!tag || !piece || piece.type !== 'article') return;
+    if (!pieces.has(tag.id)) pieces.set(tag.id, []);
+    pieces.get(tag.id).push(piece);
+  });
+  return pieces;
+}
+
+// A tag node's fill: the feed colours of the pieces it joins, blended
+// (src/lib/blendColors.js), each feed weighing as many pieces as it brings
+// and a hidden piece weighing nothing; a piece without a feed colour weighs
+// in as the theme's tag colour. With nothing to blend, the theme's tag
+// colour, as a variable, so the reader's palette still reaches it.
+function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
+  const tags = svg.selectAll('.node').filter((d) => Boolean(d && d.type === 'tag'));
+  if (tags.empty()) return;
+  let themeTag = null;
+  if (typeof getComputedStyle === 'function') {
+    themeTag = getComputedStyle(svg.node()).getPropertyValue('--gv-tag-color').trim() || null;
+  }
+  tags.select('rect').attr('fill', (d) => {
+    const parts = (pieces.get(d.id) || [])
+      .filter((p) => !isHiddenArticle(p))
+      .map((p) => ({ color: feedColorOf(p, sourceColorOf), weight: 1 }));
+    return blendColors(parts, themeTag || d.color) || 'var(--gv-tag-color)';
+  });
+}
+
 // Walk article nodes + links and toggle their display based on whether
 // the item's source is currently in the hidden set. Pure DOM mutation,
-// no simulation involvement — node positions stay locked.
-function applyVisibility(svg, cardsLayer, hiddenSet) {
+// no simulation involvement — node positions stay locked. A tag node
+// follows its pieces: hidden once every piece it joins is hidden with its
+// source, back with the first that comes back, and coloured by the ones
+// showing (paintTagColors). A closed container's members do not count as
+// hidden here; their tags stay.
+function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf) {
   const isHiddenArticle = (d) =>
-    d && d.type === 'article' && d._source && hiddenSet.has(d._source.id);
+    Boolean(d && d.type === 'article' && d._source && hiddenSet.has(d._source.id));
+  const byId = nodesById(svg);
+  const pieces = piecesByTag(svg, byId);
+  const hiddenTags = new Set();
+  for (const [tagId, list] of pieces) {
+    if (list.length && list.every(isHiddenArticle)) hiddenTags.add(tagId);
+  }
   // A member of a closed container stays hidden whatever its source.
-  const isHidden = (d) => Boolean(d && (d._closedHidden || isHiddenArticle(d)));
+  const isHidden = (d) => Boolean(d && (
+    d._closedHidden || isHiddenArticle(d) || (d.type === 'tag' && hiddenTags.has(d.id))
+  ));
 
   svg.selectAll('.node')
     .style('display', (d) => isHidden(d) ? 'none' : null);
@@ -193,11 +265,13 @@ function applyVisibility(svg, cardsLayer, hiddenSet) {
 
   svg.selectAll('.link, .link-hit')
     .style('display', (l) => {
-      const sNode = typeof l.source === 'object' ? l.source : null;
-      const tNode = typeof l.target === 'object' ? l.target : null;
+      const sNode = typeof l.source === 'object' ? l.source : byId.get(l.source);
+      const tNode = typeof l.target === 'object' ? l.target : byId.get(l.target);
       if (isHidden(sNode) || isHidden(tNode)) return 'none';
       return null;
     });
+
+  paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf);
 }
 
 // Walk article nodes + links and dim non-matching nodes when a time filter is active.
@@ -212,9 +286,16 @@ function applyTimeFilter(svg, cardsLayer, filteredSet) {
   cardsLayer.selectAll('.node-card')
     .classed('dimmed', d => !filteredSet.has(d.id));
 
+  // A tag node follows its pieces here too: dimmed, as they are, once none
+  // of them is in the span.
+  const pieces = piecesByTag(svg, nodesById(svg));
   svg.selectAll('.node')
     .classed('dimmed', d => {
       if (d.type === 'article') return !filteredSet.has(d.id);
+      if (d.type === 'tag') {
+        const list = pieces.get(d.id);
+        return Boolean(list && list.length) && !list.some((p) => filteredSet.has(p.id));
+      }
       return false;
     });
 
@@ -328,6 +409,12 @@ export function GraphViewer({
   // without becoming a dependency that rebuilds the simulation.
   const viewStateRef = useRef(viewState);
   useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
+  // The reader's own colour for a feed, chosen in the panel, or null
+  // (viewState.sourceColor; feedColorOf falls to the build's colour).
+  const sourceColorOf = (sourceId) => {
+    const vs = viewStateRef.current;
+    return (vs && typeof vs.sourceColor === 'function' && vs.sourceColor(sourceId)) || null;
+  };
 
   // The live graph, reachable from effects that must not rebuild it.
   const cardSizeFor = makeCardSizeFor(CARD);
@@ -344,6 +431,9 @@ export function GraphViewer({
   const renderAllArticleBodiesRef = useRef(null);
   const rootsUpdateRef = useRef(null);
   const paletteUpdateRef = useRef(null);
+  // Set once the simulation exists: re-reads the tightness preference and
+  // retunes the forces.
+  const tightnessUpdateRef = useRef(null);
   // Readers' contributions (settings.contributions): counted on the cards,
   // and their connections drawn as their own edge layer, the readers
   // dimension, off until the reader turns it on.
@@ -386,7 +476,7 @@ export function GraphViewer({
       ? hiddenSources
       : new Set(hiddenSources || []);
     if (!svgRef.current || !cardsLayerRef.current) return;
-    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current);
+    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf);
   }, [hiddenSources]);
 
   // Settings writes a color profile to viewState; this repaints instantly by
@@ -422,6 +512,11 @@ export function GraphViewer({
       if (rootsUpdateRef.current) rootsUpdateRef.current();
       if (readersUpdateRef.current) readersUpdateRef.current();
       if (paletteUpdateRef.current) paletteUpdateRef.current();
+      if (tightnessUpdateRef.current) tightnessUpdateRef.current();
+      // A colour the reader gives a feed reaches its tag nodes as well.
+      if (svgRef.current && cardsLayerRef.current) {
+        applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf);
+      }
     });
   }, [viewState]);
 
@@ -560,7 +655,9 @@ export function GraphViewer({
     // Graph point to screen point, through the view as drawn.
     const toScreen = (x, y) => viewToScreen(view, rotation, x, y);
 
-    const zoom = d3.zoom().on('zoom', (event) => {
+    // One wheel click is one step of about 1.25x, however many pixels the
+    // mouse reports (src/lib/wheelZoom.js); a trackpad's small deltas pass.
+    const zoom = d3.zoom().wheelDelta(wheelDelta).on('zoom', (event) => {
       if (event.sourceEvent) { userMovedView = true; focusActive = false; }
       paintView(event.transform);
       const newScale = event.transform.k;
@@ -919,21 +1016,35 @@ export function GraphViewer({
     }
 
 
+    // The reader's tightness (the panel's slider, kept as the viewState
+    // preference 'tightness'): the link distance, the charge and the collide
+    // padding scaled together (src/lib/tightness.js). Nothing chosen, or the
+    // middle, is the site's own simulation settings exactly. SIM itself stays
+    // as the site wrote it: the layout key is built from it.
+    const tightnessChosen = () => {
+      const vs = viewStateRef.current;
+      return vs && vs.preference ? vs.preference('tightness') : null;
+    };
+    let forces = tightened(SIM, tightnessChosen(), CARD);
+    // d._r is the node's real measured footprint, assigned during the
+    // render pass — but forceCollide caches every radius when the force is
+    // initialized, so if that pass has not run yet the fallback is what
+    // sticks for the whole simulation. `size / 2` is 30 for an article
+    // whose card is actually 180x140 (true radius 114), so the fallback
+    // alone would let cards overlap almost completely — the same
+    // footprint-vs-radius mismatch as before, just reachable by timing
+    // rather than by arithmetic. Fall back to the real card geometry.
+    // At the tight end the padding is negative (cards may overlap a little),
+    // so the radius is held at zero or above.
+    const collideRadius = (d) => Math.max(0, (d._r || (d.type === 'article'
+      ? Math.hypot(CARD.width, CARD.height) / 2
+      : d.size / 2)) + forces.collidePadding);
+
     const simulation = d3.forceSimulation()
-      .force('link', d3.forceLink().id(d => d.id).distance(SIM.linkDistance))
-      .force('charge', d3.forceManyBody().strength(SIM.chargeStrength))
-      // d._r is the node's real measured footprint, assigned during the
-      // render pass — but forceCollide caches every radius when the force is
-      // initialized, so if that pass has not run yet the fallback is what
-      // sticks for the whole simulation. `size / 2` is 30 for an article
-      // whose card is actually 180x140 (true radius 114), so the fallback
-      // alone would let cards overlap almost completely — the same
-      // footprint-vs-radius mismatch as before, just reachable by timing
-      // rather than by arithmetic. Fall back to the real card geometry.
+      .force('link', d3.forceLink().id(d => d.id).distance(forces.linkDistance))
+      .force('charge', d3.forceManyBody().strength(forces.chargeStrength))
       .force('collide', d3.forceCollide()
-        .radius(d => (d._r || (d.type === 'article'
-          ? Math.hypot(CARD.width, CARD.height) / 2
-          : d.size / 2)) + SIM.collidePadding)
+        .radius(collideRadius)
         .strength(1).iterations(3))
       .force('center', d3.forceCenter(width / 2, height / 2))
       // Damping was heavy enough, and the run short enough, that collisions
@@ -2094,11 +2205,11 @@ export function GraphViewer({
         if (CL.nodes.has(d.id) && d.type === 'article') {
           return (Math.min(d._size?.width || CARD.width, d._size?.height || CARD.height) / 2) * (d._cardScale || 1);
         }
-        return (d._r || (d.type === 'article' ? Math.hypot(CARD.width, CARD.height) / 2 : d.size / 2)) + SIM.collidePadding;
+        return collideRadius(d);
       });
       simulation.force('charge').strength((d) => {
         if (hiddenByClosed.has(d.id)) return 0;
-        return CL.nodes.has(d.id) ? SIM.chargeStrength * 0.05 : SIM.chargeStrength;
+        return CL.nodes.has(d.id) ? forces.chargeStrength * 0.05 : forces.chargeStrength;
       });
     }
     if (CL.nodes.size > 0) {
@@ -2110,6 +2221,27 @@ export function GraphViewer({
         return rs && rs === rootOfNode(endId(l.target)) ? 0 : defaultLinkStrength(l);
       });
     }
+
+    // Another tightness chosen in the panel: the three forces retuned and the
+    // simulation warmed again, gently. Positions, pins and the zoom are left
+    // alone; only what the forces may move, moves. In ring every node is
+    // placed outright and held, so the forces are retuned for the next
+    // return to cluster but nothing is set moving.
+    tightnessUpdateRef.current = () => {
+      const next = tightened(SIM, tightnessChosen(), CARD);
+      if (next.linkDistance === forces.linkDistance
+        && next.chargeStrength === forces.chargeStrength
+        && next.collidePadding === forces.collidePadding) return;
+      forces = next;
+      simulation.force('link').distance(forces.linkDistance);
+      if (CL.nodes.size > 0) refreshContainerForces();
+      else {
+        simulation.force('charge').strength(forces.chargeStrength);
+        simulation.force('collide').radius(collideRadius);
+      }
+      if (layoutRef.current !== 'force') return;
+      simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+    };
 
     // Never-placed members start at their targets, so the first frame is
     // already the arrangement rather than a heap that has to unfold. Top-level
@@ -3214,6 +3346,9 @@ export function GraphViewer({
       entry.root.render(
         React.createElement(Lens, {
           article: d,
+          // Its feed's colour, as the reader coloured it or as the build
+          // did, for the glow of a card outside a container.
+          sourceColor: feedColorOf(d, sourceColorOf),
           width: w,
           height: h,
           viewState: {
@@ -3323,7 +3458,7 @@ export function GraphViewer({
       articleNodes.filter(nd => nd.id === id).raise().style('z-index', 10);
       loadFullContent(d).then(() => { if (pinnedIdsRef.current.has(id)) renderArticleBody(d); });
     });
-    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current);
+    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf);
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
     // because the card's inner HTML gets replaced on re-render
@@ -3563,6 +3698,13 @@ export function GraphViewer({
         });
       }
       updateTagForms();
+      announceTag();
+    }
+    // The tag highlighted, for the page ('graph:tag-changed', detail.id the
+    // tag node's id, or null for none): the top bar's tag list marks its row.
+    function announceTag() {
+      if (typeof window === 'undefined') return;
+      window.dispatchEvent(new CustomEvent('graph:tag-changed', { detail: { id: activeTag } }));
     }
 
     // A tap on the canvas (empty space, or an open container's hull): the
@@ -3580,6 +3722,7 @@ export function GraphViewer({
         articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
         updateTagForms();
+        announceTag();
       }
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
     }
@@ -4335,6 +4478,7 @@ export function GraphViewer({
       hoveredIdRef.current = null;
       nodes.classed('dimmed', false).classed('tag-active', false);
       updateTagForms();
+      announceTag();
       articleNodes.classed('dimmed', false).style('z-index', null);
       links.classed('highlighted', false);
       pinnedIdsRef.current.clear();
@@ -4367,7 +4511,34 @@ export function GraphViewer({
       }
     };
 
+    // graph:select-tag (detail.id, a tag node's id, 'tag:<name>'): what a
+    // tap on that tag node does (toggleTagHighlight: on, or off when it is
+    // the one on). When it comes on off the screen, the view pans, at the
+    // zoom as it is, until it sits in the middle of the room between the
+    // page's fixed controls. Fired by the top bar's tag list
+    // (src/components/Toolbar).
+    const handleSelectTag = (e) => {
+      const id = e && e.detail ? e.detail.id : null;
+      const d = data.nodes.find((n) => n.type === 'tag' && n.id === id);
+      if (!d) return;
+      toggleTagHighlight(d);
+      if (activeTag !== d.id || !Number.isFinite(d.x) || !Number.isFinite(d.y)) return;
+      const p = drawnAt(d);
+      const [sx, sy] = toScreen(p.x, p.y);
+      const inset = chromeInsets(height);
+      const m = 24;
+      if (sx >= m && sx <= width - m && sy >= inset.top + m && sy <= height - inset.bottom - m) return;
+      const t = d3.zoomTransform(svg.node());
+      const dx = width / 2 - sx;
+      const dy = (inset.top + (height - inset.bottom)) / 2 - sy;
+      userMovedView = true;
+      focusActive = false;
+      svg.transition('key-zoom').duration(320).ease(d3.easeCubicOut)
+        .call(zoom.transform, d3.zoomIdentity.translate(t.x + dx, t.y + dy).scale(t.k));
+    };
+
     window.addEventListener('graph:reset-all', handleResetAll);
+    window.addEventListener('graph:select-tag', handleSelectTag);
     window.addEventListener('graph:zoom-to-fit', handleZoomToFit);
     window.addEventListener('graph:unpin-all', handleUnpinAll);
     window.addEventListener('graph:reset-sizes', handleResetSizes);
@@ -4387,6 +4558,7 @@ export function GraphViewer({
       renderAllArticleBodiesRef.current = null;
       rootsUpdateRef.current = null;
       paletteUpdateRef.current = null;
+      tightnessUpdateRef.current = null;
       readersUpdateRef.current = null;
       if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
       if (themeObserver) themeObserver.disconnect();
@@ -4405,6 +4577,7 @@ export function GraphViewer({
       container.removeEventListener('dblclick', onGhost, true);
       tapGate.cancel();
       window.removeEventListener('graph:reset-all', handleResetAll);
+      window.removeEventListener('graph:select-tag', handleSelectTag);
       window.removeEventListener('postpipe:cover-frame', onCoverFrame);
       window.removeEventListener('postpipe:cover', onCoverRest);
       window.removeEventListener('resize', onCoverRest);
