@@ -416,39 +416,64 @@
     synth.addEventListener('voiceschanged', refreshVoices);
     refreshVoices();
 
-    // The voices for the chapters' language (TTS_CONFIG.lang, "en" by
-    // default), the preferred names first, then the rest by name, each
-    // labelled by name and region (src/lib/voices.js, on the page as
-    // window.PPVoices). The device decides which voices exist; the site can
-    // only prefer names. Never a voice in another language: nothing is
-    // translated. Without PPVoices (an embed): the preferred English voices.
+    // Every voice the device has, ordered: Google's first (Chrome's own,
+    // better than the system defaults), then the site's preferred names in
+    // the site's order (TTS_CONFIG.preferredVoices), then the rest; the
+    // page's language (TTS_CONFIG.lang, "en" by default) first within each,
+    // then by label. A cap only when the site sets TTS_CONFIG.maxVoices. The
+    // device decides which voices exist; the site only orders them. The
+    // ordering lives in src/lib/voices.js (on the page as window.PPVoices,
+    // tested in test/voices.test.js); the copy below is for a page without
+    // PPVoices (an embed) and must do the same.
     const DEFAULT_PREFERRED = [
       'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa',
-      'Google US English', 'Google UK English Female', 'Google UK English Male',
       'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
     ];
-    function voiceEntries(all) {
+    function voiceOptions() {
       const cfg = window.TTS_CONFIG || {};
       const preferred = Array.isArray(cfg.preferredVoices) && cfg.preferredVoices.length
         ? cfg.preferredVoices : DEFAULT_PREFERRED;
       const max = Number.isFinite(cfg.maxVoices) && cfg.maxVoices > 0 ? cfg.maxVoices : Infinity;
-      if (window.PPVoices) return window.PPVoices.voiceList(all, { lang: cfg.lang || 'en', preferred, max });
-      const english = all.filter(v => /^en([-_]|$)/i.test(v.lang || ''));
-      const picked = [];
-      for (const name of preferred) {
-        if (picked.length >= (Number.isFinite(max) ? max : 5)) break;
-        const exact = english.find(v => v.name === name && picked.indexOf(v) === -1);
-        const prefix = exact || english.find(v => v.name.indexOf(name) === 0 && picked.indexOf(v) === -1);
-        if (prefix) picked.push(prefix);
-      }
-      if (!picked.length && english[0]) picked.push(english.find(v => v.default) || english[0]);
-      return picked.map(v => ({ voice: v, label: v.name }));
+      const lang = cfg.lang || (typeof navigator !== 'undefined' && navigator.language) || 'en';
+      return { lang, preferred, max };
     }
-    function curatedVoices(all) { return voiceEntries(all).map(e => e.voice); }
+    function langOf(lang) { return String(lang || '').toLowerCase().split(/[-_]/)[0]; }
+    function orderVoices(voices, want) {
+      return voices.slice().sort((a, b) => {
+        const am = langOf(a.lang) === want ? 0 : 1;
+        const bm = langOf(b.lang) === want ? 0 : 1;
+        if (am !== bm) return am - bm;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    function voiceEntries(all) {
+      const opts = voiceOptions();
+      if (window.PPVoices) return window.PPVoices.voiceList(all, opts);
+      const want = langOf(opts.lang) || 'en';
+      const have = (all || []).filter(v => v && v.name);
+      const google = orderVoices(have.filter(v => /^google\b/i.test(v.name)), want);
+      const taken = google.slice();
+      const picked = [];
+      for (const name of opts.preferred) {
+        const pool = orderVoices(have.filter(v => taken.indexOf(v) === -1), want);
+        const exact = pool.find(v => v.name === name);
+        const start = exact || pool.find(v => v.name.indexOf(name) === 0);
+        if (start) { picked.push(start); taken.push(start); }
+      }
+      const rest = orderVoices(have.filter(v => taken.indexOf(v) === -1), want);
+      return google.concat(picked, rest).slice(0, opts.max).map(v => ({ voice: v, label: v.name }));
+    }
 
+    // The first voice in that order that speaks the page's language (in
+    // Chrome, a Google voice; on a Mac without one, the first preferred voice
+    // the device has), else the first voice.
     function findDefaultBrowserVoice(allVoices) {
-      const first = curatedVoices(allVoices)[0];
-      return first ? first.name : null;
+      const opts = voiceOptions();
+      if (window.PPVoices && window.PPVoices.defaultVoice) return window.PPVoices.defaultVoice(allVoices, opts);
+      const want = langOf(opts.lang) || 'en';
+      const list = voiceEntries(allVoices).map(e => e.voice);
+      const mine = list.find(v => langOf(v.lang) === want);
+      return (mine || list[0]) ? (mine || list[0]).name : null;
     }
 
     window.TTS.register({

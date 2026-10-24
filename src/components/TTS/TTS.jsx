@@ -72,7 +72,7 @@ function useTTS() {
       for (const key of Object.keys(caps)) {
         if (key === 'voice') {
           // Keep the reader's choice if it is still on offer; otherwise the
-          // first of the curated voices.
+          // engine's default (the first voice in the chapters' language).
           let chosen = tts.get('voice');
           if (!chosen || (vList.length && !vList.some(v => v.id === chosen))) {
             chosen = caps.voice.default || (vList[0] && vList[0].id);
@@ -218,15 +218,18 @@ export function TTSSettings() {
   } = useTTS();
   if (!T) return null;
 
-  // The engine already curates the list: a handful of voices, best first.
-  // A chapter is spoken in its own language: only the device's voices for
-  // it are offered (src/lib/voices.js); nothing is translated.
-  const langName = (typeof window !== 'undefined' && window.PPVoices && window.TTS_CONFIG)
-    ? window.PPVoices.languageName(window.TTS_CONFIG.lang || 'en') : 'English';
-  const deviceHasVoices = typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.getVoices().length > 0;
+  // The engine already orders the list: every voice the device has, Google's
+  // first, then the site's preferred, then the rest, the chapters' language
+  // first (src/lib/voices.js). Here it is grouped by language when the device
+  // speaks more than one, the chapters' language first.
+  const pp = typeof window !== 'undefined' ? window.PPVoices : null;
+  const pageLang = (typeof window !== 'undefined' && window.TTS_CONFIG && window.TTS_CONFIG.lang) || 'en';
   const renderVoiceOptions = () => {
-    if (!voices.length) return <option>{deviceHasVoices ? `No ${langName} voice on this device` : 'Loading...'}</option>;
-    return voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>);
+    if (!voices.length) return <option>Loading...</option>;
+    const option = v => <option key={v.id} value={v.id}>{v.label}</option>;
+    const groups = pp && pp.voiceGroups ? pp.voiceGroups(voices, { lang: pageLang }) : [];
+    if (groups.length < 2) return voices.map(option);
+    return groups.map(g => <optgroup key={g.label} label={g.label}>{g.voices.map(option)}</optgroup>);
   };
 
   return (
@@ -251,7 +254,7 @@ export function TTSSettings() {
           className={styles.select}
           value={selectedVoice}
           onChange={handleVoiceChange}
-          title={`Voices on this device for ${langName}`}
+          title="Voices on this device"
           data-tts-voice
         >
           {renderVoiceOptions()}
