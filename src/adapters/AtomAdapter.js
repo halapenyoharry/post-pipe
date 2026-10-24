@@ -2,6 +2,7 @@
 
 const { XMLParser } = require('fast-xml-parser');
 const { fetchText } = require('./fetchText');
+const { decodeHtmlEntities } = require('../lib/htmlEntities');
 
 const ID = 'atom';
 
@@ -35,16 +36,19 @@ async function load(config) {
 
 function normalizeEntry(e) {
   const url = alternateLink(e.link) || e.id || '';
-  const summary = extractText(e.summary) || stripTags(extractText(e.content)).slice(0, 400);
+  // Text fields (title, summary, author) are shown as text, so the HTML
+  // character references an entry leaves in them (a type="html" title, an
+  // escaped summary) are decoded here, once. content_html stays as it came.
+  const summary = decodeHtmlEntities(stripTags(extractText(e.summary)) || stripTags(extractText(e.content)).slice(0, 400));
   const contentHtml = extractText(e.content) || extractText(e.summary) || null;
-  const authors = (e.author || []).map(a => ({ name: extractText(a.name) || '' })).filter(a => a.name);
+  const authors = (e.author || []).map(a => ({ name: decodeHtmlEntities(extractText(a.name) || '') })).filter(a => a.name);
   const image = extractImage(e);
   const tags  = (e.category || []).map(c => c['@_term']).filter(Boolean);
 
   return {
     id: e.id || url,
     url,
-    title: extractText(e.title) || '',
+    title: decodeHtmlEntities(stripTags(extractText(e.title))) || '',
     short_title: '',
     summary,
     tldr: summary,

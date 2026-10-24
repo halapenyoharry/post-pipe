@@ -3,6 +3,7 @@
 
 const { XMLParser } = require('fast-xml-parser');
 const { fetchText } = require('./fetchText');
+const { decodeHtmlEntities } = require('../lib/htmlEntities');
 
 const ID = 'rss';
 
@@ -47,16 +48,19 @@ function normalizeItem(it) {
   const url = it.link || it.guid?.['#text'] || it.guid || '';
   const id  = (typeof it.guid === 'object' ? it.guid['#text'] : it.guid) || url;
   const description = stripCdata(it.description || it['content:encoded'] || '');
-  const summary = description.replace(/<[^>]+>/g, '').slice(0, 400);
-  const author = (typeof it['dc:creator'] === 'string' ? it['dc:creator']
-                : typeof it.author === 'string' ? it.author : '') || '';
+  // Text fields (title, summary, author) are shown as text, so the HTML
+  // character references a feed leaves in them are decoded here, once.
+  // content_html stays as it came: it is HTML and keeps its own entities.
+  const summary = decodeHtmlEntities(description.replace(/<[^>]+>/g, '')).slice(0, 400);
+  const author = decodeHtmlEntities((typeof it['dc:creator'] === 'string' ? it['dc:creator']
+                : typeof it.author === 'string' ? it.author : '') || '');
   const image = extractImage(it);
   const tags  = extractCategories(it.category);
 
   return {
     id,
     url,
-    title: stripCdata(it.title || ''),
+    title: decodeHtmlEntities(stripCdata(it.title || '')),
     short_title: '',
     summary,
     tldr: summary,

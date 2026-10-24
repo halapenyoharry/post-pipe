@@ -3,6 +3,7 @@ import styles from './ReaderPanel.module.css';
 import { ICONS } from '../../utils/icons';
 import { resolveParagraph } from '../../lib/resolveParagraph';
 import { readerHeader } from '../../lib/readerHeader';
+import { byline } from '../../lib/byline';
 import { progressBarMode, allowDownload, bookmarksList } from '../../lib/readerSettings';
 import { BookmarkList } from './BookmarkList';
 import { Icon } from '../Icon/Icon';
@@ -130,6 +131,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     if (item._posted === 'title') {
       const status = navStatus(feedData, item) || '';
       setContentHtml(`<div class="${styles.notYet}" data-not-yet><div class="${styles.notYetTitle}">${escapeHtml(item.title || '')}</div><div class="${styles.notYetStatus}">${escapeHtml(status)}</div></div>`);
+      return;
+    }
+
+    // A piece from a source other than the site's own folder (a publisher's
+    // feed) has no page of its own here: the reader shows the text the feed
+    // carried, often a summary, and a link out to the piece itself.
+    if (fromElsewhere(item)) {
+      setContentHtml(renderFeedItem(item));
       return;
     }
 
@@ -509,16 +518,12 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
-  let authorName = (settings?.author?.name || settings?.author?.display || '').trim().toLowerCase();
-  let authorLink = settings?.author?.url;
-
-  if (article.authors && article.authors.length > 0 && article.authors[0].name) {
-    authorName = article.authors.map(a => a.name).join(', ').toLowerCase();
-    authorLink = article.authors[0].url || article.canonical_url || article.url;
-  } else if (article.author) {
-    authorName = article.author.trim().toLowerCase();
-    authorLink = article.canonical_url || article.url;
-  }
+  // The byline (src/lib/byline.js): the piece's own authors; else the site's
+  // author for a piece from the site's own folder, as the build gives it;
+  // else the title of the source the piece came from.
+  const by = byline(settings, article);
+  const authorName = by ? by.name : '';
+  const authorLink = by ? by.url : null;
 
   // settings.reader.header: a small line above the title, and whether the
   // byline sits under it.
@@ -711,11 +716,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             {metaParts.length > 0 && (
               <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
             )}
-            {article.kind && article.kind !== 'essay' && (
-              <div className={styles.articleMeta} style={{ marginTop: 4, opacity: 0.7 }}>
-                substrate: {article.kind}
-              </div>
-            )}
           </div>
           <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
           {contentHtml && navRow('bottom')}
@@ -758,6 +758,58 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
 function escapeHtml(v) {
   return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// The source the aggregator stamps on every item (feed.json `_sources`).
+function sourceOf(item) {
+  return item._source || (item.originalItem && item.originalItem._source) || null;
+}
+
+// A piece that came in through a feed rather than the site's own folder: its
+// source says so. Without a source stamp, a text item carrying its own
+// content_html is taken as one.
+function fromElsewhere(item) {
+  const source = sourceOf(item);
+  if (source) return source.type !== 'local';
+  return (item.kind === 'text' || item.kind === 'link') && typeof item.content_html === 'string';
+}
+
+// HTML a feed carried, read into a document as a fetched page is, and handed
+// back without scripts, frames, event handlers or javascript: links.
+function cleanHtml(html) {
+  const doc = new DOMParser().parseFromString(String(html), 'text/html');
+  doc.querySelectorAll('script, style, iframe, object, embed, link, meta, form, noscript').forEach((el) => el.remove());
+  doc.querySelectorAll('*').forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on')) el.removeAttribute(attr.name);
+      else if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+    }
+  });
+  const body = doc.querySelector('body');
+  return body ? body.innerHTML : '';
+}
+
+// A feed item's text as the feed carried it (content_html, else its
+// summary), then a plain link out to the piece at its own address.
+function renderFeedItem(item) {
+  let html = '';
+  if (typeof item.content_html === 'string' && item.content_html.trim()) {
+    const cleaned = cleanHtml(item.content_html);
+    // A bare run of text gets a paragraph, so it reads (and bookmarks,
+    // follows along) like any other.
+    html += /<(p|div|ul|ol|h[1-6]|blockquote|pre|table|figure|section|article)\b/i.test(cleaned) ? cleaned : `<p>${cleaned}</p>`;
+  } else if (item.tldr || item.summary) {
+    html += `<p>${escapeHtml(item.tldr || item.summary)}</p>`;
+  }
+  const link = item.canonical_url || item.url || '';
+  if (link) {
+    const source = sourceOf(item);
+    let where = (source && source.title) || '';
+    if (!where) { try { where = new URL(link).hostname; } catch (_) { where = ''; } }
+    html += `<p data-reader-link-out><a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Read the whole piece${where ? ' at ' + escapeHtml(where) : ''}</a></p>`;
+  }
+  return html;
 }
 
 function renderPlaceholder(article, reason) {
