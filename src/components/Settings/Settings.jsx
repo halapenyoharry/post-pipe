@@ -12,6 +12,7 @@ import { toolbarConfig, viewActionsFor } from '../../lib/toolbar';
 import { colorKeysInUse } from '../../lib/graphColors';
 import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
+import { clampTightness } from '../../lib/tightness';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -394,6 +395,28 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           value={viewState.state.layout}
           onChange={(v) => viewState.setLayout(v)}
         />
+      )}
+      {TB.show.layout && (
+        <label className={styles.choiceRow} data-pref="tightness" title="How close the cards sit in cluster. At the tight end they may overlap a little.">
+          <span className={styles.rowLabel}>Tightness</span>
+          <span className={styles.rangeRow}>
+            <span className={styles.rangeEnd} aria-hidden="true">loose</span>
+            <input
+              type="range"
+              className={styles.range}
+              min="0"
+              max="1"
+              step="0.05"
+              aria-label="Tightness, from loose to tight"
+              value={clampTightness(viewState.preference('tightness'))}
+              onChange={(e) => {
+                const v = clampTightness(e.target.value);
+                viewState.setPreference('tightness', v === 0.5 ? null : v);
+              }}
+            />
+            <span className={styles.rangeEnd} aria-hidden="true">tight</span>
+          </span>
+        </label>
       )}
     </>),
 

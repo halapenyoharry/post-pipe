@@ -358,6 +358,72 @@
   cursor: pointer;
 }
 
+/* The tag list (the tag button): a search field when it is long, then a row
+   per tag with its colour, its name and how many pieces it joins. A row that
+   is on wears the tint the dimensions rows wear. */
+.tagMenu {
+  min-width: 220px;
+}
+
+.menuSearch {
+  width: 100%;
+  min-height: 30px;
+  margin: 0 0 4px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.menuSearch:focus-visible {
+  outline: 2px solid var(--pp-accent, #64ffda);
+  outline-offset: -2px;
+}
+
+.tagRows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.menuItem[role="option"] .menuCheck {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
+.menuItem[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.tagSwatch {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tagLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tagCount {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.menuEmpty {
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 :global(html[data-pp-theme="sketchbook"]) .topIcon { background: var(--pp-panel-bg); border-color: var(--sk-line-soft); color: var(--sk-ink); }
 :global(html[data-pp-theme="sketchbook"]) .topIcon:disabled { color: var(--sk-ink-soft); opacity: 0.5; }
 :global(html[data-pp-theme="sketchbook"]) .menu { background: var(--pp-panel-bg); border-color: var(--sk-line-soft); box-shadow: 0 2px 8px var(--sk-shadow); }
@@ -367,3 +433,7 @@
 :global(html[data-pp-theme="sketchbook"]) .menuDivider, :global(html[data-pp-theme="sketchbook"]) .menuLayout { background: var(--sk-line-soft); border-color: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .menuLayout { background: transparent; }
 :global(html[data-pp-theme="sketchbook"]) .menuItem[aria-checked="true"], :global(html[data-pp-theme="sketchbook"]) .menuSeg.on { background: var(--sk-accent-bg); }
+:global(html[data-pp-theme="sketchbook"]) .menuSearch { background: transparent; border-color: var(--sk-line-soft); color: var(--sk-ink); }
+:global(html[data-pp-theme="sketchbook"]) .menuItem[role="option"] .menuCheck { border-color: var(--sk-line-soft); }
+:global(html[data-pp-theme="sketchbook"]) .menuItem[aria-selected="true"] { background: var(--sk-accent-bg); }
+:global(html[data-pp-theme="sketchbook"]) .tagCount, :global(html[data-pp-theme="sketchbook"]) .menuEmpty { color: var(--sk-ink-soft); }

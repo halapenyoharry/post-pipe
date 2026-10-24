@@ -193,6 +193,7 @@ function readerFontFaces() {
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
 const { contributionsConfig } = require('./src/lib/contributions');
+const { timeOverlayConfig } = require('./src/lib/timeOverlay');
 const { lookFromSettings } = require('./src/components/GraphViewer/containerLook');
 
 // Readers' contributions (settings.contributions) are the site's own file,
@@ -412,9 +413,12 @@ ${rightsFooterHtml(SETTINGS.rights)}
 window.TTS_CONFIG = {
   exposedEngines: ${JSON.stringify(exposedEngineIds())},
   defaultEngine: '${SETTINGS.tts?.default_engine || 'browser'}',
+  // The browser engine offers every voice the device has; the site only
+  // orders them (preferredVoices, after Google's) and may cap the list
+  // (maxVoices, a number; null for no cap).
   preferredVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.preferredVoices || [])},
   maxVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.maxVoices || null)},
-  // The chapters' language: only voices for it are offered.
+  // The chapters' language: its voices come first, and the default speaks it.
   lang: ${JSON.stringify(siteLang())},
 ${geminiConfigBlock()}};
 </script>
@@ -424,7 +428,7 @@ ${viewStateSource.replace(/module\.exports[\s\S]*?};/, '')}
 <script>
 window.PPVoices = (function () {
 ${voicesSource.replace(/module\.exports\s*=\s*\{[^}]*\};?/, '')}
-  return { voiceList: voiceList, voiceLabel: voiceLabel, languageName: languageName };
+  return { voiceList: voiceList, defaultVoice: defaultVoice, voiceGroups: voiceGroups, voiceLabel: voiceLabel, languageName: languageName };
 })();
 </script>
 <script>
@@ -669,6 +673,8 @@ ${reactJs}
         viewState: viewState,
         settings: window.SETTINGS,
         layers: readers.layers,
+        feedData: GRAPH_FEED,
+        hiddenSources: hiddenSources,
         show: TOOLBAR.show,
         placement: TOOLBAR.position
       });
@@ -723,11 +729,13 @@ ${reactJs}
             controls: TOOLBAR.position === 'top' ? graphControls : null,
             onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
           }),
+${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (settings.timeOverlay.show, default true);
+          // a site that sets it false has no stack on the page at all.
           React.createElement(TimeOverlay, {
             feedData: feed,
             onFilterChange: handleTimeFilter
           }),
-          // The bottom bar, unless the controls are in the top bar.
+` : ''}          // The bottom bar, unless the controls are in the top bar.
           TOOLBAR.position === 'top' ? null : graphControls
         ),
         // Two panels from one surface (src/lib/panels.js): the main view's,

@@ -2,6 +2,7 @@ import React, { useEffect, useReducer, useRef, useState } from 'react';
 import styles from './Toolbar.module.css';
 import { dimensionLabels, layerLabels, dimensionGroupLabel } from '../../lib/dimensionLabels';
 import { viewActionsFor, RESET_TITLE, hasGranularity as axisHasGranularity, toggleDimension, nextGranularity, menuModel, menuMove } from '../../lib/toolbar';
+import { SEARCH_FROM, hasTagNodes, tagListModel, filterTagRows, tagRowTitle } from '../../lib/tagList';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
 import { SettingsButton } from '../Settings/Settings';
@@ -22,8 +23,10 @@ import { SettingsButton } from '../Settings/Settings';
  *
  * placement 'top' (settings.toolbar.position, src/lib/toolbar.js): no bottom
  * bar; the same controls as icon buttons for the top bar (undo, redo, Reset,
- * a menu of the dimensions), then the sliders that open the main view's
- * panel, which has the view actions and the layout.
+ * a menu of the dimensions, a list of the tags when the graph draws tag
+ * nodes), then the sliders that open the main view's panel, which has the
+ * view actions and the layout. feedData and hiddenSources (what the graph
+ * draws, and the feeds hidden from it) are for the tag list.
  */
 
 export const LAYOUTS = [
@@ -33,12 +36,12 @@ export const LAYOUTS = [
 
 // The dimensions, named by settings.dimensions.labels (src/lib/dimensionLabels.js).
 
-const fire = (name) => window.dispatchEvent(new CustomEvent(name));
+const fire = (name, detail) => window.dispatchEvent(new CustomEvent(name, detail === undefined ? undefined : { detail }));
 
 // layers: the edge-layer dimensions that have something to draw, e.g.
 // ['readers'] when readers have connected chapters. Each is its own switch.
-export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, layers = [], placement = 'bottom' }) {
-  if (placement === 'top') return <TopControls viewState={viewState} show={show} layouts={layouts} settings={settings} layers={layers} />;
+export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, layers = [], placement = 'bottom', feedData = null, hiddenSources = null }) {
+  if (placement === 'top') return <TopControls viewState={viewState} show={show} layouts={layouts} settings={settings} layers={layers} feedData={feedData} hiddenSources={hiddenSources} />;
   return <BottomBar viewState={viewState} show={show} layouts={layouts} settings={settings} layers={layers} />;
 }
 
@@ -205,32 +208,51 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
 }
 
 // The controls in the top bar (settings.toolbar.position top): undo, redo,
-// Reset, the dimensions menu and the sliders, as icon buttons the height of
-// the pills. The menu (role menu) opens under its button: the dimensions as
-// checkbox rows (one on at a time) and the bucket size when the one on has
-// it. Escape or a tap outside closes it; the arrow keys, Home and End move
+// Reset, the dimensions menu, the tag list and the sliders, as icon buttons
+// the height of the pills. The menu (role menu) opens under its button: the
+// dimensions as checkbox rows (one on at a time) and the bucket size when
+// the one on has it. The tag list (its button only when the graph draws tag
+// nodes, src/lib/tagList.js hasTagNodes) opens the same way: a row per tag
+// with its colour, its name and how many pieces it joins, a search field
+// first when there are many; a row selects its tag in the graph as a tap on
+// the node does (graph:select-tag), and the graph says which is on
+// (graph:tag-changed), so the row is checked. One of the two is open at a
+// time. Escape or a tap outside closes it; the arrow keys, Home and End move
 // through it. The sliders open the main view's panel (src/components/Settings).
-function TopControls({ viewState, show, layouts, settings, layers }) {
+function TopControls({ viewState, show, layouts, settings, layers, feedData, hiddenSources }) {
   const S = settings || (typeof window !== 'undefined' ? window.SETTINGS : null);
   const [, bump] = useReducer((n) => n + 1, 0);
-  const [open, setOpen] = useState(false);
+  // Which is open: 'dimensions', 'tags', or null.
+  const [open, setOpen] = useState(null);
+  const [tagQuery, setTagQuery] = useState('');
+  const [activeTag, setActiveTag] = useState(null);
   const wrapRef = useRef(null);
   const buttonRef = useRef(null);
+  const tagButtonRef = useRef(null);
   const menuRef = useRef(null);
   useEffect(() => (viewState ? viewState.subscribe(bump) : undefined), [viewState]);
+  // The tag the graph has highlighted, or none.
+  useEffect(() => {
+    const on = (e) => setActiveTag(e.detail && e.detail.id ? e.detail.id : null);
+    window.addEventListener('graph:tag-changed', on);
+    return () => window.removeEventListener('graph:tag-changed', on);
+  }, []);
 
   const items = () => (menuRef.current ? [...menuRef.current.querySelectorAll('[data-menu-item]')] : []);
   const close = (refocus) => {
-    setOpen(false);
-    if (refocus && buttonRef.current) buttonRef.current.focus();
+    const btn = open === 'tags' ? tagButtonRef.current : buttonRef.current;
+    setOpen(null);
+    if (refocus && btn) btn.focus();
   };
 
-  // A tap outside closes it; on opening, the first row takes the focus.
+  // A tap outside closes it; on opening, the search field, else the first
+  // row, takes the focus.
   useEffect(() => {
     if (!open) return undefined;
-    const first = items()[0];
+    const field = menuRef.current ? menuRef.current.querySelector('[data-menu-search]') : null;
+    const first = field || items()[0];
     if (first) first.focus({ preventScroll: true });
-    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(null); };
     // Escape closes it wherever the focus is (a tap on a row leaves the
     // focus on the page in some browsers).
     const onKey = (e) => {
@@ -264,9 +286,33 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
   const hasMenu = model.rows.length > 0;
   const heading = cap(model.heading);
 
+  // The tag list's rows, made while it is open: the feeds hidden and the
+  // reader's own feed colours as the graph has them, a piece without a feed
+  // colour weighing in as the theme's tag colour (paintTagColors).
+  const hasTags = hasTagNodes(feedData, S && S.graph);
+  let tagRows = [];
+  if (hasTags && open === 'tags') {
+    const root = typeof document !== 'undefined' ? (document.querySelector('[data-graph-root]') || document.documentElement) : null;
+    const themeTag = root && typeof getComputedStyle === 'function'
+      ? (getComputedStyle(root).getPropertyValue('--gv-tag-color').trim() || null)
+      : null;
+    tagRows = tagListModel(feedData, {
+      hiddenSources: hiddenSources || (viewState.state && viewState.state.hiddenSources) || [],
+      sourceColorOf: (id) => (typeof viewState.sourceColor === 'function' ? viewState.sourceColor(id) : null),
+      fallbackColor: themeTag,
+    });
+  }
+  const shownTagRows = filterTagRows(tagRows, tagQuery);
+  const showSearch = tagRows.length > SEARCH_FROM;
+  const toggleTags = () => { setTagQuery(''); setOpen((o) => (o === 'tags' ? null : 'tags')); };
+
   const onMenuKey = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); return; }
-    if (e.key === 'Tab') { setOpen(false); return; }
+    if (e.key === 'Tab') { setOpen(null); return; }
+    // In the search field, only the arrows leave it for the rows; the rest
+    // of the keys type.
+    const inField = e.target && typeof e.target.matches === 'function' && e.target.matches('[data-menu-search]');
+    if (inField && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     const list = items();
     const next = menuMove(list.indexOf(document.activeElement), e.key, list.length);
     if (next === null) return;
@@ -302,6 +348,20 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
     return null;
   };
 
+  const tagRow = (r) => {
+    const on = activeTag === r.id;
+    return (
+      <button key={r.id} type="button" role="option" aria-selected={on} title={tagRowTitle(r)}
+        className={styles.menuItem} data-menu-item data-tag={r.id}
+        onClick={() => fire('graph:select-tag', { id: r.id })}>
+        <span className={styles.menuCheck} aria-hidden="true">{on && <Icon body={iconBody('check')} size={14} />}</span>
+        <span className={styles.tagSwatch} aria-hidden="true" style={{ background: r.color || 'var(--gv-tag-color)' }} />
+        <span className={styles.tagLabel}>{r.label}</span>
+        <span className={styles.tagCount}>{r.count}</span>
+      </button>
+    );
+  };
+
   return (
     <div ref={wrapRef} className={styles.top} role="group" aria-label="Graph controls" data-top-graph-controls>
       {showHistory && (
@@ -317,22 +377,44 @@ function TopControls({ viewState, show, layouts, settings, layers }) {
         </>
       )}
       <button type="button" className={styles.topIcon} title={RESET_TITLE} aria-label="Reset" data-toolbar-reset
-        onClick={() => { setOpen(false); fire('graph:reset-all'); }}>
+        onClick={() => { setOpen(null); fire('graph:reset-all'); }}>
         <Icon body={iconBody('rotate-ccw')} size={15} />
       </button>
       {hasMenu && (<>
-        <button ref={buttonRef} type="button" className={`${styles.topIcon} ${open ? styles.on : ''}`}
+        <button ref={buttonRef} type="button" className={`${styles.topIcon} ${open === 'dimensions' ? styles.on : ''}`}
           title={`${heading}: which to show`}
-          aria-label={heading} aria-haspopup="menu" aria-expanded={open} aria-controls="pp-top-menu" data-top-menu-button
-          onClick={() => setOpen((o) => !o)}
-          onKeyDown={(e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); setOpen(true); } }}>
+          aria-label={heading} aria-haspopup="menu" aria-expanded={open === 'dimensions'} aria-controls="pp-top-menu" data-top-menu-button
+          onClick={() => setOpen((o) => (o === 'dimensions' ? null : 'dimensions'))}
+          onKeyDown={(e) => { if (e.key === 'ArrowDown' && open !== 'dimensions') { e.preventDefault(); setOpen('dimensions'); } }}>
           <Icon body={iconBody('hourglass')} size={15} />
         </button>
-        {open && (
+        {open === 'dimensions' && (
           <div ref={menuRef} id="pp-top-menu" className={styles.menu} role="menu" aria-labelledby="pp-top-menu-heading"
             data-top-menu onKeyDown={onMenuKey}>
             <div id="pp-top-menu-heading" role="presentation" className={styles.menuHeading} data-group-label>{heading}</div>
             {model.rows.map(row)}
+          </div>
+        )}
+      </>)}
+      {hasTags && (<>
+        <button ref={tagButtonRef} type="button" className={`${styles.topIcon} ${open === 'tags' ? styles.on : ''}`}
+          title="Tags" aria-label="Tags" aria-haspopup="dialog" aria-expanded={open === 'tags'} aria-controls="pp-top-tags" data-top-tags-button
+          onClick={toggleTags}
+          onKeyDown={(e) => { if (e.key === 'ArrowDown' && open !== 'tags') { e.preventDefault(); toggleTags(); } }}>
+          <Icon body={iconBody('tag')} size={15} />
+        </button>
+        {open === 'tags' && (
+          <div ref={menuRef} id="pp-top-tags" className={`${styles.menu} ${styles.tagMenu}`} role="dialog" aria-label="Tags"
+            data-top-tags onKeyDown={onMenuKey}>
+            <div role="presentation" className={styles.menuHeading}>Tags</div>
+            {showSearch && (
+              <input type="search" className={styles.menuSearch} placeholder="find a tag" aria-label="Find a tag"
+                value={tagQuery} onChange={(e) => setTagQuery(e.target.value)} data-menu-search />
+            )}
+            <div role="listbox" aria-label="Tags" className={styles.tagRows}>
+              {shownTagRows.map(tagRow)}
+            </div>
+            {!shownTagRows.length && <div className={styles.menuEmpty}>none</div>}
           </div>
         )}
       </>)}

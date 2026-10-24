@@ -362,6 +362,8 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
       viewState={viewState}
       settings={settings}
       layers={readers.layers}
+      feedData={feedData}
+      hiddenSources={hiddenSources}
       show={toolbar.show}
       placement={atTop ? 'top' : 'bottom'}
     />
