@@ -44,6 +44,12 @@ export function rec(source, items, extra = {}) {
   return out;
 }
 
+// earned tag records (what rtz-discover / rtz-emerge write), one per item:
+//   earned('Wire', ['w1','w2'], 'processing') -> two discovered tag rows
+export function earned(source, itemIds, label, { origin = 'discovered', weight = 0.4, why = `recurs in ${itemIds.length} items`, ...rest } = {}) {
+  return itemIds.map((item) => ({ type: 'tag', source, item, label, weight, origin, why, ...rest }));
+}
+
 export const corpusOf = (records) => loadCorpus(records);
 
 export function tmpDir() {

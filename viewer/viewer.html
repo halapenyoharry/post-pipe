@@ -179,7 +179,7 @@ function relabel() {
   let changed = [];
   for (const c of U.concepts) {
     if (c.unmapped || c.pinned) { state.labels.set(c.id, c.canonical); continue; }
-    c.live = scoreVariants(c.variants, state.canon, state.trust);
+    c.live = scoreVariants(rankingPool(c.variants), state.canon, state.trust); // the stone's pool: a discovered spelling never outranks a human's
     const label = c.live[0].label;
     state.labels.set(c.id, label);
     if (label !== c.canonical) changed.push([c.canonical, label]);
@@ -380,10 +380,11 @@ function renderPanel() {
 }
 
 function conceptPanel(c) {
-  const live = c.live || scoreVariants(c.variants, state.canon, state.trust);
+  const live = c.live || scoreVariants(rankingPool(c.variants), state.canon, state.trust);
   const winner = c.pinned ? c.canonical : live[0].label;
   const maxScore = Math.max(...live.map((r) => r.score), 0.001);
-  const variants = c.variants.map((v) => ({ v, r: live.find((x) => x.norm === v.norm) }));
+  const variants = c.variants.map((v) => ({ v, r: live.find((x) => x.norm === v.norm) })).filter(({ r }) => r);
+  const outside = c.variants.filter((v) => !live.some((x) => x.norm === v.norm)); // only discovery wrote these: in the concept, never in the running
   const rels = U.relations.filter((r) => r.a === c.id || r.b === c.id).sort((a, b) => b.weight - a.weight);
   const items = U.items.filter((i) => i.tags.some((t) => t.c === c.id));
   const bySrc = Object.entries(c.sources);
@@ -393,6 +394,7 @@ function conceptPanel(c) {
     <p style="margin:10px 0 0"><button id="explore"${state.focus === c.id ? ' disabled' : ''}>Explore this tag ⟶ ${state.hops} hops</button></p>
     <h3>Why this name</h3>
     ${c.variants.length === 1 && !c.pinned ? '<p class="muted">Only one spelling exists, so there is nothing to choose.</p>' : variants.sort((a, b) => b.r.score - a.r.score).map(({ v, r }) => `<div class="variant"><div class="top"><span class="${v.label === winner ? 'win' : ''}">${v.label === winner ? '★ ' : ''}${esc(v.label)}</span><span class="muted">${r.score.toFixed(2)}</span></div><div class="bar"><i style="width:${(r.score / maxScore) * 100}%"></i></div><div class="parts">freq ${r.parts.freq.toFixed(2)} · cover ${r.parts.cover.toFixed(2)} · trust ${r.parts.trust.toFixed(2)} · quality ${r.parts.quality.toFixed(2)}</div></div>`).join('')}
+    ${outside.length ? `<p class="muted">${outside.map((v) => esc(v.label)).join(', ')}: proposed by discovery only, so not ranked against a spelling a human wrote.</p>` : ''}
     <h3>What each tag-system calls it</h3>
     ${bySrc.map(([s]) => `<div style="margin:5px 0"><span class="dot" style="background:${sourceColor[s]}"></span> <b>${esc(s)}</b> <span class="muted">writes it as</span> ${variants.flatMap(({ v }) => Object.entries((v.formsBySource || {})[s] || {})).sort((a, b) => b[1] - a[1]).map(([f, n]) => `<span class="chip plain">${esc(f)}${n > 1 ? ` <span class="muted">×${n}</span>` : ''}</span>`).join('')}</div>`).join('') || '<span class="muted">—</span>'}
     ${rels.length ? `<h3>Relations</h3><ul class="list">${rels.map((r) => { const other = r.a === c.id ? r.b : r.a; const dir = r.type === 'broader' ? (r.a === c.id ? 'broader than' : 'narrower than') : r.type; return `<li data-c="${esc(other)}" title="${esc(REL_TEXT[r.type] || '')}"><span class="rel" style="background:${REL_COLOR[r.type] || '#888'}">${esc(dir)}</span><span class="t">${esc(lab(other))}</span><span class="w">${r.locked ? '🔒 ' : ''}${r.weight.toFixed(2)}</span></li>`; }).join('')}</ul>` : ''}
