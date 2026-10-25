@@ -63,8 +63,9 @@ test('concepts: only vocabulary, joined by typed relations', () => {
 });
 
 test('relation type filter and labels override', () => {
-  const only = projectGraph(U, 'concepts', { relationTypes: new Set(['near']) });
-  assert.ok(only.links.length > 0 && only.links.every((l) => l.type === 'near'));
+  // the synthetic review pairs sit in different tag-systems, so they are closeMatch (a cross-scheme near)
+  const only = projectGraph(U, 'concepts', { relationTypes: new Set(['closeMatch']) });
+  assert.ok(only.links.length > 0 && only.links.every((l) => l.type === 'closeMatch'));
   const labels = new Map([[cid('ai'), 'Renamed']]);
   assert.equal(projectGraph(U, 'concepts', { labels }).nodes.find((n) => n.concept === cid('ai')).label, 'Renamed');
 });

@@ -22,6 +22,7 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
       { "adapter": "markdown",    "path": "~/vault", "source": "Notes", "inline": true }
     ],
     "overrides": "overrides.json",     optional, human decisions
+    "ledger": "stone.ledger.json",     concept-id ledger, kept across builds; default OUTDIR/ledger.json, false for none
     "seeds": [],                       optional extra seed files
     "noSeed": false,
     "discover": false,                 propose new tags for untagged items from recurring phrases
@@ -29,7 +30,8 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
     "engine": { "mergeThreshold": 0.7 }   optional overrides of lib/config.js defaults
   }
 
-Writes to OUTDIR: records.jsonl, [records.discovered.jsonl], stone.json, records.all.jsonl, universe.json, view.html, build.json`;
+Writes to OUTDIR: records.jsonl, [records.discovered.jsonl], stone.json, records.all.jsonl, universe.json, view.html,
+build.json (stages, and the ledger summary: path, minted, reused, retired, splits, merges, this build's events), and the ledger at its path`;
 
 const { values } = cli('rtz-build', usage, {
   config: { type: 'string' },
@@ -84,6 +86,8 @@ if (config.discover || values.discover) {
 }
 const stoneArgs = [baseRecords, '-o', path.join(out, 'stone.json'), ...engineFile];
 if (config.overrides && fs.existsSync(resolve(config.overrides))) stoneArgs.push('--overrides', resolve(config.overrides));
+const ledgerPath = config.ledger === false ? null : config.ledger ? resolve(config.ledger) : path.join(out, 'ledger.json');
+if (ledgerPath) stoneArgs.push('--ledger', ledgerPath);
 if (config.noSeed) stoneArgs.push('--no-seed');
 for (const f of config.seeds ?? []) stoneArgs.push('--seed', resolve(f));
 log('stone');
@@ -101,6 +105,7 @@ if (!values['no-view']) {
   log('view');
   stage('view', 'rtz-view', [path.join(out, 'universe.json'), '-o', path.join(out, 'view.html')]);
 }
-fs.writeFileSync(path.join(out, 'build.json'), JSON.stringify(manifest, null, 1) + '\n');
 const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
-log(`done: ${stone.stats.tags} tags -> ${stone.stats.concepts} concepts; review queue: ${stone.relations.filter((r) => r.type === 'near').length}; open ${path.join(out, 'view.html')}`);
+if (stone.ledger) manifest.ledger = stone.ledger;
+fs.writeFileSync(path.join(out, 'build.json'), JSON.stringify(manifest, null, 1) + '\n');
+log(`done: ${stone.stats.tags} tags -> ${stone.stats.concepts} concepts; review queue: ${stone.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').length}; open ${path.join(out, 'view.html')}`);

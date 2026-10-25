@@ -33,7 +33,7 @@ if (values.systems) {
 } else if (values.merged) {
   for (const c of stone.concepts.filter((x) => x.variants.length > 1)) out(`${c.canonical.padEnd(28)} <= ${c.variants.map((v) => `${v.label} (${v.count})`).join(' | ')}`);
 } else if (values.review) {
-  const near = stone.relations.filter((r) => r.type === 'near').sort((a, b) => b.weight - a.weight);
+  const near = stone.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').sort((a, b) => b.weight - a.weight);
   if (!near.length) out('nothing to review');
   for (const r of near) {
     out(`${pct(r.weight)}  ${name(r.a)}  ~  ${name(r.b)}`);

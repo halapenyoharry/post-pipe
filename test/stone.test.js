@@ -68,14 +68,323 @@ test('relations: seed hierarchy resolves through alias groups; usage-derived rel
   assert.ok(relations('broader').some(([a, b]) => a === 'AI' && b === 'Machine Learning'));
   assert.ok(relations('broader').some(([a, b]) => a === 'AI' && b === 'agi'), 'seed names "artificial general intelligence"; corpus only has agi');
   assert.ok(relations('related').some(([a, b]) => [a, b].sort().join() === ['General Strike', 'Labor'].sort().join()));
-  const near = relations('near').map((p) => p.slice().sort().join(' ~ '));
+  // both review pairs are written by different tag-systems, so the queue names them closeMatch
+  const near = relations('closeMatch').map((p) => p.slice().sort().join(' ~ '));
   assert.ok(near.includes('Labor ~ labour'));
   assert.ok(near.includes('Criminal Justice ~ carceral state'));
+  assert.equal(relations('near').length, 0, 'no review pair is within one scheme on the synthetic corpus');
 });
 
 test('adjacent never duplicates a pair that is already near or co-tagged', () => {
   const near = new Set(stone.relations.filter((r) => r.type === 'near').map((r) => [r.a, r.b].sort().join()));
   for (const r of stone.relations.filter((x) => x.type === 'adjacent')) assert.ok(!near.has([r.a, r.b].sort().join()));
+});
+
+// ---- relations speak SKOS: typing by scheme, every relation with its reason ------------------------
+const byType = (s, type) => s.relations.filter((r) => r.type === type);
+const pairOf = (s, r) => [s.concepts.find((c) => c.id === r.a).canonical, s.concepts.find((c) => c.id === r.b).canonical];
+// the same article under two tag-systems: one item carrying both vocabularies (shared url). Two tags
+// that always travel together on such items look like translations of each other (the anchor
+// signal), so the fixtures below say `notSame` where a human would: the point is the relation. Titles
+// are the bare ids so no fixture word leaks into the text profiles.
+const twoSchemes = (first, second) => [
+  ...rec(first.source, Object.fromEntries(first.items.map((id) => [id, first.tags[id] ?? []])), Object.fromEntries(first.items.map((id) => [id, { url: `https://x/${id}`, title: id, text: first.text?.[id] ?? '' }]))),
+  ...rec(second.source, Object.fromEntries(second.items.map((id) => [id, second.tags[id] ?? []])), Object.fromEntries(second.items.map((id) => [id, { url: `https://x/${id}`, title: id, text: second.text?.[id] ?? '' }]))),
+];
+
+test('every relation says why and carries its provenance', () => {
+  for (const s of [stone, syntheticStone({ overrides: { relations: [{ a: 'ai', b: 'labor', type: 'synergy', note: 'x' }] } })]) {
+    assert.ok(s.relations.length > 0);
+    for (const r of s.relations) {
+      assert.equal(typeof r.why, 'string', `${r.type} ${r.a} ${r.b} has a why`);
+      assert.ok(r.why.length > 20, `${r.type} ${r.a} ${r.b}: "${r.why}" is a sentence`);
+      assert.ok(Array.isArray(r.wasDerivedFrom) && r.wasDerivedFrom.length > 0, `${r.type} ${r.a} ${r.b}: wasDerivedFrom`);
+      for (const d of r.wasDerivedFrom) assert.equal(typeof d.type, 'string');
+      assert.equal(r.wasGeneratedBy.activity, 'relate');
+      assert.equal(typeof r.wasGeneratedBy.parameters, 'object');
+      assert.equal(typeof r.skos, 'boolean', `${r.type} ${r.a} ${r.b}: skos is said either way`);
+      assert.ok(!['narrower', 'narrowMatch'].includes(r.type), 'the narrow side is never emitted; the inverse is implied');
+    }
+  }
+  const strike = byType(stone, 'related').find((r) => pairOf(stone, r).sort().join() === ['General Strike', 'Labor'].sort().join());
+  assert.match(strike.why, /share \d+ of their \d+ and \d+ items/);
+  assert.match(strike.why, /NPMI/);
+  assert.deepEqual(strike.wasDerivedFrom, [{ type: 'cooccurrence', items: strike.evidence.n }]);
+  assert.deepEqual(strike.wasGeneratedBy.parameters, { minNpmi: 0.25, minCooc: 2 });
+  const seeded = byType(stone, 'broader').find((r) => pairOf(stone, r).join() === 'AI,agi');
+  assert.deepEqual(seeded.wasDerivedFrom, [{ type: 'seed' }]);
+  assert.match(seeded.why, /curated seed/);
+});
+
+test('a cross-scheme near is a closeMatch; a near inside one scheme keeps its name with skos false', () => {
+  const cross = byType(stone, 'closeMatch').find((r) => pairOf(stone, r).sort().join(' ~ ') === 'Labor ~ labour');
+  assert.ok(cross, 'Journal/Wire write "Labor", Archive writes "labour": a mapping between schemes');
+  assert.equal(cross.skos, true);
+  assert.ok(cross.weight >= 0.4 && cross.weight < 0.7);
+  assert.deepEqual(cross.evidence.terms.slice().sort(), ['labor', 'labour']);
+  assert.match(cross.why, /probably the same/);
+  assert.ok(cross.wasDerivedFrom.every((d) => d.type === 'signal' && d.name));
+  // the same two spellings inside ONE tag-system: a review item, not a mapping
+  const one = buildStone(rec('A', { 1: ['labor'], 2: ['labour'] }), {});
+  const within = one.relations.find((r) => r.evidence?.terms);
+  assert.ok(within, 'the pair is still queued for review');
+  assert.equal(within.type, 'near');
+  assert.equal(within.skos, false);
+  assert.equal(byType(one, 'closeMatch').length, 0);
+});
+
+test('a cross-scheme usage-broader is a broadMatch; within a scheme it stays broader with skos true', () => {
+  // "alpha" (system X) covers every item that "beta" (system Y) covers, and more: subsumption across schemes
+  const records = twoSchemes(
+    { source: 'X', items: ['1', '2', '3', '4', '5'], tags: { 1: ['alpha'], 2: ['alpha'], 3: ['alpha'], 4: ['alpha'], 5: ['alpha'] } },
+    { source: 'Y', items: ['3', '4', '5'], tags: { 3: ['beta'], 4: ['beta'], 5: ['beta'] } },
+  );
+  const s = buildStone(records, { overrides: { notSame: [['alpha', 'beta']] } });
+  const [bm] = byType(s, 'broadMatch');
+  assert.ok(bm, 'alpha broadMatch beta');
+  assert.deepEqual(pairOf(s, bm), ['alpha', 'beta']);
+  assert.equal(bm.skos, true);
+  assert.equal(byType(s, 'broader').length, 0);
+  assert.match(bm.why, /3 of 3 beta items also carry alpha \(P=1\.00\)/);
+  assert.deepEqual(bm.wasDerivedFrom, [{ type: 'cooccurrence', items: 3 }]);
+  assert.deepEqual(bm.wasGeneratedBy.parameters, { minSupport: 3, broaderP: 0.8, narrowerMaxP: 0.6 });
+  // the same usage inside one system is skos:broader
+  const same = buildStone(rec('X', { 1: ['alpha'], 2: ['alpha'], 3: ['alpha', 'beta'], 4: ['alpha', 'beta'], 5: ['alpha', 'beta'] }), {});
+  const [br] = byType(same, 'broader');
+  assert.deepEqual(pairOf(same, br), ['alpha', 'beta']);
+  assert.equal(br.skos, true);
+  assert.equal(byType(same, 'broadMatch').length, 0);
+  // synthetic: AI (Archive, Journal, Wire) and agi (Journal) share Journal, so the seed hierarchy is skos:broader
+  for (const r of byType(stone, 'broader')) assert.equal(r.skos, true, pairOf(stone, r).join(' > '));
+});
+
+test('adjacent alone is never SKOS, whatever the schemes', () => {
+  assert.ok(byType(stone, 'adjacent').length > 0);
+  for (const r of byType(stone, 'adjacent')) assert.equal(r.skos, false);
+  assert.ok(stone.relations.every((r) => r.skos === false || ['broader', 'related', 'closeMatch', 'broadMatch', 'relatedMatch', 'exactMatch'].includes(r.type)));
+});
+
+test('related across schemes is a relatedMatch only when the texts agree (cosine >= minAdjacent)', () => {
+  const quantum = 'quantum qubits entanglement coherence decoherence superposition';
+  const records = [
+    // E (system P) and F (system Q) co-occur on two of their three items, and every item reads alike
+    ...twoSchemes(
+      { source: 'P', items: ['e1', 'e2', 'e3'], tags: { e1: ['E'], e2: ['E'], e3: ['E'] }, text: { e1: quantum, e2: quantum, e3: quantum } },
+      { source: 'Q', items: ['e2', 'e3', 'e4'], tags: { e2: ['F'], e3: ['F'], e4: ['F'] }, text: { e2: quantum, e3: quantum, e4: quantum } },
+    ),
+    // C and D co-occur the same way, but the items they do not share are about different things and the shared ones say nothing
+    ...twoSchemes(
+      { source: 'P', items: ['m1', 'm2', 'm3'], tags: { m1: ['C'], m2: ['C'], m3: ['C'] }, text: { m1: 'cats purr whiskers kitten feline' } },
+      { source: 'Q', items: ['m2', 'm3', 'm4'], tags: { m2: ['D'], m3: ['D'], m4: ['D'] }, text: { m4: 'rockets orbit thrust booster payload' } },
+    ),
+    // filler so co-occurrence is more than chance
+    ...rec('P', { f1: ['g1'], f2: ['g2'], f3: ['g3'], f4: ['g4'], f5: ['g5'], f6: ['g6'] }),
+  ];
+  const s = buildStone(records, { overrides: { notSame: [['E', 'F'], ['C', 'D']] } });
+  const ef = s.relations.find((r) => pairOf(s, r).sort().join() === 'E,F' && r.type !== 'near');
+  assert.ok(ef, 'E and F relate');
+  assert.equal(ef.type, 'relatedMatch');
+  assert.equal(ef.skos, true);
+  assert.ok(ef.evidence.cosine >= 0.3);
+  assert.match(ef.why, /read alike \(cosine/);
+  assert.ok(ef.wasDerivedFrom.some((d) => d.type === 'cooccurrence' && d.items === 2));
+  assert.ok(ef.wasDerivedFrom.some((d) => d.type === 'text' && d.cosine === ef.evidence.cosine));
+  assert.equal(ef.wasGeneratedBy.parameters.minAdjacent, 0.3);
+  const cd = s.relations.find((r) => pairOf(s, r).sort().join() === 'C,D' && r.type !== 'near');
+  assert.ok(cd, 'C and D relate by co-occurrence');
+  assert.equal(cd.type, 'related', 'without text support the name stays');
+  assert.equal(cd.skos, false);
+  assert.ok(cd.evidence.cosine < 0.3);
+  assert.equal(byType(s, 'relatedMatch').length, 1);
+  // the synthetic review pair also co-occurs on texts that read alike: both names, one pair
+  const cj = byType(stone, 'relatedMatch').map((r) => pairOf(stone, r).sort().join(' ~ '));
+  assert.deepEqual(cj, ['Criminal Justice ~ carceral state']);
+});
+
+test('lexical broader: "brain scans" contains the words of "brain", when usage corroborates it', () => {
+  const ids = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
+  const tags = (brain, scans) => Object.fromEntries(ids(1, 9).map((id) => [id, [...(brain.includes(id) ? ['brain'] : []), ...(scans.includes(id) ? ['brain scans'] : [])]]));
+  // brain on 1..8, brain scans on 4..9: 5 of 6 brain-scans items carry brain (P=0.83); usage alone would not say
+  // broader (P(scans|brain)=0.63 is above narrowerMaxP), the words do
+  const s = buildStone(rec('Science', tags(ids(1, 8), ids(4, 9))), {});
+  const [lb] = byType(s, 'broader');
+  assert.ok(lb, 'brain broader than brain scans');
+  assert.deepEqual(pairOf(s, lb), ['brain', 'brain scans']);
+  assert.equal(lb.skos, true, 'one scheme: skos:broader');
+  assert.equal(lb.why, '"brain scans" contains the words of "brain"; 5 of 6 brain scans items also carry brain (P=0.83)');
+  assert.deepEqual(lb.wasDerivedFrom, [{ type: 'cooccurrence', items: 5 }, { type: 'stem', key: 'brain' }]);
+  assert.deepEqual(lb.wasGeneratedBy, { activity: 'relate', parameters: { lexicalBroader: { minP: 0.5, minN: 2 } } });
+  assert.deepEqual(lb.evidence.derivation, ['lexical']);
+  assert.equal(byType(s, 'related').length, 0, 'the hierarchy replaces the symmetric reading of the same pair');
+  // without the corroboration (one shared item) the words alone say nothing
+  const alone = buildStone(rec('Science', tags(ids(1, 3), ids(3, 8))), {});
+  assert.equal(byType(alone, 'broader').length, 0);
+  // across schemes the same evidence is a broadMatch
+  const cross = buildStone(twoSchemes(
+    { source: 'Posts', items: ids(1, 8), tags: Object.fromEntries(ids(1, 8).map((id) => [id, ['brain']])) },
+    { source: 'Wire', items: ids(4, 9), tags: Object.fromEntries(ids(4, 9).map((id) => [id, ['brain scans']])) },
+  ), { overrides: { notSame: [['brain', 'brain scans']] } });
+  assert.equal(byType(cross, 'broader').length, 0);
+  assert.deepEqual(pairOf(cross, byType(cross, 'broadMatch')[0]), ['brain', 'brain scans']);
+  assert.equal(byType(cross, 'broadMatch')[0].skos, true);
+});
+
+test('lexical and usage broader on one pair stay one relation that cites both', () => {
+  // brain on 1..8, brain scans on 4..8: P(brain|scans)=1, P(scans|brain)=0.63 — not usage-broader; make it: scans on 4..7
+  const s = buildStone(rec('Science', { 1: ['brain'], 2: ['brain'], 3: ['brain'], 4: ['brain', 'brain scans'], 5: ['brain', 'brain scans'], 6: ['brain', 'brain scans'], 7: ['brain'], 8: ['brain'] }), {});
+  const both = byType(s, 'broader');
+  assert.equal(both.length, 1);
+  assert.deepEqual(both[0].evidence.derivation, ['usage', 'lexical']);
+  assert.match(both[0].why, /by usage/);
+  assert.match(both[0].why, /contains the words of/);
+  assert.deepEqual(both[0].wasDerivedFrom.map((d) => d.type), ['cooccurrence', 'stem']);
+  assert.deepEqual(both[0].wasGeneratedBy.parameters, { minSupport: 3, broaderP: 0.8, narrowerMaxP: 0.6, lexicalBroader: { minP: 0.5, minN: 2 } });
+});
+
+test('a hierarchy never runs both ways: the words do not overturn a usage broader in the other direction', () => {
+  // "brain scans" on 1..10, "brain" on 1..6: usage says scans ⊃ brain (P(scans|brain)=1, P(brain|scans)=0.6),
+  // the words say brain ⊃ brain scans (6 of 10, P=0.60 >= minP) — only the usage row is emitted
+  const tags = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i + 1), ['brain scans', ...(i < 6 ? ['brain'] : [])]]));
+  const s = buildStone(rec('Science', tags), {});
+  const broader = byType(s, 'broader');
+  assert.equal(broader.length, 1, 'exactly one broader row on the pair');
+  assert.deepEqual(pairOf(s, broader[0]), ['brain scans', 'brain']);
+  assert.deepEqual(broader[0].evidence.derivation, ['usage']);
+});
+
+test('two spellings of the broader concept judge a pair once: why and provenance say it one time', () => {
+  // "brain" / "brains" alternate on 1..8 (one concept), "brain scans" on 4..9
+  const tags = {};
+  for (let i = 1; i <= 9; i++) tags[String(i)] = [...(i <= 8 ? [i % 2 ? 'brain' : 'brains'] : []), ...(i >= 4 ? ['brain scans'] : [])];
+  const s = buildStone(rec('Science', tags), {});
+  assert.equal(conceptOf(s, 'brain'), conceptOf(s, 'brains'), 'brain and brains are one concept');
+  const [lb] = byType(s, 'broader');
+  assert.ok(lb);
+  assert.equal(lb.why, '"brain scans" contains the words of "brain"; 5 of 6 brain scans items also carry brain (P=0.83)');
+  assert.deepEqual(lb.wasDerivedFrom, [{ type: 'cooccurrence', items: 5 }, { type: 'stem', key: 'brain' }]);
+  assert.deepEqual(lb.evidence.derivation, ['lexical']);
+});
+
+test('a lexical broader that replaced a related says so', () => {
+  // brain on 1..5, brain scans on 3..6, ten items tagged otherwise: on that background the pair's
+  // co-occurrence beats chance (NPMI), so usage calls it related before the words call it a hierarchy
+  const tags = { 1: ['brain'], 2: ['brain'], 3: ['brain', 'brain scans'], 4: ['brain', 'brain scans'], 5: ['brain', 'brain scans'], 6: ['brain scans'] };
+  for (let i = 0; i < 10; i++) tags[`x${i}`] = ['other'];
+  const s = buildStone(rec('Science', tags), {});
+  const [lb] = byType(s, 'broader');
+  assert.equal(lb.evidence.replaced, 'related', 'usage had called the pair related (NPMI)');
+  assert.equal(byType(s, 'related').length, 0);
+  // where usage made no related, nothing is said to be replaced
+  const both = buildStone(rec('Science', { 1: ['brain'], 2: ['brain'], 3: ['brain'], 4: ['brain', 'brain scans'], 5: ['brain', 'brain scans'], 6: ['brain', 'brain scans'], 7: ['brain'], 8: ['brain'] }), {});
+  assert.equal(byType(both, 'broader')[0].evidence.replaced, undefined);
+});
+
+test('a human relation written in a SKOS name replaces the computed row of the same saying: one row per pair and saying', () => {
+  const s = syntheticStone({ overrides: { relations: [{ a: 'labor', b: 'labour', type: 'closeMatch' }, { a: 'criminal justice', b: 'carceral state', type: 'relatedMatch' }] } });
+  const labor = conceptOf(s, 'labor').id;
+  const labour = conceptOf(s, 'labour').id;
+  const cj = conceptOf(s, 'criminal justice').id;
+  const cs = conceptOf(s, 'carceral state').id;
+  const on = (x, y) => s.relations.filter((r) => [r.a, r.b].sort().join() === [x, y].sort().join());
+  assert.deepEqual(on(labor, labour).map((r) => [r.type, r.locked]), [['closeMatch', true]], 'the human closeMatch replaced the computed near-turned-closeMatch');
+  assert.deepEqual(on(cj, cs).filter((r) => r.type !== 'closeMatch').map((r) => [r.type, r.locked]), [['relatedMatch', true]]);
+  assert.ok(on(cj, cs).some((r) => r.type === 'closeMatch' && !r.locked), 'the computed closeMatch on that pair says something else and stays');
+  // the old name does the same: a human `related` replaces a computed relatedMatch
+  const old = syntheticStone({ overrides: { relations: [{ a: 'criminal justice', b: 'carceral state', type: 'related' }] } });
+  assert.deepEqual(old.relations.filter((r) => [r.a, r.b].sort().join() === [cj, cs].sort().join() && r.type !== 'closeMatch').map((r) => [r.type, r.locked, r.skos]), [['related', true, true]]);
+});
+
+test('an override type outside the documented list is dropped with one warning, not stored', () => {
+  const warnings = [];
+  const s = syntheticStone({ warn: (m) => warnings.push(m), overrides: { relations: [{ a: 'ai', b: 'labor', type: 'bogus' }, { a: 'ai', b: 'labor', type: 'near' }, { a: 'ai', b: 'labor', type: 'synergy' }] } });
+  assert.deepEqual(s.relations.filter((r) => r.locked).map((r) => r.type), ['synergy']);
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[0], /"bogus" is not a relation type/);
+  assert.match(warnings[1], /"near" is not a relation type/);
+});
+
+test("a human's non-SKOS relation toward a published vocabulary is skos false", () => {
+  const s = syntheticStone({ overrides: { relations: [{ a: 'ai', b: 'iptc-mediatopics:medtop:1', type: 'adjacent' }, { a: 'ai', b: 'iptc-mediatopics:medtop:2', type: 'synergy' }, { a: 'ai', b: 'iptc-mediatopics:medtop:3', type: 'exactMatch' }] } });
+  assert.deepEqual(s.relations.filter((r) => r.external).map((r) => [r.type, r.skos]).sort(), [['adjacent', false], ['exactMatch', true], ['synergy', false]]);
+});
+
+test('notRelated written in the pre-typing name removes the row typing renamed, and the other way round', () => {
+  const labor = conceptOf(stone, 'labor').id;
+  const labour = conceptOf(stone, 'labour').id;
+  const cj = conceptOf(stone, 'criminal justice').id;
+  const cs = conceptOf(stone, 'carceral state').id;
+  assert.ok(stone.relations.some((r) => r.type === 'closeMatch' && [r.a, r.b].sort().join() === [labor, labour].sort().join()));
+  const s = syntheticStone({ overrides: { notRelated: [{ a: 'labor', b: 'labour', type: 'near' }, { a: 'criminal justice', b: 'carceral state', type: 'related' }] } });
+  assert.deepEqual(s.forbidden.map((r) => r.type).sort(), ['closeMatch', 'relatedMatch']);
+  assert.ok(!s.relations.some((r) => r.type === 'closeMatch' && [r.a, r.b].sort().join() === [labor, labour].sort().join()));
+  assert.ok(!s.relations.some((r) => r.type === 'relatedMatch' && [r.a, r.b].sort().join() === [cj, cs].sort().join()));
+  assert.ok(s.relations.some((r) => r.type === 'closeMatch' && [r.a, r.b].sort().join() === [cj, cs].sort().join()), 'the pair\'s closeMatch says something else and stays');
+  // a rule in the SKOS name removes a within-scheme row of the same saying
+  const ai = conceptOf(stone, 'ai').id;
+  const ml = conceptOf(stone, 'machine learning').id;
+  const t = syntheticStone({ overrides: { notRelated: [{ a: 'ai', b: 'ml', type: 'relatedMatch' }, { a: 'ai', b: 'ml', type: 'broadMatch' }] } });
+  assert.deepEqual(t.forbidden.map((r) => `${r.type} ${r.a} ${r.b}`).sort(), [`broader ${ai} ${ml}`, `related ${ai} ${ml}`]);
+});
+
+test('overrides.relations accepts SKOS names, flips the narrow side, and reaches a published vocabulary by "<scheme>:<id>"', () => {
+  const s = syntheticStone({
+    overrides: {
+      relations: [
+        { a: 'machine learning', b: 'ai', type: 'narrowMatch', note: 'ml is the narrower' },
+        { a: 'ai', b: 'iptc-mediatopics:medtop:20000763', type: 'exactMatch', note: 'IPTC artificial intelligence' },
+        { a: 'labor', b: 'iptc-mediatopics:medtop:20000521', type: 'narrower' },
+      ],
+    },
+  });
+  const ai = conceptOf(s, 'ai').id;
+  const flipped = s.relations.find((r) => r.type === 'broadMatch' && r.locked);
+  assert.deepEqual([flipped.a, flipped.b], [ai, conceptOf(s, 'machine learning').id], 'narrowMatch {ml, ai} is stored as broadMatch {ai, ml}');
+  assert.equal(flipped.skos, true);
+  assert.deepEqual(flipped.wasDerivedFrom, [{ type: 'override', note: 'ml is the narrower' }]);
+  assert.match(flipped.why, /overrides\.json says "AI" broadMatch "Machine Learning": ml is the narrower/);
+  const ext = s.relations.find((r) => r.b === 'iptc-mediatopics:medtop:20000763');
+  assert.ok(ext, 'the external id is kept verbatim');
+  assert.equal(ext.a, ai);
+  assert.equal(ext.type, 'exactMatch');
+  assert.equal(ext.skos, true);
+  assert.equal(ext.locked, true);
+  assert.equal(ext.external, true);
+  assert.ok(!s.relations.some((r) => r.b === 'iptc-mediatopics:medtop:20000521'), 'narrower toward an external id cannot be flipped, so it is not stated');
+  assert.ok(!s.relations.some((r) => r.a.includes(':')), 'an external id is never `a`');
+  // it survives the universe's unknown-id filter
+  const u = buildUniverse(s, syntheticRecords());
+  const kept = u.relations.find((r) => r.b === 'iptc-mediatopics:medtop:20000763');
+  assert.ok(kept && kept.a === ai && kept.skos === true);
+  assert.ok(u.relations.every((r) => u.concepts.some((c) => c.id === r.a)));
+  assert.ok(u.relations.every((r) => u.concepts.some((c) => c.id === r.b) || r.b.includes(':')));
+});
+
+test('overrides.notRelated removes exactly the named relation(s) and lists them in forbidden', () => {
+  const before = stone.relations.map((r) => `${r.type} ${r.a} ${r.b}`);
+  const labor = conceptOf(stone, 'labor').id;
+  const strike = conceptOf(stone, 'general strike').id;
+  const ai = conceptOf(stone, 'ai').id;
+  const ml = conceptOf(stone, 'machine learning').id;
+  // untyped: every relation between the pair, either direction; typed: that type only
+  const s = syntheticStone({ overrides: { notRelated: [{ a: 'general strike', b: 'labor' }, { a: 'ai', b: 'ml', type: 'related' }, { a: 'nobody', b: 'labor' }] } });
+  const after = s.relations.map((r) => `${r.type} ${r.a} ${r.b}`);
+  const gone = before.filter((k) => !after.includes(k));
+  assert.deepEqual(gone.sort(), [`related ${ai} ${ml}`, `related ${strike} ${labor}`].sort(), 'exactly those two');
+  assert.deepEqual(after.filter((k) => !before.includes(k)), [], 'nothing added');
+  assert.ok(after.includes(`broader ${ai} ${ml}`), 'the typed rule leaves the hierarchy alone');
+  assert.deepEqual(s.forbidden, [
+    { a: ai, b: ml, type: 'related', why: 'override' },
+    { a: strike, b: labor, type: 'related', why: 'override' },
+  ]);
+  assert.equal(s.stats.relations, stone.stats.relations - 2);
+  assert.deepEqual(stone.forbidden, [], 'nothing forbidden without the override');
+  // forbidding also beats a human relation and a seed, since it is applied last
+  const seeded = syntheticStone({ overrides: { relations: [{ a: 'ai', b: 'labor', type: 'synergy' }], notRelated: [{ a: 'labor', b: 'ai' }, { a: 'agi', b: 'ai', type: 'narrower' }] } });
+  assert.ok(!seeded.relations.some((r) => r.type === 'synergy'));
+  assert.ok(!seeded.relations.some((r) => r.type === 'broader' && r.a === ai && r.b === conceptOf(stone, 'agi').id), 'notRelated narrower {agi, ai} forbids broader {ai, agi}');
+  assert.equal(seeded.forbidden.length, 2);
+  // the universe carries the list through
+  assert.deepEqual(buildUniverse(s, syntheticRecords()).forbidden, s.forbidden);
 });
 
 test('systems report coverage honestly', () => {
@@ -187,7 +496,7 @@ test('review queue: similar usage alone never qualifies; a spelling or strong an
     ...rec('B', { 3: ['labour', 'felines'], 4: ['labour', 'felines'] }, { 3: { title: 'three', text: t }, 4: { title: 'four', text: t } }),
   ];
   const s = buildStone(records, {});
-  const pairs = s.relations.filter((r) => r.type === 'near').map((r) => r.evidence.terms.slice().sort().join(' ~ '));
+  const pairs = s.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').map((r) => r.evidence.terms.slice().sort().join(' ~ '));
   assert.ok(pairs.includes('labor ~ labour'), 'spelling variants are review candidates');
   assert.ok(!pairs.some((p) => p.includes('cats') && p.includes('felines')), 'cats/felines share only usage: adjacent at most');
 });

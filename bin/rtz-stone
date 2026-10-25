@@ -2,15 +2,20 @@
 import { cli, die, readText, parseJSONL, writeOut, log, readJSON } from '../lib/io.js';
 import { buildStone } from '../lib/stone.js';
 import { loadSeeds, loadJSONIfExists } from '../lib/seeds.js';
+import { readLedger, writeLedger } from '../lib/ledger.js';
 import fs from 'node:fs';
 
 const usage = `rtz-stone — records on stdin -> stone.json (concepts, canonical labels, relations)
 
 usage: rtz-stone [records.jsonl] [--overrides FILE] [--seed FILE]… [--no-seed]
-                 [--pairs FILE]… [--no-builtin] [--config FILE] [-o FILE] [-q]
+                 [--pairs FILE]… [--no-builtin] [--config FILE] [--ledger FILE] [-o FILE] [-q]
 
   --overrides FILE  human decisions (pin/same/notSame/relations/ignore/sourceWeights/canon).
                     Never written by the engine. Default: ./overrides.json if present.
+  --ledger FILE     concept-id ledger (rosetta-tagz/ledger@1): read before the build so a concept
+                    keeps its id across builds, rewritten after. Absent: created by this build.
+                    Unreadable: one warning, ids minted afresh, the file left as is.
+                    Not writable: one warning after the stone is written, exit 0.
   --pairs FILE      extra pair evidence JSONL from rtz-pairs or any external scorer ("-" = stdin is taken)
   --no-builtin      use ONLY --pairs evidence (the fully piped form: rtz-pairs | rtz-stone …)
   --seed / --no-seed  extra seed files / drop the shipped seed
@@ -23,6 +28,7 @@ const { values, positionals } = cli('rtz-stone', usage, {
   pairs: { type: 'string', multiple: true },
   'no-builtin': { type: 'boolean' },
   config: { type: 'string' },
+  ledger: { type: 'string' },
   o: { type: 'string', short: 'o' },
   q: { type: 'boolean', short: 'q' },
 });
@@ -31,6 +37,12 @@ try {
   const records = parseJSONL(await readText(positionals[0]), positionals[0] ?? 'stdin');
   const overridesFile = values.overrides ?? (fs.existsSync('overrides.json') ? 'overrides.json' : null);
   const extraSignals = (values.pairs ?? []).flatMap((f) => parseJSONL(fs.readFileSync(f, 'utf8'), f));
+  let ledger = null;
+  if (values.ledger) {
+    const { ledger: prior, status } = readLedger(values.ledger);
+    if (status === 'unreadable') log(`rtz-stone: ledger unreadable at ${values.ledger}, ids minted afresh; the file was left as is`);
+    ledger = { prior, path: values.ledger, writable: status !== 'unreadable' };
+  }
   const stone = buildStone(records, {
     cfg: loadJSONIfExists(values.config),
     overrides: overridesFile ? readJSON(overridesFile) : {},
@@ -38,11 +50,25 @@ try {
     extraSignals,
     builtin: !values['no-builtin'],
     now: new Date().toISOString(),
+    ledger,
+    warn: (m) => log(`rtz-stone: ${m}`),
   });
   writeOut(JSON.stringify(stone, null, 1) + '\n', values.o);
+  if (ledger?.writable) {
+    // the stone is complete and already written; a ledger that cannot be saved costs one line, not the build
+    try {
+      writeLedger(ledger.path, ledger.next);
+    } catch (e) {
+      log(`rtz-stone: ledger not written at ${ledger.path}: ${e.message}`);
+    }
+  }
   if (!values.q) {
     const s = stone.stats;
     log(`rtz-stone: ${s.tags} tags -> ${s.concepts} concepts (${s.tagsFolded} folded into ${s.merged} merged concepts), ${s.relations} relations, ${s.items} items`);
+    if (stone.ledger) {
+      const l = stone.ledger;
+      log(`rtz-stone: ledger ${l.path}: ${l.reused} ids kept, ${l.minted} minted, ${l.retired} retired, ${l.splits} splits, ${l.merges} merges`);
+    }
   }
 } catch (e) {
   die(`rtz-stone: ${e.message}`);

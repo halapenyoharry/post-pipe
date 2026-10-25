@@ -164,9 +164,53 @@ test('rtz build runs the whole pipeline from a config file', () => {
   fs.writeFileSync(cfg, JSON.stringify({ out, sources: [{ adapter: 'jsonfeed', path: `${SYN}wire.feed.json` }, { adapter: 'pairs', path: `${SYN}archive.tsv`, source: 'Archive' }] }));
   const r = run('rtz', ['build', '--config', cfg]);
   assert.equal(r.status, 0, r.err);
-  for (const f of ['records.jsonl', 'stone.json', 'records.all.jsonl', 'universe.json', 'view.html', 'build.json']) assert.ok(fs.existsSync(path.join(out, f)), f);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'build.json'), 'utf8')).stages.map((s) => s.name), ['ingest jsonfeed', 'ingest pairs', 'stone', 'emerge', 'universe', 'view']);
+  for (const f of ['records.jsonl', 'stone.json', 'records.all.jsonl', 'universe.json', 'view.html', 'build.json', 'ledger.json']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  const build = JSON.parse(fs.readFileSync(path.join(out, 'build.json'), 'utf8'));
+  assert.deepEqual(build.stages.map((s) => s.name), ['ingest jsonfeed', 'ingest pairs', 'stone', 'emerge', 'universe', 'view']);
+  const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
+  assert.deepEqual(build.ledger, { path: path.join(out, 'ledger.json'), minted: stone.concepts.length, reused: 0, retired: 0, splits: 0, merges: 0, events: [] });
+  const universe = JSON.parse(fs.readFileSync(path.join(out, 'universe.json'), 'utf8'));
+  assert.ok(universe.concepts.filter((c) => !c.unmapped).every((c) => c.ledger && c.ledger.event === 'minted' && typeof c.ledger.since === 'string'));
+  assert.ok(universe.concepts.filter((c) => c.unmapped).every((c) => c.ledger === undefined));
   assert.equal(run('rtz', ['build', '--config', path.join(out, 'nope.json')]).status, 1);
+});
+
+test('rtz-stone with an unreadable ledger: one warning, ids as a first build, the file left as is', () => {
+  const file = path.join(tmpDir(), 'ledger.json');
+  fs.writeFileSync(file, '{ "schema": "rosetta-tagz/ledger@1", "concepts": [not json');
+  const before = fs.readFileSync(file, 'utf8');
+  const plain = JSON.parse(run('rtz-stone', ['-q'], { input: records }).out);
+  const r = run('rtz-stone', ['-q', '--ledger', file], { input: records });
+  assert.equal(r.status, 0);
+  assert.equal(r.err.trim(), `rtz-stone: ledger unreadable at ${file}, ids minted afresh; the file was left as is`);
+  assert.equal(fs.readFileSync(file, 'utf8'), before, 'the unreadable file is not overwritten');
+  assert.ok(!fs.existsSync(`${file}.tmp`));
+  const s = JSON.parse(r.out);
+  assert.deepEqual(s.concepts.map((c) => c.id), plain.concepts.map((c) => c.id));
+  assert.equal(s.ledger.minted, s.concepts.length);
+  assert.equal(s.ledger.reused, 0);
+  // a readable ledger is read and rewritten
+  const good = path.join(tmpDir(), 'ledger.json');
+  assert.equal(run('rtz-stone', ['-q', '--ledger', good], { input: records }).status, 0);
+  const second = run('rtz-stone', ['--ledger', good], { input: records });
+  assert.match(second.err, /ledger .*: \d+ ids kept, 0 minted/);
+  assert.equal(JSON.parse(second.out).ledger.minted, 0);
+  assert.equal(JSON.parse(fs.readFileSync(good, 'utf8')).builds, 2);
+});
+
+test('rtz-stone with a ledger path that cannot be written: the stone is complete, one warning, exit 0', () => {
+  const blocker = path.join(tmpDir(), 'afile');
+  fs.writeFileSync(blocker, 'a regular file where the ledger wants a directory');
+  const file = path.join(blocker, 'ledger.json');
+  const plain = JSON.parse(run('rtz-stone', ['-q'], { input: records }).out);
+  const r = run('rtz-stone', ['-q', '--ledger', file], { input: records });
+  assert.equal(r.status, 0, r.err);
+  assert.match(r.err.trim(), new RegExp(`^rtz-stone: ledger not written at ${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: .+$`));
+  assert.equal(r.err.trim().split('\n').length, 1, 'one line');
+  assert.ok(!fs.existsSync(file) && !fs.existsSync(`${file}.tmp`));
+  const s = JSON.parse(r.out);
+  assert.deepEqual(s.concepts.map((c) => c.id), plain.concepts.map((c) => c.id));
+  assert.equal(s.ledger.minted, s.concepts.length);
 });
 
 test('rtz dispatcher: help, unknown command, and error reporting', () => {
