@@ -13,6 +13,7 @@ import { colorKeysInUse } from '../../lib/graphColors';
 import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
 import { clampTightness } from '../../lib/tightness';
+import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -187,7 +188,10 @@ export function SettingsButton({ className, size = 15, ...rest }) {
 // where: 'graph' (the main view's panel) or 'reader' (the reader's).
 // ownButton: draw the panel's own button at the top right; by default the
 // main view's panel does when the graph's controls are not in the top bar.
-export function Settings({ viewState, feedData, subject, readerOpen, where = 'graph', ownButton }) {
+// schemes: the feed's concept schemes (feed._stone.schemes, as
+// schemesOf(feedData) reads them when the prop is left out); with two or
+// more, the view group offers the scheme and the depth the tags are read at.
+export function Settings({ viewState, feedData, subject, readerOpen, where = 'graph', ownButton, schemes }) {
   const W = whereOf(where);
   const [open, setOpen] = useState(false);
   const [confirmForget, setConfirmForget] = useState(false);
@@ -274,6 +278,16 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   // graph.nodePalettes: with two or more, a choice of colour for the nodes.
   const palettes = nodePalettesOf(S && S.graph);
   const paletteId = (palettes.find((p) => p.id === viewState.preference('nodePalette')) || palettes[0] || {}).id;
+  // The concept schemes the tags can be read through, and the depth up
+  // skos:broader (preferences conceptScheme, null for the site's own, and
+  // broaderDepth, provisional, null for 0). The site scheme carries the
+  // site's title as its label (the build fills it in).
+  const schemeList = Array.isArray(schemes) ? schemes : schemesOf(feedData);
+  const siteSchemeId = (schemeList.find((s) => s.kind === 'site') || { id: SITE_SCHEME }).id;
+  const schemePref = viewState.preference('conceptScheme');
+  const schemeId = typeof schemePref === 'string' && schemeList.some((s) => s.id === schemePref) ? schemePref : siteSchemeId;
+  const depthPref = Number(viewState.preference('broaderDepth'));
+  const depth = Number.isFinite(depthPref) ? Math.max(0, Math.min(2, Math.round(depthPref))) : 0;
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -417,6 +431,28 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
             <span className={styles.rangeEnd} aria-hidden="true">tight</span>
           </span>
         </label>
+      )}
+      {schemeList.length > 1 && (
+        <Choice
+          label="Scheme"
+          name="conceptScheme"
+          options={schemeList.map((s) => ({ id: s.id, label: s.label || s.id, title: s.kind === 'external' && s.license ? `${s.label || s.id} (${s.license})` : (s.label || s.id) }))}
+          value={schemeId}
+          onChange={(v) => viewState.setPreference('conceptScheme', v === siteSchemeId ? null : v)}
+        />
+      )}
+      {schemeList.length > 1 && (
+        <Choice
+          label="Depth"
+          name="broaderDepth"
+          options={[
+            { id: '0', label: '0', title: 'Each tag as it is' },
+            { id: '1', label: '1', title: 'Tags read one step up, by their broader concept' },
+            { id: '2', label: '2', title: 'Tags read two steps up' },
+          ]}
+          value={String(depth)}
+          onChange={(v) => viewState.setPreference('broaderDepth', v === '0' ? null : Number(v))}
+        />
       )}
     </>),
 

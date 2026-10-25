@@ -35,6 +35,7 @@ import { TTS } from './components/TTS/TTS';
 import { FeedZ } from './components/FeedZ';
 import { showContainerCount } from './components/GraphViewer/containerCount';
 import { Settings } from './components/Settings';
+import { schemesOf } from './lib/schemeLabels';
 import { TimeOfDay } from './components/TimeOfDay/TimeOfDay';
 import { Theme } from './components/Theme/Theme';
 import { Toolbar } from './components/Toolbar/Toolbar';
@@ -434,6 +435,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           where="graph"
           viewState={viewState}
           feedData={feedData}
+          schemes={schemesOf(feedData)}
           subject={selectedArticle || focusedItem}
           readerOpen={selectedArticle ? selectedArticle.id : null}
         />
@@ -441,6 +443,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           where="reader"
           viewState={viewState}
           feedData={feedData}
+          schemes={schemesOf(feedData)}
           subject={selectedArticle || focusedItem}
           readerOpen={selectedArticle ? selectedArticle.id : null}
         />

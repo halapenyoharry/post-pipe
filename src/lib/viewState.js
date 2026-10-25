@@ -437,6 +437,33 @@ function createViewState(opts = {}) {
       });
     },
 
+    // A node's state moved to a new key: [[oldKey, newKey], ...]. The entry is
+    // copied as it is (position, auto, size, pinned, whatever it holds) to the
+    // new key only when nothing is filed there yet; the old key is left, so an
+    // older page still finds it. Running it again changes nothing. Not the
+    // reader's act (updateSilent): a graph that starts keying tag positions on
+    // concept ids instead of labels uses this so an arrangement survives the
+    // change. Returns how many entries were copied.
+    migrateNodeKeys(pairs) {
+      const todo = [];
+      const taken = new Set();
+      for (const pair of Array.isArray(pairs) ? pairs : []) {
+        if (!Array.isArray(pair)) continue;
+        const [from, to] = pair;
+        if (typeof from !== 'string' || typeof to !== 'string' || !from || !to || from === to) continue;
+        if (!state.nodes[from] || state.nodes[to] || taken.has(to)) continue;
+        taken.add(to);
+        todo.push([from, to]);
+      }
+      if (!todo.length) return 0;
+      updateSilent((s) => {
+        for (const [from, to] of todo) {
+          if (s.nodes[from] && !s.nodes[to]) s.nodes[to] = clone(s.nodes[from]);
+        }
+      });
+      return todo.length;
+    },
+
     // Which nodes the reader has open. Kept with the node's other state so an
     // open chapter is still open on the next visit. Not an undoable act.
     setNodePinned(id, pinned) {

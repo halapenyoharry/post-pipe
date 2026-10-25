@@ -509,3 +509,64 @@ test('historyVersion counts the undos and redos that happen, and nothing else', 
   assert.strictEqual(s.historyVersion, 3);
   assert.strictEqual(s.nodeState('n').x, 5);
 });
+
+// Positions moving from one key to another (a graph that starts keying tag
+// positions on concept ids instead of labels): copied, never overwritten.
+test('migrateNodeKeys copies an entry once, as it is, and leaves the old key', async () => {
+  const s = mk(); await s.ready();
+  s.setNodePosition('force@h::tag:ml', 10, 20, { silent: true });
+  s.setNodeSize('tag:ml', 30, 40);
+  const historyBefore = s.historyVersion;
+  const undoBefore = s.canUndo;
+  const n = s.migrateNodeKeys([
+    ['force@h::tag:ml', 'force@h::concept:c_ml'],
+    ['tag:ml', 'concept:c_ml'],
+    ['force@h::tag:absent', 'force@h::concept:c_absent'],
+  ]);
+  assert.strictEqual(n, 2, 'only entries that exist are copied');
+  assert.deepStrictEqual(s.nodeState('force@h::concept:c_ml'), s.nodeState('force@h::tag:ml'), 'copied as it is');
+  assert.strictEqual(s.nodeState('force@h::concept:c_ml').auto, true, 'a generated position stays generated');
+  assert.deepStrictEqual(
+    { w: s.nodeState('concept:c_ml').w, h: s.nodeState('concept:c_ml').h },
+    { w: 30, h: 40 },
+  );
+  assert.ok(s.nodeState('force@h::tag:ml'), 'the old key remains');
+  assert.strictEqual(s.nodeState('force@h::concept:c_absent'), null);
+  assert.strictEqual(s.canUndo, undoBefore, 'not an undoable act');
+  assert.strictEqual(s.historyVersion, historyBefore, 'and no history entry');
+});
+
+test('migrateNodeKeys is idempotent and never overwrites a target', async () => {
+  const s = mk(); await s.ready();
+  s.setNodePosition('tag:ml', 1, 1);
+  s.setNodePosition('concept:c_ml', 5, 5);
+  assert.strictEqual(s.migrateNodeKeys([['tag:ml', 'concept:c_ml']]), 0);
+  assert.deepStrictEqual({ x: s.nodeState('concept:c_ml').x, y: s.nodeState('concept:c_ml').y }, { x: 5, y: 5 }, 'the target is kept');
+
+  s.setNodePosition('tag:old', 2, 3);
+  assert.strictEqual(s.migrateNodeKeys([['tag:old', 'concept:c_old']]), 1);
+  assert.strictEqual(s.migrateNodeKeys([['tag:old', 'concept:c_old']]), 0, 'a second run changes nothing');
+  s.setNodePosition('tag:old', 9, 9);
+  s.migrateNodeKeys([['tag:old', 'concept:c_old']]);
+  assert.deepStrictEqual({ x: s.nodeState('concept:c_old').x, y: s.nodeState('concept:c_old').y }, { x: 2, y: 3 });
+  // Two pairs naming one target: the first wins.
+  s.setNodePosition('tag:a', 1, 0); s.setNodePosition('tag:b', 2, 0);
+  assert.strictEqual(s.migrateNodeKeys([['tag:a', 'concept:c_ab'], ['tag:b', 'concept:c_ab']]), 1);
+  assert.strictEqual(s.nodeState('concept:c_ab').x, 1);
+  // Nothing at all: nothing happens.
+  assert.strictEqual(s.migrateNodeKeys(null), 0);
+  assert.strictEqual(s.migrateNodeKeys([['same', 'same'], [null, 'x'], 'junk']), 0);
+});
+
+test('migrated keys survive a reload and prune leaves them alone', async () => {
+  const backend = memoryBackend();
+  let t = 0;
+  const a = mk({ backend, corpusId: 'c', now: () => ++t }); await a.ready();
+  a.setNodePosition('force@h::tag:ml', 10, 20);
+  a.migrateNodeKeys([['force@h::tag:ml', 'force@h::concept:c_ml']]);
+  a.prune(['https://x/1'], { keep: 500 });
+  assert.ok(a.nodeState('force@h::concept:c_ml'), 'a migrated position is kept through prune');
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' }); await b.ready();
+  assert.deepStrictEqual({ x: b.nodeState('force@h::concept:c_ml').x, y: b.nodeState('force@h::concept:c_ml').y }, { x: 10, y: 20 });
+});

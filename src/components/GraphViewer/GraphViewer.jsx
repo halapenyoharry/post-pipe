@@ -29,6 +29,7 @@ import { countsByChapter, connectionEdges } from '../../lib/contributions';
 import { isLinkItem, linkOf, followLink } from '../../lib/linkNode';
 import { rightsOverCards } from '../../lib/rights';
 import { tagForms, tagFormsLines } from '../../lib/tagForms';
+import { labelFor, migrationPairs, schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
 
@@ -53,6 +54,17 @@ function feedToGraph(feed, config = {}) {
   const tagColor = config.tagColor || '#f39c12';
   const topologyColor = config.topologyColor || '#9b59b6';
   const placeholderColor = config.placeholderColor || '#7f8c8d';
+
+  // What the stone's ledger says a concept was called before this build
+  // (feed._stone.concepts[].ledger.previousLabel), so a position filed under
+  // the old label can move to the concept's key.
+  const previousLabelOf = new Map();
+  const stoneConcepts = feed._stone && Array.isArray(feed._stone.concepts) ? feed._stone.concepts : [];
+  for (const c of stoneConcepts) {
+    if (c && typeof c.id === 'string' && c.ledger && typeof c.ledger.previousLabel === 'string' && c.ledger.previousLabel) {
+      previousLabelOf.set(c.id, c.ledger.previousLabel);
+    }
+  }
 
   for (const item of feed.items) {
     const slug = item.url.split('/').pop().replace('.html', '');
@@ -146,7 +158,16 @@ function feedToGraph(feed, config = {}) {
     const target = resolveEndpoint(edge.target);
 
     if (edge.layer === 'tag' && !auxNodes.has(target)) {
-      auxNodes.set(target, { id: target, label: target.slice(4), type: 'tag', size: 30, color: tagColor });
+      // A tag node knows its concept (the first tag edge's attrs.concept, the
+      // stone's id; none without a stone), the label the ledger says the
+      // concept had before, and the source ids of the pieces it joins
+      // (systems, filled once every edge is read). Positions key on the
+      // concept (persistKey), and the scheme and depth chosen in the panel
+      // read the label through it (lib/schemeLabels.js).
+      const concept = edge.attrs && typeof edge.attrs.concept === 'string' && edge.attrs.concept ? edge.attrs.concept : null;
+      const node = { id: target, label: target.slice(4), type: 'tag', size: 30, color: tagColor, concept, systems: [] };
+      if (concept && previousLabelOf.has(concept)) node.previousLabel = previousLabelOf.get(concept);
+      auxNodes.set(target, node);
     } else if (edge.layer === 'topology' && !auxNodes.has(target)) {
       auxNodes.set(target, { id: target, label: target.slice(9), type: 'topology', size: 30, color: topologyColor });
     } else if (edge.layer === 'authored' && !articleSlugs.has(target) && !auxNodes.has(target)) {
@@ -161,7 +182,28 @@ function feedToGraph(feed, config = {}) {
     links.push({ source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label });
   }
 
+  // Each tag node's systems: the source id of every piece it joins, one per
+  // tag edge, for the majority-system fallback when a scheme has no label.
+  const sourceOfSlug = new Map(nodes.map((n) => [n.id, n._source && n._source.id]));
+  for (const l of links) {
+    if (l.layer !== 'tag') continue;
+    const tag = auxNodes.get(l.target);
+    if (!tag || tag.type !== 'tag') continue;
+    const sid = sourceOfSlug.get(l.source);
+    if (sid) tag.systems.push(sid);
+  }
+
   nodes.push(...auxNodes.values());
+
+  // A link is drawn only between two nodes that exist: the link force throws
+  // on an endpoint it cannot find. A relation edge between two tags (the
+  // stone's broader, related and the mappings, corpus/relationEdges.js) in
+  // a layer a site shows while its tag layer is hidden has no tag nodes to
+  // join and is left out; a tag or topology edge always made its own node.
+  const knownIds = new Set(nodes.map((n) => n.id));
+  for (let i = links.length - 1; i >= 0; i--) {
+    if (!knownIds.has(links[i].source) || !knownIds.has(links[i].target)) links.splice(i, 1);
+  }
 
   let containers = feed.containers || config.containment || [];
   if (containers.length === 0 && containmentEdges.length > 0) {
@@ -180,6 +222,17 @@ function feedToGraph(feed, config = {}) {
   }
 
   return { nodes, links, containmentEdges, containers };
+}
+
+// The centroid of the saved positions among a list of node states (entries
+// without a finite x and y count for nothing); null when none has one.
+function centroidOf(states) {
+  let n = 0; let x = 0; let y = 0;
+  for (const s of states || []) {
+    if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.y)) continue;
+    n += 1; x += s.x; y += s.y;
+  }
+  return n ? { x: x / n, y: y / n } : null;
 }
 
 // The colour a piece's feed shows as: the reader's own choice for that feed
@@ -204,7 +257,7 @@ function nodesById(svg) {
 function piecesByTag(svg, byId) {
   const pieces = new Map();
   svg.selectAll('.link').each((l) => {
-    if (!l || l.layer !== 'tag') return;
+    if (!l || l.layer !== 'tag' || l._dupByGroup) return;
     const s = typeof l.source === 'object' ? l.source : byId.get(l.source);
     const t = typeof l.target === 'object' ? l.target : byId.get(l.target);
     const tag = t && t.type === 'tag' ? t : (s && s.type === 'tag' ? s : null);
@@ -222,7 +275,7 @@ function piecesByTag(svg, byId) {
 // in as the theme's tag colour. With nothing to blend, the theme's tag
 // colour, as a variable, so the reader's palette still reaches it.
 function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
-  const tags = svg.selectAll('.node').filter((d) => Boolean(d && d.type === 'tag'));
+  const tags = svg.selectAll('.node').filter((d) => Boolean(d && d.type === 'tag' && !d._groupedInto));
   if (tags.empty()) return;
   let themeTag = null;
   if (typeof getComputedStyle === 'function') {
@@ -252,9 +305,10 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf) {
   for (const [tagId, list] of pieces) {
     if (list.length && list.every(isHiddenArticle)) hiddenTags.add(tagId);
   }
-  // A member of a closed container stays hidden whatever its source.
+  // A member of a closed container stays hidden whatever its source, and so
+  // does a tag collapsed into another at the depth chosen (_groupedInto).
   const isHidden = (d) => Boolean(d && (
-    d._closedHidden || isHiddenArticle(d) || (d.type === 'tag' && hiddenTags.has(d.id))
+    d._closedHidden || d._groupedInto || isHiddenArticle(d) || (d.type === 'tag' && hiddenTags.has(d.id))
   ));
 
   svg.selectAll('.node')
@@ -267,7 +321,7 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf) {
     .style('display', (l) => {
       const sNode = typeof l.source === 'object' ? l.source : byId.get(l.source);
       const tNode = typeof l.target === 'object' ? l.target : byId.get(l.target);
-      if (isHidden(sNode) || isHidden(tNode)) return 'none';
+      if (l._dupByGroup || isHidden(sNode) || isHidden(tNode)) return 'none';
       return null;
     });
 
@@ -293,6 +347,7 @@ function applyTimeFilter(svg, cardsLayer, filteredSet) {
     .classed('dimmed', d => {
       if (d.type === 'article') return !filteredSet.has(d.id);
       if (d.type === 'tag') {
+        if (d._groupedInto) return false;
         const list = pieces.get(d.id);
         return Boolean(list && list.length) && !list.some((p) => filteredSet.has(p.id));
       }
@@ -431,6 +486,11 @@ export function GraphViewer({
   const renderAllArticleBodiesRef = useRef(null);
   const rootsUpdateRef = useRef(null);
   const paletteUpdateRef = useRef(null);
+  // Set once the bubbles are drawn: re-reads the scheme and depth preferences
+  // and relabels (and collapses) the tag bubbles.
+  const schemeUpdateRef = useRef(null);
+  // The feed whose tag positions were moved from label keys to concept keys.
+  const migratedFeedRef = useRef(null);
   // Set once the simulation exists: re-reads the tightness preference and
   // retunes the forces.
   const tightnessUpdateRef = useRef(null);
@@ -442,9 +502,13 @@ export function GraphViewer({
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
-  // reorders everything. Tag and topology nodes key by their own synthetic id,
-  // which is already stable.
-  const persistKey = (d) => (d.originalItem && d.originalItem.id) || d.id;
+  // reorders everything. A tag node whose concept the stone named keys on
+  // the concept id ('concept:<id>'), which survives a relabel; a tag
+  // collapsed with others at the chosen depth keys on the group's concept
+  // (_groupKey). Without a stone, tag and topology nodes key by their own
+  // synthetic id ('tag:<label>'), as they always did.
+  const persistKey = (d) => d._groupKey
+    || (d.type === 'tag' && d.concept ? 'concept:' + d.concept : ((d.originalItem && d.originalItem.id) || d.id));
 
   // Where a node sits depends on the layout — a node has one place in a ring
   // and another on a timeline — so positions are filed per layout, and per
@@ -511,6 +575,7 @@ export function GraphViewer({
       }
       if (rootsUpdateRef.current) rootsUpdateRef.current();
       if (readersUpdateRef.current) readersUpdateRef.current();
+      if (schemeUpdateRef.current) schemeUpdateRef.current();
       if (paletteUpdateRef.current) paletteUpdateRef.current();
       if (tightnessUpdateRef.current) tightnessUpdateRef.current();
       // A colour the reader gives a feed reaches its tag nodes as well.
@@ -964,6 +1029,19 @@ export function GraphViewer({
     //
     // The check is area: a layout needs room for its nodes. Anything occupying
     // a small fraction of that is not an arrangement, whatever produced it.
+    // Tag positions key on the concept id where the stone named one
+    // (persistKey). An arrangement filed under the label is moved to the
+    // concept's key, once per feed, under every layout's prefix and bare,
+    // and from the label the ledger says the concept had before
+    // (viewState.migrateNodeKeys copies, never overwrites, leaves the old).
+    // Done before the restore below, which then reads the moved entries.
+    if (viewStateRef.current && typeof viewStateRef.current.migrateNodeKeys === 'function'
+      && migratedFeedRef.current !== feedData) {
+      migratedFeedRef.current = feedData;
+      const pairs = migrationPairs(data.nodes, placeOf);
+      if (pairs.length) viewStateRef.current.migrateNodeKeys(pairs);
+    }
+
     let positionsWereDegenerate = false;
     if (viewStateRef.current) {
       const restored = data.nodes
@@ -994,6 +1072,32 @@ export function GraphViewer({
         }
         if (RESIZE_ON && savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
           d._size = { width: savedSize.w, height: savedSize.h };
+        }
+      }
+      // A tag keyed on a concept (a stone's) with no saved force position
+      // starts at the centroid of the saved positions of the pieces it joins,
+      // when any has one, so a concept whose key is new comes up among its
+      // pieces rather than wherever the simulation drops it. Seeded, not
+      // pinned (no fx/fy). Only in the force layout, the only one that reads
+      // a seed; and never for a tag keyed on its label (no stone), whose
+      // first frame stays as it was.
+      if (layoutRef.current === 'force' && data.nodes.some((d) => d.type === 'tag' && d.concept)) {
+        const nodeByIdForCentroid = new Map(data.nodes.map((n) => [n.id, n]));
+        const membersOfTag = new Map();
+        for (const l of data.links) {
+          if (l.layer !== 'tag') continue;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          const piece = nodeByIdForCentroid.get(typeof l.source === 'object' ? l.source.id : l.source);
+          if (!piece || piece.type !== 'article') continue;
+          if (!membersOfTag.has(tid)) membersOfTag.set(tid, []);
+          membersOfTag.get(tid).push(piece);
+        }
+        for (const d of data.nodes) {
+          if (d.type !== 'tag' || !d.concept) continue;
+          const own = viewStateRef.current.nodeState(positionKey(d));
+          if (own && Number.isFinite(own.x) && Number.isFinite(own.y)) continue;
+          const c = centroidOf((membersOfTag.get(d.id) || []).map((p) => viewStateRef.current.nodeState(positionKey(p))));
+          if (c) { d.x = c.x; d.y = c.y; }
         }
       }
     }
@@ -1036,13 +1140,16 @@ export function GraphViewer({
     // rather than by arithmetic. Fall back to the real card geometry.
     // At the tight end the padding is negative (cards may overlap a little),
     // so the radius is held at zero or above.
-    const collideRadius = (d) => Math.max(0, (d._r || (d.type === 'article'
+    const collideRadius = (d) => (d._groupedInto ? 0 : Math.max(0, (d._r || (d.type === 'article'
       ? Math.hypot(CARD.width, CARD.height) / 2
-      : d.size / 2)) + forces.collidePadding);
+      : d.size / 2)) + forces.collidePadding));
+    // A tag collapsed into another (_groupedInto) takes no room and pushes
+    // nothing.
+    const chargeStrength = (d) => (d._groupedInto ? 0 : forces.chargeStrength);
 
     const simulation = d3.forceSimulation()
       .force('link', d3.forceLink().id(d => d.id).distance(forces.linkDistance))
-      .force('charge', d3.forceManyBody().strength(forces.chargeStrength))
+      .force('charge', d3.forceManyBody().strength(chargeStrength))
       .force('collide', d3.forceCollide()
         .radius(collideRadius)
         .strength(1).iterations(3))
@@ -2201,14 +2308,14 @@ export function GraphViewer({
       // A laid-out member already has a rectangle nobody else overlaps, so its
       // collision circle is the one inscribed in its card, not the one around it.
       simulation.force('collide').radius((d) => {
-        if (hiddenByClosed.has(d.id)) return 0;
+        if (hiddenByClosed.has(d.id) || d._groupedInto) return 0;
         if (CL.nodes.has(d.id) && d.type === 'article') {
           return (Math.min(d._size?.width || CARD.width, d._size?.height || CARD.height) / 2) * (d._cardScale || 1);
         }
         return collideRadius(d);
       });
       simulation.force('charge').strength((d) => {
-        if (hiddenByClosed.has(d.id)) return 0;
+        if (hiddenByClosed.has(d.id) || d._groupedInto) return 0;
         return CL.nodes.has(d.id) ? forces.chargeStrength * 0.05 : forces.chargeStrength;
       });
     }
@@ -2236,7 +2343,7 @@ export function GraphViewer({
       simulation.force('link').distance(forces.linkDistance);
       if (CL.nodes.size > 0) refreshContainerForces();
       else {
-        simulation.force('charge').strength(forces.chargeStrength);
+        simulation.force('charge').strength(chargeStrength);
         simulation.force('collide').radius(collideRadius);
       }
       if (layoutRef.current !== 'force') return;
@@ -2288,7 +2395,7 @@ export function GraphViewer({
         }
         cursor += info.box.x1 - info.box.x0 + 200;
       }
-      const loose = data.nodes.filter((n) => !CL.nodes.has(n.id));
+      const loose = data.nodes.filter((n) => !CL.nodes.has(n.id) && !n._groupedInto);
       if (loose.length) {
         const pos = radialLayout(loose, { cardW: CARD.width, cardH: CARD.height });
         const xs = Object.values(pos).map((p) => p.x);
@@ -3157,54 +3264,103 @@ export function GraphViewer({
       d._r = Math.hypot(inkW + TAG.padding * 2, (inkBottom - inkTop) + TAG.padding * 2) / 2;
     }
 
+    // A tag's label broken into the lines its bubble shows: whole as long as
+    // it fits TAG.maxWidth, else split at spaces and after hyphens, two lines
+    // balanced, never more than TAG.maxLines. widthOf measures a string in
+    // the bubble's font.
+    function wrapTagLabel(label, widthOf) {
+      const PAD = TAG.padding;
+      const MAX_BUBBLE_W = TAG.maxWidth;
+      const MAX_LINES = TAG.maxLines;
+      const pieces = label.split(/(?<=-)|\s+/).filter(Boolean);
+      const join = (arr) => arr.join('').replace(/\s+$/, '').trim();
+
+      let lines = [label];
+      if (widthOf(label) + PAD * 2 > MAX_BUBBLE_W && pieces.length > 1) {
+        lines = [];
+        let current = [];
+        for (const piece of pieces) {
+          const next = [...current, piece];
+          if (current.length && widthOf(join(next)) + PAD * 2 > MAX_BUBBLE_W) {
+            lines.push(join(current));
+            current = [piece];
+          } else {
+            current = next;
+          }
+        }
+        if (current.length) lines.push(join(current));
+
+        if (lines.length === 2) {
+          let bestSplit = 1;
+          let bestCost = Infinity;
+          for (let i = 1; i < pieces.length; i++) {
+            const cost = Math.max(
+              widthOf(join(pieces.slice(0, i))),
+              widthOf(join(pieces.slice(i))),
+            );
+            if (cost < bestCost) { bestCost = cost; bestSplit = i; }
+          }
+          lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
+        }
+        if (lines.length > MAX_LINES) {
+          const head = lines.slice(0, MAX_LINES - 1);
+          lines = head.concat([lines.slice(MAX_LINES - 1).join(' ')]);
+        }
+      }
+      return lines;
+    }
+    const tagLineH = (lines, fontSize) => (lines.length > 1 ? fontSize * 1.0 : fontSize * 1.1);
+
+    // A measurer for wrapTagLabel: a hidden text in the bubble's font, to be
+    // removed by the caller.
+    function tagProbe() {
+      const p = svg.append('text')
+        .style('font-family', TAG_FONT_FAMILY)
+        .style('visibility', 'hidden')
+        .style('font-size', TAG.fontSize + 'px')
+        .style('font-weight', '500');
+      return { widthOf: (t) => { p.text(t); return p.node().getComputedTextLength(); }, remove: () => p.remove() };
+    }
+
+    // The small lines beside a tag bubble (lib/tagForms.js: what each system
+    // writes, who named it), shown while the tag is hovered or active. The
+    // concept is looked up by its id where the stone named one, else by the
+    // label. Null when there is nothing to show.
+    function buildTagForms(el, d, fontSize) {
+      const formLines = d.type === 'tag'
+        ? tagFormsLines(tagForms(feedData._stone, d.concept || d.label, feedData.items))
+        : [];
+      if (!formLines.length) return null;
+      const formFontSize = Math.round(fontSize * 0.65);
+      const formLineH = formFontSize * 1.25;
+      const formsEl = el.append('text')
+        .attr('class', 'tag-forms')
+        .attr('text-anchor', 'start')
+        .attr('dominant-baseline', 'central')
+        .style('font-family', TAG_FONT_FAMILY)
+        .style('font-size', formFontSize + 'px')
+        .style('font-weight', String(TAG_WEIGHT))
+        .style('fill', 'var(--text, #ccc)')
+        .style('pointer-events', 'none')
+        .style('display', 'none');
+      formLines.forEach((line, i) => {
+        formsEl.append('tspan')
+          .attr('y', (i - (formLines.length - 1) / 2) * formLineH)
+          .text(line);
+      });
+      return formsEl;
+    }
+
     nodes.each(function(d) {
       const el = d3.select(this);
       if (d.type !== 'article') {
         const fontSize = TAG.fontSize;
-        const PAD = TAG.padding;
-        const MAX_BUBBLE_W = TAG.maxWidth;
-        const MAX_LINES = TAG.maxLines;
 
         probe.style('font-size', fontSize + 'px').style('font-weight', '500');
         const widthOf = (t) => { probe.text(t); return probe.node().getComputedTextLength(); };
 
-        const pieces = d.label.split(/(?<=-)|\s+/).filter(Boolean);
-        const join = (arr) => arr.join('').replace(/\s+$/, '').trim();
-
-        let lines = [d.label];
-        if (widthOf(d.label) + PAD * 2 > MAX_BUBBLE_W && pieces.length > 1) {
-          lines = [];
-          let current = [];
-          for (const piece of pieces) {
-            const next = [...current, piece];
-            if (current.length && widthOf(join(next)) + PAD * 2 > MAX_BUBBLE_W) {
-              lines.push(join(current));
-              current = [piece];
-            } else {
-              current = next;
-            }
-          }
-          if (current.length) lines.push(join(current));
-
-          if (lines.length === 2) {
-            let bestSplit = 1;
-            let bestCost = Infinity;
-            for (let i = 1; i < pieces.length; i++) {
-              const cost = Math.max(
-                widthOf(join(pieces.slice(0, i))),
-                widthOf(join(pieces.slice(i))),
-              );
-              if (cost < bestCost) { bestCost = cost; bestSplit = i; }
-            }
-            lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
-          }
-          if (lines.length > MAX_LINES) {
-            const head = lines.slice(0, MAX_LINES - 1);
-            lines = head.concat([lines.slice(MAX_LINES - 1).join(' ')]);
-          }
-        }
-
-        const effLineH = lines.length > 1 ? fontSize * 1.0 : fontSize * 1.1;
+        const lines = wrapTagLabel(d.label, widthOf);
+        const effLineH = tagLineH(lines, fontSize);
 
         const textEl = el.append('text')
           .attr('text-anchor', 'middle')
@@ -3222,31 +3378,9 @@ export function GraphViewer({
           .attr('fill', 'var(--gv-' + (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') + ')')
           .attr('opacity', TAG.opacity);
 
-        let formsEl = null;
-        const formLines = d.type === 'tag'
-          ? tagFormsLines(tagForms(feedData._stone, d.label, feedData.items))
-          : [];
-        if (formLines.length) {
-          const formFontSize = Math.round(fontSize * 0.65);
-          const formLineH = formFontSize * 1.25;
-          formsEl = el.append('text')
-            .attr('class', 'tag-forms')
-            .attr('text-anchor', 'start')
-            .attr('dominant-baseline', 'central')
-            .style('font-family', TAG_FONT_FAMILY)
-            .style('font-size', formFontSize + 'px')
-            .style('font-weight', String(TAG_WEIGHT))
-            .style('fill', 'var(--text, #ccc)')
-            .style('pointer-events', 'none')
-            .style('display', 'none');
-          formLines.forEach((line, i) => {
-            formsEl.append('tspan')
-              .attr('y', (i - (formLines.length - 1) / 2) * formLineH)
-              .text(line);
-          });
-        }
+        const formsEl = buildTagForms(el, d, fontSize);
 
-        const entry = { d, textEl, rectEl, formsEl, lines, fontSize, lineH: effLineH };
+        const entry = { d, el, textEl, rectEl, formsEl, lines, fontSize, lineH: effLineH };
         tagBubbles.push(entry);
         fitBubble(entry);
 
@@ -3992,6 +4126,198 @@ export function GraphViewer({
     });
     simulation.force('link').links(data.links);
 
+    // ── Scheme and depth ──────────────────────────────────────────────────
+    // The panel's concept scheme (preference conceptScheme, null for the
+    // site's own) and depth up skos:broader (broaderDepth, provisional, null
+    // for 0, at most 2) reach the tag bubbles without a rebuild: each is
+    // relabelled through lib/schemeLabels.js labelFor, a label standing in
+    // from another scheme is marked (.tag-fallback, a dashed outline), and
+    // the tags that reach one concept at that depth collapse into one
+    // bubble. The representative (the member whose concept is the group's,
+    // if drawn, else the one joining most pieces, ties by id) shows the
+    // group's label, keys its position on the group concept (_groupKey:
+    // the saved position for that key, else the members' centroid); the
+    // other members are hidden (_groupedInto, honoured by applyVisibility,
+    // applyTimeFilter and paintTagColors, weightless in the forces, held
+    // where they were) and their tag links re-pointed to the representative
+    // (_origTarget kept; a second link to one piece hidden, _dupByGroup).
+    // Depth 0 puts everything back. No node is made or removed and d.id
+    // never changes, so select, highlight and the tag list go on working.
+    const stoneForLabels = feedData && feedData._stone;
+    const tagEntries = tagBubbles.filter((e) => e.d.type === 'tag' && e.d.concept);
+    const tagLinks = data.links.filter((l) => l.layer === 'tag');
+    let schemeShown = { scheme: SITE_SCHEME, depth: 0 };
+    // A stored scheme the feed no longer lists (a feed dropped since the
+    // reader chose it) is the site's, as the panel reads it (Settings.jsx).
+    const schemeIds = new Set(schemesOf(feedData).map((s) => s.id));
+    const schemeChosen = () => {
+      const vs = viewStateRef.current;
+      const s = vs && vs.preference ? vs.preference('conceptScheme') : null;
+      const n = vs && vs.preference ? Number(vs.preference('broaderDepth')) : 0;
+      return {
+        scheme: typeof s === 'string' && s && schemeIds.has(s) ? s : SITE_SCHEME,
+        depth: Number.isFinite(n) ? Math.max(0, Math.min(2, Math.round(n))) : 0,
+      };
+    };
+    const depthSteps = (n) => (Number.isFinite(n) && n > 0 ? n : 0);
+    // The bubble's text, outline and forms for a label (the tag's own when
+    // the stone does not know the concept).
+    function relabelBubble(entry, label, fallback) {
+      const { d, el, textEl, fontSize } = entry;
+      const shown = label || d.label;
+      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback)) return;
+      d._shownLabel = shown;
+      entry.fallback = Boolean(fallback);
+      const p = tagProbe();
+      const lines = wrapTagLabel(shown, p.widthOf);
+      p.remove();
+      textEl.selectAll('tspan').remove();
+      lines.forEach((line) => { textEl.append('tspan').attr('x', 0).text(line); });
+      entry.lines = lines;
+      entry.lineH = tagLineH(lines, fontSize);
+      el.classed('tag-fallback', entry.fallback);
+      if (entry.formsEl) entry.formsEl.remove();
+      entry.formsEl = buildTagForms(el, d, fontSize);
+      fitBubble(entry);
+    }
+    const pieceCountOf = (tagId) => tagLinks.filter((l) => endId(l._origTarget || l.target) === tagId).length;
+    // Members back to their own bubbles and links; true when any was grouped.
+    // The holds taken at grouping time (_groupSaved, _preGroupPos) are force
+    // layout coordinates: they go back only while the force layout is on
+    // screen. In a ring or on the timeline a released node keeps the hold it
+    // has, or takes the position this layout saved under its own key; the
+    // layout switch skipped it while it was hidden.
+    function ungroupAll() {
+      let had = false;
+      const inForce = layoutRef.current === 'force';
+      const vs = viewStateRef.current;
+      for (const l of tagLinks) {
+        if (l._origTarget === undefined) continue;
+        l.target = l._origTarget;
+        delete l._origTarget;
+        delete l._dupByGroup;
+      }
+      for (const d of data.nodes) {
+        let released = false;
+        if (d._groupedInto) {
+          had = true;
+          released = true;
+          delete d._groupedInto;
+          if (d._groupSaved) {
+            if (inForce) { d.fx = d._groupSaved.fx; d.fy = d._groupSaved.fy; }
+            delete d._groupSaved;
+          }
+        }
+        if (d._groupKey) {
+          had = true;
+          released = true;
+          delete d._groupKey;
+          if (d._preGroupPos) {
+            const p = d._preGroupPos;
+            if (inForce) { d.x = p.x; d.y = p.y; d.fx = p.fx; d.fy = p.fy; }
+            delete d._preGroupPos;
+          }
+        }
+        if (released && !inForce && vs && vs.nodeState) {
+          const saved = vs.nodeState(positionKey(d));
+          if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+            d.x = saved.x; d.y = saved.y; d.fx = saved.x; d.fy = saved.y;
+          }
+        }
+      }
+      return had;
+    }
+    function applyScheme({ scheme, depth }) {
+      if (!tagEntries.length) return;
+      const hadGroups = ungroupAll();
+      const reached = new Map();
+      const groups = new Map();
+      for (const e of tagEntries) {
+        const r = labelFor(stoneForLabels, e.d.concept, { scheme, depth, systems: e.d.systems });
+        reached.set(e.d.id, r);
+        const gid = r.groupId || e.d.concept;
+        if (!groups.has(gid)) groups.set(gid, []);
+        groups.get(gid).push(e.d);
+      }
+      let hasGroups = false;
+      const vs = viewStateRef.current;
+      // Grouping is the depth's doing: at depth 0 every tag keeps its own
+      // bubble, whatever concept its label is read from (two tags mapped to
+      // one vocabulary concept both show its label, each dashed or not on
+      // its own), so depth 0 restores and never collapses.
+      for (const [gid, members] of (depthSteps(depth) > 0 ? groups : [])) {
+        if (members.length === 1 && members[0].concept === gid) continue;
+        hasGroups = true;
+        const own = members.filter((d) => d.concept === gid);
+        const pool = own.length ? own : members;
+        const rep = pool.slice().sort((a, b) => (pieceCountOf(b.id) - pieceCountOf(a.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+        rep._preGroupPos = { x: rep.x, y: rep.y, fx: rep.fx, fy: rep.fy };
+        rep._groupKey = 'concept:' + gid;
+        const saved = vs && vs.nodeState ? vs.nodeState(placeOf(layoutRef.current) + rep._groupKey) : null;
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+          // Once the simulation has settled every node is pinned (fx, fy),
+          // and a tick puts x back to fx: a pinned representative moves only
+          // through its pin. A reader-placed position pins it there; a
+          // layout-made one (auto) moves the pin it already has.
+          rep.x = saved.x; rep.y = saved.y;
+          if (!saved.auto || rep.fx != null) { rep.fx = saved.x; rep.fy = saved.y; }
+        } else {
+          const c = centroidOf(members);
+          if (c) {
+            rep.x = c.x; rep.y = c.y;
+            if (rep.fx != null) { rep.fx = c.x; rep.fy = c.y; }
+          }
+        }
+        const linkedToRep = new Set(tagLinks.filter((l) => endId(l.target) === rep.id).map((l) => endId(l.source)));
+        for (const d of members) {
+          if (d === rep) continue;
+          d._groupedInto = rep.id;
+          d._groupSaved = { fx: d.fx, fy: d.fy };
+          d.fx = d.x; d.fy = d.y;
+          for (const l of tagLinks) {
+            if (endId(l.target) !== d.id) continue;
+            l._origTarget = l.target;
+            l.target = rep;
+            const pid = endId(l.source);
+            if (linkedToRep.has(pid)) l._dupByGroup = true;
+            else linkedToRep.add(pid);
+          }
+        }
+      }
+      for (const e of tagEntries) {
+        if (e.d._groupedInto) continue;
+        const r = reached.get(e.d.id);
+        relabelBubble(e, r.label, r.fallback && r.label);
+      }
+      if (hadGroups || hasGroups) {
+        // A second link from one piece to the representative (_dupByGroup) is
+        // hidden and pulls nothing: the force sees each piece–tag pair once.
+        simulation.force('link').links(data.links.filter((l) => !l._dupByGroup));
+        simulation.force('charge').strength(simulation.force('charge').strength());
+        simulation.force('collide').radius(simulation.force('collide').radius());
+        applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf);
+        applyPositions();
+        simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+      } else {
+        // A relabel alone: the bubbles' new sizes reach the collide force,
+        // nothing is set moving.
+        simulation.force('collide').radius(simulation.force('collide').radius());
+        applyPositions();
+      }
+    }
+    schemeUpdateRef.current = () => {
+      const next = schemeChosen();
+      if (next.scheme === schemeShown.scheme && next.depth === schemeShown.depth) return;
+      schemeShown = next;
+      applyScheme(next);
+    };
+    // The choice already made when the graph is drawn (the site's scheme at
+    // depth 0 is what was just drawn).
+    if (tagEntries.length) {
+      const first = schemeChosen();
+      if (first.scheme !== SITE_SCHEME || first.depth !== 0) { schemeShown = first; applyScheme(first); }
+    }
+
     // Paint once now, from whatever positions were restored or seeded, so the
     // first frame is correct with or without the simulation ever running.
     nudgeOpenCards();
@@ -4421,6 +4747,13 @@ export function GraphViewer({
 
     const handleUnpinAll = () => {
       data.nodes.forEach(d => {
+        // A tag collapsed into another (_groupedInto) keeps the hold that
+        // parks it, hidden, where it was; the unpin reaches it when it comes
+        // back (its saved hold is cleared), as it reaches every other node now.
+        if (d._groupedInto) {
+          if (d._groupSaved) d._groupSaved = { fx: null, fy: null };
+          return;
+        }
         d.fx = null;
         d.fy = null;
         delete d._forcePos;
@@ -4519,7 +4852,11 @@ export function GraphViewer({
     // (src/components/Toolbar).
     const handleSelectTag = (e) => {
       const id = e && e.detail ? e.detail.id : null;
-      const d = data.nodes.find((n) => n.type === 'tag' && n.id === id);
+      let d = data.nodes.find((n) => n.type === 'tag' && n.id === id);
+      // A tag collapsed into another at the chosen depth (_groupedInto) is
+      // hidden and its links point at the representative: that bubble is
+      // what lights up and is panned to.
+      if (d && d._groupedInto) d = data.nodes.find((n) => n.id === d._groupedInto) || d;
       if (!d) return;
       toggleTagHighlight(d);
       if (activeTag !== d.id || !Number.isFinite(d.x) || !Number.isFinite(d.y)) return;
@@ -4558,6 +4895,7 @@ export function GraphViewer({
       renderAllArticleBodiesRef.current = null;
       rootsUpdateRef.current = null;
       paletteUpdateRef.current = null;
+      schemeUpdateRef.current = null;
       tightnessUpdateRef.current = null;
       readersUpdateRef.current = null;
       if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
@@ -4799,18 +5137,22 @@ export function GraphViewer({
       }
     }
 
+    // A tag collapsed into another at the chosen depth (_groupedInto) is
+    // hidden: it takes no place in the ring or on the timeline, is not moved,
+    // and keeps the hold that parks it (ungroupAll reads it back).
+    const shown = g.data.nodes.filter((d) => !d._groupedInto);
     const computed = layout === 'force'
-      ? Object.fromEntries(g.data.nodes.map(d => [
+      ? Object.fromEntries(shown.map(d => [
           d.id,
           d._forcePos || (vs && vs.nodeState(placeOf('force') + persistKey(d))) || { x: d.x, y: d.y },
         ]))
       : (layout === 'radial' && g.ringTargets && g.ringTargets())
-        || computeLayout(layout, g.data.nodes, { cardW: rest.width, cardH: rest.height });
+        || computeLayout(layout, shown, { cardW: rest.width, cardH: rest.height });
     if (!computed) return;
 
     const startPositions = new Map(g.data.nodes.map(d => [d.id, { x: d.x, y: d.y }]));
 
-    g.data.nodes.forEach((d) => {
+    shown.forEach((d) => {
       const saved = vs && vs.nodeState(placeOf(layout) + persistKey(d));
       const target = (saved && typeof saved.x === 'number' && !saved.auto)
         ? { x: saved.x, y: saved.y }
