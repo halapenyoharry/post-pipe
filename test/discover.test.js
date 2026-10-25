@@ -58,10 +58,59 @@ test('hubs bridge into tagged items that contain them; items that never mention 
   assert.equal(out.filter((t) => t.item === 'lone').length, 0);
 });
 
-test('only untagged items choose hubs; tagged items are capped lower', () => {
-  const perWire = Object.groupBy(out.filter((t) => t.source === 'Wire'), (t) => t.item);
-  for (const list of Object.values(perWire)) assert.ok(list.length <= 3);
-  assert.ok(out.filter((t) => t.source === 'Mine').length <= 2);
+test('the per-item cap governs hub selection, not attachment: every hub lands on every item containing it', () => {
+  const items = records.filter((r) => r.type === 'item');
+  const taggedKeys = new Set(records.filter((r) => r.type === 'tag').map((r) => `${r.source}::${r.item}`));
+  const orphans = items.filter((it) => !taggedKeys.has(`${it.source}::${it.id}`));
+  const hubs = new Set(out.map((t) => t.label));
+  assert.ok(hubs.size > 0);
+  assert.ok(hubs.size <= orphans.length * 3, 'distinct hubs are chosen from the orphans, perItem each');
+  for (const label of hubs) {
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${label}(?![\\p{L}\\p{N}])`, 'iu');
+    const containing = items.filter((it) => re.test(`${it.title} ${it.text}`)).map((it) => `${it.source}::${it.id}`);
+    const carrying = out.filter((t) => t.label === label).map((t) => `${t.source}::${t.item}`);
+    for (const k of containing) assert.ok(carrying.includes(k), `"${label}" is in ${k} and must be attached there`);
+  }
+  // the defect this pins: q1 says "qubits" and q2 says "reporters"; before, the cap at attachment dropped them
+  const on = (item, label) => out.some((t) => t.source === 'Wire' && t.item === item && t.label === label);
+  assert.ok(on('q1', 'qubits'));
+  assert.ok(on('q2', 'reporters'));
+});
+
+test('the why-count of a discovered concept equals the number of items asserting it', () => {
+  const byLabel = Object.groupBy(out, (t) => t.label);
+  for (const [label, list] of Object.entries(byLabel)) {
+    for (const t of list) {
+      const n = Number(t.why.match(/recurs in (\d+)/)[1]);
+      assert.equal(n, list.length, `"${label}" claims ${n} items and is asserted on ${list.length}`);
+      assert.equal(t.wasGeneratedBy.parameters.items, list.length);
+    }
+  }
+});
+
+test('every discovered record carries its provenance', () => {
+  for (const t of out) {
+    assert.equal(t.wasDerivedFrom.length, 1);
+    const [d] = t.wasDerivedFrom;
+    assert.equal(d.type, 'text');
+    assert.equal(typeof d.phrase, 'string');
+    assert.ok(d.count >= 1);
+    assert.equal(typeof d.inTitle, 'boolean');
+    const it = records.find((r) => r.type === 'item' && r.source === t.source && r.id === t.item);
+    assert.ok(`${it.title} ${it.text}`.toLowerCase().includes(d.phrase), `"${d.phrase}" is in the item's text`);
+    assert.equal(d.inTitle, it.title.toLowerCase().split(/[^\p{L}\p{N}]+/u).join(' ').includes(d.phrase), `inTitle for "${d.phrase}" on ${t.item}`);
+    assert.equal(t.wasGeneratedBy.activity, 'discover');
+    const P = t.wasGeneratedBy.parameters;
+    assert.deepEqual(Object.keys(P).sort(), ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'perItem']);
+    assert.ok(P.items >= P.minDf && P.items <= P.df);
+  }
+});
+
+test('output order is by hub, then by item', () => {
+  const keys = out.map((t) => `${t.label}\u0000${t.source}::${t.item}`);
+  const labels = out.map((t) => t.label);
+  assert.deepEqual(labels, [...labels].sort());
+  assert.deepEqual(keys, [...keys].sort());
 });
 
 test('discovery is deterministic', () => {
@@ -80,12 +129,23 @@ test('discovered phrases join the stone as evidence and fold into other systems\
   assert.ok(Object.keys(c.variants.find((v) => v.norm === 'quantum').bySource).includes('Editorial'));
 });
 
-test('a concept only ever proposed by discovery is flagged and is not re-matched by emerge', () => {
+test('a concept only ever proposed by discovery is flagged, visible to emerge, and never doubled', () => {
   const s = buildStone([...records, ...out], {});
   const hubOnly = s.concepts.filter((c) => c.discovered);
   assert.ok(hubOnly.length > 0);
   assert.ok(s.concepts.filter((c) => !c.discovered).every((c) => c.variants.some((v) => v.explicit > 0)));
-  const extra = emerge(s, [...records, ...out]);
   const discoveredIds = new Set(hubOnly.map((c) => c.id));
-  assert.ok(extra.every((t) => !discoveredIds.has(t.concept)));
+  const eruption = hubOnly.find((c) => c.variants.some((v) => v.norm === 'volcano eruption'));
+  assert.ok(eruption, 'the wire\'s "volcano eruption" is a concept the stone knows only from discovery');
+
+  // without the discovered records, emergence sees the concept and earns it where the text says it
+  const fresh = emerge(s, records);
+  const earned = fresh.filter((t) => t.concept === eruption.id);
+  assert.deepEqual(earned.map((t) => t.item).sort(), ['v1', 'v2']);
+  for (const t of earned) assert.equal(t.label, eruption.canonical);
+
+  // with them, every item that carries a discovered concept already is left alone
+  const carried = new Set(out.map((t) => `${t.source}::${t.item}::${s.concepts.find((c) => c.variants.some((v) => v.norm === t.label.toLowerCase()))?.id}`));
+  const extra = emerge(s, [...records, ...out]);
+  for (const t of extra) if (discoveredIds.has(t.concept)) assert.ok(!carried.has(`${t.source}::${t.item}::${t.concept}`), `${t.item} already carries ${t.concept}`);
 });

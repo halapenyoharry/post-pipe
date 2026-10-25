@@ -72,17 +72,37 @@ profiles, only for pairs that never share an item. Each concept keeps its strong
 - a lone generic word is accepted only if the item reads like the items carrying the tag (TF-IDF cosine
   ≥ 0.12): a mulberry article does not earn `process`;
 - acronyms match only in capitals ("maid" does not contain `AI`);
-- concepts that exist only because discovery proposed them are skipped (discovery already placed them).
+- concepts that exist only because discovery proposed them are matched like any other (since 2026-10-25;
+  before, they were skipped): discovery attached them where its candidate scan found the phrase, and
+  emergence catches what that scan missed, under the same guards;
+- whatever an item already carries, from any tag-system or stage, is never doubled: a record naming a
+  concept the stone knows counts as is, any other record is resolved by its label.
 
 `discover` exists for tag-systems with no shared vocabulary. Candidates are unigrams and bigrams that
 never span punctuation; a hub must recur in ≥ 2 items, stay under 12% of items, avoid
 `seed/generic-words.txt`, and not be incoherent (a weak guard: on short summaries the coherence
 statistic does not separate topics from filler, so the word list does the real work). Hubs are chosen
-from the untagged items' point of view and then attached to *every* item containing them.
+from the untagged items' point of view, `perItem` at a time, and then attached to *every* item
+containing them, with no cap: attachment follows justification, and a hub's `why` counts exactly the
+items that carry it (a hub left on fewer than `minDf` items is dropped). Before 2026-10-25 the cap was
+applied again at attachment, so a `why` could claim six items while two carried the tag.
+
+Every record either stage emits carries its provenance in PROV terms: `wasDerivedFrom`
+(`[{type: 'text', phrase, count, inTitle}]`, where `phrase` is the span of the item's own words that
+matched, so an item that says "court" is never said to contain "courts") and `wasGeneratedBy`
+(`{activity: 'discover' | 'emerge', parameters}`, the stage and the numbers that admitted the tag;
+emergence's `context` is present only for a lone word, where it was computed).
+
+Two consequences of filing discovered spellings under their own scheme, noted for the relation work:
+the anti-synonym penalty (`sameSourceCooccurrence` in `lib/cluster.js`) compares item sets per
+scheme, so a human's tag and a discovered phrase on the same item no longer count as a human saying
+the two are different things (only a human's co-tagging does); and since emergence now extends
+discovered-only concepts, a discovered concept's `why` count equals the number of its *discovered*
+assertions, not every edge it ends up with.
 
 ## What was verified, and how
 
-- 98 `node:test` tests: normalisation, each signal, clustering, overrides, canonical scoring,
+- 114 `node:test` tests: normalisation, each signal, clustering, overrides, canonical scoring,
   emergence/discovery, all four graph projections, and the real programs run as separate processes
   (including the fully piped form and an external scorer).
 - Real corpus runs (your Posts + post-pipe's feed) found five defects the synthetic data hid; each now
