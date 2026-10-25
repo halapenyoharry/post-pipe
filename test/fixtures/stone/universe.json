@@ -11,16 +11,34 @@
     "concepts": 4,
     "merged": 2,
     "tagsFolded": 2,
-    "relations": 0,
+    "relations": 5,
+    "mappings": 2,
     "items": 4,
     "itemRecords": 5,
     "unmapped": 1,
-    "emergentTags": 2
+    "emergentTags": 2,
+    "untagged": 1
   },
   "sources": [
     { "name": "Posts", "color": "#2ecc71", "weight": 1, "items": 2, "tagged": 2 },
     { "name": "ScienceWire", "color": "#3498db", "weight": 1, "items": 2, "tagged": 1 },
     { "name": "Journal", "color": "#e67e22", "weight": 1, "items": 1, "tagged": 1 }
+  ],
+  "schemes": [
+    { "id": "site", "label": "site", "kind": "site" },
+    { "id": "Posts", "label": "Posts", "kind": "system" },
+    { "id": "ScienceWire", "label": "ScienceWire", "kind": "system" },
+    { "id": "Journal", "label": "Journal", "kind": "system" },
+    { "id": "discovered", "kind": "discovered" },
+    {
+      "id": "iptc-mediatopics",
+      "label": "IPTC Media Topics",
+      "kind": "external",
+      "iri": "http://cv.iptc.org/newscodes/mediatopic/",
+      "license": "CC BY 4.0",
+      "concepts": 3,
+      "path": "/sites/fixture/vocab/iptc-mediatopics.json"
+    }
   ],
   "concepts": [
     {
@@ -33,6 +51,9 @@
       "n": 1,
       "nEmergent": 0,
       "sources": { "Posts": 1 },
+      "inScheme": ["Posts", "site"],
+      "prefLabel": { "Posts": "act-1", "site": "act-1" },
+      "altLabel": {},
       "variants": [
         {
           "norm": "act 1",
@@ -66,6 +87,15 @@
       "n": 2,
       "nEmergent": 1,
       "sources": { "Posts": 1, "ScienceWire": 1, "Journal": 1 },
+      "inScheme": ["Posts", "ScienceWire", "Journal", "site"],
+      "ledger": { "since": "2026-10-22T12:00:00.000Z", "event": "minted" },
+      "prefLabel": {
+        "Posts": "artificial intelligence",
+        "ScienceWire": "A.I.",
+        "Journal": "AI",
+        "site": "Artificial Intelligence"
+      },
+      "altLabel": { "Posts": ["AI"] },
       "variants": [
         {
           "norm": "artificial intelligence",
@@ -116,6 +146,15 @@
       "n": 3,
       "nEmergent": 1,
       "sources": { "Posts": 1, "ScienceWire": 1, "Journal": 1 },
+      "inScheme": ["Posts", "ScienceWire", "Journal", "site"],
+      "ledger": { "since": "2026-10-20T12:00:00.000Z", "event": "reused", "previousLabel": "machine learning" },
+      "prefLabel": {
+        "Posts": "machine-learning",
+        "ScienceWire": "Machine Learning",
+        "Journal": "ML",
+        "site": "Machine Learning"
+      },
+      "altLabel": {},
       "variants": [
         {
           "norm": "machine learning",
@@ -160,6 +199,9 @@
       "n": 0,
       "nEmergent": 0,
       "sources": {},
+      "inScheme": ["site"],
+      "prefLabel": { "site": "Unused Concept" },
+      "altLabel": {},
       "variants": [],
       "rank": [],
       "links": []
@@ -174,6 +216,9 @@
       "n": 0,
       "nEmergent": 1,
       "sources": { "ScienceWire": 1 },
+      "inScheme": ["discovered", "site"],
+      "prefLabel": { "discovered": "neural hardware", "site": "neural hardware" },
+      "altLabel": {},
       "variants": [
         {
           "norm": "neural hardware",
@@ -197,7 +242,87 @@
       "links": []
     }
   ],
-  "relations": [],
+  "relations": [
+    {
+      "a": "c_ai",
+      "b": "c_machine_learning",
+      "type": "related",
+      "weight": 0.6,
+      "skos": true,
+      "why": "co-occur on 2 of 4 items (npmi 0.9)",
+      "evidence": { "n": 2, "na": 3, "nb": 4, "npmi": 0.9 },
+      "wasDerivedFrom": [{ "type": "cooccurrence", "items": 2 }],
+      "wasGeneratedBy": { "activity": "relate", "parameters": { "minNpmi": 0.25, "minCooc": 2 } },
+      "locked": false
+    },
+    {
+      "a": "c_ai",
+      "b": "u_neural_hardware",
+      "type": "broader",
+      "weight": 1,
+      "skos": true,
+      "why": "every item with neural hardware also carries Artificial Intelligence",
+      "evidence": { "n": 1, "na": 3, "nb": 1 },
+      "wasDerivedFrom": [{ "type": "cooccurrence", "items": 1 }],
+      "wasGeneratedBy": { "activity": "relate", "parameters": { "broaderP": 0.8, "narrowerMaxP": 0.6, "minSupport": 1 } },
+      "locked": false
+    },
+    {
+      "a": "c_ai",
+      "b": "iptc-mediatopics:20000763",
+      "type": "exactMatch",
+      "weight": 1,
+      "skos": true,
+      "why": "label \"artificial intelligence\" matches the vocabulary's prefLabel",
+      "wasDerivedFrom": [{ "type": "label", "scheme": "iptc-mediatopics", "label": "artificial intelligence" }],
+      "wasGeneratedBy": { "activity": "map", "parameters": { "exactMatch": 0.7, "closeMatch": 0.4 } },
+      "locked": false
+    },
+    {
+      "a": "c_machine_learning",
+      "b": "iptc-mediatopics:20000763",
+      "type": "broadMatch",
+      "weight": 0.56,
+      "skos": true,
+      "why": "related to Artificial Intelligence, which matches artificial intelligence exactly",
+      "wasDerivedFrom": [{ "type": "propagation", "via": "c_ai" }],
+      "wasGeneratedBy": { "activity": "map", "parameters": { "broadMatchMinP": 0.5 } },
+      "locked": false
+    },
+    {
+      "a": "c_ai",
+      "b": "c_act_1",
+      "type": "adjacent",
+      "weight": 0.12,
+      "skos": false,
+      "evidence": { "cosine": 0.32, "na": 3, "nb": 1 },
+      "locked": false
+    }
+  ],
+  "external": {
+    "iptc-mediatopics:20000763": {
+      "prefLabel": "artificial intelligence",
+      "broader": ["iptc-mediatopics:20000756"],
+      "iri": "http://cv.iptc.org/newscodes/mediatopic/20000763"
+    },
+    "iptc-mediatopics:20000756": {
+      "prefLabel": "technology and engineering",
+      "broader": ["iptc-mediatopics:13000000"],
+      "iri": "http://cv.iptc.org/newscodes/mediatopic/20000756"
+    },
+    "iptc-mediatopics:13000000": {
+      "prefLabel": "science and technology",
+      "broader": [],
+      "iri": "http://cv.iptc.org/newscodes/mediatopic/13000000"
+    }
+  },
+  "untagged": [
+    {
+      "key": "Journal::j-unjoined",
+      "source": "Journal",
+      "why": ["no phrase recurs across Journal items", "best candidate \"short note\" below minDf 2"]
+    }
+  ],
   "items": [
     {
       "key": "ScienceWire::wire-1",
@@ -228,7 +353,13 @@
             { "l": "A.I.", "n": "ai", "s": "ScienceWire" }
           ],
           "sys": ["Posts", "ScienceWire"],
-          "via": "known"
+          "via": "known",
+          "wasDerivedFrom": [
+            { "type": "category", "scheme": "Posts", "label": "artificial intelligence" },
+            { "type": "category", "scheme": "Posts", "label": "AI" },
+            { "type": "category", "scheme": "ScienceWire", "label": "A.I." }
+          ],
+          "wasGeneratedBy": { "activity": "ingest" }
         },
         {
           "c": "c_machine_learning",
@@ -236,7 +367,9 @@
           "origin": "explicit",
           "raw": [{ "l": "Machine Learning", "n": "machine learning", "s": "ScienceWire" }],
           "sys": ["ScienceWire"],
-          "via": "known"
+          "via": "known",
+          "wasDerivedFrom": [{ "type": "category", "scheme": "ScienceWire", "label": "Machine Learning" }],
+          "wasGeneratedBy": { "activity": "ingest" }
         }
       ]
     },
@@ -257,7 +390,9 @@
           "origin": "explicit",
           "raw": [{ "l": "machine-learning", "n": "machine learning", "s": "Posts" }],
           "sys": ["Posts"],
-          "via": "known"
+          "via": "known",
+          "wasDerivedFrom": [{ "type": "category", "scheme": "Posts", "label": "machine-learning" }],
+          "wasGeneratedBy": { "activity": "ingest" }
         }
       ]
     },
@@ -279,7 +414,9 @@
           "raw": [],
           "sys": ["ScienceWire"],
           "via": "known",
-          "why": "text mentions \"artificial intelligence\" ×2 (in title)"
+          "why": "text mentions \"artificial intelligence\" ×2 (in title)",
+          "wasDerivedFrom": [{ "type": "text", "phrase": "artificial intelligence", "count": 2, "inTitle": true }],
+          "wasGeneratedBy": { "activity": "emerge", "parameters": { "minDf": 2 } }
         },
         {
           "c": "c_machine_learning",
@@ -288,7 +425,9 @@
           "raw": [],
           "sys": ["ScienceWire"],
           "via": "known",
-          "why": "text mentions \"machine learning\" ×1"
+          "why": "text mentions \"machine learning\" ×1",
+          "wasDerivedFrom": [{ "type": "text", "phrase": "machine learning", "count": 1, "inTitle": false }],
+          "wasGeneratedBy": { "activity": "emerge", "parameters": { "minDf": 2 } }
         },
         {
           "c": "u_neural_hardware",
@@ -297,7 +436,12 @@
           "raw": [],
           "sys": ["ScienceWire"],
           "via": "unmapped",
-          "why": "recurs in 2 of 4 items"
+          "why": "recurs in 2 of 4 items",
+          "wasDerivedFrom": [{ "type": "text", "phrase": "neural hardware", "count": 1, "inTitle": false }],
+          "wasGeneratedBy": {
+            "activity": "discover",
+            "parameters": { "minDf": 2, "maxDfRatio": 0.5, "perItem": 3, "df": 2, "items": 2, "coherence": 0.4 }
+          }
         }
       ]
     },
@@ -318,7 +462,9 @@
           "origin": "explicit",
           "raw": [{ "l": "AI", "n": "ai", "s": "Journal" }],
           "sys": ["Journal"],
-          "via": "known"
+          "via": "known",
+          "wasDerivedFrom": [{ "type": "category", "scheme": "Journal", "label": "AI" }],
+          "wasGeneratedBy": { "activity": "ingest" }
         },
         {
           "c": "c_machine_learning",
@@ -326,7 +472,9 @@
           "origin": "explicit",
           "raw": [{ "l": "ML", "n": "ml", "s": "Journal" }],
           "sys": ["Journal"],
-          "via": "known"
+          "via": "known",
+          "wasDerivedFrom": [{ "type": "category", "scheme": "Journal", "label": "ML" }],
+          "wasGeneratedBy": { "activity": "ingest" }
         }
       ]
     }

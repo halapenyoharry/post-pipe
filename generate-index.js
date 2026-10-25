@@ -16,6 +16,7 @@ const RssAdapter         = require('./src/adapters/RssAdapter');
 const AtomAdapter        = require('./src/adapters/AtomAdapter');
 const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
 const { loadCorpus }     = require('./src/aggregator');
+const { cacheDirForSite, SKOS_FILES } = require('./src/lib/stone');
 const { parseOpml }      = require('./src/lib/opml');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
@@ -814,10 +815,15 @@ function siteLang() {
 async function main() {
   console.log(`Site root: ${SITE_ROOT}`);
   const entries = buildAdapterEntries();
+  // The stone's cache folder for this site, named here once: the phase writes
+  // into it and the SKOS copy below reads from it.
+  const stoneCacheDir = path.resolve(cacheDirForSite(SITE_ROOT));
   const { items, sources, stone } = await loadCorpus(entries, {
     stone: SETTINGS.stone,
     siteRoot: SITE_ROOT,
     containment: SETTINGS.containment,
+    siteTitle: SETTINGS.site && typeof SETTINGS.site.title === 'string' ? SETTINGS.site.title : '',
+    cacheDir: stoneCacheDir,
   });
 
   console.log(`Aggregated ${items.length} item(s) from ${sources.length} source(s)`);
@@ -887,6 +893,21 @@ async function main() {
   if (stone) feed._stone = stone;
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
+
+  // The stone's SKOS serialization, when this build wrote one, goes beside
+  // feed.json; one left there by an earlier build (the stone off, skipped, or
+  // its skos stage failed) is removed, so a file beside feed.json always
+  // describes it. Neither a copy nor a removal can fail the build.
+  for (const name of SKOS_FILES) {
+    const from = path.join(stoneCacheDir, name);
+    const to = path.join(SITE_DIR, name);
+    try {
+      if (stone && fs.existsSync(from)) fs.copyFileSync(from, to);
+      else if (fs.existsSync(to)) fs.unlinkSync(to);
+    } catch (err) {
+      console.warn(`stone: ${name} left as it was in _site (${err.message})`);
+    }
+  }
 
   fs.writeFileSync(path.join(SITE_DIR, 'feed.json'), JSON.stringify(feed, null, 2));
 

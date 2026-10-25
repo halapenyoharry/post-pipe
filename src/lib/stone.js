@@ -5,11 +5,16 @@
 // the canonical URL fold, the container guard, and write-back onto items.
 
 const fs     = require('fs');
+const os     = require('os');
 const path   = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const POSTPIPE_ROOT = path.resolve(__dirname, '../..');
+
+// The stone's SKOS serialization, written beside universe.json when its
+// skos stage ran, and copied beside feed.json by generate-index.
+const SKOS_FILES = ['skos.jsonld', 'skos.ttl'];
 
 const NAMED_ENTITIES = {
   amp:  '&',
@@ -99,14 +104,53 @@ function mergeOverrides(siteOverrides = {}, containment = []) {
   return merged;
 }
 
-function buildConfig({ emerge = true, discover = false } = {}) {
-  return {
+// A path from a site's settings, made absolute: as given when absolute, a
+// leading ~ as the home folder, anything else against the site root.
+function sitePath(p, siteRoot) {
+  const s = String(p);
+  if (path.isAbsolute(s)) return s;
+  if (s === '~' || s.startsWith('~/')) return path.join(os.homedir(), s.slice(1));
+  return path.resolve(siteRoot, s);
+}
+
+// The stone's build config. conceptSchemes (settings.stone.conceptSchemes,
+// each { id, path }) are the published vocabularies the site vendors, their
+// paths made absolute against the site root; left out when there are none.
+// ledger (settings.stone.ledger, default stone.ledger.json in the site) is
+// where the stone keeps its concept ids between builds, so the ids stay
+// stable in the site, not in post-pipe's disposable cache. Written only when
+// a site root is known: no user's site lives in post-pipe's own folder, so a
+// caller without one leaves the ledger to the stone's own default.
+function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, siteRoot } = {}) {
+  const root = path.resolve(siteRoot || POSTPIPE_ROOT);
+  const config = {
     out: '.',
     sources: [{ adapter: 'jsonl', path: 'records.jsonl' }],
     overrides: 'overrides.json',
     emerge: Boolean(emerge),
     discover: Boolean(discover),
   };
+  const schemes = [];
+  const list = Array.isArray(conceptSchemes) ? conceptSchemes : [];
+  for (let i = 0; i < list.length; i += 1) {
+    const s = list[i];
+    const missing = [];
+    if (!s || typeof s !== 'object') missing.push('id', 'path');
+    else {
+      if (typeof s.id !== 'string' || !s.id) missing.push('id');
+      if (typeof s.path !== 'string' || !s.path) missing.push('path');
+    }
+    if (missing.length) {
+      console.warn(`stone: conceptSchemes[${i}] skipped, no ${missing.join(' or ')}`);
+      continue;
+    }
+    schemes.push({ id: s.id, path: sitePath(s.path, root) });
+  }
+  if (schemes.length) config.conceptSchemes = schemes;
+  if (siteRoot) {
+    config.ledger = sitePath(typeof ledger === 'string' && ledger ? ledger : 'stone.ledger.json', root);
+  }
+  return config;
 }
 
 function buildRecords(results, overrides = {}) {
@@ -210,11 +254,192 @@ function checkContainerGuard(results, universe, containment = []) {
   return { ok: true };
 }
 
-function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest) {
+// The five SKOS mapping properties. A relation of one of these types is a
+// mapping whatever it points at: an external vocabulary's concept, or one of
+// the stone's own in another scheme (a closeMatch or broadMatch across two
+// tag-systems). Neither is reinterpreted: a's mapping to b is written as the
+// stone wrote it.
+const MAPPING_TYPES = new Set(['exactMatch', 'closeMatch', 'broadMatch', 'narrowMatch', 'relatedMatch']);
+
+// The SKOS side of the universe, read once: which relations are SKOS
+// (skos: true; the stone's near and adjacent are not and are ignored), which
+// of those are mappings (one of MAPPING_TYPES, or b an external id: one in
+// universe.external, or no concept at all and spelled <scheme>:<id>), each
+// concept's broader concepts (broader {a, b} means a is broader than b), and
+// each concept's mappings, each once. A concept that carries its own, non-empty
+// mappings[] or broader[] wins over what the relations say; an empty list is
+// no answer and the relations are read.
+function indexSkos(universe, conceptById) {
+  const external = universe.external && typeof universe.external === 'object' && !Array.isArray(universe.external)
+    ? universe.external
+    : null;
+  const isExternalId = (id) => typeof id === 'string' && id !== '' && (
+    (external && Object.prototype.hasOwnProperty.call(external, id))
+    || (!conceptById.has(id) && id.includes(':'))
+  );
+
+  const relationCounts = {};
+  const mappingCounts = {};
+  const mappingsByConcept = new Map();
+  const broaderByConcept = new Map();
+
+  for (const r of universe.relations || []) {
+    if (!r || r.skos !== true || typeof r.type !== 'string' || !r.type) continue;
+    if (typeof r.a !== 'string' || typeof r.b !== 'string') continue;
+    if (MAPPING_TYPES.has(r.type) || isExternalId(r.b)) {
+      if (!mappingsByConcept.has(r.a)) mappingsByConcept.set(r.a, []);
+      const list = mappingsByConcept.get(r.a);
+      if (list.some((m) => m.type === r.type && m.target === r.b)) continue;
+      mappingCounts[r.type] = (mappingCounts[r.type] || 0) + 1;
+      const m = { type: r.type, target: r.b };
+      if (typeof r.weight === 'number' && Number.isFinite(r.weight)) m.weight = r.weight;
+      if (typeof r.why === 'string' && r.why) m.why = r.why;
+      list.push(m);
+    } else {
+      relationCounts[r.type] = (relationCounts[r.type] || 0) + 1;
+      if (r.type === 'broader') {
+        if (!broaderByConcept.has(r.b)) broaderByConcept.set(r.b, []);
+        if (!broaderByConcept.get(r.b).includes(r.a)) broaderByConcept.get(r.b).push(r.a);
+      }
+    }
+  }
+
+  const mappingsOf = (concept) => {
+    if (Array.isArray(concept.mappings) && concept.mappings.length) {
+      const out = [];
+      for (const m of concept.mappings) {
+        if (!m || typeof m.type !== 'string' || typeof m.target !== 'string') continue;
+        if (out.some((x) => x.type === m.type && x.target === m.target)) continue;
+        const copy = { type: m.type, target: m.target };
+        if (typeof m.weight === 'number' && Number.isFinite(m.weight)) copy.weight = m.weight;
+        if (typeof m.why === 'string' && m.why) copy.why = m.why;
+        out.push(copy);
+      }
+      return out;
+    }
+    return (mappingsByConcept.get(concept.id) || []).map((m) => ({ ...m }));
+  };
+
+  const broaderOf = (concept) => {
+    if (Array.isArray(concept.broader) && concept.broader.length) {
+      return concept.broader.filter((b) => typeof b === 'string' && b);
+    }
+    return [...(broaderByConcept.get(concept.id) || [])];
+  };
+
+  // The scheme an external id belongs to, and its label in it.
+  const schemeOfExternal = (id) => {
+    const ext = external ? external[id] : null;
+    if (ext && typeof ext.scheme === 'string' && ext.scheme) return ext.scheme;
+    if (ext && typeof ext.inScheme === 'string' && ext.inScheme) return ext.inScheme;
+    if (ext && Array.isArray(ext.inScheme) && typeof ext.inScheme[0] === 'string') return ext.inScheme[0];
+    const colon = id.indexOf(':');
+    return colon > 0 ? id.slice(0, colon) : '';
+  };
+  const labelOfExternal = (id, scheme) => {
+    const ext = external ? external[id] : null;
+    if (!ext) return '';
+    if (typeof ext.prefLabel === 'string') return ext.prefLabel;
+    if (ext.prefLabel && typeof ext.prefLabel === 'object') {
+      if (typeof ext.prefLabel[scheme] === 'string') return ext.prefLabel[scheme];
+      const first = Object.values(ext.prefLabel).find((v) => typeof v === 'string' && v);
+      return first || '';
+    }
+    return '';
+  };
+
+  // A concept's prefLabel per scheme as a reference carries it: the stone's
+  // own, plus an external scheme's label only through an exactMatch mapping.
+  const prefLabelCache = new Map();
+  const referencePrefLabel = (concept) => {
+    if (prefLabelCache.has(concept.id)) return prefLabelCache.get(concept.id);
+    const out = {};
+    if (concept.prefLabel && typeof concept.prefLabel === 'object') {
+      for (const [scheme, label] of Object.entries(concept.prefLabel)) {
+        if (scheme && typeof label === 'string' && label) out[scheme] = label;
+      }
+    }
+    for (const m of mappingsOf(concept)) {
+      if (m.type !== 'exactMatch' || !external || !external[m.target]) continue;
+      const scheme = schemeOfExternal(m.target);
+      const label = labelOfExternal(m.target, scheme);
+      if (scheme && label && out[scheme] === undefined) out[scheme] = label;
+    }
+    const result = Object.keys(out).length ? out : null;
+    prefLabelCache.set(concept.id, result);
+    return result;
+  };
+
+  return { external, relationCounts, mappingCounts, mappingsOf, broaderOf, referencePrefLabel };
+}
+
+// What the feed carries of a scheme record: the plan's shape and nothing
+// else, so a vocabulary's header (its file path, when it was fetched) stays
+// out of the published feed.
+const SCHEME_KEYS = ['id', 'label', 'kind', 'sourceId', 'iri', 'license', 'concepts'];
+
+// The concept schemes a feed carries: the stone's own list when the universe
+// has one, then whatever it leaves out that post-pipe knows anyway: the site
+// scheme (labelled with the site's title), one scheme per tag-system with its
+// source id, and the discovered scheme when any concept is filed in it or
+// flagged discovered. A scheme the stone lists bare gets the kind and label
+// post-pipe knows for it. No label is invented: a scheme without one is
+// labelled with its id (the site's with the site's title) until the stone, or
+// Harold, names it.
+function buildSchemes(universe, systems, siteTitle) {
+  const out = [];
+  const seen = new Set();
+  const push = (s) => {
+    if (!s || typeof s.id !== 'string' || !s.id || seen.has(s.id)) return;
+    seen.add(s.id);
+    out.push(s);
+  };
+  const knownKind = (id) => {
+    if (id === 'site') return 'site';
+    if (id === 'discovered') return 'discovered';
+    if (systems && Object.prototype.hasOwnProperty.call(systems, id)) return 'system';
+    return undefined;
+  };
+
+  for (const s of Array.isArray(universe.schemes) ? universe.schemes : []) {
+    if (!s || typeof s !== 'object' || typeof s.id !== 'string' || !s.id) continue;
+    const copy = {};
+    for (const k of SCHEME_KEYS) {
+      if (s[k] !== undefined && s[k] !== null) copy[k] = s[k];
+    }
+    if (copy.id === 'site' && siteTitle && (!copy.label || copy.label === copy.id)) copy.label = siteTitle;
+    if (typeof copy.label !== 'string' || !copy.label) copy.label = copy.id;
+    if (typeof copy.kind !== 'string' || !copy.kind) {
+      const kind = knownKind(copy.id);
+      if (kind) copy.kind = kind;
+    }
+    if (systems && systems[copy.id] && copy.sourceId === undefined && systems[copy.id].sourceId !== undefined) {
+      copy.sourceId = systems[copy.id].sourceId;
+    }
+    push(copy);
+  }
+
+  push({ id: 'site', label: siteTitle || 'site', kind: 'site' });
+  for (const [name, info] of Object.entries(systems || {})) {
+    push({ id: name, label: name, kind: 'system', sourceId: info ? info.sourceId : undefined });
+  }
+  const anyDiscovered = (universe.concepts || []).some(
+    (c) => c && ((Array.isArray(c.inScheme) && c.inScheme.includes('discovered')) || c.discovered === true)
+  );
+  if (anyDiscovered) push({ id: 'discovered', label: 'discovered', kind: 'discovered' });
+  return out;
+}
+
+function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, options = {}) {
   const conceptById = new Map();
   for (const c of universe.concepts || []) {
     conceptById.set(c.id, c);
   }
+  const skos = indexSkos(universe, conceptById);
+  // Which post-pipe items joined each universe item, for reading the stone's
+  // untagged list back onto post-pipe ids (a folded representative stands for
+  // every item folded into it).
+  const joinedByKey = new Map();
 
   const byKey = new Map();
   const byUrl = new Map();
@@ -258,6 +483,10 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
         unjoined += 1;
         continue;
       }
+      if (uItem.key) {
+        if (!joinedByKey.has(uItem.key)) joinedByKey.set(uItem.key, []);
+        joinedByKey.get(uItem.key).push({ id, source: sysName });
+      }
 
       const originalTags = Array.isArray(item.tags) ? item.tags : [];
       const explicitEntries = [];
@@ -290,6 +519,10 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
           via: t.via || 'known',
           why: origin === 'explicit' ? null : (t.why !== undefined ? t.why : null),
           rawLabels: rawList.map((x) => x.l),
+          // SKOS and PROV, only when the universe carries them.
+          prefLabel: skos.referencePrefLabel(concept),
+          wasDerivedFrom: t.wasDerivedFrom !== undefined && t.wasDerivedFrom !== null ? t.wasDerivedFrom : undefined,
+          wasGeneratedBy: t.wasGeneratedBy !== undefined && t.wasGeneratedBy !== null ? t.wasGeneratedBy : undefined,
         };
 
         if (origin === 'explicit') {
@@ -317,7 +550,7 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
         if (seenCanonical.has(e.canonical)) continue;
         seenCanonical.add(e.canonical);
         newTags.push(e.canonical);
-        newTagRefs.push({
+        const ref = {
           type: 'tag',
           value: e.canonical,
           concept: e.concept,
@@ -327,7 +560,11 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
           forms: e.forms,
           via: e.via,
           why: e.why,
-        });
+        };
+        if (e.prefLabel) ref.prefLabel = { ...e.prefLabel };
+        if (e.wasDerivedFrom !== undefined) ref.wasDerivedFrom = e.wasDerivedFrom;
+        if (e.wasGeneratedBy !== undefined) ref.wasGeneratedBy = e.wasGeneratedBy;
+        newTagRefs.push(ref);
       }
 
       const nonTagRefs = Array.isArray(item._references)
@@ -366,14 +603,49 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
       },
     }));
 
-    summaryConcepts.push({
+    const sc = {
       canonical: c.canonical,
       pinned: Boolean(c.pinned),
       discovered: Boolean(c.discovered),
       items: itemCount,
       forms,
       rank,
-    });
+    };
+    if (typeof c.id === 'string' && c.id) sc.id = c.id;
+    // SKOS, as the stone wrote it, only where it did.
+    if (Array.isArray(c.inScheme) && c.inScheme.length) {
+      sc.inScheme = c.inScheme.filter((s) => typeof s === 'string' && s);
+    }
+    if (c.prefLabel && typeof c.prefLabel === 'object') {
+      const pref = {};
+      for (const [scheme, label] of Object.entries(c.prefLabel)) {
+        if (scheme && typeof label === 'string' && label) pref[scheme] = label;
+      }
+      if (Object.keys(pref).length) sc.prefLabel = pref;
+    }
+    if (c.altLabel && typeof c.altLabel === 'object') {
+      const alt = {};
+      for (const [scheme, labels] of Object.entries(c.altLabel)) {
+        if (!scheme || !Array.isArray(labels)) continue;
+        const list = labels.filter((l) => typeof l === 'string' && l);
+        if (list.length) alt[scheme] = list;
+      }
+      if (Object.keys(alt).length) sc.altLabel = alt;
+    }
+    const broader = skos.broaderOf(c);
+    if (broader.length) sc.broader = broader;
+    const mappings = skos.mappingsOf(c);
+    if (mappings.length) sc.mappings = mappings;
+    // The ledger's word on this concept's id: when it was first seen, what
+    // happened to it this build, and the label it had before a relabel.
+    if (c.ledger && typeof c.ledger === 'object' && !Array.isArray(c.ledger)) {
+      const ledger = {};
+      for (const k of ['since', 'event', 'previousLabel']) {
+        if (typeof c.ledger[k] === 'string' && c.ledger[k]) ledger[k] = c.ledger[k];
+      }
+      if (Object.keys(ledger).length) sc.ledger = ledger;
+    }
+    summaryConcepts.push(sc);
   }
 
   const summary = {
@@ -382,7 +654,52 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
     concepts: summaryConcepts,
     unjoined,
     skippedDuplicateIds,
+    schemes: buildSchemes(universe, systems, options.siteTitle),
   };
+
+  if (Object.keys(skos.relationCounts).length) summary.relations = skos.relationCounts;
+  if (Object.keys(skos.mappingCounts).length) summary.mappings = skos.mappingCounts;
+
+  // The stone's untagged items (from the universe, else build.json, which the
+  // stone writes too), on post-pipe's ids: a universe key joined by one or
+  // more post-pipe items names each of them; one joined by none keeps the id
+  // and source the stone gave. An empty list writes nothing.
+  const untaggedList = Array.isArray(universe.untagged)
+    ? universe.untagged
+    : (buildManifest && Array.isArray(buildManifest.untagged) ? buildManifest.untagged : null);
+  if (untaggedList && untaggedList.length) {
+    const items = [];
+    for (const u of untaggedList) {
+      if (!u || typeof u !== 'object') continue;
+      const key = typeof u.key === 'string'
+        ? u.key
+        : (u.source !== undefined && u.id !== undefined ? `${u.source}::${u.id}` : '');
+      const why = Array.isArray(u.why)
+        ? u.why.filter((w) => typeof w === 'string' && w)
+        : (typeof u.why === 'string' && u.why ? [u.why] : []);
+      const joined = joinedByKey.get(key);
+      if (joined && joined.length) {
+        for (const j of joined) items.push({ id: j.id, source: j.source, why: [...why] });
+      } else {
+        const sep = key.indexOf('::');
+        const id = u.id !== undefined && u.id !== null ? String(u.id) : (sep >= 0 ? key.slice(sep + 2) : key);
+        const source = typeof u.source === 'string' ? u.source : (sep >= 0 ? key.slice(0, sep) : '');
+        items.push({ id, source, why });
+      }
+    }
+    if (items.length) summary.untagged = { count: items.length, items };
+  }
+
+  if (skos.external && Object.keys(skos.external).length) summary.external = JSON.parse(JSON.stringify(skos.external));
+
+  if (buildManifest && buildManifest.ledger && typeof buildManifest.ledger === 'object') {
+    const ledger = {};
+    for (const k of ['minted', 'reused', 'retired']) {
+      const v = buildManifest.ledger[k];
+      if (typeof v === 'number' && Number.isFinite(v)) ledger[k] = v;
+    }
+    if (Object.keys(ledger).length) summary.ledger = ledger;
+  }
 
   return { summary };
 }
@@ -475,6 +792,13 @@ async function runStonePhase(results, options = {}) {
       ? path.resolve(options.cacheDir)
       : path.resolve(cacheDirForSite(siteRoot));
     fs.mkdirSync(cacheDir, { recursive: true });
+    // The stone writes its SKOS files only when that stage runs and succeeds,
+    // and never clears its out folder, so last build's are removed first: a
+    // file left in the cache after the build is this build's.
+    for (const name of SKOS_FILES) {
+      const stale = path.join(cacheDir, name);
+      if (fs.existsSync(stale)) fs.unlinkSync(stale);
+    }
 
     const recordsPath = path.join(cacheDir, 'records.jsonl');
     const overridesOutPath = path.join(cacheDir, 'overrides.json');
@@ -487,6 +811,9 @@ async function runStonePhase(results, options = {}) {
     const rtzConfig = buildConfig({
       emerge: stoneCfg.emerge !== false,
       discover: Boolean(stoneCfg.discover),
+      conceptSchemes: stoneCfg.conceptSchemes,
+      ledger: stoneCfg.ledger,
+      siteRoot: options.siteRoot ? siteRoot : undefined,
     });
     fs.writeFileSync(configPath, JSON.stringify(rtzConfig, null, 2) + '\n', 'utf8');
 
@@ -511,8 +838,15 @@ async function runStonePhase(results, options = {}) {
       return { ran: false, stone: null };
     }
 
-    const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest);
-    return { ran: true, stone: summary };
+    // The site scheme is labelled with the site's title, which the caller
+    // passes (generate-index reads settings.json once); absent, the scheme
+    // is labelled with its id.
+    const siteTitle = typeof options.siteTitle === 'string' ? options.siteTitle : '';
+
+    const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, { siteTitle });
+    // cacheDir is where the stone wrote its files, for whoever copies the
+    // SKOS serialization beside the feed.
+    return { ran: true, stone: summary, cacheDir };
   } catch (err) {
     console.warn(`stone: ${err.message}, tags left as written`);
     return { ran: false, stone: null };
@@ -520,6 +854,7 @@ async function runStonePhase(results, options = {}) {
 }
 
 module.exports = {
+  SKOS_FILES,
   htmlToText,
   itemText,
   canonicalUrl,

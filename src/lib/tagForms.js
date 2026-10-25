@@ -76,15 +76,18 @@ function collectReferences(source, canonical, out = []) {
   }
   if (source.forms && typeof source.forms === 'object') {
     if (source.type && source.type !== 'tag') return out;
-    if (source.value !== undefined && source.value !== canonical) return out;
+    // The key is a canonical label or a concept id; a reference answers to either.
+    if (source.value !== undefined && source.value !== canonical && source.concept !== canonical) return out;
     out.push(source);
   }
   return out;
 }
 
-function fromReferences(source, canonical, systemNames) {
-  const refs = collectReferences(source, canonical);
+function fromReferences(source, key, systemNames) {
+  const refs = collectReferences(source, key);
   if (!refs.length) return null;
+  // When the key was a concept id, the label is the reference's value.
+  const canonical = typeof refs[0].value === 'string' && refs[0].value ? refs[0].value : key;
 
   const seenSystems = [...(systemNames || [])];
   const bySystem = {};
@@ -138,14 +141,19 @@ function fromReferences(source, canonical, systemNames) {
   };
 }
 
-// Given feed._stone (may be undefined) and a canonical label, returns null
-// when there is nothing to show, else:
+// Given feed._stone (may be undefined) and a key, a concept id or a canonical
+// label (the id is looked up first), returns null when there is nothing to
+// show, else:
 //   { canonical, pinned, discovered, items,
 //     forms: [{ system, spellings: [{ label, count }] }],
-//     rank: [{ label, score, parts }] }
-// Accepts item-level _references entries (or items carrying _references) as a
-// fallback when feed._stone is absent.
-function tagForms(stone, canonical, fallback) {
+//     rank: [{ label, score, parts }],
+//     and, when the concept carries them: id, inScheme, prefLabel, altLabel,
+//     broader, mappings }
+// Concepts without id or prefLabel (feeds built before the stone spoke SKOS)
+// are read as before. Accepts item-level _references entries (or items
+// carrying _references) as a fallback when feed._stone is absent.
+function tagForms(stone, key, fallback) {
+  const canonical = key;
   if (!canonical || typeof canonical !== 'string') return null;
 
   let stoneObj = null;
@@ -170,10 +178,16 @@ function tagForms(stone, canonical, fallback) {
 
   if (stoneObj && stoneObj.concepts) {
     const list = Array.isArray(stoneObj.concepts) ? stoneObj.concepts : null;
-    const concept = list
-      ? list.find((c) => c && c.canonical === canonical)
-      : stoneObj.concepts[canonical];
+    let concept;
+    if (list) {
+      concept = list.find((c) => c && c.id === canonical)
+        || list.find((c) => c && c.canonical === canonical);
+    } else {
+      concept = stoneObj.concepts[canonical]
+        || Object.values(stoneObj.concepts).find((c) => c && typeof c === 'object' && c.id === canonical);
+    }
     if (!concept || typeof concept !== 'object') return null;
+    const label = typeof concept.canonical === 'string' && concept.canonical ? concept.canonical : canonical;
 
     const rawForms = concept.forms && typeof concept.forms === 'object' ? concept.forms : {};
     const forms = [];
@@ -182,7 +196,7 @@ function tagForms(stone, canonical, fallback) {
       if (spellings.length) forms.push({ system, spellings });
     }
 
-    if (!hasExtraBeyondCanonical(forms, canonical)) return null;
+    if (!hasExtraBeyondCanonical(forms, label)) return null;
 
     const rank = Array.isArray(concept.rank)
       ? concept.rank.map((r) => ({
@@ -192,14 +206,30 @@ function tagForms(stone, canonical, fallback) {
         }))
       : [];
 
-    return {
-      canonical: concept.canonical || canonical,
+    const info = {
+      canonical: label,
       pinned: Boolean(concept.pinned),
       discovered: Boolean(concept.discovered),
       items: typeof concept.items === 'number' ? concept.items : 0,
       forms,
       rank,
     };
+    if (typeof concept.id === 'string' && concept.id) info.id = concept.id;
+    if (Array.isArray(concept.inScheme) && concept.inScheme.length) info.inScheme = [...concept.inScheme];
+    if (concept.prefLabel && typeof concept.prefLabel === 'object' && Object.keys(concept.prefLabel).length) {
+      info.prefLabel = { ...concept.prefLabel };
+    }
+    if (concept.altLabel && typeof concept.altLabel === 'object' && Object.keys(concept.altLabel).length) {
+      info.altLabel = {};
+      for (const [scheme, labels] of Object.entries(concept.altLabel)) {
+        info.altLabel[scheme] = Array.isArray(labels) ? [...labels] : labels;
+      }
+    }
+    if (Array.isArray(concept.broader) && concept.broader.length) info.broader = [...concept.broader];
+    if (Array.isArray(concept.mappings) && concept.mappings.length) {
+      info.mappings = concept.mappings.map((m) => (m && typeof m === 'object' ? { ...m } : m));
+    }
+    return info;
   }
 
   if (fallbackSource !== undefined && fallbackSource !== null) {
