@@ -83,6 +83,11 @@ function buildEdges(items, options = {}) {
           : null;
         if (ref && ref.concept !== undefined && ref.weight !== undefined && ref.origin !== undefined) {
           edge.attrs = { concept: ref.concept, weight: ref.weight, origin: ref.origin };
+          // The stone's word on this attachment, only where it wrote one: why
+          // (an explicit tag's is null and stays out) and the PROV fields.
+          if (ref.why !== undefined && ref.why !== null) edge.attrs.why = ref.why;
+          if (ref.wasDerivedFrom !== undefined && ref.wasDerivedFrom !== null) edge.attrs.wasDerivedFrom = ref.wasDerivedFrom;
+          if (ref.wasGeneratedBy !== undefined && ref.wasGeneratedBy !== null) edge.attrs.wasGeneratedBy = ref.wasGeneratedBy;
         }
         edges.push(edge);
       }

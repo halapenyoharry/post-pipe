@@ -313,7 +313,19 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   });
   const aiEdge = edges.find((e) => e.source === post1.id && e.target === 'tag:Artificial Intelligence');
   assert.ok(aiEdge);
-  assert.deepStrictEqual(aiEdge.attrs, { concept: 'c_ai', weight: 1, origin: 'explicit' });
+  //    The explicit tag's attrs carry the PROV the universe wrote on it (the
+  //    categories it came from, ingested); its why is null and stays out.
+  assert.deepStrictEqual(aiEdge.attrs, {
+    concept: 'c_ai',
+    weight: 1,
+    origin: 'explicit',
+    wasDerivedFrom: [
+      { type: 'category', scheme: 'Posts', label: 'artificial intelligence' },
+      { type: 'category', scheme: 'Posts', label: 'AI' },
+      { type: 'category', scheme: 'ScienceWire', label: 'A.I.' },
+    ],
+    wasGeneratedBy: { activity: 'ingest' },
+  });
   const act1TagEdge = edges.find((e) => e.target === 'tag:act-1');
   assert.strictEqual(act1TagEdge, undefined, 'pinned container tag is intercepted by containment');
 
@@ -338,7 +350,7 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   //    untagged items, external concepts and the ledger.
   assert.deepStrictEqual(Object.keys(summary), [
     'built', 'systems', 'concepts', 'unjoined', 'skippedDuplicateIds',
-    'schemes', 'relations', 'mappings', 'untagged', 'external', 'ledger',
+    'schemes', 'relations', 'relationList', 'mappings', 'untagged', 'external', 'ledger',
   ]);
 
   //    schemes: the universe's list, the site scheme labelled with the site's
@@ -365,6 +377,32 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   //    Counts over the SKOS relations only: the adjacent one (skos: false) is not counted.
   assert.deepStrictEqual(summary.relations, { related: 1, broader: 1 });
   assert.deepStrictEqual(summary.mappings, { exactMatch: 1, broadMatch: 1 });
+
+  //    relationList: each SKOS relation between two of the stone's own
+  //    concepts, the pair as written (broader {a, b}: a is broader than b),
+  //    with its weight, why and PROV, for the relation edges. The two mappings
+  //    to the external vocabulary and the adjacent relation (skos: false) are
+  //    not in it.
+  assert.deepStrictEqual(summary.relationList, [
+    {
+      a: 'c_ai',
+      b: 'c_machine_learning',
+      type: 'related',
+      weight: 0.6,
+      why: 'co-occur on 2 of 4 items (npmi 0.9)',
+      wasDerivedFrom: [{ type: 'cooccurrence', items: 2 }],
+      wasGeneratedBy: { activity: 'relate', parameters: { minNpmi: 0.25, minCooc: 2 } },
+    },
+    {
+      a: 'c_ai',
+      b: 'u_neural_hardware',
+      type: 'broader',
+      weight: 1,
+      why: 'every item with neural hardware also carries Artificial Intelligence',
+      wasDerivedFrom: [{ type: 'cooccurrence', items: 1 }],
+      wasGeneratedBy: { activity: 'relate', parameters: { broaderP: 0.8, narrowerMaxP: 0.6, minSupport: 1 } },
+    },
+  ]);
 
   //    untagged: the stone's note about j-unjoined, which no post-pipe item
   //    joined, keeps the id and source the stone gave.
@@ -499,7 +537,7 @@ test('stone: untagged items come back on post-pipe ids through the join rule, a 
       { id: 'j-1', source: 'Journal', why: ['one reason, as a string'] },
     ],
   });
-  assert.ok(!('relations' in summary) && !('mappings' in summary) && !('external' in summary) && !('ledger' in summary));
+  assert.ok(!('relations' in summary) && !('relationList' in summary) && !('mappings' in summary) && !('external' in summary) && !('ledger' in summary));
 });
 
 test('stone: a concept\'s own mappings[] win over the relations, and only an exactMatch lends a reference the external label', () => {
@@ -594,12 +632,16 @@ test('stone: an empty mappings[] or broader[] on a concept is no answer, and the
 });
 
 test('stone: a mapping listed twice is read once, and a match between two of the stone\'s own concepts across schemes is a mapping on the first', () => {
+  // broadMatch is written as broader is: a is the broader concept (AI).
   const summary = summaryOf(twoConceptUniverse([
     { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
     { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
-    { a: 'c_machine_learning', b: 'c_ai', type: 'broadMatch', weight: 0.7, skos: true, why: 'every Posts item with machine-learning also carries AI' },
+    { a: 'c_ai', b: 'c_machine_learning', type: 'broadMatch', weight: 0.7, skos: true, why: 'every Posts item with machine-learning also carries AI' },
     { a: 'c_machine_learning', b: 'c_ai', type: 'closeMatch', weight: 0.5, skos: true },
     { a: 'c_machine_learning', b: 'c_ai', type: 'related', weight: 0.4, skos: true },
+    // The same symmetric pairs the other way round: once each in the list.
+    { a: 'c_ai', b: 'c_machine_learning', type: 'closeMatch', weight: 0.5, skos: true },
+    { a: 'c_ai', b: 'c_machine_learning', type: 'related', weight: 0.9, skos: true, why: 'later' },
     // Not SKOS: ignored.
     { a: 'c_machine_learning', b: 'c_ai', type: 'near', weight: 0.4, skos: false },
   ], {
@@ -613,13 +655,21 @@ test('stone: a mapping listed twice is read once, and a match between two of the
   assert.deepStrictEqual(ai.mappings, [{ type: 'closeMatch', target: 'voc:2', weight: 0.5 }], 'a concept\'s own list, read once');
   const ml = summary.concepts.find((c) => c.id === 'c_machine_learning');
   assert.deepStrictEqual(ml.mappings, [
-    { type: 'broadMatch', target: 'c_ai', weight: 0.7, why: 'every Posts item with machine-learning also carries AI' },
     { type: 'closeMatch', target: 'c_ai', weight: 0.5 },
   ]);
   assert.ok(!('broader' in ml), 'a broadMatch is a mapping, not a broader concept');
-  // Counts are over the relations, each mapping once, mappings apart from relations.
-  assert.deepStrictEqual(summary.mappings, { exactMatch: 1, broadMatch: 1, closeMatch: 1 });
-  assert.deepStrictEqual(summary.relations, { related: 1 });
+  // Counts are over the relations as written, each mapping once, mappings apart from relations.
+  assert.deepStrictEqual(summary.mappings, { exactMatch: 1, broadMatch: 1, closeMatch: 2 });
+  assert.deepStrictEqual(summary.relations, { related: 2 });
+  // The pair list holds the three between the stone's own concepts, each
+  // pair once (a symmetric one as first written, whatever a later entry
+  // weighs), a cross-scheme mapping among them; the exactMatch to the
+  // vocabulary and the near relation are not in it.
+  assert.deepStrictEqual(summary.relationList, [
+    { a: 'c_ai', b: 'c_machine_learning', type: 'broadMatch', weight: 0.7, why: 'every Posts item with machine-learning also carries AI' },
+    { a: 'c_machine_learning', b: 'c_ai', type: 'closeMatch', weight: 0.5 },
+    { a: 'c_machine_learning', b: 'c_ai', type: 'related', weight: 0.4 },
+  ]);
 });
 
 test('stone: a concept flagged discovered with no inScheme still puts the discovered scheme on the list, and a bare scheme list is filled in', () => {

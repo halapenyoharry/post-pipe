@@ -100,7 +100,7 @@ Run with `child_process`, `cwd` the cache folder, `stdio` captured, `detached: t
 
 - `items[]` — each with `key` (`<source>::<id>`), `source`, `alsoIn[]`, `url`, and `tags[]`. Each tag has `c` (concept id), `w` (weight, 1 for explicit), `origin` (`explicit`, `emergent`, `discovered`), `raw[]` (what was written: `l` label, `n` norm, `s` system), `sys[]` (which systems contributed it), `via`, and `why` for earned tags.
 - `concepts[]` — each with `id`, `canonical`, `pinned`, `n`, `variants[]` (each with `label`, `count`, `formsBySource`), `rank[]` (each candidate's `score` and `parts` `freq`, `cover`, `trust`, `quality`), and `sources`. `discovered` is present on stone concepts. Tags the stone never clustered come back as unmapped singleton concepts with ids starting `u_`: those carry `unmapped: true` and lack `discovered`, `variants` and `rank`; read a missing `discovered` as false.
-- `relations[]` — `a`, `b` (concept ids), `type`, `weight`. Not used in this first integration; noted so a later one knows it is there.
+- `relations[]` — `a`, `b` (concept ids), `type`, `weight`, `skos` (true for a relation SKOS has a name for), and `why`, `wasDerivedFrom`, `wasGeneratedBy` where the stone wrote them. post-pipe reads only the `skos: true` ones. Direction, pinned here because the stone's own text (`lib/stone.js`, `docs/FORMATS.md`) states it and post-pipe draws arrows from it: in `broader {a, b}` a is the broader concept (a ⊃ b), and a `broadMatch` between two of the stone's own concepts is a cross-scheme `broader` renamed with the pair kept, so a is the broader concept there too. The symmetric types (`related`, `closeMatch`, `relatedMatch`, `exactMatch`) may be written either way round; post-pipe reads each unordered pair once, the first entry kept. A relation whose `b` is an external vocabulary id (`<schemeId>:<id>`) is a mapping on concept `a`, not a pair between tags; post-pipe reads a `broadMatch` mapping as the vocabulary concept being the broader one (the plan's propagation rule: `broader(A, B)` with `A exactMatch X` gives `broadMatch(B, X)`), the reverse of the own-concept convention. The stone has no map stage yet, so that reading is post-pipe's and must be confirmed against the stone when the stage lands (2026-10-25).
 
 **`build.json`** — the stone's manifest: `built`, `config`, and `stages[]` with each stage's `name`, `program` and `ms`. Copied into the feed summary.
 
@@ -120,7 +120,8 @@ For each joined item:
 `forms` lists what each system wrote for this concept on this item. `why` is the stone's reason string for earned tags; the stone leaves it absent for explicit tags and post-pipe writes `null`. `concept` is informational: see Keying below.
 
 - Items not joined, or when the stone is off or skipped, are untouched.
-- Tag edges gain attributes. `buildEdges.js` emits tag edges with no `attrs` today; after the seam, when an item's reference for that tag exists, the edge carries `attrs: { concept, weight, origin }` from it. This is additive; every edge consumer ignores attributes it does not know, and the existing tests do not assert their absence.
+- Tag edges gain attributes. `buildEdges.js` emits tag edges with no `attrs` today; after the seam, when an item's reference for that tag exists, the edge carries `attrs: { concept, weight, origin }` from it, plus `why`, `wasDerivedFrom` and `wasGeneratedBy` when the reference has them (an explicit tag's `why` is null and stays out). This is additive; every edge consumer ignores attributes it does not know, and the existing tests do not assert their absence. The attrs come from the item's `_references`, whatever wrote them: a site with the stone off whose JSON Feed items already carry stone-shaped references gets the same attrs. The byte-identity promise is for a site with no stone and no upstream `_references`.
+- Relation edges (2026-10-25). `src/corpus/relationEdges.js` turns `feed._stone.relationList` into edges between tag nodes: `source` and `target` are `tag:<site prefLabel>`, `layer` and `role` are the SKOS name (`broader`, `related`, `closeMatch`, `broadMatch`, `relatedMatch`, `exactMatch`; `narrower` and `narrowMatch` are never written), `directed` for `broader` and `broadMatch` with the arrow landing on the broader concept (source the narrower tag), one edge per unordered pair for the rest, `attrs { concept: a, target: b, weight, why, wasDerivedFrom, wasGeneratedBy }` where present. An edge exists only where both concepts are tags on a joined item and neither is a container tag (`settings.containment[].tag`); a mapping to an external id makes no edge. `generate-index.js` appends them to `feed.edges` when the stone ran. The viewer draws a layer only when `graph.visibleLayers` names it; a relation edge whose tag nodes are not drawn is left out at the viewer, not an error.
 
 Onto the feed, `generate-index.js` adds `feed._stone`:
 
@@ -130,15 +131,22 @@ Onto the feed, `generate-index.js` adds `feed._stone`:
   "systems": {"ScienceDaily": {"sourceId": "<feed id>", "items": 60, "tagged": 0}, "...": {}},
   "concepts": [{"canonical": "Artificial Intelligence", "pinned": false, "discovered": false, "items": 14, "forms": {"ScienceDaily": {"AI": 9}, "My Posts": {"artificial intelligence": 5}}, "rank": [{"label": "Artificial Intelligence", "score": 0.81, "parts": {"freq": 0.7, "cover": 1, "trust": 0.9, "quality": 0.8}}]}],
   "unjoined": 0,
-  "skippedDuplicateIds": 0
+  "skippedDuplicateIds": 0,
+  "schemes": [{"id": "site", "label": "<settings.site.title>", "kind": "site"}, {"id": "ScienceDaily", "label": "ScienceDaily", "kind": "system", "sourceId": "<feed id>"}, {"id": "discovered", "label": "discovered", "kind": "discovered"}, {"id": "iptc-mediatopics", "label": "IPTC Media Topics", "kind": "external", "license": "CC BY 4.0"}],
+  "relations": {"related": 12, "broader": 3},
+  "relationList": [{"a": "c_ai", "b": "u_neural_hardware", "type": "broader", "weight": 1, "why": "...", "wasDerivedFrom": [], "wasGeneratedBy": {}}],
+  "mappings": {"exactMatch": 4, "broadMatch": 2},
+  "untagged": {"count": 4, "items": [{"id": "<item id>", "source": "<feed id>", "why": ["..."]}]},
+  "external": {"iptc-mediatopics:20000763": {"prefLabel": "artificial intelligence", "broader": ["iptc-mediatopics:20000756"]}},
+  "ledger": {"minted": 0, "reused": 223, "retired": 0}
 }
 ```
 
-`concepts` is keyed by `canonical` and carries the per-system forms and the ranking, so the GraphViewer can show, on a tag node, what each system calls it and why this name won. Only concepts that appear on at least one item are included.
+`concepts` is keyed by `canonical` and carries the per-system forms and the ranking, so the GraphViewer can show, on a tag node, what each system calls it and why this name won. Only concepts that appear on at least one item are included. Since 2026-10-25 each concept also carries `id`, `inScheme`, `prefLabel` and `altLabel` per scheme, `broader` (the concept's own list when the universe wrote one, else read from the `broader` relations), `mappings[{type, target, weight, why}]` and `ledger {since, event, previousLabel}`; `schemes`, `relations`, `relationList`, `mappings`, `untagged`, `external` and `ledger` are written only when there is something to write. `relationList` is the pairs the relation edges are drawn from: the `skos: true` relations between two of the stone's own concepts, each pair once, as written. It is built from `relations[]` alone; a `broader` a concept states on itself without a matching relation is descriptive (it reaches the label walk in `src/lib/schemeLabels.js`) and draws no edge.
 
 ## Keying
 
-Tag node ids stay `tag:<label>` where `<label>` is the canonical label. Saved node positions in `viewState` are keyed on that id, so they are keyed on canonical label, never on concept id. Concept ids today are `c_` plus the lexicographically smallest member norm, and move when a cluster's smallest member changes (the stone's `docs/DESIGN.md` lists persisting them as future work). Until that is settled, post-pipe persists nothing keyed on concept id. The `concept` field written onto references is for reading and debugging, not for keys. When a canonical label changes between builds, the tag node's saved position is orphaned; that is accepted for now and should be stated in the viewer's known issues.
+Tag node ids stay `tag:<label>` where `<label>` is the canonical label. Since 2026-10-25 a tag node whose first tag edge names a concept keys its saved position on `concept:<id>` (GraphViewer `persistKey`), and `viewState.migrateNodeKeys` copies an arrangement filed under `tag:<label>` (and under the ledger's `previousLabel`) to that key once per feed, never overwriting; a tag with no concept (no stone) keys on `tag:<label>` as before. A tag collapsed with others at a depth above 0 keys on the reached concept (`concept:<groupId>`). The paragraph that follows records the state before the ledger made ids stable. Concept ids today are `c_` plus the lexicographically smallest member norm, and move when a cluster's smallest member changes (the stone's `docs/DESIGN.md` lists persisting them as future work). Until that is settled, post-pipe persists nothing keyed on concept id. The `concept` field written onto references is for reading and debugging, not for keys. When a canonical label changes between builds, the tag node's saved position is orphaned; that is accepted for now and should be stated in the viewer's known issues.
 
 ## What never crosses the seam
 
@@ -168,6 +176,5 @@ Existing tests that pin tag behaviour stay as they are: `buildEdges.test.js` (ta
 
 - Stable concept ids across rebuilds (the stone's work).
 - Feeding a reader's decisions in the viewer back into the site's overrides file.
-- Using `relations[]` for edges between tag nodes.
 - SKOS export.
 - Translating the containers' own tags through the stone instead of pinning them.

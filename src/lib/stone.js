@@ -260,6 +260,8 @@ function checkContainerGuard(results, universe, containment = []) {
 // tag-systems). Neither is reinterpreted: a's mapping to b is written as the
 // stone wrote it.
 const MAPPING_TYPES = new Set(['exactMatch', 'closeMatch', 'broadMatch', 'narrowMatch', 'relatedMatch']);
+// The relation types with a direction: in each, a is the broader concept.
+const DIRECTED_TYPES = new Set(['broader', 'broadMatch']);
 
 // The SKOS side of the universe, read once: which relations are SKOS
 // (skos: true; the stone's near and adjacent are not and are ignored), which
@@ -282,10 +284,32 @@ function indexSkos(universe, conceptById) {
   const mappingCounts = {};
   const mappingsByConcept = new Map();
   const broaderByConcept = new Map();
+  // Every SKOS relation between two of the stone's own concepts, typed, with
+  // its weight, why and PROV as the stone wrote them, each pair once: a
+  // directed type (broader, broadMatch: a is the broader concept) once per
+  // (type, a, b), a symmetric one (related and the other mappings) once per
+  // unordered pair, the first entry kept. The pair list the relation edges
+  // are drawn from (corpus/relationEdges.js). A relation to an external id is
+  // a mapping on its concept and not in it.
+  const relationList = [];
+  const relationSeen = new Set();
 
   for (const r of universe.relations || []) {
     if (!r || r.skos !== true || typeof r.type !== 'string' || !r.type) continue;
     if (typeof r.a !== 'string' || typeof r.b !== 'string') continue;
+    if (conceptById.has(r.a) && conceptById.has(r.b)) {
+      const ordered = DIRECTED_TYPES.has(r.type) || r.a < r.b;
+      const key = ordered ? `${r.type}\u0000${r.a}\u0000${r.b}` : `${r.type}\u0000${r.b}\u0000${r.a}`;
+      if (!relationSeen.has(key)) {
+        relationSeen.add(key);
+        const entry = { a: r.a, b: r.b, type: r.type };
+        if (typeof r.weight === 'number' && Number.isFinite(r.weight)) entry.weight = r.weight;
+        if (typeof r.why === 'string' && r.why) entry.why = r.why;
+        if (r.wasDerivedFrom !== undefined && r.wasDerivedFrom !== null) entry.wasDerivedFrom = r.wasDerivedFrom;
+        if (r.wasGeneratedBy !== undefined && r.wasGeneratedBy !== null) entry.wasGeneratedBy = r.wasGeneratedBy;
+        relationList.push(entry);
+      }
+    }
     if (MAPPING_TYPES.has(r.type) || isExternalId(r.b)) {
       if (!mappingsByConcept.has(r.a)) mappingsByConcept.set(r.a, []);
       const list = mappingsByConcept.get(r.a);
@@ -370,7 +394,7 @@ function indexSkos(universe, conceptById) {
     return result;
   };
 
-  return { external, relationCounts, mappingCounts, mappingsOf, broaderOf, referencePrefLabel };
+  return { external, relationCounts, mappingCounts, relationList, mappingsOf, broaderOf, referencePrefLabel };
 }
 
 // What the feed carries of a scheme record: the plan's shape and nothing
@@ -658,6 +682,9 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
   };
 
   if (Object.keys(skos.relationCounts).length) summary.relations = skos.relationCounts;
+  // Each SKOS relation between two of the stone's own concepts, with its why
+  // and PROV, for the relation edges (corpus/relationEdges.js); none, nothing.
+  if (skos.relationList.length) summary.relationList = skos.relationList;
   if (Object.keys(skos.mappingCounts).length) summary.mappings = skos.mappingCounts;
 
   // The stone's untagged items (from the universe, else build.json, which the

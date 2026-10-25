@@ -86,6 +86,7 @@ function configFor(entry) {
 }
 
 const { buildEdges } = require('./src/corpus/buildEdges');
+const { relationEdges } = require('./src/corpus/relationEdges');
 const { readerFonts } = require('./src/lib/readerSettings');
 const { accentCss } = require('./src/lib/accent');
 const { rightsMeta, rightsFooterHtml } = require('./src/lib/rights');
@@ -742,10 +743,14 @@ ${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (setting
         // Two panels from one surface (src/lib/panels.js): the main view's,
         // from the sliders in the top bar, and the reader's, from the sliders
         // in its header.
+        // The feed's concept schemes (feed._stone.schemes; none without a
+        // stone), read here rather than through the bundle so a page built
+        // against an older bundle still mounts.
         React.createElement(Settings, {
           where: 'graph',
           viewState: viewState,
           feedData: feed,
+          schemes: (feed._stone && Array.isArray(feed._stone.schemes)) ? feed._stone.schemes : [],
           subject: selectedArticle || focusedItem,
           readerOpen: selectedArticle ? selectedArticle.id : null
         }),
@@ -753,6 +758,7 @@ ${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (setting
           where: 'reader',
           viewState: viewState,
           feedData: feed,
+          schemes: (feed._stone && Array.isArray(feed._stone.schemes)) ? feed._stone.schemes : [],
           subject: selectedArticle || focusedItem,
           readerOpen: selectedArticle ? selectedArticle.id : null
         }),
@@ -847,6 +853,8 @@ async function main() {
 
   const feed = buildFeed(items);
   feed.edges = buildEdges(items, SETTINGS);
+  // The stone's SKOS relations as tag-to-tag edges, when it ran this build.
+  if (stone) feed.edges.push(...relationEdges(stone, items, SETTINGS));
   if (SETTINGS.containment) {
     // settings.containers.<id> carries per-container extras: a status line
     // such as "soon"; an anchor, where the container rests on the cover's
