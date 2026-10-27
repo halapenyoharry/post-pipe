@@ -231,6 +231,49 @@
   fill: none;
 }
 
+/* A selected tag's lines to its relatives (the stone's relations): thin, in
+   one colour, --gv-relation (the theme's text colour unless a site sets it),
+   never touched; their hit areas, under the containers layer, are. The
+   arrowhead of a broader or broadMatch lands on the broader tag. */
+.graphContainer :global(.relations-layer) {
+  pointer-events: none;
+}
+.graphContainer :global(.relation-line) {
+  stroke: var(--gv-relation, var(--text, #ccc));
+  stroke-width: 1.2px;
+  stroke-opacity: 0.75;
+  stroke-linecap: round;
+  fill: none;
+  /* As thin on the screen at any zoom. */
+  vector-effect: non-scaling-stroke;
+}
+.graphContainer :global(.relation-hit) {
+  vector-effect: non-scaling-stroke;
+}
+.graphContainer :global(.relation-arrow path) {
+  fill: var(--gv-relation, var(--text, #ccc));
+  fill-opacity: 0.75;
+}
+/* +N under the selected tag (the rest of its relatives), -N to take them
+   away again: the edge label's dark pill. */
+.graphContainer :global(.relation-more-bg) {
+  fill: rgba(15, 17, 26, 0.88);
+  stroke: var(--gv-relation, var(--text, #ccc));
+  stroke-opacity: 0.6;
+}
+.graphContainer :global(.relation-more-text) {
+  fill: #c9ccd6;
+  font-family: 'Atkinson', sans-serif;
+  font-weight: 600;
+  pointer-events: none;
+}
+.graphContainer :global(.relation-more:focus-visible .relation-more-bg) {
+  stroke-opacity: 1;
+}
+.graphContainer :global(.relation-more:focus) {
+  outline: none;
+}
+
 /* Roots (graph.roots): thin and quiet, behind everything, never touched.
    --pp-root-color comes from the theme. */
 .graphContainer :global(.roots-layer) {

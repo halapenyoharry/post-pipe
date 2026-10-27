@@ -32,6 +32,8 @@ import { tagForms, tagFormsLines } from '../../lib/tagForms';
 import { labelFor, migrationPairs, schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
+import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
+import { isRelationEdge, relativesOf, relationLabel, STRONGEST } from '../../lib/tagNetwork';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -142,12 +144,28 @@ function feedToGraph(feed, config = {}) {
   }
 
   const containmentEdges = [];
+  // The stone's relations between two tags (broader, related and the
+  // mappings, corpus/relationEdges.js; lib/tagNetwork.js): kept aside, never
+  // a link, so the force never sees them and the layout is what it would be
+  // without them. They are drawn only from a selected tag to its relatives.
+  const relations = [];
 
   for (const edge of (feed.edges || [])) {
     if (edge.layer === 'containment' || edge.role === 'contains') {
       containmentEdges.push({
         source: edge.source,
         target: resolveEndpoint(edge.target),
+        attrs: edge.attrs || {},
+      });
+      continue;
+    }
+
+    if (isRelationEdge(edge)) {
+      relations.push({
+        source: edge.source,
+        target: edge.target,
+        directed: !!edge.directed,
+        layer: edge.layer,
         attrs: edge.attrs || {},
       });
       continue;
@@ -196,13 +214,16 @@ function feedToGraph(feed, config = {}) {
   nodes.push(...auxNodes.values());
 
   // A link is drawn only between two nodes that exist: the link force throws
-  // on an endpoint it cannot find. A relation edge between two tags (the
-  // stone's broader, related and the mappings, corpus/relationEdges.js) in
-  // a layer a site shows while its tag layer is hidden has no tag nodes to
-  // join and is left out; a tag or topology edge always made its own node.
+  // on an endpoint it cannot find. A tag or topology edge always made its own
+  // node. A relation between two tags is kept only when both tag nodes exist
+  // (with the tag layer hidden, none does).
   const knownIds = new Set(nodes.map((n) => n.id));
   for (let i = links.length - 1; i >= 0; i--) {
     if (!knownIds.has(links[i].source) || !knownIds.has(links[i].target)) links.splice(i, 1);
+  }
+  const tagIds = new Set(nodes.filter((n) => n.type === 'tag').map((n) => n.id));
+  for (let i = relations.length - 1; i >= 0; i--) {
+    if (!tagIds.has(relations[i].source) || !tagIds.has(relations[i].target)) relations.splice(i, 1);
   }
 
   let containers = feed.containers || config.containment || [];
@@ -221,7 +242,7 @@ function feedToGraph(feed, config = {}) {
     containers = Array.from(inferred.values());
   }
 
-  return { nodes, links, containmentEdges, containers };
+  return { nodes, links, containmentEdges, containers, relations };
 }
 
 // The centroid of the saved positions among a list of node states (entries
@@ -289,14 +310,30 @@ function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
   });
 }
 
+// The number of pieces on each tag bubble drawn, for the panel's pieces per
+// tag slider (src/components/Settings): kept on window.PostPipeGraphTags
+// (counts, a list of numbers) and announced as 'graph:tag-counts' when it
+// changes, at a depth above 0 too, where one bubble stands for a group.
+function publishTagCounts(counts) {
+  if (typeof window === 'undefined') return;
+  const list = [...counts.values()].sort((a, b) => a - b);
+  const sig = list.join(',');
+  const prev = window.PostPipeGraphTags;
+  if (prev && prev.sig === sig) return;
+  window.PostPipeGraphTags = { sig, counts: list };
+  window.dispatchEvent(new CustomEvent('graph:tag-counts', { detail: { counts: list } }));
+}
+
 // Walk article nodes + links and toggle their display based on whether
 // the item's source is currently in the hidden set. Pure DOM mutation,
 // no simulation involvement — node positions stay locked. A tag node
 // follows its pieces: hidden once every piece it joins is hidden with its
 // source, back with the first that comes back, and coloured by the ones
 // showing (paintTagColors). A closed container's members do not count as
-// hidden here; their tags stay.
-function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf) {
+// hidden here; their tags stay. A tag joining fewer pieces than the panel's
+// pieces per tag (minPieces, the preference minTagPieces; lib/minPieces.js)
+// is hidden too, with its edges; at 1, or with nothing chosen, none is.
+function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces) {
   const isHiddenArticle = (d) =>
     Boolean(d && d.type === 'article' && d._source && hiddenSet.has(d._source.id));
   const byId = nodesById(svg);
@@ -305,6 +342,13 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf) {
   for (const [tagId, list] of pieces) {
     if (list.length && list.every(isHiddenArticle)) hiddenTags.add(tagId);
   }
+  const bubbleIds = [];
+  for (const d of byId.values()) if (d.type === 'tag' && !d._groupedInto) bubbleIds.push(d.id);
+  const counts = pieceCounts(pieces, bubbleIds);
+  let most = 0;
+  for (const n of counts.values()) if (n > most) most = n;
+  for (const id of tagsBelow(counts, clampMinPieces(minPieces, most))) hiddenTags.add(id);
+  publishTagCounts(counts);
   // A member of a closed container stays hidden whatever its source, and so
   // does a tag collapsed into another at the depth chosen (_groupedInto).
   const isHidden = (d) => Boolean(d && (
@@ -470,6 +514,13 @@ export function GraphViewer({
     const vs = viewStateRef.current;
     return (vs && typeof vs.sourceColor === 'function' && vs.sourceColor(sourceId)) || null;
   };
+  // The panel's pieces per tag (the preference minTagPieces, null for 1;
+  // lib/minPieces.js): read by applyVisibility, which hides the tags joining
+  // fewer pieces. Nothing is rebuilt and nothing moves.
+  const minPiecesChosen = () => {
+    const vs = viewStateRef.current;
+    return vs && vs.preference ? vs.preference(MIN_PIECES_PREF) : null;
+  };
 
   // The live graph, reachable from effects that must not rebuild it.
   const cardSizeFor = makeCardSizeFor(CARD);
@@ -499,6 +550,9 @@ export function GraphViewer({
   // dimension, off until the reader turns it on.
   const contributionsRef = useRef(contributions || []);
   const readersUpdateRef = useRef(null);
+  // Set once the graph is drawn: redraws the selected tag's lines to its
+  // relatives, after anything that can hide or show a tag.
+  const relationsUpdateRef = useRef(null);
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
@@ -540,7 +594,8 @@ export function GraphViewer({
       ? hiddenSources
       : new Set(hiddenSources || []);
     if (!svgRef.current || !cardsLayerRef.current) return;
-    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf);
+    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
+    if (relationsUpdateRef.current) relationsUpdateRef.current();
   }, [hiddenSources]);
 
   // Settings writes a color profile to viewState; this repaints instantly by
@@ -578,10 +633,12 @@ export function GraphViewer({
       if (schemeUpdateRef.current) schemeUpdateRef.current();
       if (paletteUpdateRef.current) paletteUpdateRef.current();
       if (tightnessUpdateRef.current) tightnessUpdateRef.current();
-      // A colour the reader gives a feed reaches its tag nodes as well.
+      // A colour the reader gives a feed reaches its tag nodes as well, and
+      // the pieces per tag chosen in the panel hides or shows tags.
       if (svgRef.current && cardsLayerRef.current) {
-        applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf);
+        applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
       }
+      if (relationsUpdateRef.current) relationsUpdateRef.current();
     });
   }, [viewState]);
 
@@ -647,7 +704,21 @@ export function GraphViewer({
       .append('path')
       .attr('d', 'M 0 1.5 L 8 5 L 0 8.5 z')
       .attr('fill', 'var(--gv-accent, #d4af37)');
-    
+    // The arrowhead on a line from a selected tag to a relative, landing on
+    // the broader tag of a broader or broadMatch (see Relations below).
+    defs.append('marker')
+      .attr('id', 'relation-arrow')
+      .attr('class', 'relation-arrow')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 9)
+      .attr('refY', 5)
+      .attr('markerUnits', 'userSpaceOnUse')
+      .attr('markerWidth', 11)
+      .attr('markerHeight', 11)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M 0 1 L 10 5 L 0 9 z');
+
     // The two-layer architecture: SVG handles lines/bubbles, HTML handles cards.
     // Width/height 100% on the layer, but the transform container is 0x0
     // so Safari doesn't clip out-of-bounds accelerated children.
@@ -731,6 +802,8 @@ export function GraphViewer({
       if (positionsReady && GROW && growOn()) applyPositions();
       if (positionsReady) scheduleRightsFade();
       if (edgeLabelFor) placeEdgeLabel();
+      // The +N under a selected tag keeps its size on the screen.
+      if (relationsUpdateRef.current) relationsUpdateRef.current({ paintOnly: true });
       // The rail is pinned to the window and the nodes are not, so every pan
       // and zoom moves one end of every connector.
       if (connectorUpdateRef.current) connectorUpdateRef.current();
@@ -2958,6 +3031,11 @@ export function GraphViewer({
     // The readers' layer (see Readers below): over the book's edges, under
     // the cards.
     const readersLayer = g.append('g').attr('class', 'readers-layer').style('display', 'none');
+    // The selected tag's lines to its relatives (see Relations below): over
+    // the edges, under the bubbles, so a line ends under a bubble's edge.
+    // Their hit areas sit with the edges', under the containers layer.
+    const relationsLayer = g.append('g').attr('class', 'relations-layer').style('display', 'none');
+    const relationHitsLayer = g.insert('g', '.containers-layer').attr('class', 'relation-hits');
 
     // The sketchbook theme's second pencil pass along each edge.
     const linkGhosts = g.selectAll('.link-ghost')
@@ -3015,6 +3093,24 @@ export function GraphViewer({
       const k = zoomScaleRef.current || 1;
       const fs = 13 / k;
       const color = linkColor(edgeLabelFor);
+      // A label of several lines (a relation's type and weight, then its
+      // why: see Relations below) is a block of lines in a rounded box; one
+      // line is the pill it always was.
+      const lines = String(edgeLabelFor.label).split('\n');
+      if (lines.length > 1) {
+        const lineH = fs * 1.35;
+        edgeLabelText.attr('font-size', fs).style('fill', color).text(null);
+        lines.forEach((line, i) => {
+          edgeLabelText.append('tspan').attr('x', 0).attr('y', (i - (lines.length - 1) / 2) * lineH).text(line);
+        });
+        const longest = lines.reduce((m, line) => Math.max(m, line.length), 0);
+        const w = (longest * 0.62 + 1.4) * fs;
+        const h = lineH * lines.length + fs * 0.7;
+        edgeLabelBg.attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h)
+          .attr('rx', fs * 0.6).style('stroke', color).attr('stroke-width', 1 / k);
+        edgeLabel.attr('transform', `translate(${p.x}, ${p.y})${upright()}`).style('display', null);
+        return;
+      }
       edgeLabelText.attr('font-size', fs).style('fill', color).text(edgeLabelFor.label);
       const w = (edgeLabelFor.label.length * 0.62 + 1.4) * fs;
       const h = fs * 1.7;
@@ -3022,12 +3118,25 @@ export function GraphViewer({
         .attr('rx', h / 2).style('stroke', color).attr('stroke-width', 1 / k);
       edgeLabel.attr('transform', `translate(${p.x}, ${p.y})${upright()}`).style('display', null);
     }
+    // A relation line's label (see Relations below) is lifted over the
+    // bubbles and the +N under the selected tag, which would cover its
+    // lines; put back under the bubbles, where every other edge's label sits,
+    // once it is hidden.
+    let edgeLabelLifted = false;
     function showEdgeLabel(l, el) {
       clearTimeout(edgeLabelTimer);
       edgeLabelTimer = null;
       edgeLabelFor = l;
       edgeLabelEl = el;
+      if (l && l.layer === 'relation') { edgeLabel.raise(); edgeLabelLifted = true; }
+      else lowerEdgeLabel();
       placeEdgeLabel();
+    }
+    function lowerEdgeLabel() {
+      if (!edgeLabelLifted) return;
+      edgeLabelLifted = false;
+      const first = g.node().querySelector(':scope > .node');
+      if (first) g.node().insertBefore(edgeLabel.node(), first);
     }
     function hideEdgeLabel() {
       clearTimeout(edgeLabelTimer);
@@ -3035,6 +3144,7 @@ export function GraphViewer({
       edgeLabelFor = null;
       edgeLabelEl = null;
       edgeLabel.style('display', 'none');
+      lowerEdgeLabel();
     }
     linkHits
       .on('mouseenter', function (event, l) { showEdgeLabel(l, this); })
@@ -3054,6 +3164,20 @@ export function GraphViewer({
       .data(data.nodes)
       .enter().append('g')
       .attr('class', 'node');
+
+    // Under the selected tag, when it has more relatives than show: +N
+    // brings in the rest, -N goes back to the strongest (see Relations
+    // below). Over the bubbles, so a neighbour never covers it.
+    const relationMoreEl = g.append('g')
+      .attr('class', 'relation-more')
+      .attr('role', 'button')
+      .style('display', 'none')
+      .style('cursor', 'pointer');
+    relationMoreEl.append('rect').attr('class', 'relation-more-bg');
+    relationMoreEl.append('text')
+      .attr('class', 'relation-more-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central');
 
     const dragHandler = d3.drag().clickDistance(5)
         // Pointer positions in graph coordinates, through the view as drawn
@@ -3592,7 +3716,7 @@ export function GraphViewer({
       articleNodes.filter(nd => nd.id === id).raise().style('z-index', 10);
       loadFullContent(d).then(() => { if (pinnedIdsRef.current.has(id)) renderArticleBody(d); });
     });
-    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf);
+    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
     // because the card's inner HTML gets replaced on re-render
@@ -3803,36 +3927,46 @@ export function GraphViewer({
         tapOrDouble(event, () => toggleTagHighlight(d));
       });
     function toggleTagHighlight(d) {
-      if (activeTag === d.id) {
-        activeTag = null;
+      activeTag = activeTag === d.id ? null : d.id;
+      // Each selection starts with the strongest relatives only.
+      relationsExpanded = false;
+      // The lines to the relatives, then the highlight, which keeps them lit.
+      refreshRelations({ force: true });
+      updateTagForms();
+      announceTag();
+    }
+    // The highlight of the tag selected (activeTag): its pieces and its
+    // drawn relatives (see Relations below) stay, the rest fades. With none
+    // selected, nothing fades.
+    function paintHighlight() {
+      if (!activeTag) {
         nodes.classed('dimmed', false).classed('tag-active', false);
         articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
-      } else {
-        activeTag = d.id;
-        const connected = new Set(
-          data.links.filter(l => {
-            const sid = typeof l.source === 'object' ? l.source.id : l.source;
-            const tid = typeof l.target === 'object' ? l.target.id : l.target;
-            return sid === d.id || tid === d.id;
-          }).map(l => {
-            const sid = typeof l.source === 'object' ? l.source.id : l.source;
-            const tid = typeof l.target === 'object' ? l.target.id : l.target;
-            return sid === d.id ? tid : sid;
-          })
-        );
-        connected.add(d.id);
-        nodes.classed('dimmed', nd => !connected.has(nd.id));
-        nodes.classed('tag-active', nd => nd.id === d.id);
-        articleNodes.classed('dimmed', nd => !connected.has(nd.id));
-        links.classed('highlighted', l => {
+        return;
+      }
+      const id = activeTag;
+      const connected = new Set(
+        data.links.filter(l => {
           const sid = typeof l.source === 'object' ? l.source.id : l.source;
           const tid = typeof l.target === 'object' ? l.target.id : l.target;
-          return sid === d.id || tid === d.id;
-        });
-      }
-      updateTagForms();
-      announceTag();
+          return sid === id || tid === id;
+        }).map(l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          return sid === id ? tid : sid;
+        })
+      );
+      connected.add(id);
+      for (const r of relationShown) connected.add(r.id);
+      nodes.classed('dimmed', nd => !connected.has(nd.id));
+      nodes.classed('tag-active', nd => nd.id === id);
+      articleNodes.classed('dimmed', nd => !connected.has(nd.id));
+      links.classed('highlighted', l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        return sid === id || tid === id;
+      });
     }
     // The tag highlighted, for the page ('graph:tag-changed', detail.id the
     // tag node's id, or null for none): the top bar's tag list marks its row.
@@ -3852,9 +3986,8 @@ export function GraphViewer({
       hideEdgeLabel();
       if (activeTag) {
         activeTag = null;
-        nodes.classed('dimmed', false).classed('tag-active', false);
-        articleNodes.classed('dimmed', false);
-        links.classed('highlighted', false);
+        relationsExpanded = false;
+        refreshRelations({ force: true });
         updateTagForms();
         announceTag();
       }
@@ -3890,6 +4023,7 @@ export function GraphViewer({
       updateContainers();
       if (rootsUpdateRef.current) rootsUpdateRef.current();
       if (readersUpdateRef.current) readersUpdateRef.current();
+      if (relationsUpdateRef.current) relationsUpdateRef.current({ paintOnly: true });
       scheduleRightsFade();
     }
     // ── The rights line at the foot ───────────────────────────────────────
@@ -3956,6 +4090,186 @@ export function GraphViewer({
     }
     readersUpdateRef.current = paintReaders;
     buildReaders();
+
+    // ── Relations ─────────────────────────────────────────────────────────
+    // While a tag is selected, thin lines run from it to the tags the stone
+    // relates to it (data.relations: broader, related and the mappings,
+    // lib/tagNetwork.js), the strongest five by weight, with +N under the
+    // selected bubble when it has more (-N takes them away again). They are
+    // never links: the force never sees them and nothing moves. Only a tag
+    // drawn counts, at either end: not one hidden with its feeds or by the
+    // panel's pieces per tag, nor one collapsed into another at the depth
+    // chosen (_groupedInto). The relatives stay lit while the rest fades, and
+    // tapping one selects it in turn. A line of a broader or a broadMatch
+    // carries an arrowhead landing on the broader tag. What a line is (its
+    // type, weight and why) is said only in the edge label, on hover or tap.
+    const nodeElById = new Map();
+    nodes.each(function (d) { nodeElById.set(d.id, this); });
+    const bubbleOf = new Map(tagBubbles.map((e) => [e.d.id, e]));
+    let relationsExpanded = false;
+    let relationShown = []; // [{ id, l, line, hit }]
+    let relationSig = '';
+    function tagShown(id) {
+      const n = nodeBySlug.get(id);
+      if (!n || n.type !== 'tag' || n._groupedInto) return false;
+      const el = nodeElById.get(id);
+      return Boolean(el && el.style.display !== 'none');
+    }
+    function relationNet() {
+      if (!activeTag || !data.relations.length || !tagShown(activeTag)) return null;
+      return relativesOf(data.relations, activeTag, { visible: tagShown, limit: relationsExpanded ? Infinity : STRONGEST });
+    }
+    // How far from a bubble's centre its outline lies in the direction
+    // (ux, uy), in graph coordinates; the bubble is drawn upright, turned
+    // back by the rotation, so the direction is read in its own frame.
+    function bubbleReach(id, ux, uy) {
+      const e = bubbleOf.get(id);
+      if (!e) return 0;
+      const hw = (Number(e.rectEl.attr('width')) || 0) / 2 + 2;
+      const hh = (Number(e.rectEl.attr('height')) || 0) / 2 + 2;
+      const a = (rotation * Math.PI) / 180;
+      const lx = ux * Math.cos(a) - uy * Math.sin(a);
+      const ly = ux * Math.sin(a) + uy * Math.cos(a);
+      return Math.min(
+        Math.abs(lx) > 1e-4 ? hw / Math.abs(lx) : Infinity,
+        Math.abs(ly) > 1e-4 ? hh / Math.abs(ly) : Infinity
+      );
+    }
+    function buildRelations(net) {
+      if (edgeLabelFor && edgeLabelFor.layer === 'relation') hideEdgeLabel();
+      relationsLayer.selectAll('*').remove();
+      relationHitsLayer.selectAll('*').remove();
+      relationShown = [];
+      relationMoreEl.style('display', 'none');
+      if (!net || !net.relatives.length) { relationsLayer.style('display', 'none'); return; }
+      relationsLayer.style('display', null);
+      for (const r of net.relatives) {
+        // A broader or broadMatch is drawn from the narrower tag to the
+        // broader, so its arrowhead lands on the broader one.
+        const fromId = r.broader === activeTag ? r.id : activeTag;
+        const toId = fromId === activeTag ? r.id : activeTag;
+        const types = [...new Set(r.relations.map((x) => x.layer))];
+        const l = {
+          source: nodeBySlug.get(fromId),
+          target: nodeBySlug.get(toId),
+          layer: 'relation',
+          directed: r.broader !== null,
+          label: relationLabel(r.relations),
+        };
+        const line = relationsLayer.append('path')
+          .attr('class', ['relation-line', ...types.map((t) => `relation-${t}`)].join(' '))
+          .attr('fill', 'none')
+          .attr('data-relation', r.id)
+          .attr('data-relation-types', types.join(' '))
+          .attr('marker-end', l.directed ? 'url(#relation-arrow)' : null);
+        const hit = relationHitsLayer.append('path')
+          .attr('class', 'relation-hit')
+          .attr('fill', 'none')
+          .attr('data-relation', r.id)
+          .style('stroke', 'transparent')
+          .style('stroke-width', '16px')
+          .style('pointer-events', 'stroke')
+          .style('cursor', 'default')
+          .on('mouseenter', function () { showEdgeLabel(l, this); })
+          .on('mouseleave', () => { if (!edgeLabelTimer) hideEdgeLabel(); })
+          .on('click', function (event) {
+            // A tap names the line, as it names an edge; it does not count
+            // as a tap on the canvas.
+            event.stopPropagation();
+            const el = this;
+            tapOrDouble(event, () => {
+              showEdgeLabel(l, el);
+              edgeLabelTimer = setTimeout(() => { edgeLabelTimer = null; hideEdgeLabel(); }, 2500);
+            });
+          });
+        relationShown.push({ id: r.id, l, line, hit });
+      }
+      const extra = relationsExpanded ? Math.max(0, net.total - STRONGEST) : net.more;
+      if (extra > 0) {
+        relationMoreEl
+          .attr('data-relation-more', relationsExpanded ? 'all' : 'strongest')
+          .attr('aria-expanded', relationsExpanded ? 'true' : 'false')
+          .attr('aria-label', relationsExpanded ? `${STRONGEST} related tags` : `${net.total} related tags`)
+          .style('display', null);
+        relationMoreEl.select('text').text(`${relationsExpanded ? '−' : '+'}${extra}`);
+      }
+    }
+    function paintRelations() {
+      if (!relationShown.length) return;
+      for (const r of relationShown) {
+        const s = r.l.source;
+        const t = r.l.target;
+        let path = '';
+        if (s && t) {
+          const ps = drawnAt(s);
+          const pt = drawnAt(t);
+          const dx = pt.x - ps.x;
+          const dy = pt.y - ps.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 1) {
+            const ux = dx / dist;
+            const uy = dy / dist;
+            const rs = bubbleReach(s.id, ux, uy);
+            const rt = bubbleReach(t.id, ux, uy);
+            if (dist > rs + rt + 2) {
+              path = `M ${ps.x + ux * rs} ${ps.y + uy * rs} L ${pt.x - ux * rt} ${pt.y - uy * rt}`;
+            }
+          }
+        }
+        r.line.attr('d', path);
+        r.hit.attr('d', path);
+      }
+      const a = activeTag ? nodeBySlug.get(activeTag) : null;
+      if (a && relationMoreEl.style('display') !== 'none') {
+        // As big as the bubble's own text has it, and never under 12px on
+        // the screen, so it can be read and tapped zoomed out.
+        const k = zoomScaleRef.current || 1;
+        const e = bubbleOf.get(a.id);
+        const fs = Math.max(TAG.fontSize * 0.6, 12 / k);
+        const label = relationMoreEl.select('text').text();
+        const w = (label.length * 0.62 + 1.6) * fs;
+        const h = fs * 1.6;
+        const below = (e ? (Number(e.rectEl.attr('y')) || 0) + (Number(e.rectEl.attr('height')) || 0) : TAG.fontSize) + h / 2 + 4 / k;
+        relationMoreEl.select('rect')
+          .attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h).attr('rx', h / 2)
+          .attr('stroke-width', 1 / k);
+        relationMoreEl.select('text').attr('font-size', fs);
+        const q = drawnAt(a);
+        relationMoreEl.attr('transform', `translate(${q.x}, ${q.y})${upright()} translate(0, ${below})`);
+      }
+      if (edgeLabelFor && edgeLabelFor.layer === 'relation') placeEdgeLabel();
+    }
+    // force: build again whatever was drawn (a selection, or +N/-N);
+    // paintOnly: only follow the nodes (every frame they move). Otherwise
+    // build again only when what should be drawn has changed (a tag hidden
+    // or shown by the panel, a feed, or the depth).
+    function refreshRelations({ force = false, paintOnly = false } = {}) {
+      if (force || !paintOnly) {
+        const net = relationNet();
+        const sig = net
+          ? [activeTag, relationsExpanded ? 'all' : 'strongest', net.more, ...net.relatives.map((r) => r.id)].join('\u0000')
+          : '';
+        if (force || sig !== relationSig) {
+          relationSig = sig;
+          buildRelations(net);
+          paintHighlight();
+        }
+      }
+      paintRelations();
+    }
+    function toggleRelationsExpanded(event) {
+      if (event) { event.stopPropagation(); event.preventDefault(); }
+      relationsExpanded = !relationsExpanded;
+      refreshRelations({ force: true });
+    }
+    relationMoreEl
+      .attr('tabindex', 0)
+      .on('click', (event) => toggleRelationsExpanded(event))
+      .on('dblclick', (event) => { event.stopPropagation(); event.preventDefault(); })
+      .on('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') toggleRelationsExpanded(event);
+      });
+    relationsUpdateRef.current = refreshRelations;
 
     // ── Roots ─────────────────────────────────────────────────────────────
     // graph.roots (default off): thin branching roots grow along the reading
@@ -4295,7 +4609,7 @@ export function GraphViewer({
         simulation.force('link').links(data.links.filter((l) => !l._dupByGroup));
         simulation.force('charge').strength(simulation.force('charge').strength());
         simulation.force('collide').radius(simulation.force('collide').radius());
-        applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf);
+        applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
         applyPositions();
         simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
       } else {
@@ -4807,6 +5121,8 @@ export function GraphViewer({
       focusNode(null);
       hideEdgeLabel();
       activeTag = null;
+      relationsExpanded = false;
+      refreshRelations({ force: true });
       hoveredTag = null;
       hoveredIdRef.current = null;
       nodes.classed('dimmed', false).classed('tag-active', false);
@@ -4898,6 +5214,8 @@ export function GraphViewer({
       schemeUpdateRef.current = null;
       tightnessUpdateRef.current = null;
       readersUpdateRef.current = null;
+      relationsUpdateRef.current = null;
+      if (typeof window !== 'undefined') delete window.PostPipeGraphTags;
       if (rootsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rootsFrame);
       if (themeObserver) themeObserver.disconnect();
       simulation.stop();

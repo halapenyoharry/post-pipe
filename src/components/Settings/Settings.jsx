@@ -14,6 +14,8 @@ import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
 import { clampTightness } from '../../lib/tightness';
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
+import { PREF as MIN_PIECES_PREF, minPiecesSummary, pieceCountsFromFeed } from '../../lib/minPieces';
+import { hasTagNodes } from '../../lib/tagList';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -205,6 +207,21 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
     return viewState.subscribe(() => bump((n) => n + 1));
   }, [viewState]);
 
+  // The number of pieces on each tag bubble the graph draws, for the pieces
+  // per tag slider: the graph's own count (window.PostPipeGraphTags, and
+  // 'graph:tag-counts' when it changes, a group at a depth above 0 counted
+  // as one bubble), read from the feed's tag edges until the graph has said.
+  const [graphTagCounts, setGraphTagCounts] = useState(() => (
+    typeof window !== 'undefined' && window.PostPipeGraphTags ? window.PostPipeGraphTags.counts : null
+  ));
+  useEffect(() => {
+    if (W !== 'graph') return undefined;
+    if (window.PostPipeGraphTags) setGraphTagCounts(window.PostPipeGraphTags.counts);
+    const on = (e) => setGraphTagCounts(e && e.detail && Array.isArray(e.detail.counts) ? e.detail.counts : null);
+    window.addEventListener('graph:tag-counts', on);
+    return () => window.removeEventListener('graph:tag-counts', on);
+  }, [W]);
+
   // Reading choices are attributes on <html>, so the reader pane and every
   // open node read them from one place.
   useEffect(() => {
@@ -288,6 +305,12 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const schemeId = typeof schemePref === 'string' && schemeList.some((s) => s.id === schemePref) ? schemePref : siteSchemeId;
   const depthPref = Number(viewState.preference('broaderDepth'));
   const depth = Number.isFinite(depthPref) ? Math.max(0, Math.min(2, Math.round(depthPref))) : 0;
+  // Pieces per tag (preference minTagPieces, null for 1; lib/minPieces.js):
+  // a tag joining fewer pieces is hidden. Offered while the graph draws tag
+  // nodes and some tag joins more than one piece.
+  const tagCounts = W !== 'graph' ? []
+    : (graphTagCounts || (hasTagNodes(feedData, S && S.graph) ? [...pieceCountsFromFeed(graphFeed(feedData, topBarConfig(S))).values()] : []));
+  const minPieces = minPiecesSummary(tagCounts, viewState.preference(MIN_PIECES_PREF));
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -430,6 +453,32 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
             />
             <span className={styles.rangeEnd} aria-hidden="true">tight</span>
           </span>
+        </label>
+      )}
+      {minPieces.max > 1 && (
+        <label className={styles.choiceRow} data-pref={MIN_PIECES_PREF} title="Tags joining fewer pieces than this are hidden.">
+          <span className={styles.rowLabel}>Pieces per tag</span>
+          <span className={styles.rangeRow}>
+            <span className={styles.rangeEnd} aria-hidden="true">1</span>
+            <input
+              type="range"
+              className={styles.range}
+              min="1"
+              max={minPieces.max}
+              step="1"
+              aria-label={`Pieces per tag, from 1 to ${minPieces.max}`}
+              aria-valuetext={`at least ${minPieces.min}: ${minPieces.shown} of ${minPieces.total} tags`}
+              value={minPieces.min}
+              onChange={(e) => {
+                const v = Math.round(Number(e.target.value));
+                viewState.setPreference(MIN_PIECES_PREF, Number.isFinite(v) && v > 1 ? v : null);
+              }}
+            />
+            <span className={styles.rangeEnd} aria-hidden="true">{minPieces.max}</span>
+          </span>
+          <output className={styles.rangeEnd} data-tag-count aria-live="polite">
+            at least {minPieces.min} · {minPieces.shown} of {minPieces.total} tags
+          </output>
         </label>
       )}
       {schemeList.length > 1 && (
