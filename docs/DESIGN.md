@@ -81,7 +81,10 @@ profiles, only for pairs that never share an item. Each concept keeps its strong
 `discover` exists for tag-systems with no shared vocabulary. Candidates are unigrams and bigrams that
 never span punctuation; a hub must recur in ≥ 2 items, stay under 12% of items, avoid
 `seed/generic-words.txt`, and not be incoherent (a weak guard: on short summaries the coherence
-statistic does not separate topics from filler, so the word list does the real work). Hubs are chosen
+statistic does not separate topics from filler, so the word list does the real work). Since
+2026-10-27 coherence is also measured against how alike items from the same sources already are
+(`sourceCoherenceRatio`, `sourceBaseline`; see FORMATS.md): a word spread over one source of long,
+alike articles had inherited that source's likeness and passed. Hubs are chosen
 from the untagged items' point of view, `perItem` at a time, and then attached to *every* item
 containing them, with no cap: attachment follows justification, and a hub's `why` counts exactly the
 items that carry it (a hub left on fewer than `minDf` items is dropped). Before 2026-10-25 the cap was

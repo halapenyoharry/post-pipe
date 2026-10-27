@@ -17,6 +17,38 @@ preserved where it matters, so other programs can add their own.
 - A tag record without `type` but with `item` and `label` is accepted.
 - Items with no tags are meaningful: they are the orphans discovery and emergence exist for.
 
+### Discovered tags (`rtz-discover`)
+
+```json
+{"type":"tag","source":"ProPublica","item":"…","label":"cancer","weight":0.4,"origin":"discovered",
+ "why":"recurs in 7 of 102 items, which stay alike without it (0.05, 2.9× the 0.016 that items from the same sources share)",
+ "wasDerivedFrom":[{"type":"text","phrase":"cancer","count":1,"inTitle":false}],
+ "wasGeneratedBy":{"activity":"discover","parameters":{"minDf":2,"maxDfRatio":0.12,"perItem":3,"sourceCoherenceRatio":1.6,
+   "df":7,"items":7,"coherence":0.046,"sourceBaseline":0.016}}}
+```
+
+A phrase becomes a hub when it is on at least `discover.minDf` items, on no more than `maxDfRatio` of
+them, and its items are coherent: `coherence`, the mean TF-IDF cosine between the items holding it
+(at most the first 25) with the phrase removed, must reach every bar below.
+
+| bar | parameter (default) | what it compares with |
+|---|---|---|
+| floor | `minCoherence` (0.04) | a fixed minimum |
+| corpus | `coherenceRatio` (1.6) | that multiple of how alike two items of the whole corpus are (a fixed sample of pairs) |
+| sources | `sourceCoherenceRatio` (1.6; 0 turns it off) | that multiple of `sourceBaseline`: how alike items from the same sources are anyway |
+
+`sourceBaseline` is measured per phrase: for each pair of its items, the mean cosine between items of
+those two sources (a fixed sample of up to 400 pairs per pair of sources) leaving out the pairs that
+both hold the phrase, since those are what is being tested; averaged over the same item pairs the
+coherence is taken over. A pair of sources with no other pair to compare with uses the corpus figure.
+It exists because one source can make its items alike by itself: on post-pipe's site corpus of
+2026-10-26, two ProPublica articles average 0.084 against 0.017 for two ScienceDaily summaries, so
+any word spread over ProPublica items ("instead", "role", "force") passed the 0.04 floor without
+saying anything about a topic; measured against the likeness of items from their own sources they
+come out at 0.9× to 1.3×, while "cancer", "immune system" and "blood pressure" come out at 2.9× to
+5.5×. `why` states the coherence and that multiple; `items` is the number of items the hub is
+attached to, which is the count `why` gives.
+
 ## Pair evidence (`pairs.jsonl`, from `rtz-pairs` or any external scorer)
 
 ```json

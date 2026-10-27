@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { discover } from '../lib/discover.js';
+import { makeConfig } from '../lib/config.js';
 import { buildStone } from '../lib/stone.js';
 import { emerge } from '../lib/emerge.js';
 import { rec } from './helpers.js';
@@ -101,7 +102,7 @@ test('every discovered record carries its provenance', () => {
     assert.equal(d.inTitle, it.title.toLowerCase().split(/[^\p{L}\p{N}]+/u).join(' ').includes(d.phrase), `inTitle for "${d.phrase}" on ${t.item}`);
     assert.equal(t.wasGeneratedBy.activity, 'discover');
     const P = t.wasGeneratedBy.parameters;
-    assert.deepEqual(Object.keys(P).sort(), ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'perItem']);
+    assert.deepEqual(Object.keys(P).sort(), ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio']);
     assert.ok(P.items >= P.minDf && P.items <= P.df);
   }
 });
@@ -148,4 +149,48 @@ test('a concept only ever proposed by discovery is flagged, visible to emerge, a
   const carried = new Set(out.map((t) => `${t.source}::${t.item}::${s.concepts.find((c) => c.variants.some((v) => v.norm === t.label.toLowerCase()))?.id}`));
   const extra = emerge(s, [...records, ...out]);
   for (const t of extra) if (discoveredIds.has(t.concept)) assert.ok(!carried.has(`${t.source}::${t.item}::${t.concept}`), `${t.item} already carries ${t.concept}`);
+});
+
+// A newsroom whose items are alike anyway (they share its vocabulary), one untagged newsroom item, a
+// wire with a topic the newsroom also covers, and filler so nothing is everywhere. "instead" sits on
+// five newsroom items and nowhere else; "wildfire" on three newsroom items and both wire items.
+const newsroom = 'county commissioners weighed the budget after an audit of agency records; lawmakers demanded testimony and a subpoena from the department';
+const deskMeta = {
+  d1: { title: 'Wildfire response audit in Ashford County', text: `${newsroom}. the wildfire forced evacuation orders as smoke covered acres near ashford; firefighters held containment lines` },
+  d2: { title: 'Brennan County wildfire costs', text: `${newsroom}. after the wildfire, smoke and evacuation costs grew as firefighters lost acres near brennan` },
+  d3: { title: 'Calloway wildfire records', text: `${newsroom}. a wildfire near calloway sent smoke over acres; evacuation routes jammed and firefighters asked for relief` },
+  d4: { title: 'Dunmore audit', text: `${newsroom}; dunmore spent the reserve instead` },
+  d5: { title: 'Fairhaven audit', text: `${newsroom}; fairhaven hired a consultant instead` },
+  d6: { title: 'Glenrock audit', text: `${newsroom}; glenrock delayed the vote instead` },
+  d7: { title: 'Harlow audit', text: `${newsroom}; harlow borrowed the money instead` },
+  d8: { title: 'Elmwood audit', text: `${newsroom}; elmwood paid the vendor instead` },
+};
+const deskRecords = [
+  ...rec('Desk', { d1: ['Politics'], d2: ['Politics'], d3: ['Politics'], d4: ['Politics'], d5: ['Politics'], d6: ['Politics'], d7: ['Politics'], d8: [] }, deskMeta),
+  ...rec('Wire', { w1: [], w2: [] }, {
+    w1: { title: 'Wildfire smoke reaches the valley', text: 'smoke from the wildfire drifted over acres of orchards; evacuation shelters opened and firefighters worked overnight' },
+    w2: { title: 'Firefighters gain on the wildfire', text: 'firefighters cut lines around the wildfire; smoke thinned, evacuation orders eased and acres of forest were saved' },
+  }),
+  ...rec('Filler', filler, fillerMeta),
+];
+const deskOn = discover(deskRecords);
+const deskOff = discover(deskRecords, makeConfig({ discover: { sourceCoherenceRatio: 0 } }));
+const hubsOf = (found) => new Set(found.map((t) => t.label));
+
+test('a word spread over one homogeneous source is not a topic: its items are only as alike as the source makes them', () => {
+  assert.ok(hubsOf(deskOff).has('instead'), 'measured against the whole corpus, the newsroom\'s likeness carries "instead" through');
+  assert.ok(!hubsOf(deskOn).has('instead'), 'measured against items from the same source, it adds nothing');
+  assert.equal(deskOn.filter((t) => t.item === 'd8').length, 0, 'the untagged newsroom item had only "instead" to offer');
+});
+
+test('a real topic whose items are alike beyond what their sources share is kept', () => {
+  assert.ok(hubsOf(deskOn).has('wildfire'), `got ${[...hubsOf(deskOn)]}`);
+  const w = deskOn.filter((t) => t.label === 'wildfire');
+  assert.deepEqual(w.map((t) => t.item).sort(), ['d1', 'd2', 'd3', 'w1', 'w2'], 'it lands on every item that says it, newsroom items included');
+  for (const t of w) {
+    const P = t.wasGeneratedBy.parameters;
+    assert.equal(P.sourceCoherenceRatio, 1.6);
+    assert.ok(P.sourceBaseline > 0 && P.coherence >= P.sourceCoherenceRatio * P.sourceBaseline, `coherence ${P.coherence} against baseline ${P.sourceBaseline}`);
+    assert.match(t.why, /^recurs in 5 of 50 items, which stay alike without it \(\d\.\d\d, \d+\.\d× the \d\.\d{3} that items from the same sources share\)/);
+  }
 });
