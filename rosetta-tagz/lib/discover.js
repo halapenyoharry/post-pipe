@@ -437,16 +437,27 @@ export function discover(records, cfg = makeConfig(), info = null) {
   const usable = new Map(); // stemKey -> coherence, at or above sourceCoherenceRatio
   const under = new Map(); // stemKey -> coherence, below it but at or above the floor
   const measure = new Map(); // stemKey -> { baseline, ratio }
+  const turnedAway = new Map(); // stemKey -> why it is no hub: { tooCommon } | { incoherent, coherence } | { underFloor, sourceRatio }
   for (const [key, d] of df) {
-    if (d < D.minDf || d / N > D.maxDfRatio) continue;
+    if (d < D.minDf) continue;
+    if (d / N > D.maxDfRatio) {
+      turnedAway.set(key, { reason: 'tooCommon' });
+      continue;
+    }
     if (!written.get(key).size) continue; // nothing in the text spells it as written, so it could only be named by an invented label
     const c = coherent(key);
-    if (c < threshold) continue;
+    if (c < threshold) {
+      turnedAway.set(key, { reason: 'incoherent', coherence: c });
+      continue;
+    }
     const e = expected(key);
     const ratio = e > 0 ? Number((c / e).toFixed(3)) : null;
     if (ratio === null || ratio >= D.sourceCoherenceRatio) usable.set(key, c);
     else if (floor !== null && ratio >= floor) under.set(key, c);
-    else continue;
+    else {
+      turnedAway.set(key, { reason: 'underFloor', sourceRatio: ratio });
+      continue;
+    }
     measure.set(key, { baseline: e, ratio });
   }
   const coherenceOf = (key) => usable.get(key) ?? under.get(key);
@@ -535,11 +546,17 @@ export function discover(records, cfg = makeConfig(), info = null) {
     return fa < fb ? -1 : fa > fb ? 1 : a < b ? -1 : 1;
   };
   const out = [];
+  const landed = new Set(); // item keys an at-bar hub lands on
+  const dropped = new Set(); // hubs chosen and then dropped, on fewer than minDf items
   for (const key of [...attached.keys()].sort(byForm)) {
     const carriers = attached.get(key);
     const n = carriers.length;
     const k = distinctItems(carriers.map(({ it }) => it.key));
-    if (k < D.minDf) continue;
+    if (k < D.minDf) {
+      dropped.add(key);
+      continue;
+    }
+    if (!under.has(key)) for (const { it } of carriers) landed.add(it.key);
     const coherence = coherenceOf(key);
     const { baseline, ratio } = measure.get(key);
     const below = under.has(key);
@@ -579,5 +596,47 @@ export function discover(records, cfg = makeConfig(), info = null) {
       });
     }
   }
+  if (info) info.untagged = untaggedFates();
   return out;
+
+  // What became of each candidate phrase of every untagged item no hub at or above the bar lands on,
+  // as this run knows it: the items a tag-system tagged are left out (they have tags), and so are the
+  // items an at-bar hub reached. Keyed by the item's key; `members` lists the keys of every record of
+  // the same article (folded by url or long title), so a reader can find it under any of them.
+  function untaggedFates() {
+    const members = new Map();
+    for (const it of corpus.items.values()) {
+      const rep = corpus.canonItem.get(it.key) ?? it.key;
+      if (!members.has(rep)) members.set(rep, []);
+      members.get(rep).push(it.key);
+    }
+    const fates = {};
+    for (const it of reps) {
+      if (tagged.has(it.key) || landed.has(it.key)) continue;
+      const fate = { members: (members.get(it.key) ?? [it.key]).sort(), candidates: 0, single: 0, nearCopy: [], tooCommon: [], incoherent: [], underFloor: [], underBar: [], dropped: [], notChosen: [] };
+      for (const [key, f] of perItem.get(it.key)) {
+        fate.candidates += 1;
+        const name = phrase(f);
+        const raw = containing.get(key).length;
+        const d = df.get(key);
+        if (raw < D.minDf) fate.single += 1;
+        else if (d < D.minDf) fate.nearCopy.push({ phrase: name, items: raw, df: d });
+        else if (dropped.has(key)) fate.dropped.push({ phrase: name, df: d });
+        else if (usable.has(key)) fate.notChosen.push({ phrase: name, sourceRatio: measure.get(key).ratio });
+        else if (under.has(key)) fate.underBar.push({ phrase: name, sourceRatio: measure.get(key).ratio, attached: hubs.has(key) });
+        else if (turnedAway.has(key)) {
+          const t = turnedAway.get(key);
+          if (t.reason === 'tooCommon') fate.tooCommon.push({ phrase: name, df: d, of: N });
+          else if (t.reason === 'incoherent') fate.incoherent.push({ phrase: name, df: d, coherence: Number(t.coherence.toFixed(4)), bar: Number(threshold.toFixed(4)) });
+          else fate.underFloor.push({ phrase: name, sourceRatio: t.sourceRatio });
+        }
+      }
+      const byRatio = (a, b) => b.sourceRatio - a.sourceRatio || (a.phrase < b.phrase ? -1 : 1);
+      fate.underBar.sort(byRatio);
+      fate.underFloor.sort(byRatio);
+      for (const k of ['nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen']) fate[k].sort((a, b) => (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
+      fates[it.key] = fate;
+    }
+    return { bar: D.sourceCoherenceRatio, floor, minDf: D.minDf, maxDfRatio: D.maxDfRatio, items: N, untagged: fates };
+  }
 }

@@ -447,6 +447,49 @@ ingested it, so nothing is claimed). An earned tag (`discovered`, `emergent`) ca
 is a span of the item's own words (lower-cased, as `words()` reads them), never the label whose stems
 matched it. A PROV field is either present with a value or absent; it is never `null`.
 
+## `build.json` and untagged items
+
+`rtz-build` writes `build.json` last: `built`, `config`, `stages[]` (`name`, `program`, `ms`), `ledger`
+(above) and `untagged`, every item of the universe that ends with no tag a viewer shows at the build's
+bar, and why, as far as the build knows (`lib/untagged.js`). Nothing is forced onto such an item.
+
+```
+untagged: { bar, count, none, items[]: {
+  key, source, id, title,
+  reason, reasons[], why[],                        // reason is reasons[0]; why is one plain sentence per reason
+  under[]: {concept, label, origin, sourceRatio},  // its tags under the bar, highest ratio first
+  candidates?: {phrases, single, underBar?, underFloor?, nearCopy?, tooCommon?, incoherent?, dropped?, notChosen?}
+} }
+```
+
+- `bar` is `discover.sourceCoherenceRatio` when discovery ran, else `null` (then every tag shows).
+  `count` is the number of items listed; `none` the number whose `under` is empty, which have no tag
+  at any ratio. A viewer set at v shows a listed item again once any `under` ratio is at or above v.
+- One universe item is one real-world article, so an article two systems list is one entry, under the
+  key the universe kept.
+- `reasons`, in this order, each present only when it applies: `underBar` (tags under the bar, or
+  phrases under it no item chose), `underFloor` (phrases under `sourceRatioFloor`), `nearCopy` (phrases
+  that recur only in near-copies of one story, so on fewer than `minDf` items counted once), `tooCommon`
+  (on more than `maxDfRatio` of the items), `incoherent` (the items holding the phrase are not alike
+  without it), `dropped` (a hub chosen and then left on fewer than `minDf` items), `notChosen` (a hub at
+  the bar that no item chose); when none applies, `noRecurring` (no candidate phrase is on another item)
+  or `noCandidate` (the text has no candidate phrase); with discovery off, `noDiscovery`.
+- `candidates` lists every candidate phrase in each group with its numbers, spelled as the item writes
+  it: `{phrase, sourceRatio}` under and below the bar (`attached` says whether a below-bar hub was
+  attached), `{phrase, items, df}` for near-copies, `{phrase, df, of}` too common, `{phrase, df,
+  coherence, bar}` incoherent. `single` counts the phrases on this item alone. `why` names at most
+  eight phrases per sentence and says how many more there are.
+
+The reasons come from `rtz-discover --report FILE` (rtz-build writes it as `discover.report.json` when
+discovery runs, and reads it only then): `{schema: "rosetta-tagz/discover-report@1", bar, floor, minDf,
+maxDfRatio, items, untagged: {<item key>: {members[], candidates, single, nearCopy[], tooCommon[],
+incoherent[], underFloor[], underBar[], dropped[], notChosen[]}}}`, one entry for every item no tag-system
+tagged and no hub at or above the bar reached. `members` lists every record key of the same article. The
+report is a reading of what discovery measured; it changes no record (the records rtz-discover writes are
+the same with or without `--report`). The report's file name and the reason codes are provisional. A
+failure reading either file is one line on stderr and `build.json` without `untagged`; it never fails
+the build.
+
 ## Trying another bar (`sourceRatio`)
 
 A viewer cannot rerun discovery, so rosetta-tagz hands over what it needs to filter at view time:

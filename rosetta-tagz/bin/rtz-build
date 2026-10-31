@@ -7,6 +7,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { cli, die, log } from '../lib/io.js';
+import { makeConfig } from '../lib/config.js';
+import { untaggedReport } from '../lib/untagged.js';
 
 const usage = `rtz-build — run the whole pipeline from one config file
 
@@ -30,8 +32,9 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
     "engine": { "mergeThreshold": 0.7 }   optional overrides of lib/config.js defaults
   }
 
-Writes to OUTDIR: records.jsonl, [records.discovered.jsonl], stone.json, records.all.jsonl, universe.json, view.html,
-build.json (stages, and the ledger summary: path, minted, reused, retired, splits, merges, this build's events), and the ledger at its path`;
+Writes to OUTDIR: records.jsonl, [records.discovered.jsonl, discover.report.json], stone.json, records.all.jsonl, universe.json,
+view.html, build.json (stages; the ledger summary: path, minted, reused, retired, splits, merges, this build's events;
+and untagged: every item with no tag shown at the build's bar, and why), and the ledger at its path`;
 
 const { values } = cli('rtz-build', usage, {
   config: { type: 'string' },
@@ -79,10 +82,12 @@ if (config.engine) {
   engineFile = ['--config', path.join(out, 'engine.json')];
 }
 let baseRecords = path.join(out, 'records.jsonl');
-if (config.discover || values.discover) {
+const discovering = Boolean(config.discover || values.discover);
+const reportPath = path.join(out, 'discover.report.json');
+if (discovering) {
   log('discover');
   baseRecords = path.join(out, 'records.discovered.jsonl');
-  stage('discover', 'rtz-discover', [path.join(out, 'records.jsonl'), '--all', '-o', baseRecords, ...engineFile]);
+  stage('discover', 'rtz-discover', [path.join(out, 'records.jsonl'), '--all', '-o', baseRecords, '--report', reportPath, ...engineFile]);
 }
 const stoneArgs = [baseRecords, '-o', path.join(out, 'stone.json'), ...engineFile];
 if (config.overrides && fs.existsSync(resolve(config.overrides))) stoneArgs.push('--overrides', resolve(config.overrides));
@@ -107,5 +112,15 @@ if (!values['no-view']) {
 }
 const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
 if (stone.ledger) manifest.ledger = stone.ledger;
+// The untagged report is a reading of files already written; it never fails the build.
+try {
+  const universe = JSON.parse(fs.readFileSync(path.join(out, 'universe.json'), 'utf8'));
+  const report = discovering ? JSON.parse(fs.readFileSync(reportPath, 'utf8')) : null;
+  const bar = discovering ? makeConfig(config.engine).discover.sourceCoherenceRatio : null;
+  manifest.untagged = untaggedReport(universe, report, bar);
+  log(`untagged: ${manifest.untagged.count} items with no tag at the ${bar ?? 'build'}${bar ? '× bar' : ''}, ${manifest.untagged.none} with none at any`);
+} catch (e) {
+  log(`rtz-build: untagged report not written (${e.message})`);
+}
 fs.writeFileSync(path.join(out, 'build.json'), JSON.stringify(manifest, null, 1) + '\n');
 log(`done: ${stone.stats.tags} tags -> ${stone.stats.concepts} concepts; review queue: ${stone.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').length}; open ${path.join(out, 'view.html')}`);
