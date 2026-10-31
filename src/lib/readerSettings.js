@@ -33,6 +33,12 @@ const READER_FONTS = {
     label: 'OpenDyslexic',
     family: "'OpenDyslexic', 'Atkinson', sans-serif",
     file: 'OpenDyslexic-Regular.woff2',
+    files: [
+      { file: 'OpenDyslexic-Regular.woff2', format: 'woff2', weight: 'normal', style: 'normal' },
+      { file: 'OpenDyslexic-Bold.woff2', format: 'woff2', weight: 'bold', style: 'normal' },
+      { file: 'OpenDyslexic-Italic.otf', format: 'opentype', weight: 'normal', style: 'italic' },
+      { file: 'OpenDyslexic-BoldItalic.otf', format: 'opentype', weight: 'bold', style: 'italic' },
+    ],
     license: 'OpenDyslexic-OFL.txt',
     licenseName: 'SIL Open Font License 1.1',
   },

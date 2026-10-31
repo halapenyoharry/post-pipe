@@ -100,11 +100,12 @@ const { marked } = require('marked');
 // anywhere else.
 function copyReaderFonts() {
   const dir = path.join(SITE_DIR, 'fonts');
-  const faces = readerFonts(SETTINGS).filter((f) => f.file);
+  const faces = readerFonts(SETTINGS).filter((f) => f.file || (Array.isArray(f.files) && f.files.length));
   if (!faces.length) return;
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   for (const f of faces) {
-    for (const name of [f.file, f.license].filter(Boolean)) {
+    const faceFiles = Array.isArray(f.files) && f.files.length ? f.files.map((v) => v.file) : [f.file];
+    for (const name of [...faceFiles, f.license].filter(Boolean)) {
       fs.copyFileSync(path.join(__dirname, 'fonts', name), path.join(dir, name));
     }
   }
@@ -187,12 +188,17 @@ function siteFontPreload() {
 }
 
 function readerFontFaces() {
-  return readerFonts(SETTINGS).filter((f) => f.file).map((f) => `
+  return readerFonts(SETTINGS).filter((f) => f.file || (Array.isArray(f.files) && f.files.length)).flatMap((f) => {
+    const variants = Array.isArray(f.files) && f.files.length
+      ? f.files
+      : [{ file: f.file, format: 'woff2', weight: 'normal', style: 'normal' }];
+    return variants.map((v) => `
   @font-face {
     font-family: '${f.label}';
-    src: url(./fonts/${f.file}) format('woff2');
-    font-weight: normal; font-style: normal; font-display: swap;
-  }`).join('');
+    src: url(./fonts/${v.file}) format('${v.format || 'woff2'}');
+    font-weight: ${v.weight || 'normal'}; font-style: ${v.style || 'normal'}; font-display: swap;
+  }`);
+  }).join('');
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
 const { contributionsConfig } = require('./src/lib/contributions');

@@ -30,6 +30,12 @@ test('reader.fonts offers the page face and OpenDyslexic by default, each shippe
   assert.deepStrictEqual(ids({ reader: { fonts: ['opendyslexic', 'nonesuch', 'opendyslexic'] } }), ['default', 'opendyslexic']);
   const od = readerFonts(undefined)[1];
   assert.strictEqual(od.file, 'OpenDyslexic-Regular.woff2');
+  assert.deepStrictEqual(od.files, [
+    { file: 'OpenDyslexic-Regular.woff2', format: 'woff2', weight: 'normal', style: 'normal' },
+    { file: 'OpenDyslexic-Bold.woff2', format: 'woff2', weight: 'bold', style: 'normal' },
+    { file: 'OpenDyslexic-Italic.otf', format: 'opentype', weight: 'normal', style: 'italic' },
+    { file: 'OpenDyslexic-BoldItalic.otf', format: 'opentype', weight: 'bold', style: 'italic' },
+  ]);
   assert.strictEqual(od.license, 'OpenDyslexic-OFL.txt');
   assert.ok(!/https?:/.test(JSON.stringify(readerFonts(undefined))));
 });
