@@ -161,7 +161,12 @@ function rtagzSettings(settings) {
 // stay stable in the site, not in post-pipe's disposable cache. Written only
 // when a site root is known: no user's site lives in post-pipe's own folder,
 // so a caller without one leaves the ledger to rosetta-tagz's own default.
-function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, siteRoot } = {}) {
+// skos (settings.rtagz.skos, provisional): rosetta-tagz's SKOS files' switches,
+// { base, lang } (the IRI concepts and schemes are named under, and the
+// language tag on labels), passed through as rtz-build's skos block; false
+// writes no SKOS files; absent, rosetta-tagz's defaults (base urn:rosetta-tagz:,
+// lang en). Only base and lang are passed.
+function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, siteRoot, skos } = {}) {
   const root = path.resolve(siteRoot || POSTPIPE_ROOT);
   const config = {
     out: '.',
@@ -189,6 +194,13 @@ function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, 
   if (schemes.length) config.conceptSchemes = schemes;
   if (siteRoot) {
     config.ledger = typeof ledger === 'string' && ledger ? sitePath(ledger, root) : defaultSiteFile(IDS_FILE, root);
+  }
+  if (skos === false) config.skos = false;
+  else if (skos && typeof skos === 'object' && !Array.isArray(skos)) {
+    const block = {};
+    if (typeof skos.base === 'string' && skos.base) block.base = skos.base;
+    if (typeof skos.lang === 'string' || skos.lang === null) block.lang = skos.lang;
+    if (Object.keys(block).length) config.skos = block;
   }
   return config;
 }
@@ -968,6 +980,7 @@ async function runRtagzPhase(results, options = {}) {
       discover: Boolean(rtagzCfg.discover),
       conceptSchemes: rtagzCfg.conceptSchemes,
       ledger: rtagzCfg.ledger,
+      skos: rtagzCfg.skos,
       siteRoot: options.siteRoot ? siteRoot : undefined,
     });
     fs.writeFileSync(configPath, JSON.stringify(rtzConfig, null, 2) + '\n', 'utf8');

@@ -185,6 +185,12 @@ test('rtagz: build config carries the site\'s concept schemes and ledger as abso
 
   // No site root: no ledger key, so nothing lands in post-pipe's own folder.
   assert.ok(!('ledger' in buildConfig({})), 'ledger omitted without a site root');
+  // the SKOS switches (settings.rtagz.skos) pass through as rtz-build's skos block: base and lang only
+  assert.ok(!('skos' in buildConfig({})), 'absent: rosetta-tagz\'s defaults');
+  assert.deepStrictEqual(buildConfig({ skos: { base: 'https://site.test/skos/', lang: 'en-GB', other: 1 } }).skos, { base: 'https://site.test/skos/', lang: 'en-GB' });
+  assert.deepStrictEqual(buildConfig({ skos: { lang: null } }).skos, { lang: null }, 'null lang: plain literals');
+  assert.strictEqual(buildConfig({ skos: false }).skos, false, 'false: no SKOS files');
+  assert.ok(!('skos' in buildConfig({ skos: { other: 1 } })), 'nothing it knows: nothing passed');
   assert.ok(!('ledger' in buildConfig({ ledger: 'ids.json' })), 'a relative ledger path needs a site root');
 });
 
