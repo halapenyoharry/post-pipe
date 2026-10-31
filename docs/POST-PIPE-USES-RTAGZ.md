@@ -1,80 +1,104 @@
 # How post-pipe uses rosetta-tagz
 
 #post-pipe #rosetta-tagz #rtagz #contract
-Written 2026-10-22. The contract between post-pipe and rosetta-tagz (rtagz for short), the project that finds and categorizes tags. Since 2026-10-31 rosetta-tagz is a folder in this repository, `rosetta-tagz/`, with its history, and it is still its own part: its own programs in `bin/`, its own docs, and its own tests, which `npm test` does not run (`cd rosetta-tagz && node --test test/*.test.js`). A commit touching `rosetta-tagz/` is still a commit of its own, never mixed with post-pipe's. post-pipe never imports rosetta-tagz's `lib/`. It writes files rosetta-tagz reads, runs rosetta-tagz's programs, and reads the files they write. Everything below is that exchange. rosetta-tagz's own formats are documented in `rosetta-tagz/docs/FORMATS.md`; this file does not restate them, it says which of them post-pipe uses and how.
+Rewritten 2026-10-31 (first written 2026-10-22). This is the contract between post-pipe and rosetta-tagz (rtagz for short), the part that finds and categorizes tagz. It says what post-pipe hands rosetta-tagz, what it gets back, where the files live, what a site can set, which stages run, what the feed carries afterwards, and how a build is checked. rosetta-tagz's own file formats are in `rosetta-tagz/docs/FORMATS.md`; this document names the parts post-pipe uses and does not restate them.
 
-## Why
+Names marked *(provisional)* were chosen by the droids that built them and wait for Harold to confirm or rename them.
 
-Each source post-pipe loads brings its own tag vocabulary. Today every `<category>` a publisher writes becomes a tag node as written, so the graph shows each publisher's opinion beside the others, and a source with no categories lands as isolated items. rosetta-tagz merges equivalent spellings across sources into concepts, picks one canonical label per concept by explainable weights, keeps every system's own spelling visible, and lets an item with no tags earn tags from its text. After the seam, the tags in the graph are one translated vocabulary, and each tag can still say what each source called it.
+## The boundary
 
-## Where
+- rosetta-tagz is the folder `rosetta-tagz/` in this repository (since 2026-10-31, with its history). It is still its own part: its own programs in `bin/`, its own docs, its own tests (`cd rosetta-tagz && node --test test/*.test.js`; `npm test` does not run them).
+- A commit touching `rosetta-tagz/` is a commit of its own, never mixed with post-pipe files.
+- post-pipe never imports anything from `rosetta-tagz/lib/`. It writes files, runs `rosetta-tagz/bin/rtz-build` as a separate process, and reads the files that come back.
+- post-pipe writes nothing under `rosetta-tagz/`. When rosetta-tagz has to change for post-pipe, the lead droid writes a request to `rosetta-tagz/inbox/from-post-pipe-<date>.md`, and the change lands in a rosetta-tagz commit.
+- rosetta-tagz creates no items. Its output is tagz and relations on items that exist because a file or a feed item exists.
+- No network. rosetta-tagz has none at run time; post-pipe's only network is the feeds the site's `feeds.opml` lists.
+- rosetta-tagz never fails a post-pipe build. A missing engine, a non-zero exit, a timeout, unreadable output or a thrown error is one logged line, and the build goes on with the tagz as the sources wrote them.
 
-`src/aggregator.js`, `loadCorpus`, has three phases: fetch from every adapter, resolve each feed's colour, then build the sources list and stamp provenance on every item. The rosetta-tagz phase runs after the colours and before the stamping, so records can carry the source colour and so nothing downstream ever sees an untranslated tag. Downstream means `generate-index.js` (which builds `feed.json` and the edges), `src/corpus/buildEdges.js`, the GraphViewer, its layouts, `src/lib/graphColors.js`, `src/lib/readerNav.js` and the ReaderPanel. The inventory of 2026-10-22 found that every one of them reads `item.tags` and nothing reads `item._references` yet.
+## A site turns it on
 
-## A site subscribes, or not
-
-rosetta-tagz is something a site turns on. It is off unless the site's `settings.json` asks for it, in an `rtagz` block. The Elinor Jones site has no such setting and is untouched. post-pipe's own root `settings.json` turns it on for Harold's corpus.
+rosetta-tagz runs for a site only when that site's own `settings.json` has an `rtagz` block with `enabled: true`. A site without the block, such as epicofelinorjones.com, is built exactly as before, byte for byte. The engine has no settings of its own that turn it on for anyone.
 
 ```json
 "rtagz": {
   "enabled": true,
-  "engine": "rosetta-tagz",
-  "overrides": "rtagz-overrides.json",
-  "emerge": true,
   "discover": true,
-  "timeoutMs": 120000
+  "emerge": true,
+  "overrides": "rtagz-overrides.json",
+  "ledger": "rtagz-ids.json",
+  "timeoutMs": 120000,
+  "engine": "rosetta-tagz",
+  "conceptSchemes": [],
+  "skos": { "base": "urn:rosetta-tagz:", "lang": "en" }
 }
 ```
 
-- `enabled` — default `false`.
-- `engine` — folder holding rosetta-tagz's `bin/`. Relative paths resolve against post-pipe's root, not the site. Default `rosetta-tagz`. If the folder or its `bin/rtz-build` does not exist, the phase logs one line, `rtagz: engine not found at <path>, tags left as written`, and the build continues with raw tags.
-- `overrides` — the site's human decisions in rosetta-tagz's `overrides.json` format, relative to the site folder. Optional. Default `rtagz-overrides.json`; silently absent is fine. A site holding only `stone.overrides.json`, the default's name before 2026-10-31, has that file read, with one logged line, until it is renamed.
-- `emerge` — let items earn tags from their text against the concepts `rtz-stone` made. Default `true`.
-- `discover` — propose tags for tag-systems that share no vocabulary with anything, from phrases recurring across their items. Default `false`, rosetta-tagz's own default. Harold's root settings turn it on, because ScienceDaily has no categories.
-- `timeoutMs` — `rtz-build` is killed after this long, logged in one line, and the build continues with raw tags. Default 120000.
-- `conceptSchemes` — published vocabularies the site vendors, each `{ id, path }`, the path relative to the site (see `docs/SITES.md`). Optional.
-- `ledger` — the ids file, where `rtz-stone` keeps its concept ids from one build to the next, relative to the site. Default `rtagz-ids.json`. A site holding only `stone.ledger.json`, the default's name before 2026-10-31, has that file read, with one logged line, until it is renamed. The key keeps rosetta-tagz's own word for the file: `rtz-build`'s config calls it `ledger` too.
+What a site can set, all in that block:
 
-rosetta-tagz never fails a post-pipe build. Any non-zero exit, timeout, unreadable output or thrown error is one logged line and raw tags.
+| key | default | what it does |
+|---|---|---|
+| `enabled` | `false` | turns rosetta-tagz on for this site |
+| `discover` | `false` | proposes tagz for items no source tagged, from phrases that recur across items (`rtz-discover`); a site of untagged wire items needs it |
+| `emerge` | `true` | lets an item earn a tag from its text, against the concepts `rtz-stone` made (`rtz-emerge`) |
+| `overrides` | `rtagz-overrides.json` | the site's own decisions, in rosetta-tagz's overrides format, relative to the site; absent is fine. Its `config` key reaches `rtz-stone` only (below) |
+| `ledger` | `rtagz-ids.json` | the ids file, where `rtz-stone` keeps concept ids from one build to the next, relative to the site. Worth tracking in the site's git |
+| `timeoutMs` | `120000` | `rtz-build` is stopped after this long; the build goes on with the tagz as written |
+| `engine` | `rosetta-tagz` | the folder holding rosetta-tagz's `bin/`, relative to post-pipe's root, not the site; absent or missing, one logged line and raw tagz |
+| `conceptSchemes` | none | published vocabularies the site vendors, each `{ id, path }`, the path relative to the site. Passed to `rtz-build`; rosetta-tagz has no stage that reads them yet (below) |
+| `skos` *(provisional)* | rosetta-tagz's defaults | the SKOS files' switches: `base`, the IRI concepts and schemes are named under (default `urn:rosetta-tagz:`, which names nothing on the web), and `lang`, the language tag on labels (default `en`, `null` for none); `false` writes no SKOS files |
 
-Harold named the block `rtagz` on 2026-10-31. Before that it was `stone`; a site whose settings still say `stone` (and no `rtagz`) is read the same, with one logged line, `rtagz: the settings key "stone" is now "rtagz"; ...`, so it builds until the key is renamed (`rtagzSettings` in `src/lib/rtagz.js`).
+Old names are still read, each with one logged line, until the site renames them: a settings block called `stone` (the block's name before 2026-10-31), and the files `stone.ledger.json` and `stone.overrides.json`.
+
+### Not yet settable from a site
+
+These exist in rosetta-tagz, but nothing a site writes reaches them today. Nothing here should be read as a setting a site can use.
+
+- **Discovery's parameters**: `discover.sourceCoherenceRatio` (the bar, 1.6), `discover.sourceRatioFloor` (1.0), `discover.nearCopyGrouping` (`chain`), `nearCopy`, `minDf`, `maxDfRatio`, `perItem` and the rest of `discover.*` in `rosetta-tagz/lib/config.js`.
+- **Emergence's parameters**: `emerge.maxDfRatio`, `emerge.minWeight`, `emerge.minContext`.
+- **Why**: `rtz-discover` and `rtz-emerge` read their parameters from `rtz-build`'s `engine` block, and post-pipe writes no `engine` block (in a site's settings, `rtagz.engine` already means the engine folder). The overrides file's `config` key reaches `rtz-stone` alone, so `mergeThreshold`, `relate.*` and the other clustering and relation parameters *can* be set there, and the discovery and emergence ones cannot. Making them settable needs either rosetta-tagz passing the overrides `config` on to discovery and emergence, or a pass-through block in the site's settings whose name Harold chooses.
+- **Seeds**: `rtz-build`'s `seeds` and `noSeed`.
+- **Vocabularies**: `conceptSchemes` is passed through, but rosetta-tagz has no vocabulary format, no `rtz-vocab` and no `rtz-map` yet, so a listed vocabulary changes nothing (on hold by Harold's decision of 2026-10-31).
+
+## Where the files live
+
+| file | where | written by |
+|---|---|---|
+| the cache folder | `.feed-cache/rtagz/<site>-<hash>/` under post-pipe's working folder: `<site>` is the site folder's name, `<hash>` the first eight hex digits of the sha1 of its absolute path, so two sites of one name never share a cache. `.feed-cache/` is git-ignored | post-pipe (`cacheDirForSite` in `src/lib/rtagz.js`) |
+| `records.jsonl`, `overrides.json`, `rtz.config.json` | the cache folder | post-pipe, before the run |
+| `stone.json`, `records.discovered.jsonl`, `discover.report.json` *(provisional)*, `records.all.jsonl`, `universe.json`, `skos.jsonld`, `skos.ttl`, `build.json` | the cache folder | rosetta-tagz's stages |
+| `rtagz-ids.json` | the site folder (setting `ledger`) | `rtz-stone`, every build |
+| `rtagz-overrides.json` | the site folder (setting `overrides`) | the site's owner; the engine only reads it |
+| `skos.jsonld`, `skos.ttl` | the site's `_site/`, beside `feed.json` | `generate-index.js` copies them from the cache when this build wrote them, and removes ones an earlier build left |
+
+Before each run post-pipe removes the cache folder's SKOS files, since `rtz-build` never clears its output folder: a SKOS file found there afterwards is this build's.
 
 ## What post-pipe hands over
 
-One folder per site under post-pipe's cache: `.feed-cache/rtagz/<site>/`. `.feed-cache` resolves the same way the colour cache does, relative to the working directory, which is post-pipe's root when `generate-index.js` runs. `<site>` is the basename of the site root followed by a dash and the first eight hex digits of the sha1 of its absolute path, so two sites with the same folder name never share a cache (`post-pipe-3fa2c19b` for the root site). `.feed-cache/` is already git-ignored. Nothing is written under `rosetta-tagz/`.
+Three files in the cache folder.
 
-Into that folder post-pipe writes three files before running `rtz-build`.
-
-**`records.jsonl`** — one line per record, rosetta-tagz's record format. For every item from every source that fetched successfully:
+**`records.jsonl`**, rosetta-tagz's record format, one JSON object per line. For every item of every source that fetched:
 
 ```json
 {"type":"item","source":"ScienceDaily","id":"<item.id>","title":"<item.title>","text":"<text>","url":"<item.url>","date":"<item.date_published>","kind":"<item.kind or ''>","color":"<feed colour>"}
 ```
 
-and, for every entry of that item's `tags` array, in order, as written:
+then one tag record per entry of the item's `tags`, in order, as written:
 
 ```json
-{"type":"tag","source":"ScienceDaily","item":"<item.id>","label":"<raw tag>","weight":1,"origin":"explicit"}
+{"type":"tag","source":"ScienceDaily","item":"<item.id>","label":"<tag as written>","weight":1,"origin":"explicit"}
 ```
 
-- `source` is the tag-system name. One OPML entry is one tag-system. Its name is the feed's title as the aggregator resolves it (`feedMeta.title || config.title`), because the name is shown to readers ("ScienceDaily writes AI"). If two entries resolve to the same title, the second and later get ` (<feed id>)` appended so systems stay distinct. `feed._rtagz.systems` (below) maps every system name to its source id, so nothing joins systems to sources by title.
-- `id` is post-pipe's own item id, unchanged, so the result can be written back onto the same item. If two items in one source share an id, the first is written and the rest are skipped and counted in the summary; rosetta-tagz keeps one record per key.
-- `text` is the best plain text post-pipe has: `content_text`, else `content_html` reduced to text, else `summary`, else the title. Reducing html to text means: drop `script` and `style` elements with their contents, drop every other tag, decode entities (named and numeric, at least `&amp; &lt; &gt; &quot; &#39;` and `&#NNN;`), collapse whitespace. Emergence and discovery read this; the more text, the better the earned tags.
-- `url` matters: rosetta-tagz unifies the same article seen in two systems by url, or by a long identical title, and that is its strongest alignment evidence. See the join rule below for how that folding is undone on the way back.
-- Tags named in the merged overrides' `ignore` list are not written at all. post-pipe compares trimmed and case-folded; finer folding is rosetta-tagz's business. This is done on the way in because `rtz-stone` honours `ignore` but `rtz-universe` reads the raw records again and would hand an ignored tag back as an unmapped concept.
-- Items with no tags are written with no tag records. They are the orphans emergence and discovery exist for.
-- A source that failed to fetch contributes nothing and is not a system.
+- `source` is the tag-system: one `feeds.opml` entry is one tag-system, named by the feed's title as the aggregator resolves it. A second entry with the same title gets ` (<feed id>)` appended. `feed._rtagz.systems` maps each name to its source id.
+- `id` is post-pipe's own item id, so the answer can be written back onto the same item. A repeated id in one source is written once and counted as `skippedDuplicateIds`.
+- `text` is the best plain text post-pipe has: `content_text`, else `content_html` reduced to text (scripts and styles dropped, tags dropped, entities decoded, whitespace collapsed), else `summary`, else the title.
+- `url` matters: rosetta-tagz treats the same article in two systems (same url, or the same long title) as one item.
+- A tag the overrides' `ignore` list names (compared trimmed and case-folded) is not written.
+- An item with no tagz is written with no tag records.
+- A source that failed to fetch contributes nothing and is no tag-system.
 
-**`overrides.json`** — the merge of two things, written by post-pipe, in rosetta-tagz's overrides format:
+**`overrides.json`**: the site's overrides file as it is, plus one `pin` per container tag the site declares in `settings.containment`, pinning that spelling as the canonical of whatever concept it lands in (`"pin": {"act-1": "act-1"}`). The container pins win over the file's on the same key.
 
-1. The site's own overrides file, if present, verbatim.
-2. One `pin` per container tag the site declares in `settings.containment` (each entry's `tag`), pinning that spelling as the canonical label of whatever concept it lands in: `"pin": {"act-1": "act-1"}`. The site's pins come second and win over the file's on the same key.
-
-The pins are what keep containers working. Containers match items by exact string equality on `item.tags` in four places (`buildEdges.js`, `GraphViewer.jsx`, `graphColors.js`, `readerNav.js`). If `rtz-stone` chose another spelling for a concept that a container names, the container would go empty. Pinning makes the container's spelling the canonical one, which is also rosetta-tagz's own philosophy: humans win and are never overwritten.
-
-Two limits of pinning, and the guard. A pin whose spelling no item carries is inert: no concept contains it, nothing is pinned, and nothing is lost, because no item had the tag. And a pin is matched by norm against a concept's members, first match wins, so if two container tags fold into one concept only one of them can be canonical. The guard: after reading the universe back, post-pipe checks that every container tag that appears on at least one item's raw tags equals some concept's `canonical`. If any does not, the rosetta-tagz phase logs one line naming the tag and leaves that whole site's tags as written. A container going quietly empty is worse than an untranslated graph.
-
-**`rtz.config.json`** — the config for `rtz-build`, generated:
+**`rtz.config.json`**, `rtz-build`'s config:
 
 ```json
 {
@@ -82,103 +106,145 @@ Two limits of pinning, and the guard. A pin whose spelling no item carries is in
   "sources": [{ "adapter": "jsonl", "path": "records.jsonl" }],
   "overrides": "overrides.json",
   "emerge": true,
-  "discover": true
+  "discover": true,
+  "ledger": "/abs/path/to/site/rtagz-ids.json",
+  "conceptSchemes": [{ "id": "…", "path": "/abs/path" }],
+  "skos": { "base": "…", "lang": "en" }
 }
 ```
 
-`emerge` and `discover` copy the site's settings. Paths are relative to the config file, so `out: "."` is the same cache folder.
+`emerge` and `discover` copy the site's settings; `ledger` is the site's ids file made absolute; `conceptSchemes` and `skos` are written only when the site sets them.
+
+Never run a cache folder's `rtz.config.json` by hand: it writes the ids file into the site.
 
 ## How a build runs it
 
 ```
-node <engine>/bin/rtz-build --config .feed-cache/rtagz/<site>/rtz.config.json --no-view
+node <engine>/bin/rtz-build --config .feed-cache/rtagz/<site>-<hash>/rtz.config.json --no-view
 ```
 
-Run with `child_process`, `cwd` the cache folder, `stdio` captured, `detached: true` so the whole process group can be killed on timeout (`rtz-build` runs each stage synchronously as a child of its own, and killing only the parent would orphan the running stage). rosetta-tagz requires Node 22 or later; post-pipe runs it on the same `process.execPath`. `--no-view` skips `rtz-view`, rosetta-tagz's HTML viewer; post-pipe has its own. `rtz-build` writes `records.jsonl` back over the one post-pipe wrote (the same records re-serialised, so compare parsed objects, never bytes), then `stone.json`, `records.all.jsonl`, `universe.json` and `build.json` beside it, plus `records.discovered.jsonl` when `discover` is on and `engine.json` when the config sets `engine`. post-pipe reads two of these.
+Run from `src/lib/rtagz.js` with `child_process.spawn` on post-pipe's own `process.execPath` (rosetta-tagz needs Node 22 or later), the cache folder as working folder, `detached: true` so the whole process group can be killed at the timeout. `rtz-build` runs each stage as a program of its own, in this order:
+
+| stage | program | reads | writes |
+|---|---|---|---|
+| ingest | `rtz-ingest jsonl` | `records.jsonl` | `records.jsonl` again (the same records re-serialized: compare parsed objects, never bytes) |
+| discover (when `discover`) | `rtz-discover --report` | `records.jsonl` | `records.discovered.jsonl`, and `discover.report.json` *(provisional)*: what became of each candidate phrase of every untagged item |
+| stone | `rtz-stone --ledger` | the records, the overrides | `stone.json`, and the site's ids file |
+| emerge (when `emerge`) | `rtz-emerge` | `stone.json`, the records | `records.all.jsonl` |
+| universe | `rtz-universe` | `stone.json`, the records | `universe.json` |
+| skos (unless `skos: false`) | `rtz-skos` | `universe.json` | `skos.jsonld`, `skos.ttl`; a failure is one line, `rtz-build: skos files not written (…)`, and the build goes on |
+| view | `rtz-view` | | skipped (`--no-view`); post-pipe has its own viewer |
+
+Last, `rtz-build` writes `build.json`: `built`, `config`, `stages[]` (name, program, ms), `ledger` (path, minted, reused, retired, splits, merges, this build's events) and `untagged` (below).
 
 ## What post-pipe reads back
 
-**`universe.json`** is the joined model. post-pipe uses:
+Two files, `universe.json` and `build.json`, from `runRtagzPhase` in `src/lib/rtagz.js`, between the aggregator's colour phase and its provenance stamping (`src/aggregator.js`), so nothing downstream sees an untranslated tag.
 
-- `items[]` — each with `key` (`<source>::<id>`), `source`, `alsoIn[]`, `url`, and `tags[]`. Each tag has `c` (concept id), `w` (weight, 1 for explicit), `origin` (`explicit`, `emergent`, `discovered`), `raw[]` (what was written: `l` label, `n` norm, `s` system), `sys[]` (which systems contributed it), `via`, and `why` for earned tags.
-- `concepts[]` — each with `id`, `canonical`, `pinned`, `n`, `variants[]` (each with `label`, `count`, `formsBySource`), `rank[]` (each candidate's `score` and `parts` `freq`, `cover`, `trust`, `quality`), and `sources`. `discovered` is present on the concepts `rtz-stone` made. Tags `rtz-stone` never clustered come back as unmapped singleton concepts with ids starting `u_`: those carry `unmapped: true` and lack `discovered`, `variants` and `rank`; read a missing `discovered` as false.
-- `relations[]` — `a`, `b` (concept ids), `type`, `weight`, `skos` (true for a relation SKOS has a name for), and `why`, `wasDerivedFrom`, `wasGeneratedBy` where `rtz-stone` wrote them. post-pipe reads only the `skos: true` ones. Direction, pinned here because rosetta-tagz's own text (`rosetta-tagz/lib/stone.js`, the code behind `rtz-stone`, and `rosetta-tagz/docs/FORMATS.md`) states it and post-pipe draws arrows from it: in `broader {a, b}` a is the broader concept (a ⊃ b), and a `broadMatch` between two of rosetta-tagz's own concepts is a cross-scheme `broader` renamed with the pair kept, so a is the broader concept there too. The symmetric types (`related`, `closeMatch`, `relatedMatch`, `exactMatch`) may be written either way round; post-pipe reads each unordered pair once, the first entry kept. A relation whose `b` is an external vocabulary id (`<schemeId>:<id>`) is a mapping on concept `a`, not a pair between tags; post-pipe reads a `broadMatch` mapping as the vocabulary concept being the broader one (the plan's propagation rule: `broader(A, B)` with `A exactMatch X` gives `broadMatch(B, X)`), the reverse of the own-concept convention. rosetta-tagz has no map stage (`rtz-map`) yet, so that reading is post-pipe's and must be confirmed against rosetta-tagz when the stage lands (2026-10-25).
+**`universe.json`**: `items[]` (each with `key` `<source>::<id>`, `url`, `title`, and `tags[]` of `{c, w, origin, raw[], sys[], via, why, wasDerivedFrom, wasGeneratedBy, sourceRatio}`), `concepts[]` (id, canonical, pinned, discovered, variants, rank, `inScheme`, `prefLabel` and `altLabel` per scheme, ledger note, `sourceRatio`), `relations[]` (`a`, `b`, `type`, `weight`, `skos`, `why`, `wasDerivedFrom`, `wasGeneratedBy`) and `forbidden[]`. rosetta-tagz's FORMATS.md has every field.
 
-**`build.json`** — `rtz-build`'s manifest: `built`, `config`, and `stages[]` with each stage's `name`, `program` and `ms`. Copied into the feed summary.
+**`build.json`**: `built`, the ledger summary, and `untagged` *(the report's shape is provisional)*:
 
-Join rule. For each post-pipe item, look up `universe.items` by `<source>::<id>`. If present, that is the item. If absent, rosetta-tagz folded this item into another system's copy of the same article, and the surviving universe item is the representative: the member with the longest excerpt (280 characters), ties to the smaller key. Its `url` and `title` are the representative's, so raw equality will not find it. Folding happens on the canonical url, which rosetta-tagz computes as: hostname lower-cased with a leading `www.` removed, path with a trailing slash removed, lower-cased, no query, no fragment. When a record has no url, folding happens on the title folded the way rosetta-tagz folds labels, and only when that folded title is 24 characters or longer. post-pipe rebuilds the same canonical url for its own items (four lines, a format, not an import), indexes the universe items by the canonical url of their `url`, and finds the representative there. Items with no url and a short title are never folded, so the key lookup always finds them. If still absent, the item keeps its raw tags and is counted as unjoined in the summary. A folded item receives the union of both systems' tags, which is the point of folding.
-
-## What post-pipe writes onto items
-
-For each joined item:
-
-- `tags` becomes the concept canonical labels of its universe tags, deduplicated, explicit before earned. The universe lists an item's tags sorted by concept id, which is not the author's order, so post-pipe orders them itself: explicit tags by the first position in the item's original `tags` of any of their `raw[].l` spellings, then earned tags by `w` descending, ties alphabetical. A canonical label is a spelling some system actually wrote, an acronym with its dots and spaces removed (`A.I.` becomes `AI`), or a pin. Two raw tags that merged into one concept become one entry.
-- `_references` keeps every non-`tag` entry as it was. Its `tag` entries are replaced by one per entry of the new `tags`, in the same order:
-
-```json
-{"type":"tag","value":"Artificial Intelligence","concept":"c_ai","origin":"explicit","weight":1,"systems":["ScienceDaily","My Posts"],"forms":{"ScienceDaily":["AI"],"My Posts":["artificial intelligence"]},"via":"known","why":null}
+```
+untagged: { bar, count, none, items[]: { key, source, id, title, reason, reasons[], why[], under[], candidates } }
 ```
 
-`forms` lists what each system wrote for this concept on this item. `why` is rosetta-tagz's reason string for earned tags; rosetta-tagz leaves it absent for explicit tags and post-pipe writes `null`. `concept` is informational: see Keying below.
+every item that ends with no tag shown at the build's bar (`discover.sourceCoherenceRatio`), with its tagz under the bar (`under`, each `{concept, label, origin, sourceRatio}`), the reasons as codes (`underBar`, `underFloor`, `nearCopy`, `tooCommon`, `incoherent`, `dropped`, `notChosen`, `noRecurring`, `noCandidate`, `noDiscovery`; provisional) and as sentences (`why`), and every candidate phrase grouped by what became of it.
 
-- Items not joined, or when rosetta-tagz is off or skipped, are untouched.
-- Tag edges gain attributes. `buildEdges.js` emits tag edges with no `attrs` today; after the seam, when an item's reference for that tag exists, the edge carries `attrs: { concept, weight, origin }` from it, plus `why`, `wasDerivedFrom` and `wasGeneratedBy` when the reference has them (an explicit tag's `why` is null and stays out). This is additive; every edge consumer ignores attributes it does not know, and the existing tests do not assert their absence. The attrs come from the item's `_references`, whatever wrote them: a site with rosetta-tagz off whose JSON Feed items already carry references in this shape gets the same attrs. The byte-identity promise is for a site with no rosetta-tagz and no upstream `_references`.
-- Relation edges (2026-10-25). `src/corpus/relationEdges.js` turns `feed._rtagz.relationList` into edges between tag nodes: `source` and `target` are `tag:<site prefLabel>`, `layer` and `role` are the SKOS name (`broader`, `related`, `closeMatch`, `broadMatch`, `relatedMatch`, `exactMatch`; `narrower` and `narrowMatch` are never written), `directed` for `broader` and `broadMatch` with the arrow landing on the broader concept (source the narrower tag), one edge per unordered pair for the rest, `attrs { concept: a, target: b, weight, why, wasDerivedFrom, wasGeneratedBy }` where present. An edge exists only where both concepts are tags on a joined item and neither is a container tag (`settings.containment[].tag`); a mapping to an external id makes no edge. `generate-index.js` appends them to `feed.edges` when rosetta-tagz ran. Since 2026-10-27 the viewer keeps them aside from its links whatever `graph.visibleLayers` says (`src/lib/tagNetwork.js`): they never reach the link force, so they move nothing, and they are drawn only while a tag is selected, from it to its relatives, the strongest five by weight with a control under the tag for the rest, each line's type, weight and why in the edge label. A relation edge whose tag nodes are not drawn, or are hidden by their feeds, the panel's pieces per tag or its source coherence ratio, is left out at the viewer, not an error. A tag folded into another's bubble at the depth chosen draws its line to that bubble, one line per bubble with each folded relative named in its label, unless the panel's "Lines to folded tagz" is set to left out (preference `foldedRelatives`).
-- The source coherence ratio (2026-10-31). `sourceRatio` is a discovered tag's coherence divided by its `sourceBaseline` (how alike items from the same sources are anyway), to three decimals; a tag a person wrote never has one. rosetta-tagz's build admits a hub at or above its bar, `discover.sourceCoherenceRatio` (1.6), and, in a second layer that never changes what the bar admits, hubs down to its floor, `discover.sourceRatioFloor` (1.0). post-pipe copies the ratio, only where rosetta-tagz wrote one, onto the item's tag reference, onto `feed._rtagz.concepts[]` and into the tag edge's `attrs`. The panel's slider "Source coherence ratio" (preference `minSourceRatio`, null for the build's bar, offered only when the feed carries a ratio) runs from the lowest floor the feed records, at least 1.0, to the largest ratio present, in steps of 0.1. At a value v a tag edge shows when it has no `sourceRatio` or one at or above v, a tag shows while any of its edges does, nothing moves, and the graph counts only what shows, since rosetta-tagz's own `n`, `nEmergent` and `stats` count hidden tags too. At the build's bar the graph shows what a build with its floor at the bar would. At any other value it is an approximation of a fresh build at that value, for the reasons `rosetta-tagz/docs/FORMATS.md` gives under "Trying another bar", where a viewer at v differs from a fresh build at v.
+**The join.** Each post-pipe item is looked up in `universe.items` by `<source>::<id>`. If absent, rosetta-tagz folded it into another system's copy of the same article, and post-pipe finds the copy by the canonical url (hostname lower-cased without `www.`, path without a trailing slash, no query, no fragment, lower-cased) or, with no url, by the folded title when it is 24 characters or longer. A folded item gets the union of both systems' tagz. An item still not found keeps its tagz and is counted as `unjoined`.
 
-Onto the feed, `generate-index.js` adds `feed._rtagz`:
+**The container guard.** After the build, every container tag that some item carries must be some concept's canonical. If one is not, the phase logs one line naming it and leaves the whole site's tagz as written: a container quietly losing its pieces is worse than an untranslated graph.
+
+## What the feed carries
+
+Nothing below is written when rosetta-tagz is off, skipped or failed.
+
+**On each joined item**
+
+- `tags`: the concepts' canonical labels (the `site` scheme's prefLabel), de-duplicated, explicit tagz first in the order the item first wrote any of their spellings, then earned tagz by weight, ties alphabetical.
+- `_references`: every non-tag entry kept, then one tag reference per entry of `tags`:
+
+  ```json
+  {"type":"tag","value":"Artificial Intelligence","concept":"c_ai","origin":"explicit","weight":1,
+   "systems":["ScienceDaily","My Posts"],"forms":{"ScienceDaily":["AI"],"My Posts":["artificial intelligence"]},
+   "via":"known","why":null,"prefLabel":{"site":"Artificial Intelligence","ScienceDaily":"AI"},
+   "wasDerivedFrom":[…],"wasGeneratedBy":{…},"sourceRatio":2.964}
+  ```
+
+  `prefLabel`, `wasDerivedFrom`, `wasGeneratedBy` and `sourceRatio` only where rosetta-tagz gave them; an explicit tag's `why` is `null`.
+- An item `build.json` lists as untagged also gets one reference `{"type":"untagged","why":[…],"reason":"…","reasons":[…],"under":[…]}` *(the type name is provisional)*, so its own reference list says why it shows no tag. An older note of that type is replaced on every build. Nothing is forced onto the item: it keeps exactly the tagz rosetta-tagz gave, under the bar or none.
+
+**Edges**
+
+- A card-to-tag edge (`layer: "tag"`, `role: "tagged"`, target `tag:<label>`) carries `attrs: {concept, weight, origin}` from the item's reference, plus `why`, `wasDerivedFrom`, `wasGeneratedBy` and `sourceRatio` where present (`src/corpus/buildEdges.js`).
+- Relation edges (`src/corpus/relationEdges.js`), from `feed._rtagz.relationList`: one edge between two tag nodes per SKOS relation, `layer` and `role` the SKOS name (`broader`, `related`, `closeMatch`, `broadMatch`, `relatedMatch`, `exactMatch`), `directed` for `broader` and `broadMatch` with the arrow on the broader tag (in rosetta-tagz's `{a, b}` for those two types, `a` is the broader), `attrs {concept: a, target: b, weight, why, wasDerivedFrom, wasGeneratedBy}`. Only between two tagz drawn on joined items, never to a container tag or a container's concept, never to an external vocabulary's concept.
+
+**On the containers**
+
+Each container whose tag rosetta-tagz resolved carries `concept` *(provisional)*, its tag's concept id, in `feed.containers` and in the containment the edges are built from. A piece belongs to a container when one of its tag references names that concept, whatever label the concept shows, else when its `tags` hold the container's tag string (`src/lib/containers.js`; used by `buildEdges.js`, `GraphViewer.jsx`, `graphColors.js` and `readerNav.js`). Without rosetta-tagz there is no `concept`, and membership is the tag string, as it always was.
+
+**`feed._rtagz`**
 
 ```json
 {
-  "built": "<from build.json>",
-  "systems": {"ScienceDaily": {"sourceId": "<feed id>", "items": 60, "tagged": 0}, "...": {}},
-  "concepts": [{"canonical": "Artificial Intelligence", "pinned": false, "discovered": false, "items": 14, "forms": {"ScienceDaily": {"AI": 9}, "My Posts": {"artificial intelligence": 5}}, "rank": [{"label": "Artificial Intelligence", "score": 0.81, "parts": {"freq": 0.7, "cover": 1, "trust": 0.9, "quality": 0.8}}]}],
+  "built": "…",
+  "systems": {"ScienceDaily": {"sourceId": "…", "items": 60, "tagged": 0}},
+  "concepts": [{"canonical": "…", "id": "c_ai", "pinned": false, "discovered": false, "items": 14,
+                "forms": {}, "rank": [], "inScheme": [], "prefLabel": {}, "altLabel": {},
+                "broader": [], "mappings": [{"type": "closeMatch", "target": "c_x", "weight": 0.6, "why": "…"}],
+                "ledger": {"since": "…", "event": "reused", "previousLabel": "…"}, "sourceRatio": 1.7}],
   "unjoined": 0,
   "skippedDuplicateIds": 0,
-  "schemes": [{"id": "site", "label": "<settings.site.title>", "kind": "site"}, {"id": "ScienceDaily", "label": "ScienceDaily", "kind": "system", "sourceId": "<feed id>"}, {"id": "discovered", "label": "discovered", "kind": "discovered"}, {"id": "iptc-mediatopics", "label": "IPTC Media Topics", "kind": "external", "license": "CC BY 4.0"}],
-  "relations": {"related": 12, "broader": 3},
-  "relationList": [{"a": "c_ai", "b": "u_neural_hardware", "type": "broader", "weight": 1, "why": "...", "wasDerivedFrom": [], "wasGeneratedBy": {}}],
-  "mappings": {"exactMatch": 4, "broadMatch": 2},
-  "untagged": {"count": 4, "items": [{"id": "<item id>", "source": "<feed id>", "why": ["..."]}]},
-  "external": {"iptc-mediatopics:20000763": {"prefLabel": "artificial intelligence", "broader": ["iptc-mediatopics:20000756"]}},
-  "ledger": {"minted": 0, "reused": 223, "retired": 0}
+  "schemes": [{"id": "site", "label": "<settings.site.title>", "kind": "site"},
+              {"id": "ScienceDaily", "label": "ScienceDaily", "kind": "system", "sourceId": "…"},
+              {"id": "discovered", "label": "discovered", "kind": "discovered"}],
+  "relations": {"related": 92, "broader": 9},
+  "relationList": [{"a": "…", "b": "…", "type": "broader", "weight": 1, "why": "…", "wasDerivedFrom": [], "wasGeneratedBy": {}}],
+  "mappings": {"relatedMatch": 8},
+  "untagged": {"bar": 1.6, "count": 12, "items": [{"id": "<post-pipe item id>", "source": "<tag-system>", "why": ["…"],
+               "reason": "underBar", "reasons": [], "under": [{"concept": "…", "label": "…", "origin": "discovered", "sourceRatio": 1.514}],
+               "candidates": {}}], "none": 5},
+  "containers": {"act-1": "c_act_1"},
+  "external": {},
+  "ledger": {"minted": 0, "reused": 191, "retired": 0}
 }
 ```
 
-`concepts` is keyed by `canonical` and carries the per-system forms and the ranking, so the GraphViewer can show, on a tag node, what each system calls it and why this name won. Only concepts that appear on at least one item are included. Since 2026-10-25 each concept also carries `id`, `inScheme`, `prefLabel` and `altLabel` per scheme, `broader` (the concept's own list when the universe wrote one, else read from the `broader` relations), `mappings[{type, target, weight, why}]` and `ledger {since, event, previousLabel}`; `schemes`, `relations`, `relationList`, `mappings`, `untagged`, `external` and `ledger` are written only when there is something to write. `relationList` is the pairs the relation edges are drawn from: the `skos: true` relations between two of rosetta-tagz's own concepts, each pair once, as written. It is built from `relations[]` alone; a `broader` a concept states on itself without a matching relation is descriptive (it reaches the label walk in `src/lib/schemeLabels.js`) and draws no edge.
+- `concepts` holds only concepts on at least one item, keyed by `canonical` and carrying `id`. Each field is written only where rosetta-tagz wrote it.
+- `schemes`: the site's own scheme is labelled with the site's title; `site` and `discovered` are rosetta-tagz's scheme ids *(provisional)*.
+- `relationList`: the `skos: true` relations between two of rosetta-tagz's own concepts, each pair once.
+- `untagged`: `count` is the post-pipe items listed (a folded article names every item folded into it), `none` those with no tag at any ratio, `bar` the build's bar. A viewer set at a ratio v shows a listed card's tag again once one of its `under` ratios is at or above v, without a rebuild.
+- `containers` *(provisional)*: each container tag resolved to its concept id.
+- `relations`, `relationList`, `mappings`, `untagged`, `containers`, `external` and `ledger` are written only when there is something in them.
 
-## Keying
+## What the viewer does with it
 
-Tag node ids stay `tag:<label>` where `<label>` is the canonical label. Since 2026-10-25 a tag node whose first tag edge names a concept keys its saved position on `concept:<id>` (GraphViewer `persistKey`), and `viewState.migrateNodeKeys` copies an arrangement filed under `tag:<label>` (and under the ledger's `previousLabel`) to that key once per feed, never overwriting; a tag with no concept (no rosetta-tagz) keys on `tag:<label>` as before. A tag collapsed with others at a depth above 0 keys on the reached concept (`concept:<groupId>`). The paragraph that follows records the state before the ledger made ids stable. Concept ids today are `c_` plus the lexicographically smallest member norm, and move when a cluster's smallest member changes (rosetta-tagz's `docs/DESIGN.md` lists persisting them as future work). Until that is settled, post-pipe persists nothing keyed on concept id. The `concept` field written onto references is for reading and debugging, not for keys. When a canonical label changes between builds, the tag node's saved position is orphaned; that is accepted for now and should be stated in the viewer's known issues.
+- **Scheme and depth** (panel; preferences `conceptScheme`, and `broaderDepth` *(provisional)*, 0 to 2): relabel the tag bubbles by the chosen scheme's prefLabel, read that many steps up `broader`, without a rebuild (`src/lib/schemeLabels.js`). Tagz that reach one concept at that depth share one bubble. A tag with no label in the chosen scheme falls back to the site's, then the majority system's, then discovered, and is drawn with a dashed outline.
+- **Positions** key on `concept:<id>` for a tag whose edge names a concept (`tag:<label>` without one), migrated once from the label, and from the ledger's `previousLabel`.
+- **Source coherence ratio** (panel slider; preference `minSourceRatio`, null for the build's bar): a card-to-tag edge shows when it has no `sourceRatio` or one at or above the value; a tag shows while any of its edges does (`src/lib/sourceRatio.js`). At the build's bar it shows what the build at that bar has; at other values it approximates a fresh build (rosetta-tagz FORMATS.md, "Trying another bar").
+- **Hide tagz on fewer than N cards** (preference `minTagPieces`).
+- **Relations**: choosing a tag draws thin lines to its five strongest relatives, with a control for the rest; lines to tagz folded into another bubble go to that bubble unless "Lines to folded tagz" says to leave them out (preference `foldedRelatives`).
+- **Hover**: a card-to-tag edge shows its role, its why and the PROV pair ("derived from …", "generated by …"); a relation line shows its type, weight, why and the PROV pair (`src/lib/provenance.js`).
+- **A tag's detail**, shown beside the bubble while it is hovered or chosen (`tagFormsLines` in `src/lib/tagForms.js`): what each system writes, which part of the ranking named it, its label in each scheme (the site's own scheme named by the site's title), each mapping with its type and weight, and, for a bubble standing for several tagz at the chosen depth, the tagz it stands for.
 
-## What never crosses the seam
+## Checking a build
 
-- post-pipe does not import anything from `rosetta-tagz/lib/`.
-- post-pipe does not write into `rosetta-tagz/` at all, not `out/`, not `local/`, not `seed/`.
-- post-pipe's code does not change rosetta-tagz and does not write into its folder. When rosetta-tagz needs to change to satisfy this contract, the lead droid, not the build, writes a request to `rosetta-tagz/inbox/from-post-pipe-<date>.md` and tells Harold; another lead may own that work, and its change lands in a commit of its own.
-- rosetta-tagz does not create items. Its output is tags and relations. Emergent and discovered tags are tags on items that exist because a file or a feed item exists.
-- No network. rosetta-tagz has none at runtime; post-pipe's only network is the feeds the site lists.
+- `node tools/rtagz-report.js <feed.json> [--ratio 1.6] [--depth N] [--scheme ID]`: cards, tag edges by origin, tag nodes, single-card tagz, cards with no tag, card pairs sharing a tag within and across sources, and the why check (each discovered tag's "recurs in N of M items" against the cards carrying it), counted as the viewer shows them at the given ratio.
+- `node tools/rtagz-labels-check.js <site folder> [--feed path] [--cache dir]`: traces every label the feed carries to a record's label, an item's text, the site's overrides or an enabled vocabulary, and exits 1 on any label with no origin.
+- `python3 rosetta-tagz/tools/skos-check.py <folder with skos.ttl and skos.jsonld>`: rdflib parses both files, checks they are the same graph, and runs the SKOS integrity checks (one prefLabel per language per concept and per scheme, prefLabel and altLabel disjoint, no broader cycle, related or closeMatch not mixed with broader, exactMatch not mixed with broadMatch or relatedMatch); exits 1 on any failure. Needs rdflib; installs nothing.
+- **Measure before and after on frozen feeds.** Real feeds turn over hourly. Serve saved feed text locally, point a scratch copy of the site's `feeds.opml` at it, and build into a scratch copy of the site (copy `settings.json`, `feeds.opml`, `rtagz-ids.json`, `favicon.svg`), never into a site's own `_site`.
+- **epicofelinorjones.com stays byte-identical**: build it with the old and the new engine (`POSTPIPE_ENGINE=<checkout> node scripts/build.js` in a scratch copy) and compare `_site/feed.json` and `_site/haroldyoung/feed.json`.
 
 ## Tests
 
-In `test/rtagz.test.js`, with a fixture corpus of three tag-systems under `test/fixtures/rtagz/` (small, synthetic, safe to commit):
+- `test/rtagz.test.js`: record writing, overrides merging with container pins, the write-back (tagz, references, edges' attrs, `feed._rtagz`), the untagged report and the untagged note on a card, the skip paths (disabled, missing engine, non-zero exit, timeout, container guard), the old names, the SKOS settings pass-through, and the real engine when `rosetta-tagz/bin/rtz-build` (or `POSTPIPE_RTAGZ_ENGINE`) exists, skipped otherwise.
+- `test/containers.test.js`: containment by concept through the four places that decide it. `test/buildEdges.test.js`, `test/graphColors.test.js` and `test/readerNav.test.js` pin the tag-string path and do not know rosetta-tagz exists.
+- `test/relationEdges.test.js`, `test/schemeLabels.test.js`, `test/sourceRatio.test.js`, `test/tagForms.test.js`, `test/tagNetwork.test.js`, `test/provenance.test.js`, `test/rtagzReport.test.js`, `test/rtagzLabelsCheck.test.js`: the pieces above.
+- rosetta-tagz's own suite covers its stages, `rtz-skos` and the untagged report (`rosetta-tagz/test/`).
 
-- Record writing: the aggregator's phase produces the expected records (compared as parsed objects) from fixture items, including an item with no tags, the same article in two systems sharing a url, two feeds with the same title, an ignored tag left out, and a duplicate id skipped.
-- Overrides merging: a site overrides file plus two containers yields the expected `overrides.json` with pins, site pins winning.
-- Write-back: from a canned `universe.json` fixture, items get the expected `tags` and `_references`, deduplicated, in the specified order; a folded item is found through the canonical url; an unjoined item is untouched; tag edges carry `attrs`; `feed._rtagz` has the expected shape.
-- Skip paths: engine path absent, `enabled: false`, timeout, non-zero exit, and a container tag that is not canonical after the build, each leaves tags as written and logs one line.
-- The names from before 2026-10-31: a `stone` settings block, and a site holding only `stone.ledger.json` or `stone.overrides.json`, are each read with one logged line.
-- The real engine, when present: one test runs `rtz-build` on the fixture and checks that `universe.json` appears and that at least one concept has two forms. It runs `rosetta-tagz/` in this repository, or the engine folder `POSTPIPE_RTAGZ_ENGINE` names, and is skipped, not failed, when that folder has no `bin/rtz-build`.
+## Not in this seam yet
 
-Existing tests that pin tag behaviour stay as they are: `buildEdges.test.js` (tag edges, containment interception), `graphColors.test.js`, `readerNav.test.js`, `layouts.test.js`, `viewState.test.js`. They run on `item.tags` and do not know rosetta-tagz exists.
-
-## A deliberate narrowing
-
-`vision/DECOMPOSITION.md` has the viewer translating labels through rosetta-tagz at draw time, with the reader choosing which system's vocabulary to read in. This seam translates once, at corpus time, into one vocabulary, and keeps each system's spellings in the references and in `feed._rtagz.concepts`. That is still Layer 2 work, and it is the smaller step. The per-system spellings survive, so a later lens can offer the choice without redoing the corpus.
-
-## Not in this seam
-
-- Stable concept ids across rebuilds (rosetta-tagz's work).
+- Published vocabularies: the format, `rtz-vocab`, `rtz-map` (on hold).
+- Discovery and emergence settings a site can set (above).
 - Feeding a reader's decisions in the viewer back into the site's overrides file.
-- SKOS export.
-- Translating the containers' own tags through rosetta-tagz instead of pinning them.
+- Relaxing the container guard now that containment can follow concept ids.
