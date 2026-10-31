@@ -81,7 +81,7 @@ test("a same override that merges two priors: one id (the larger prior's), one m
   assert.deepEqual(merged.ledger, { since: 't1', event: 'merged' });
   const merge = [{ type: 'merge', at: 't2', parents: ['c_cat', 'c_dog'], child: 'c_cat' }];
   assert.deepEqual(second.next.events, merge);
-  assert.deepEqual(second.next.retired, { c_dog: { members: ['dog'], label: 'dog', since: 't1', lastSeen: 't1', into: 'c_cat' } });
+  assert.deepEqual(second.next.retired, { c_dog: { members: ['dog'], label: 'dog', since: 't1', lastSeen: 't1', retiredAt: 't2', into: 'c_cat' } });
   assert.equal(second.next.concepts.c_dog, undefined);
   assert.deepEqual(second.stone.ledger, { path: 'ledger.json', minted: 0, reused: 1, retired: 1, splits: 0, merges: 1, events: merge });
 });
@@ -168,7 +168,7 @@ test('a term that disappears is retired and gets its old id back when it returns
   assert.equal(byMember(first.stone, 'zeta').id, 'c_zeta');
   const second = ledgered(without, first.next, { now: 't2' });
   assert.equal(second.stone.ledger.retired, 1);
-  assert.deepEqual(second.next.retired.c_zeta, { members: ['zeta'], label: 'zeta', since: 't1', lastSeen: 't1' });
+  assert.deepEqual(second.next.retired.c_zeta, { members: ['zeta'], label: 'zeta', since: 't1', lastSeen: 't1', retiredAt: 't2' });
   assert.deepEqual(second.next.events, [{ type: 'retire', at: 't2', ids: ['c_zeta'] }]);
   const third = ledgered(withZ, second.next, { now: 't3' });
   const back = byMember(third.stone, 'zeta');
@@ -258,4 +258,27 @@ test('events keep only the most recent 200', () => {
   assert.equal(r.next.events.length, MAX_EVENTS);
   assert.deepEqual(r.next.events.at(-1), { type: 'retire', at: 't1', ids: ['c_gone'] });
   assert.equal(r.next.events[0].at, 'old1');
+});
+
+test('retired retention: retired ids record retiredAt and drop after retiredMaxBuilds or retiredMaxDays', () => {
+  const withZ = rec('Journal', { 1: ['alpha'], 2: ['zeta'] });
+  const without = rec('Journal', { 1: ['alpha'] });
+  const cfg = { ledger: { retiredMaxBuilds: 2, retiredMaxDays: 90 } };
+
+  const b1 = ledgered(withZ, null, { now: '2026-01-01T00:00:00.000Z', cfg });
+  const b2 = ledgered(without, b1.next, { now: '2026-01-02T00:00:00.000Z', cfg });
+  assert.equal(b2.next.retired.c_zeta.retiredAt, '2026-01-02T00:00:00.000Z');
+  const b3 = ledgered(without, b2.next, { now: '2026-01-03T00:00:00.000Z', cfg });
+  assert.equal(b3.next.retired.c_zeta.retiredBuilds, 2);
+  const b4 = ledgered(without, b3.next, { now: '2026-01-04T00:00:00.000Z', cfg });
+  assert.equal(b4.next.retired.c_zeta, undefined, 'dropped once retiredBuilds exceeds retiredMaxBuilds');
+
+  // By days: 91 days past retiredAt drops even on the very next build
+  const byDays = ledgered(without, b2.next, { now: '2026-04-05T00:00:00.000Z', cfg });
+  assert.equal(byDays.next.retired.c_zeta, undefined, 'dropped once elapsed days exceed retiredMaxDays');
+
+  // 0 disables pruning
+  const keepForever = { ledger: { retiredMaxBuilds: 0, retiredMaxDays: 0 } };
+  const kept = ledgered(without, b3.next, { now: '2027-01-01T00:00:00.000Z', cfg: keepForever });
+  assert.ok(kept.next.retired.c_zeta, 'kept when both limits are 0');
 });

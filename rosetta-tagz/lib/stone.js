@@ -128,7 +128,7 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
       return { terms: cl.terms, label: named[i].canonical.label, ...(own.length && own.length < cl.terms.length ? { mint: own } : {}) };
     }),
     ledger?.prior ?? null,
-    { pins: pinByNorm.keys(), now },
+    { pins: pinByNorm.keys(), now, retention: cfg.ledger },
   );
   if (ledger) ledger.next = assigned.next;
 

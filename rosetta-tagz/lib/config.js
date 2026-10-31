@@ -61,6 +61,11 @@ export const DEFAULTS = {
     minWeight: 0.25,
     minContext: 0.12, // single-word labels: TF-IDF cosine the item must have with the tag's existing items
   },
+
+  ledger: {
+    retiredMaxBuilds: 50, // (provisional) builds a retired concept id is kept before pruning; 0 or null keeps forever
+    retiredMaxDays: 90, // (provisional) days since retiredAt a retired concept id is kept before pruning; 0 or null keeps forever
+  },
 };
 
 export function mergeDeep(base, extra) {
