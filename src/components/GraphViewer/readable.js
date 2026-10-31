@@ -12,7 +12,7 @@ function readablePxOf(graphSettings) {
 
 // A title fontPx CSS px in its card, the card drawn at zoom k and at its own
 // scale (a spiral's cardScale): its size on the screen. 0 when there is no
-// title (a card far out is a marker and draws none).
+// title.
 function titleScreenPx(fontPx, k, cardScale = 1) {
   if (!(fontPx > 0) || !(k > 0)) return 0;
   return fontPx * k * (cardScale > 0 ? cardScale : 1);

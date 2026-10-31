@@ -19,6 +19,7 @@ import { closedMemberSet, edgeHidden, initiallyClosed as initiallyClosedIds, clo
 import { createTapGate } from './tapGate';
 import { bindingsOf, resolve as resolveBinding, usesGesture, isBound } from '../../lib/actions';
 import { readablePxOf, titleScreenPx, readableZoom, keepUnderFinger } from './readable';
+import { getLOD, makeCardSizeFor } from './levelOfDetail';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { layoutKey } from './layoutKey';
@@ -497,25 +498,8 @@ function labelPositionOf(c) {
   return c && (c.labelPosition === 'top' || c.labelPosition === 'hidden') ? c.labelPosition : 'center';
 }
 
-// Zoom-aware level of detail.
-const LOD_MARKER = 0.35;
-const LOD_TITLE = 0.6;
-function getLOD(scale) {
-  if (scale < LOD_MARKER) return 'marker';
-  if (scale < LOD_TITLE) return 'title';
-  return 'full';
-}
-
-// Bounds for a hand-resized card. Below the minimum the label stops fitting;
-// above the maximum one node eats the graph.
-function makeCardSizeFor(CARD) {
-  return function cardSizeFor({ hovered, pinned, lod }) {
-    if (pinned) return { width: CARD.pinnedWidth, height: CARD.pinnedHeight };
-    if (hovered) return { width: CARD.hoverWidth, height: CARD.hoverHeight };
-    if (lod === 'marker') return { width: 16, height: 16 };
-    return { width: CARD.width, height: CARD.height };
-  };
-}
+// The zoom-aware level of detail (getLOD) and the size a card is drawn at
+// (makeCardSizeFor) are in levelOfDetail.js.
 
 export function GraphViewer({
   feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout = 'force', timeAxis, graphSettings,
@@ -831,10 +815,9 @@ export function GraphViewer({
 
     const g = svg.append('g');
 
-    // Zoom — repaints node text content only when crossing an LOD boundary;
-    // never touches the simulation. Re-renders card contents at the new
-    // font-size on every zoom event so the on-screen label size stays
-    // constant as the user zooms in/out.
+    // Zoom — repaints the cards only when the zoom crosses a level of detail
+    // (levelOfDetail.js); never touches the simulation. Cards and tagz keep
+    // their size in the graph, so on the screen they grow and shrink with it.
     // Whether the reader has panned or zoomed. Until they have, the view is
     // re-framed once the layout settles; after, it is theirs.
     let userMovedView = false;
@@ -2932,14 +2915,11 @@ export function GraphViewer({
         .on('end', () => { if (!userMovedView) fitToViewport({ animate: true }); });
     }
 
-    // Half the size a card is drawn at right now, so an edge ends at its edge
-    // whether it is a full card or, zoomed far out, a marker.
+    // Half the size a card is drawn at right now, so an edge ends at its edge.
     function drawnHalf(n) {
       const hovered = hoveredIdRef.current === n.id;
       const pinned = pinnedIdsRef.current.has(n.id);
-      const lod = getLOD(zoomScaleRef.current);
-      if (lod === 'marker' && !hovered && !pinned) return { w: 8, h: 8 };
-      const size = n._size || cardSizeFor({ hovered, pinned, lod });
+      const size = n._size || cardSizeFor({ hovered, pinned });
       const s = n._cardScale || 1;
       return { w: (size.width / 2) * s, h: (size.height / 2) * s };
     }
@@ -3664,16 +3644,10 @@ export function GraphViewer({
       const hovered = hoveredIdRef.current === d.id;
       const pinned = pinnedIdsRef.current.has(d.id);
       const lod = getLOD(zoomScaleRef.current);
-      const defaultSize = cardSizeFor({ hovered, pinned, lod });
-      let w, h;
-      if (lod === 'marker' && !hovered && !pinned) {
-        w = defaultSize.width;
-        h = defaultSize.height;
-      } else {
-        const customSize = d._size || (d._customWidth && d._customHeight ? { width: d._customWidth, height: d._customHeight } : null);
-        w = customSize ? customSize.width : defaultSize.width;
-        h = customSize ? customSize.height : defaultSize.height;
-      }
+      const defaultSize = cardSizeFor({ hovered, pinned });
+      const customSize = d._size || (d._customWidth && d._customHeight ? { width: d._customWidth, height: d._customHeight } : null);
+      const w = customSize ? customSize.width : defaultSize.width;
+      const h = customSize ? customSize.height : defaultSize.height;
 
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
@@ -3888,8 +3862,7 @@ export function GraphViewer({
     // ── Readable cards (node.readable, node.zoomToReadable) ───────────────
     // A card is readable when its title renders at graph.readablePx CSS px
     // or more (default 16, readable.js): its font as the card draws it,
-    // times the zoom and the card's own scale. A card far out draws no
-    // title (a marker) and is not readable. The card is drawn first for
+    // times the zoom and the card's own scale. The card is drawn first for
     // the state it is in (a hover or a tap may have changed it a moment
     // ago, and React draws later), so the title measured is the one it
     // shows: a card under the pointer or a finger shows its text with a
@@ -3929,7 +3902,7 @@ export function GraphViewer({
       const entry = reactRoots.get(d.id);
       if (!entry || round > 2) return;
       const cs = d._cardScale || 1;
-      // Far out a card draws no title: the smallest it can draw it at.
+      // No title measured: the smallest a card draws it at.
       const font = titleFontOf(d) || (Number.isFinite(CARD.labelMinFontSize) ? CARD.labelMinFontSize : 14);
       const t = d3.zoomTransform(svg.node());
       let k = readableZoom(t.k, titleScreenPx(font, t.k, cs), READABLE_PX, ZOOM_MAX);

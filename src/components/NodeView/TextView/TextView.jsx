@@ -129,16 +129,12 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     isDraft ? styles.draft : styles.published,
     expanded && styles.expanded,
     pinned && styles.pinned,
-    viewState.lod === 'marker' && !expanded && styles.marker
   ].filter(Boolean).join(' ');
-
-  const showHandles = viewState.lod !== 'marker';
 
   // The sketchbook theme's pencil outline: generated per card and size, so it
   // is the same on every frame; hidden by CSS in any other theme.
   const radius = cardSettings?.cornerRadius != null ? cardSettings.cornerRadius : 10;
-  const isMarker = viewState.lod === 'marker' && !expanded;
-  const sketch = isMarker || !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
+  const sketch = !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
 
   return (
     <div
@@ -148,9 +144,8 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         width,
         height,
         background: bgColor,
-        // settings.graph.card.cornerRadius; a marker stays a dot.
-        ...(cardSettings?.cornerRadius != null && !(viewState.lod === 'marker' && !expanded)
-          ? { borderRadius: cardSettings.cornerRadius } : {}),
+        // settings.graph.card.cornerRadius.
+        ...(cardSettings?.cornerRadius != null ? { borderRadius: cardSettings.cornerRadius } : {}),
         // Provenance moves from a full coloured ring to a bar down one edge.
         // Ringing the whole card in a saturated feed colour competed with the
         // content for attention; an edge bar says the same thing quietly.
@@ -184,7 +179,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
           )}
         </div>
       )}
-      {contributionCount > 0 && showHandles && (
+      {contributionCount > 0 && (
         <div
           className={styles.readersMark}
           title={contributionCount === 1 ? '1 from readers' : `${contributionCount} from readers`}
@@ -218,7 +213,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         fullContent={fullContent}
         cardSettings={cardSettings}
       />
-      {showHandles && (readMax > 0 || readDone) && (
+      {(readMax > 0 || readDone) && (
         <div
           className={styles.readBar}
           role="progressbar"
@@ -231,11 +226,11 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
           <div className={styles.readFill} style={{ width: `${(readDone ? 1 : readMax) * 100}%` }} />
         </div>
       )}
-      {showHandles && readDone && (
+      {readDone && (
         <div className={styles.readMark} title="Read to the end" aria-hidden="true">✓</div>
       )}
       {pinned && <PopoutButton />}
-      {showHandles && onResize && (
+      {onResize && (
         <ResizeHandles
           width={width}
           height={height}
@@ -325,11 +320,6 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     );
   }
 
-  // Marker-LOD: small dot, empty content inside.
-  if (viewState.lod === 'marker') {
-    return null;
-  }
-
   // In the unselected (not open) card: do not show the summary (the idea.tldr /
   // description text). Show the title large and bold, and under it a subtitle
   // in a smaller, lighter weight, with tight spacing between them (line-height
@@ -379,11 +369,10 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
 
 // A link node's card: the same card as a text node's, holding its title,
 // the line under it (subtitle) and its blurb, with the ↗ in the corner. The
-// same at every size; a marker stays a dot.
+// same at every size and every zoom.
 function LinkCard({ article, width, height, viewState, cardSettings, sourceColor, isDraft, bgColor }) {
-  const marker = viewState.lod === 'marker' && !viewState.hovered && !viewState.pinned;
   const radius = cardSettings?.cornerRadius != null ? cardSettings.cornerRadius : 10;
-  const sketch = marker || !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
+  const sketch = !width || !height ? null : sketchFor(article.id || article.title || '', width, height, radius);
   const title = article.title || article.label || '';
   const blurb = article.description || '';
   const subtitle = article.subtitle || '';
@@ -399,7 +388,6 @@ function LinkCard({ article, width, height, viewState, cardSettings, sourceColor
     styles.linkCard,
     sourceColor && styles.glow,
     viewState.hovered && styles.linkHover,
-    marker && styles.marker,
   ].filter(Boolean).join(' ');
   return (
     <div
@@ -410,7 +398,7 @@ function LinkCard({ article, width, height, viewState, cardSettings, sourceColor
         width,
         height,
         background: bgColor,
-        ...(cardSettings?.cornerRadius != null && !marker ? { borderRadius: cardSettings.cornerRadius } : {}),
+        ...(cardSettings?.cornerRadius != null ? { borderRadius: cardSettings.cornerRadius } : {}),
         ...(sourceColor ? { '--nv-src': sourceColor } : {}),
       }}
     >
@@ -420,14 +408,10 @@ function LinkCard({ article, width, height, viewState, cardSettings, sourceColor
           <path className={styles.sketchMain} d={sketch.main} />
         </svg>
       )}
-      {!marker && (
-        <>
-          <div className={styles.linkTitle} style={{ fontSize: `${titleFontSize}px` }} data-link-title>{title}</div>
-          {subtitle && <div className={styles.linkSubtitle} data-link-subtitle>{subtitle}</div>}
-          {blurb && <div className={styles.linkBlurb} data-link-blurb>{blurb}</div>}
-          <span className={styles.linkOut} data-link-out aria-hidden="true">↗</span>
-        </>
-      )}
+      <div className={styles.linkTitle} style={{ fontSize: `${titleFontSize}px` }} data-link-title>{title}</div>
+      {subtitle && <div className={styles.linkSubtitle} data-link-subtitle>{subtitle}</div>}
+      {blurb && <div className={styles.linkBlurb} data-link-blurb>{blurb}</div>}
+      <span className={styles.linkOut} data-link-out aria-hidden="true">↗</span>
     </div>
   );
 }
