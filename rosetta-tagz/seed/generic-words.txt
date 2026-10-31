@@ -1,0 +1,43 @@
+# Generic English words that are never a topic on their own: common verbs, adverbs, adjectives,
+# quantifiers, time words and filler nouns. Used by rtz-discover (and text profiling) like a stopword
+# list. Topical nouns are deliberately absent (water, power, attention, process, pattern, house...).
+# One word per line; '#' starts a comment. Edit freely: this is data, not code.
+told tell tells said say says asked ask asks called call calls went goes going gone come comes came coming
+took take takes taken taking gave give gives given giving made make makes making got get gets getting
+put puts putting kept keep keeps keeping let lets began begin begins begun seemed seem seems felt feel feels
+left leave leaves brought bring brings turned turn turns started start starts heard hear hears played play
+plays ran run runs running moved move moves lived live lives believe believed hold holds held wrote written
+provide provides provided stand stood lose lost paid meet met include includes included continue continues
+continued sets learn learned change changes changed lead leads led understand watch follow follows followed
+stop stops stopped create creates created spoke reads allow allows allowed added spend spent grow grew
+open opened walk walked won offer offers offered remember consider appear appears appeared buy bought wait
+serve served serves died send sent expect expected build built stay stayed fell reach reached remain
+remains remained raise raises raised pass passed sold require required reported decide decided pull pulled
+return returned explain explained hope hoped develop developed carry carried broke receive received agree
+agreed support supported produce produced cover covered caught drew choose chose cause caused point
+pointed listen realize realized enable enabled challenge challenges challenged review reviews reviewed
+involve involved involves seek seeks sought trying tried tries try want wants wanted need needs needed
+use uses used using work works worked working look looks looked looking turn using
+earlier later latest typically usually often always never sometimes already almost nearly quite rather
+really very highest lowest higher lower largest larger biggest bigger smallest smaller middle faster
+slower fastest famous responsible dynamic major minor main various several certain whole entire enough
+ever even still just only also yet soon today tomorrow yesterday now then here there where away back
+down across along around behind beyond inside outside upon toward towards within without whether although
+though unless whereas since because until while during before after again once twice many much most more
+less least few fewer little lot lots plenty every each either neither both another other others same
+different similar possible impossible likely unlikely able unable important significant simple general
+specific common special particular popular local national international huge tiny giant massive
+strong stronger strongest weak weaker big small long short great good best better worse worst real true
+false right wrong full empty easy hard difficult sure clear clearly actually finally simply directly
+immediately eventually recently currently previously originally essentially mostly mainly largely partly
+hours minutes seconds ages days weeks months years decade decades century centuries ago moment period
+dozens hundreds thousands millions billions half double triple percent number numbers amount amounts
+thing things something anything nothing everything someone anyone everyone way ways kind kinds type types
+example examples case cases part parts fact facts result results issue issues problem problems question
+questions answer answers reason reasons story stories line lines form forms level levels side sides
+group groups member members place places term terms end ends top bottom hand hands
+first second third last next previous following former latter overall
+tends tend tended become becomes became remain seemingly apparently
+one two three four five six seven eight nine ten twelve twenty hundred thousand million billion
+targeted beneath above below near far
+detail details modern serious depend depends influence associated scale material disappears combinations shape unprecedented happening activated slowly search healthy journey faces shock self

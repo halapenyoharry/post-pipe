@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+import { cli, die, readText, parseJSONL, toJSONL, writeOut, readJSON, log } from '../lib/io.js';
+import { indexStone, resolveLabel } from '../lib/stone.js';
+
+const usage = `rtz-translate — rewrite tag records through the stone
+
+usage: rtz-translate <stone.json> [records.jsonl] [--only-unmapped] [-o FILE]
+
+Each tag record gains: concept, canonical (the Rosetta label), via (known|stem|tokenset|unmapped), conf.
+The original "label" is never touched, so the translation is reversible and auditable.
+Labels the stone has never seen are matched by stem / word-set where that is unambiguous,
+otherwise passed through as via:"unmapped" (candidates for the next rtz-stone run).
+
+  --only-unmapped   print only the tags the stone could not place (the to-do list)`;
+
+const { values, positionals } = cli('rtz-translate', usage, { 'only-unmapped': { type: 'boolean' }, o: { type: 'string', short: 'o' } });
+const [stoneFile, input] = positionals;
+if (!stoneFile) die(usage, 2);
+try {
+  const stone = readJSON(stoneFile);
+  const index = indexStone(stone);
+  const records = parseJSONL(await readText(input), input ?? 'stdin');
+  let unmapped = 0;
+  const out = [];
+  for (const r of records) {
+    if (r.type !== 'tag') {
+      if (!values['only-unmapped']) out.push(r);
+      continue;
+    }
+    const hit = resolveLabel(index, r.label);
+    if (!hit) unmapped += 1;
+    if (values['only-unmapped'] && hit) continue;
+    out.push(
+      hit
+        ? { ...r, concept: hit.concept, canonical: index.concepts.get(hit.concept).canonical, via: hit.via, conf: hit.conf }
+        : { ...r, concept: null, canonical: r.label, via: 'unmapped', conf: 0 },
+    );
+  }
+  writeOut(toJSONL(out), values.o);
+  if (unmapped) log(`rtz-translate: ${unmapped} tag(s) not in the stone`);
+} catch (e) {
+  die(`rtz-translate: ${e.message}`);
+}

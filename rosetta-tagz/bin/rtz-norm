@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+import { cli, die, readText, parseJSONL, toJSONL, writeOut } from '../lib/io.js';
+import { normalizeLabel } from '../lib/normalize.js';
+
+const usage = `rtz-norm — add normalization keys to tag records (handy for sort | uniq -c)
+
+usage: rtz-norm [records.jsonl] [-o FILE]
+
+Adds to each tag record: norm (case/accent/punctuation folded), skey (stem sequence), tkey (stem word-set).
+Example: rtz-norm records.jsonl | jq -r .norm | sort | uniq -c | sort -rn`;
+
+const { values, positionals } = cli('rtz-norm', usage, { o: { type: 'string', short: 'o' } });
+try {
+  const records = parseJSONL(await readText(positionals[0]), positionals[0] ?? 'stdin');
+  writeOut(
+    toJSONL(
+      records.map((r) => {
+        if (r.type !== 'tag') return r;
+        const i = normalizeLabel(r.label);
+        return { ...r, norm: i.norm, skey: i.skey, tkey: i.tkey };
+      }),
+    ),
+    values.o,
+  );
+} catch (e) {
+  die(`rtz-norm: ${e.message}`);
+}

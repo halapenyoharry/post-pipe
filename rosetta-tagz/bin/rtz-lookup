@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+import { cli, die, readJSON } from '../lib/io.js';
+import { indexStone, resolveLabel } from '../lib/stone.js';
+import { scoreVariants } from '../lib/canon.js';
+
+const usage = `rtz-lookup — read the stone
+
+usage: rtz-lookup <stone.json> <label>… [--json]
+       rtz-lookup <stone.json> --review          pairs the engine thinks are probably the same, for a human to decide
+       rtz-lookup <stone.json> --merged          every concept that folded several spellings together
+       rtz-lookup <stone.json> --systems         the tag-systems and how they are used
+
+A concept card shows the canonical label, WHY it won (every variant's score parts), the spellings
+per tag-system, and the relations to other concepts.`;
+
+const { values, positionals } = cli('rtz-lookup', usage, {
+  json: { type: 'boolean' },
+  review: { type: 'boolean' },
+  merged: { type: 'boolean' },
+  systems: { type: 'boolean' },
+});
+const [file, ...labels] = positionals;
+if (!file) die(usage, 2);
+
+const stone = readJSON(file);
+const index = indexStone(stone);
+const name = (id) => index.concepts.get(id)?.canonical ?? id;
+const pct = (x) => (x * 100).toFixed(0).padStart(3) + '%';
+const out = (s = '') => process.stdout.write(s + '\n');
+
+if (values.systems) {
+  for (const [k, s] of Object.entries(stone.systems)) out(`${k.padEnd(16)} items ${String(s.items).padStart(4)}  tagged ${String(s.tagged).padStart(4)}  distinct tags ${String(s.distinctTags).padStart(4)}  trust ${s.weight}`);
+} else if (values.merged) {
+  for (const c of stone.concepts.filter((x) => x.variants.length > 1)) out(`${c.canonical.padEnd(28)} <= ${c.variants.map((v) => `${v.label} (${v.count})`).join(' | ')}`);
+} else if (values.review) {
+  const near = stone.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').sort((a, b) => b.weight - a.weight);
+  if (!near.length) out('nothing to review');
+  for (const r of near) {
+    out(`${pct(r.weight)}  ${name(r.a)}  ~  ${name(r.b)}`);
+    for (const [sig, why] of Object.entries(r.evidence.signals ?? {})) out(`        ${sig}: ${why}`);
+    out(`        accept:  rtz-override same "${name(r.a)}" "${name(r.b)}"`);
+  }
+} else {
+  if (!labels.length) die(usage, 2);
+  for (const label of labels) {
+    const hit = resolveLabel(index, label);
+    if (!hit) {
+      out(`"${label}": not in the stone`);
+      continue;
+    }
+    const c = index.concepts.get(hit.concept);
+    if (values.json) {
+      out(JSON.stringify({ ...c, via: hit.via, relations: stone.relations.filter((r) => r.a === c.id || r.b === c.id) }, null, 1));
+      continue;
+    }
+    out(`${c.canonical}${c.pinned ? '   [pinned]' : ''}${c.locked ? '   [locked merge]' : ''}   (${c.items} items; matched "${label}" by ${hit.via})`);
+    out('  why this name (higher is better):');
+    for (const r of scoreVariants(c.variants, stone.config.canon, stone.config.sourceWeights)) {
+      const p = r.parts;
+      out(`    ${r.score.toFixed(2)}  ${r.label.padEnd(24)} freq ${p.freq.toFixed(2)}  cover ${p.cover.toFixed(2)}  trust ${p.trust.toFixed(2)}  quality ${p.quality.toFixed(2)}`);
+    }
+    out('  spellings by tag-system:');
+    for (const v of c.variants) out(`    ${v.label.padEnd(24)} ${Object.entries(v.bySource).map(([s, n]) => `${s}×${n}`).join('  ')}   forms: ${Object.keys(v.forms).join(', ')}`);
+    const rels = stone.relations.filter((r) => r.a === c.id || r.b === c.id).sort((a, b) => b.weight - a.weight);
+    if (rels.length) {
+      out('  relations:');
+      for (const r of rels) {
+        const other = r.a === c.id ? r.b : r.a;
+        const dir = r.type === 'broader' ? (r.a === c.id ? 'broader than' : 'narrower than') : r.type;
+        out(`    ${dir.padEnd(14)} ${name(other).padEnd(26)} ${r.weight}${r.locked ? '  [locked]' : ''}`);
+      }
+    }
+    out();
+  }
+}

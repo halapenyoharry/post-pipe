@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+import { cli, die, readText, parseJSONL, toJSONL, writeOut, readJSON, log } from '../lib/io.js';
+import { emerge } from '../lib/emerge.js';
+import { makeConfig } from '../lib/config.js';
+import { loadJSONIfExists } from '../lib/seeds.js';
+
+const usage = `rtz-emerge — give items tags that their TEXT earns (no model, phrase matching against the stone)
+
+usage: rtz-emerge <stone.json> [records.jsonl] [--all] [--config FILE] [-o FILE]
+
+  Reads records on stdin (or a file). Writes NEW tag records with origin "emergent", a weight in 0..1,
+  and a "why" explaining the match. With --all the input records are echoed first, so the output
+  can be fed straight back into rtz-universe.`;
+
+const { values, positionals } = cli('rtz-emerge', usage, { all: { type: 'boolean' }, config: { type: 'string' }, o: { type: 'string', short: 'o' } });
+const [stoneFile, input] = positionals;
+if (!stoneFile) die(usage, 2);
+try {
+  const records = parseJSONL(await readText(input), input ?? 'stdin');
+  const fresh = emerge(readJSON(stoneFile), records, makeConfig(loadJSONIfExists(values.config)));
+  writeOut(toJSONL(values.all ? [...records.filter((r) => r.origin !== 'emergent'), ...fresh] : fresh), values.o);
+  log(`rtz-emerge: ${fresh.length} emergent tags on ${new Set(fresh.map((r) => `${r.source}::${r.item}`)).size} items`);
+} catch (e) {
+  die(`rtz-emerge: ${e.message}`);
+}

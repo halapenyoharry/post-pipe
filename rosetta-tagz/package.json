@@ -1,0 +1,29 @@
+{
+  "name": "rosetta-tagz",
+  "version": "0.1.0",
+  "description": "A Rosetta stone for tags: sits between tag-systems, merges equivalent tags into concepts, picks a canonical label by weight, and exposes the relations between them. Small Unix-style programs over JSONL.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "bin": {
+    "rtz": "bin/rtz",
+    "rtz-ingest": "bin/rtz-ingest",
+    "rtz-norm": "bin/rtz-norm",
+    "rtz-pairs": "bin/rtz-pairs",
+    "rtz-stone": "bin/rtz-stone",
+    "rtz-emerge": "bin/rtz-emerge",
+    "rtz-translate": "bin/rtz-translate",
+    "rtz-universe": "bin/rtz-universe",
+    "rtz-graph": "bin/rtz-graph",
+    "rtz-lookup": "bin/rtz-lookup",
+    "rtz-override": "bin/rtz-override",
+    "rtz-view": "bin/rtz-view",
+    "rtz-build": "bin/rtz-build"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "demo": "node bin/rtz build --config examples/synthetic/rtz.config.json"
+  },
+  "dependencies": {}
+}

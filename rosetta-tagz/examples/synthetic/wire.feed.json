@@ -1,0 +1,16 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Wire",
+  "items": [
+    { "id": "w1", "url": "https://example.org/wire/nurse-scheduling-algorithm", "title": "Inside the Algorithm That Decides Nurse Schedules", "summary": "Hospitals are handing shift assignments to software. Nurses say the system ignores fatigue.", "tags": ["Artificial Intelligence", "Labor", "Health Care"] },
+    { "id": "w2", "url": "https://example.org/wire/prison-system-oversight", "title": "A Prison System Starved of Oversight", "summary": "State inspectors have not visited most facilities in years.", "tags": ["Criminal Justice", "Prison", "Regulation"] },
+    { "id": "w3", "url": "https://example.org/wire/judges-risk-scores", "title": "Judges Rely on Risk Scores Few Understand", "summary": "Courts use automated risk assessments to set bail, and the vendors will not disclose how they work.", "tags": ["Artificial Intelligence", "Criminal Justice"] },
+    { "id": "w4", "url": "https://example.org/wire/jail-deaths-staffing", "title": "County Jail Deaths Rise as Staffing Falls", "summary": "Incarceration rates held steady while guards quit, and medical care slipped.", "tags": ["Incarceration", "Criminal Justice", "Health Care"] },
+    { "id": "w5", "url": "https://example.org/wire/rising-seas-zoning", "title": "Rising Seas Rewrite Coastal Zoning", "summary": "Towns rewrite building codes as flood maps expand.", "tags": ["Climate Change", "Real Estate", "Regulation"] },
+    { "id": "w6", "url": "https://example.org/wire/insurers-retreat", "title": "Insurers Quietly Retreat from Fire Country", "summary": "Global warming is repricing homes across the West.", "tags": ["Global Warming", "Insurance", "Real Estate"] },
+    { "id": "w7", "url": "https://example.org/wire/warehouse-robots", "title": "Warehouse Workers Organize Against Robots", "summary": "Automation targets the same shifts that unions are trying to protect.", "tags": ["Labor", "Automation", "Unions"] },
+    { "id": "w8", "url": "https://example.org/wire/strike-fund-swells", "title": "Strike Fund Swells at Hospital Chain", "summary": "A general strike is now a live possibility across the system.", "tags": ["Labor", "Unions", "General Strike", "Health Care"] },
+    { "id": "w9", "url": "https://example.org/wire/ml-rent-pricing", "title": "How Machine Learning Is Used to Price Rent", "summary": "Landlords share data with a pricing model that nudges rents upward in lockstep.", "tags": ["Machine Learning", "Real Estate"] },
+    { "id": "w10", "url": "https://example.org/wire/congress-weighs-ai-rules", "title": "Congress Weighs AI Rules", "summary": "Lawmakers split over how much to regulate frontier models.", "tags": ["AI", "Regulation", "Politics"] }
+  ]
+}

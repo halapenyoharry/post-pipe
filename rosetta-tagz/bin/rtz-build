@@ -1,0 +1,111 @@
+#!/usr/bin/env node
+// Runs the pipeline by invoking the real stage programs one after another. There is no second
+// implementation here: `rtz build` is exactly what you would type by hand, written down once.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { cli, die, log } from '../lib/io.js';
+
+const usage = `rtz-build — run the whole pipeline from one config file
+
+usage: rtz-build --config rtz.config.json [-o OUTDIR] [--no-view] [--no-emerge] [--discover]
+
+rtz.config.json (paths are relative to the config file; ~ is expanded):
+  {
+    "out": "out",
+    "sources": [
+      { "adapter": "jsonfeed",    "path": "wire.feed.json" },
+      { "adapter": "frontmatter", "path": "~/Posts", "source": "My Writing", "field": "tags" },
+      { "adapter": "pairs",       "path": "archive.tsv", "source": "Archive" },
+      { "adapter": "markdown",    "path": "~/vault", "source": "Notes", "inline": true }
+    ],
+    "overrides": "overrides.json",     optional, human decisions
+    "ledger": "stone.ledger.json",     concept-id ledger, kept across builds; default OUTDIR/ledger.json, false for none
+    "seeds": [],                       optional extra seed files
+    "noSeed": false,
+    "discover": false,                 propose new tags for untagged items from recurring phrases
+    "emerge": true,                    earn tags from item text (concepts the stone already knows)
+    "engine": { "mergeThreshold": 0.7 }   optional overrides of lib/config.js defaults
+  }
+
+Writes to OUTDIR: records.jsonl, [records.discovered.jsonl], stone.json, records.all.jsonl, universe.json, view.html,
+build.json (stages, and the ledger summary: path, minted, reused, retired, splits, merges, this build's events), and the ledger at its path`;
+
+const { values } = cli('rtz-build', usage, {
+  config: { type: 'string' },
+  o: { type: 'string', short: 'o' },
+  'no-view': { type: 'boolean' },
+  'no-emerge': { type: 'boolean' },
+  discover: { type: 'boolean' },
+});
+if (!values.config) die(usage, 2);
+
+const bin = path.dirname(fileURLToPath(import.meta.url));
+const configPath = path.resolve(values.config);
+const base = path.dirname(configPath);
+const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+const resolve = (p) => (p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : path.resolve(base, p));
+const out = path.resolve(values.o ? values.o : config.out ? resolve(config.out) : 'out');
+fs.mkdirSync(out, { recursive: true });
+
+const manifest = { built: new Date().toISOString(), config: configPath, stages: [] };
+function stage(name, program, args, { capture = false } = {}) {
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, [path.join(bin, program), ...args], { encoding: 'utf8', maxBuffer: 1 << 30 });
+  if (r.stderr) process.stderr.write(r.stderr.split('\n').filter(Boolean).map((l) => `  ${l}\n`).join(''));
+  if (r.status !== 0) die(`rtz-build: stage "${name}" failed (exit ${r.status})`);
+  manifest.stages.push({ name, program, ms: Date.now() - t0 });
+  return capture ? r.stdout : null;
+}
+
+log(`rtz-build: ${configPath} -> ${out}`);
+const records = [];
+for (const s of config.sources ?? []) {
+  const args = [s.adapter, resolve(s.path)];
+  if (s.source) args.push('--source', s.source);
+  if (s.field) args.push('--field', s.field);
+  if (s.inline) args.push('--inline');
+  log(`ingest ${s.adapter} ${s.path}`);
+  records.push(stage(`ingest ${s.adapter}`, 'rtz-ingest', args, { capture: true }));
+}
+if (!records.length) die('rtz-build: config has no sources');
+fs.writeFileSync(path.join(out, 'records.jsonl'), records.join(''));
+
+let engineFile = [];
+if (config.engine) {
+  fs.writeFileSync(path.join(out, 'engine.json'), JSON.stringify(config.engine, null, 1));
+  engineFile = ['--config', path.join(out, 'engine.json')];
+}
+let baseRecords = path.join(out, 'records.jsonl');
+if (config.discover || values.discover) {
+  log('discover');
+  baseRecords = path.join(out, 'records.discovered.jsonl');
+  stage('discover', 'rtz-discover', [path.join(out, 'records.jsonl'), '--all', '-o', baseRecords, ...engineFile]);
+}
+const stoneArgs = [baseRecords, '-o', path.join(out, 'stone.json'), ...engineFile];
+if (config.overrides && fs.existsSync(resolve(config.overrides))) stoneArgs.push('--overrides', resolve(config.overrides));
+const ledgerPath = config.ledger === false ? null : config.ledger ? resolve(config.ledger) : path.join(out, 'ledger.json');
+if (ledgerPath) stoneArgs.push('--ledger', ledgerPath);
+if (config.noSeed) stoneArgs.push('--no-seed');
+for (const f of config.seeds ?? []) stoneArgs.push('--seed', resolve(f));
+log('stone');
+stage('stone', 'rtz-stone', stoneArgs);
+
+let finalRecords = baseRecords;
+if (config.emerge !== false && !values['no-emerge']) {
+  log('emerge');
+  stage('emerge', 'rtz-emerge', [path.join(out, 'stone.json'), baseRecords, '--all', '-o', path.join(out, 'records.all.jsonl'), ...engineFile]);
+  finalRecords = path.join(out, 'records.all.jsonl');
+}
+log('universe');
+stage('universe', 'rtz-universe', [path.join(out, 'stone.json'), finalRecords, '-o', path.join(out, 'universe.json')]);
+if (!values['no-view']) {
+  log('view');
+  stage('view', 'rtz-view', [path.join(out, 'universe.json'), '-o', path.join(out, 'view.html')]);
+}
+const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
+if (stone.ledger) manifest.ledger = stone.ledger;
+fs.writeFileSync(path.join(out, 'build.json'), JSON.stringify(manifest, null, 1) + '\n');
+log(`done: ${stone.stats.tags} tags -> ${stone.stats.concepts} concepts; review queue: ${stone.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').length}; open ${path.join(out, 'view.html')}`);

@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rosetta Tagz</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0e14; --panel: #121722; --panel2: #171d2b; --line: #263046; --text: #dfe5f1; --dim: #8e9ab3; --faint: #5d6a85;
+    --accent: #ffd166; --good: #5fd3a6; --warn: #ff9f6b;
+    --r-broader: #ff9f43; --r-related: #54a0ff; --r-adjacent: #a29bfe; --r-near: #ff6b81; --r-synergy: #1dd1a1; --r-opposes: #ee5253;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); overflow: hidden; }
+  #app { display: grid; grid-template-columns: 300px 1fr 360px; height: 100%; }
+  aside { background: var(--panel); overflow-y: auto; padding: 14px 14px 40px; }
+  #left { border-right: 1px solid var(--line); }
+  #right { border-left: 1px solid var(--line); }
+  #stage { position: relative; min-width: 0; }
+  #graph { position: absolute; inset: 0; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .lbl { position: absolute; transform: translate(-50%, -135%); white-space: nowrap; font-size: 12px; text-shadow: 0 0 4px #000, 0 0 2px #000; will-change: transform; }
+  .lbl.concept { color: #fff4cf; font-weight: 600; }
+  .lbl.term { color: #cdd6ea; font-size: 11px; }
+  .lbl.item { color: #aebad2; font-size: 10.5px; font-weight: 400; }
+  .lbl.sel { color: #fff; outline: 1px solid var(--accent); background: rgba(0,0,0,.55); padding: 0 4px; border-radius: 3px; }
+  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .02em; }
+  h1 small { color: var(--dim); font-weight: 400; margin-left: 6px; }
+  h2 { font-size: 19px; margin: 0 0 4px; line-height: 1.2; }
+  h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); margin: 18px 0 8px; font-weight: 600; }
+  p.hint { color: var(--dim); margin: 6px 0 0; font-size: 12px; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 12px 0 4px; }
+  button, select, input[type=search] { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--faint); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tabs button { padding: 7px 4px; font-size: 12px; }
+  .tabs button[aria-pressed=true] { background: #25304a; border-color: var(--accent); color: #fff; }
+  input[type=search] { width: 100%; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .row label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row input[type=range] { flex: 0 0 96px; accent-color: var(--accent); }
+  .row output { flex: 0 0 34px; text-align: right; color: var(--dim); font-family: var(--mono); font-size: 11px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; display: inline-block; }
+  .swatch { width: 14px; height: 3px; border-radius: 2px; flex: 0 0 14px; display: inline-block; }
+  .chip { display: inline-block; padding: 1px 7px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); margin: 2px 3px 2px 0; font-size: 12px; cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.em { border-style: dashed; color: #8fd4ee; }
+  .chip.plain { cursor: default; }
+  .badge { font-size: 10.5px; padding: 1px 7px; border-radius: 9px; background: #2a3550; color: #b7c4e6; margin-right: 5px; }
+  .badge.gold { background: #4a3d12; color: var(--accent); }
+  .muted { color: var(--dim); }
+  .bar { height: 6px; background: #1d2536; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #8a6d1d, var(--accent)); }
+  .variant { padding: 8px 0; border-top: 1px solid var(--line); }
+  .variant:first-child { border-top: 0; }
+  .variant .top { display: flex; justify-content: space-between; gap: 8px; }
+  .variant .parts { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 3px; }
+  .win { color: var(--accent); }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { padding: 5px 0; border-top: 1px solid var(--line); cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  ul.list li:first-child { border-top: 0; }
+  ul.list li:hover .t { color: #fff; }
+  .rel { font-size: 10.5px; padding: 0 6px; border-radius: 3px; color: #0b0e14; font-weight: 600; flex: 0 0 auto; }
+  .w { margin-left: auto; color: var(--faint); font-family: var(--mono); font-size: 11px; }
+  .bar-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; z-index: 5; flex-wrap: wrap; }
+  .bar-top > * { pointer-events: auto; }
+  .pill { background: rgba(18,23,34,.88); border: 1px solid var(--line); border-radius: 16px; padding: 4px 12px; font-size: 12px; backdrop-filter: blur(4px); }
+  .results { position: absolute; z-index: 20; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; width: 272px; max-height: 260px; overflow: auto; }
+  .results div { padding: 6px 9px; cursor: pointer; }
+  .results div:hover, .results div.on { background: #25304a; }
+  textarea { width: 100%; height: 130px; background: #0d1119; color: #b9c4dd; border: 1px solid var(--line); border-radius: 6px; font: 11px/1.4 var(--mono); padding: 8px; }
+  details summary { cursor: pointer; color: var(--dim); }
+  #empty { position: absolute; inset: 0; display: none; place-items: center; color: var(--dim); text-align: center; }
+  .help { border: 1px solid var(--line); background: var(--panel2); border-radius: 8px; padding: 9px 11px; margin-top: 10px; font-size: 12px; color: var(--dim); }
+  .help b { color: var(--text); }
+  @media (max-width: 1000px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    aside { position: absolute; z-index: 30; top: 0; bottom: 0; width: min(88vw, 340px); transition: transform .2s; }
+    #left { left: 0; transform: translateX(-102%); } #left.open { transform: none; }
+    #right { right: 0; transform: translateX(102%); } #right.open { transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { aside { transition: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="left" aria-label="Controls">
+    <h1>Rosetta Tagz <small id="meta"></small></h1>
+    <div class="tabs" role="group" aria-label="Projection">
+      <button data-mode="raw" aria-pressed="false" title="Every tag as each tag-system wrote it">Raw</button>
+      <button data-mode="hyper" aria-pressed="true" title="Items + one node per concept (tags are vertices)">Hyper</button>
+      <button data-mode="dyadic" aria-pressed="false" title="Items only; tags become the label on the edge between items">Dyadic</button>
+      <button data-mode="concepts" aria-pressed="false" title="Concepts only, joined by relations">Concepts</button>
+    </div>
+    <div class="help" id="modehelp"></div>
+
+    <h3>Find a tag</h3>
+    <div style="position:relative">
+      <input type="search" id="q" placeholder="any spelling: AI, a.i., artificial intelligence…" autocomplete="off" aria-label="Find a tag">
+      <div class="results" id="results" hidden></div>
+    </div>
+
+    <h3>Tag-systems</h3>
+    <div id="sources"></div>
+
+    <h3>Why a name wins <button id="resetCanon" style="float:right;padding:1px 7px;font-size:11px">reset</button></h3>
+    <div id="weights"></div>
+    <div class="row"><label for="prefer">Prefer</label>
+      <select id="prefer"><option value="expanded">expanded names</option><option value="short">short names</option><option value="neutral">neither</option></select></div>
+    <p class="hint" id="renamed"></p>
+    <details style="margin-top:8px"><summary>overrides.json fragment for these settings</summary>
+      <textarea id="frag" readonly aria-label="overrides fragment"></textarea>
+      <button id="copyFrag" style="margin-top:6px">copy</button>
+    </details>
+
+    <h3>Show</h3>
+    <div id="relchecks"></div>
+    <div class="row"><input type="checkbox" id="emergent" checked><label for="emergent">tags earned or discovered from text (dashed)</label></div>
+    <h3>Legend</h3>
+    <div id="legend" class="muted"></div>
+  </aside>
+
+  <main id="stage">
+    <div id="graph"></div>
+    <div id="labels" aria-hidden="true"></div>
+    <div class="bar-top">
+      <button id="toggleLeft" class="pill" style="display:none">controls</button>
+      <span class="pill" id="focusPill" hidden></span>
+      <span class="pill muted" id="countPill"></span>
+      <button id="toggleRight" class="pill" style="display:none; margin-left:auto">details</button>
+    </div>
+    <div id="empty"><div>Nothing to show with these filters.</div></div>
+  </main>
+
+  <aside id="right" aria-label="Details"><div id="panel"></div></aside>
+</div>
+
+<script>/*__LIB__*/</script>
+<script>/*__CANON__*/</script>
+<script>/*__GRAPH__*/</script>
+<script>
+const U = /*__UNIVERSE__*/;
+(function () {
+'use strict';
+const REL_COLOR = { broader: '#ff9f43', related: '#54a0ff', adjacent: '#a29bfe', near: '#ff6b81', synergy: '#1dd1a1', opposes: '#ee5253', closeMatch: '#f368e0', broadMatch: '#e0a24a', relatedMatch: '#48b5c4', exactMatch: '#b8e994' };
+const REL_TEXT = {
+  broader: 'broader / narrower — appears wherever the other appears, not the reverse',
+  related: 'related — co-occur more than chance',
+  adjacent: 'adjacent — used on similar texts but never together (cross-vocabulary neighbour)',
+  near: 'near — probably the same, evidence short of a merge: review this',
+  synergy: 'synergy (human-authored)', opposes: 'opposes (human-authored)',
+  closeMatch: 'closeMatch — probably the same concept in two schemes, short of a merge: review this',
+  broadMatch: 'broadMatch — broader / narrower across two schemes',
+  relatedMatch: 'relatedMatch — co-occur more than chance AND are used on texts that read alike, across two schemes',
+  exactMatch: 'exactMatch — the same concept in two schemes (human-authored or vocabulary mapping)',
+};
+const MODE_HELP = {
+  raw: '<b>Raw.</b> One node per tag as each tag-system wrote it. The same idea appears several times: this is the duplication the stone removes.',
+  hyper: '<b>Hyper.</b> Tags are vertices. One node per <i>concept</i>, joined to the items that carry it. Gold nodes are concepts that merged several spellings.',
+  dyadic: '<b>Dyadic.</b> Tags are not nodes any more: each is the <i>label on an edge</i> between two items that share it. Hover an edge to read its tags.',
+  concepts: '<b>Concepts.</b> Only the vocabulary: concepts joined by their relations. Click one, then <i>Explore</i>, to pull its neighbourhood up.',
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fold = (s) => String(s).normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+const concept = new Map(U.concepts.map((c) => [c.id, c]));
+const itemByKey = new Map(U.items.map((i) => [i.key, i]));
+const sourceColor = Object.fromEntries(U.sources.map((s) => [s.name, s.color]));
+const state = {
+  mode: 'hyper', focus: null, hops: 2, sel: null,
+  hidden: new Set(), relTypes: new Set(RELATION_TYPES), emergent: true,
+  canon: JSON.parse(JSON.stringify(U.canon)), trust: { ...U.sourceWeights }, labels: new Map(),
+};
+const defaultCanon = JSON.parse(JSON.stringify(U.canon));
+const defaultTrust = { ...U.sourceWeights };
+
+// ---------- live canonical labels ----------------------------------------------------------
+function relabel() {
+  let changed = [];
+  for (const c of U.concepts) {
+    if (c.unmapped || c.pinned) { state.labels.set(c.id, c.canonical); continue; }
+    c.live = scoreVariants(rankingPool(c.variants), state.canon, state.trust); // the stone's pool: a discovered spelling never outranks a human's
+    const label = c.live[0].label;
+    state.labels.set(c.id, label);
+    if (label !== c.canonical) changed.push([c.canonical, label]);
+  }
+  $('renamed').innerHTML = changed.length
+    ? `<b>${changed.length}</b> canonical name${changed.length > 1 ? 's' : ''} differ from the stone: ` + changed.slice(0, 5).map(([a, b]) => `${esc(a)} → <b>${esc(b)}</b>`).join(', ') + (changed.length > 5 ? '…' : '')
+    : 'Same names as the stone.';
+  const frag = {};
+  if (JSON.stringify(state.canon) !== JSON.stringify(defaultCanon)) frag.canon = state.canon;
+  if (JSON.stringify(state.trust) !== JSON.stringify(defaultTrust)) frag.sourceWeights = state.trust;
+  $('frag').value = Object.keys(frag).length ? JSON.stringify(frag, null, 2) : '// unchanged — nothing to add to overrides.json';
+}
+
+// ---------- graph ------------------------------------------------------------------------------
+const el = $('graph');
+const G = ForceGraph3D({ controlType: 'orbit' })(el)
+  .backgroundColor('#0b0e14')
+  .showNavInfo(false)
+  .nodeOpacity(0.95)
+  .nodeResolution(14)
+  .nodeLabel((n) => tip(n))
+  .linkLabel((l) => (l.type === 'shared' ? esc(l.label) : l.relation ? esc(l.type) : ''))
+  .linkOpacity(0.7)
+  .linkDirectionalArrowLength((l) => (l.type === 'broader' ? 4 : 0))
+  .linkDirectionalArrowRelPos(1)
+  .onNodeClick((n) => select(n))
+  .onLinkClick((l) => { if (l.type === 'shared') select(l); })
+  .onBackgroundClick(() => select(null))
+  .cooldownTicks(260);
+G.d3Force('charge').strength((n) => (n.type === 'item' ? -34 : n.type === 'term' ? -50 : -110));
+G.d3Force('link').distance((l) => (l.relation ? 95 : l.type === 'shared' ? 62 : 48)).strength((l) => (l.relation ? 0.3 : l.type === 'shared' ? Math.min(0.9, 0.15 + l.weight * 0.1) : 0.7));
+// weak pull toward the origin so untagged / isolated items stay in view instead of drifting away
+G.d3Force('gravity', (() => {
+  let nodes = [];
+  const f = (alpha) => { for (const n of nodes) { n.vx -= n.x * 0.05 * alpha; n.vy -= n.y * 0.05 * alpha; n.vz -= n.z * 0.05 * alpha; } };
+  f.initialize = (ns) => { nodes = ns; };
+  return f;
+})());
+G.onEngineStop(() => { if (fitPending) { fitPending = false; G.zoomToFit(500, 70); } });
+let fitPending = true;
+
+const neighborIds = () => {
+  const s = new Set();
+  if (!state.sel) return s;
+  const id = state.sel.id;
+  s.add(id);
+  const { links } = G.graphData();
+  if (state.sel.kind === 'link') { s.add(sid(state.sel.link.source)); s.add(sid(state.sel.link.target)); }
+  else for (const l of links) { const a = sid(l.source), b = sid(l.target); if (a === id) s.add(b); if (b === id) s.add(a); }
+  return s;
+};
+const sid = (x) => (typeof x === 'object' ? x.id : x);
+let near = new Set();
+
+const discoveredOnly = (n) => !!(concept.get(n.concept) || {}).discovered;
+function nodeBase(n) {
+  if (n.type === 'concept') return n.unmapped ? '#8d97ab' : n.merged ? '#ffd166' : discoveredOnly(n) ? '#b9a0d6' : '#efe9d6';
+  return sourceColor[n.source] || '#9aa';
+}
+G.nodeColor((n) => (state.sel && !near.has(n.id) ? 'rgba(80,92,118,0.28)' : nodeBase(n)));
+G.nodeVal((n) => n.val);
+G.linkColor((l) => {
+  const hot = state.sel && (near.has(sid(l.source)) && near.has(sid(l.target)));
+  if (state.sel && !hot) return 'rgba(80,92,118,0.12)';
+  if (l.relation) return REL_COLOR[l.type] || '#888';
+  if (l.type === 'shared') return hot ? 'rgba(255,209,102,.8)' : 'rgba(170,182,206,.45)';
+  return l.origin && l.origin !== 'explicit' ? 'rgba(110,200,240,.5)' : hot ? 'rgba(255,255,255,.6)' : 'rgba(165,176,200,.32)';
+});
+G.linkWidth((l) => (l.relation ? 0.8 + l.weight * 2 : l.type === 'shared' ? Math.min(3.2, 0.4 + l.weight * 0.35) : 0.25));
+
+function tip(n) {
+  if (n.type === 'concept') {
+    const c = concept.get(n.concept);
+    return `<div style="font:12px system-ui"><b>${esc(n.label)}</b><br>${c.variants.length} spelling${c.variants.length > 1 ? 's' : ''} · ${c.n + c.nEmergent} items<br><span style="opacity:.7">${esc(c.variants.map((v) => v.label).join(' · '))}</span></div>`;
+  }
+  if (n.type === 'term') return `<div style="font:12px system-ui"><b>${esc(n.label)}</b><br>as written in ${esc(n.source)} · ${n.count}×</div>`;
+  return `<div style="font:12px system-ui;max-width:280px"><b>${esc(n.label)}</b><br><span style="opacity:.7">${esc([n.source, ...(n.alsoIn || [])].join(' + '))}</span></div>`;
+}
+
+// ---------- (re)projection --------------------------------------------------------------------
+function project(resetCamera = true) {
+  const g = projectGraph(U, state.mode, {
+    labels: state.labels, focus: state.focus, hops: state.hops, relations: true,
+    relationTypes: state.relTypes, emergent: state.emergent, hiddenSources: state.hidden,
+  });
+  $('empty').style.display = g.nodes.length ? 'none' : 'grid';
+  G.graphData({ nodes: g.nodes, links: g.links });
+  $('countPill').textContent = `${g.nodes.length} nodes · ${g.links.length} edges`;
+  const fp = $('focusPill');
+  if (state.focus) {
+    fp.hidden = false;
+    fp.innerHTML = `exploring <b>${esc(state.labels.get(state.focus) || state.focus)}</b> · ${state.hops} hops <button id="unfocus" style="margin-left:6px;padding:0 8px">clear ✕</button>`;
+    $('unfocus').onclick = () => { state.focus = null; project(); renderPanel(); };
+  } else fp.hidden = true;
+  rebuildLabelPool(g.nodes);
+  near = neighborIds();
+  fitPending = resetCamera;
+  if (resetCamera) setTimeout(() => G.zoomToFit(600, 70), 900);
+}
+
+// ---------- labels overlay (DOM so text stays crisp) ------------------------------------------
+let pool = new Map();
+function rebuildLabelPool(nodes) {
+  $('labels').innerHTML = '';
+  pool = new Map();
+  const want = nodes.filter((n) => n.type !== 'item' || state.mode === 'dyadic');
+  want.sort((a, b) => b.val - a.val);
+  for (const n of want.slice(0, 220)) {
+    const d = document.createElement('div');
+    d.className = `lbl ${n.type}`;
+    d.textContent = n.label.length > 34 ? n.label.slice(0, 33) + '…' : n.label;
+    $('labels').appendChild(d);
+    pool.set(n.id, { n, d });
+  }
+}
+// Labels are placed greedily by priority and skipped when they would overlap one already placed,
+// so the most important names stay readable at any zoom instead of piling up.
+function tickLabels() {
+  const cam = G.camera();
+  const e = cam.matrixWorldInverse.elements;
+  const cp = cam.position;
+  const stage = $('stage').getBoundingClientRect();
+  const cands = [];
+  for (const rec of pool.values()) {
+    const { n, d } = rec;
+    d.style.display = 'none';
+    if (n.x === undefined) continue;
+    if (e[2] * n.x + e[6] * n.y + e[10] * n.z + e[14] >= -1) continue;
+    const p = G.graph2ScreenCoords(n.x, n.y, n.z);
+    if (p.x < -40 || p.y < -20 || p.x > stage.width + 40 || p.y > stage.height + 20) continue;
+    const isSel = !!(state.sel && state.sel.id === n.id);
+    const dim = !!(state.sel && !near.has(n.id));
+    const dist = Math.hypot(n.x - cp.x, n.y - cp.y, n.z - cp.z);
+    const pri = (isSel ? 1e9 : 0) + (near.has(n.id) && state.sel ? 1e6 : 0) + (n.merged ? 5000 : 0) + n.val * 10 - dist * 0.01;
+    cands.push({ rec, p, isSel, dim, dist, pri });
+  }
+  cands.sort((a, b) => b.pri - a.pri);
+  const placed = [];
+  for (const c of cands) {
+    const { n, d } = c.rec;
+    if (n.type === 'concept') {
+      const t = state.labels.get(n.concept) || n.label;
+      if (c.rec.text !== t) { d.textContent = t.length > 34 ? t.slice(0, 33) + '…' : t; c.rec.text = t; }
+    }
+    const w = d.textContent.length * (n.type === 'concept' ? 7.2 : 6.2) + 8;
+    const x0 = c.p.x - w / 2, y0 = c.p.y - 26, x1 = x0 + w, y1 = y0 + 16;
+    if (!c.isSel && placed.some((b) => x0 < b.x1 && x1 > b.x0 && y0 < b.y1 && y1 > b.y0)) continue;
+    placed.push({ x0, y0, x1, y1 });
+    d.style.display = 'block';
+    d.style.transform = `translate(${c.p.x.toFixed(1)}px, ${c.p.y.toFixed(1)}px) translate(-50%, -135%)`;
+    d.style.opacity = c.dim ? 0.2 : Math.max(0.35, Math.min(1, 1.35 - c.dist / 900)).toFixed(2);
+    d.classList.toggle('sel', c.isSel);
+  }
+  requestAnimationFrame(tickLabels);
+}
+
+// ---------- selection ---------------------------------------------------------------------------
+function select(target) {
+  if (!target) state.sel = null;
+  else if (target.type === 'concept') state.sel = { kind: 'concept', id: target.id, cid: target.concept };
+  else if (target.type === 'term') state.sel = { kind: 'concept', id: target.id, cid: target.concept };
+  else if (target.type === 'item') state.sel = { kind: 'item', id: target.id, key: target.itemKey };
+  else if (target.type === 'shared') state.sel = { kind: 'link', id: null, link: target };
+  near = neighborIds();
+  G.nodeColor(G.nodeColor()); G.linkColor(G.linkColor()); G.linkWidth(G.linkWidth());
+  renderPanel();
+  if (target && target.x !== undefined) {
+    const d = 230, r = 1 + d / Math.max(1, Math.hypot(target.x, target.y, target.z));
+    G.cameraPosition({ x: target.x * r, y: target.y * r, z: target.z * r }, target, 700);
+  }
+  $('right').classList.toggle('open', !!state.sel);
+}
+function selectConcept(cid) {
+  const node = G.graphData().nodes.find((n) => n.concept === cid && n.type === 'concept') || G.graphData().nodes.find((n) => n.concept === cid);
+  if (node) return select(node);
+  state.sel = { kind: 'concept', id: `c:${cid}`, cid };
+  near = neighborIds(); renderPanel();
+}
+
+// ---------- right panel ---------------------------------------------------------------------------
+const lab = (cid) => state.labels.get(cid) || concept.get(cid)?.canonical || cid;
+function chip(cid, extra = '', cls = '') { return `<span class="chip ${cls}" data-c="${esc(cid)}" ${extra}>${esc(lab(cid))}</span>`; }
+
+function renderPanel() {
+  const p = $('panel');
+  const s = state.sel;
+  if (!s) {
+    p.innerHTML = `<h2>Rosetta stone</h2><p class="muted">${U.stats.tags} tags from ${U.sources.length} tag-systems folded into <b>${U.stats.concepts}</b> concepts (${U.stats.merged} of them merged several spellings).${U.stats.emergentTags ? ` ${U.stats.emergentTags} tags were earned from item text.` : ''}</p>
+      <p class="muted">Click a node to see why it has the name it has, what it is called in each tag-system, and how it relates to everything else. Then <b>Explore</b> to pull its neighbourhood up.</p>
+      <h3>Biggest merges</h3>${U.concepts.filter((c) => c.variants.length > 1).sort((a, b) => b.variants.length - a.variants.length || b.items - a.items).slice(0, 8).map((c) => `<div class="chip" data-c="${esc(c.id)}">${esc(lab(c.id))}</div> <span class="muted">← ${esc(c.variants.map((v) => v.label).join(', '))}</span><br>`).join('')}
+      <h3>Review queue</h3>${U.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').sort((a, b) => b.weight - a.weight).slice(0, 6).map((r) => `<div>${chip(r.a)} ~ ${chip(r.b)} <span class="w">${Math.round(r.weight * 100)}%</span></div>`).join('') || '<span class="muted">nothing to review</span>'}`;
+  } else if (s.kind === 'concept') p.innerHTML = conceptPanel(concept.get(s.cid));
+  else if (s.kind === 'item') p.innerHTML = itemPanel(itemByKey.get(s.key));
+  else p.innerHTML = linkPanel(s.link);
+  p.querySelectorAll('[data-c]').forEach((e) => (e.onclick = () => selectConcept(e.dataset.c)));
+  p.querySelectorAll('[data-i]').forEach((e) => (e.onclick = () => { const n = G.graphData().nodes.find((x) => x.itemKey === e.dataset.i); if (n) select(n); else { state.sel = { kind: 'item', id: null, key: e.dataset.i }; renderPanel(); } }));
+  const ex = p.querySelector('#explore'); if (ex) ex.onclick = () => { state.focus = s.cid; project(); };
+}
+
+function conceptPanel(c) {
+  const live = c.live || scoreVariants(rankingPool(c.variants), state.canon, state.trust);
+  const winner = c.pinned ? c.canonical : live[0].label;
+  const maxScore = Math.max(...live.map((r) => r.score), 0.001);
+  const variants = c.variants.map((v) => ({ v, r: live.find((x) => x.norm === v.norm) })).filter(({ r }) => r);
+  const outside = c.variants.filter((v) => !live.some((x) => x.norm === v.norm)); // only discovery wrote these: in the concept, never in the running
+  const rels = U.relations.filter((r) => r.a === c.id || r.b === c.id).sort((a, b) => b.weight - a.weight);
+  const items = U.items.filter((i) => i.tags.some((t) => t.c === c.id));
+  const bySrc = Object.entries(c.sources);
+  return `<h2>${esc(winner)}</h2>
+    <div class="muted">${c.variants.length > 1 ? `<span class="badge gold">${c.variants.length} spellings merged</span>` : ''}${c.pinned ? '<span class="badge">pinned by you</span>' : ''}${c.locked ? '<span class="badge">locked merge</span>' : ''}${c.unmapped ? '<span class="badge">not in stone</span>' : ''}${c.discovered ? '<span class="badge" title="no human wrote this tag; it was proposed from recurring phrases">discovered</span>' : ''}${c.n} tagged · ${c.nEmergent} from text</div>
+    <p style="margin:8px 0 0">${bySrc.map(([s, n]) => `<span class="chip plain"><span class="dot" style="background:${sourceColor[s]}"></span> ${esc(s)} ×${n}</span>`).join('')}</p>
+    <p style="margin:10px 0 0"><button id="explore"${state.focus === c.id ? ' disabled' : ''}>Explore this tag ⟶ ${state.hops} hops</button></p>
+    <h3>Why this name</h3>
+    ${c.variants.length === 1 && !c.pinned ? '<p class="muted">Only one spelling exists, so there is nothing to choose.</p>' : variants.sort((a, b) => b.r.score - a.r.score).map(({ v, r }) => `<div class="variant"><div class="top"><span class="${v.label === winner ? 'win' : ''}">${v.label === winner ? '★ ' : ''}${esc(v.label)}</span><span class="muted">${r.score.toFixed(2)}</span></div><div class="bar"><i style="width:${(r.score / maxScore) * 100}%"></i></div><div class="parts">freq ${r.parts.freq.toFixed(2)} · cover ${r.parts.cover.toFixed(2)} · trust ${r.parts.trust.toFixed(2)} · quality ${r.parts.quality.toFixed(2)}</div></div>`).join('')}
+    ${outside.length ? `<p class="muted">${outside.map((v) => esc(v.label)).join(', ')}: proposed by discovery only, so not ranked against a spelling a human wrote.</p>` : ''}
+    <h3>What each tag-system calls it</h3>
+    ${bySrc.map(([s]) => `<div style="margin:5px 0"><span class="dot" style="background:${sourceColor[s]}"></span> <b>${esc(s)}</b> <span class="muted">writes it as</span> ${variants.flatMap(({ v }) => Object.entries((v.formsBySource || {})[s] || {})).sort((a, b) => b[1] - a[1]).map(([f, n]) => `<span class="chip plain">${esc(f)}${n > 1 ? ` <span class="muted">×${n}</span>` : ''}</span>`).join('')}</div>`).join('') || '<span class="muted">—</span>'}
+    ${rels.length ? `<h3>Relations</h3><ul class="list">${rels.map((r) => { const other = r.a === c.id ? r.b : r.a; const dir = r.type === 'broader' ? (r.a === c.id ? 'broader than' : 'narrower than') : r.type; return `<li data-c="${esc(other)}" title="${esc(REL_TEXT[r.type] || '')}"><span class="rel" style="background:${REL_COLOR[r.type] || '#888'}">${esc(dir)}</span><span class="t">${esc(lab(other))}</span><span class="w">${r.locked ? '🔒 ' : ''}${r.weight.toFixed(2)}</span></li>`; }).join('')}</ul>` : ''}
+    <h3>Items (${items.length})</h3><ul class="list">${items.slice(0, 60).map((i) => { const t = i.tags.find((x) => x.c === c.id); return `<li data-i="${esc(i.key)}" title="${esc([i.source, ...(i.alsoIn || [])].join(' + '))}"><span class="dot" style="background:${sourceColor[i.source]};margin-top:4px"></span><span class="t">${esc(i.title)}</span>${t.origin !== 'explicit' ? '<span class="w" title="' + esc(t.why || '') + '">' + (t.origin === 'discovered' ? 'found' : 'text') + '</span>' : ''}</li>`; }).join('')}</ul>`;
+}
+
+function itemPanel(it) {
+  const systems = [it.source, ...(it.alsoIn || [])];
+  const via = (t) => (t.raw || []).map((r) => `${r.l} (${r.s})`).join(', ');
+  return `<h2>${esc(it.title)}</h2>
+    <div>${systems.map((s) => `<span class="chip plain"><span class="dot" style="background:${sourceColor[s]}"></span> ${esc(s)}</span>`).join('')}${it.kind ? `<span class="badge">${esc(it.kind)}</span>` : ''}</div>
+    ${systems.length > 1 ? '<p class="hint">the same item in several tag-systems: its tags below are all of their vocabularies together</p>' : ''}
+    ${it.excerpt ? `<p class="muted">${esc(it.excerpt)}${it.excerpt.length >= 280 ? '…' : ''}</p>` : ''}
+    ${it.url ? `<p class="muted" style="word-break:break-all">${esc(it.url)}</p>` : ''}
+    <h3>Tags</h3>
+    ${it.tags.length ? it.tags.map((t) => t.origin === 'explicit' ? chip(t.c, `title="written as: ${esc(via(t))}"`) : chip(t.c, `title="${esc(t.why || 'earned from text')}"`, 'em')).join('') : '<span class="muted">no tags, and nothing in the text matches a known concept</span>'}
+    ${it.tags.some((t) => t.origin !== 'explicit') ? '<p class="hint">dashed = earned from the text, not written by anyone; hover for the reason</p>' : ''}`;
+}
+
+function linkPanel(l) {
+  const a = itemByKey.get(sid(l.source).slice(2)), b = itemByKey.get(sid(l.target).slice(2));
+  return `<h2>Shared by two items</h2>
+    <p><span data-i="${esc(a.key)}" class="chip">${esc(a.title)}</span><br><span data-i="${esc(b.key)}" class="chip">${esc(b.title)}</span></p>
+    <h3>The edge is these tags</h3>${l.tags.map((cid) => chip(cid)).join('')}
+    <p class="hint">In dyadic form the tags are not vertices: they are what the edge says.</p>`;
+}
+
+// ---------- left controls ----------------------------------------------------------------------------
+function buildControls() {
+  $('meta').textContent = U.generated ? U.generated.slice(0, 10) : '';
+  $('sources').innerHTML = U.sources.map((s) => `<div class="row"><input type="checkbox" id="s_${esc(s.name)}" data-s="${esc(s.name)}" checked aria-label="show ${esc(s.name)}"><span class="dot" style="background:${s.color}"></span><label for="s_${esc(s.name)}" title="${s.items} items, ${s.tagged} tagged">${esc(s.name)} <span class="muted">${s.tagged}/${s.items}</span></label><input type="range" min="0" max="2" step="0.1" value="${state.trust[s.name] ?? 1}" data-t="${esc(s.name)}" aria-label="trust in ${esc(s.name)}"><output>${(state.trust[s.name] ?? 1).toFixed(1)}</output></div>`).join('') + '<p class="hint">checkbox shows/hides · slider = how much to trust this system when choosing names</p>';
+  $('sources').onchange = (e) => {
+    if (e.target.dataset.s) { e.target.checked ? state.hidden.delete(e.target.dataset.s) : state.hidden.add(e.target.dataset.s); project(false); }
+  };
+  $('sources').oninput = (e) => {
+    const name = e.target.dataset.t; if (!name) return;
+    state.trust[name] = Number(e.target.value); e.target.nextElementSibling.textContent = Number(e.target.value).toFixed(1);
+    relabel(); G.nodeLabel(G.nodeLabel()); if (state.sel) renderPanel();
+  };
+  const W = [['freq', 'how often it is used'], ['cover', 'how many systems use it'], ['trust', 'trusted systems favour it'], ['quality', 'clean, preferred length']];
+  $('weights').innerHTML = W.map(([k, t]) => `<div class="row"><label for="w_${k}" title="${t}">${k} <span class="muted">${t}</span></label><input type="range" id="w_${k}" min="0" max="1" step="0.05" value="${state.canon.weights[k]}" data-w="${k}"><output>${state.canon.weights[k].toFixed(2)}</output></div>`).join('');
+  $('weights').oninput = (e) => { const k = e.target.dataset.w; if (!k) return; state.canon.weights[k] = Number(e.target.value); e.target.nextElementSibling.textContent = Number(e.target.value).toFixed(2); relabel(); if (state.sel) renderPanel(); };
+  $('prefer').value = state.canon.prefer || 'expanded';
+  $('prefer').onchange = () => { state.canon.prefer = $('prefer').value; relabel(); if (state.sel) renderPanel(); };
+  $('resetCanon').onclick = () => { state.canon = JSON.parse(JSON.stringify(defaultCanon)); state.trust = { ...defaultTrust }; buildControls(); relabel(); if (state.sel) renderPanel(); };
+  $('copyFrag').onclick = async () => { $('frag').select(); try { await navigator.clipboard.writeText($('frag').value); } catch { document.execCommand('copy'); } };
+
+  const present = new Set(U.relations.map((r) => r.type));
+  $('relchecks').innerHTML = RELATION_TYPES.filter((t) => present.has(t)).map((t) => `<div class="row"><input type="checkbox" id="r_${t}" data-r="${t}" checked><span class="swatch" style="background:${REL_COLOR[t]}"></span><label for="r_${t}" title="${esc(REL_TEXT[t])}">${t} <span class="muted">${U.relations.filter((r) => r.type === t).length}</span></label></div>`).join('');
+  $('relchecks').onchange = (e) => { const t = e.target.dataset.r; if (!t) return; e.target.checked ? state.relTypes.add(t) : state.relTypes.delete(t); project(false); };
+  $('emergent').onchange = (e) => { state.emergent = e.target.checked; project(false); };
+  $('legend').innerHTML = `<div><span class="dot" style="background:#ffd166"></span> concept that merged several spellings</div><div><span class="dot" style="background:#efe9d6"></span> concept with one spelling</div><div><span class="dot" style="background:#b9a0d6"></span> discovered from text only (no human wrote it)</div><div><span class="dot" style="background:#8d97ab"></span> tag the stone has not seen</div>${present.has('broader') ? '<div>arrow points broader → narrower</div>' : ''}<div><span class="swatch" style="background:#6ec8f0"></span> tag earned / discovered from text</div>`;
+}
+
+document.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => {
+  state.mode = b.dataset.mode;
+  document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  $('modehelp').innerHTML = MODE_HELP[state.mode];
+  state.sel = null; project(); renderPanel();
+}));
+
+// search: any spelling of any tag
+const searchIndex = U.concepts.flatMap((c) => c.variants.flatMap((v) => Object.keys(v.forms).concat(v.label).map((f) => ({ f, k: fold(f), cid: c.id }))));
+$('q').oninput = () => {
+  const q = fold($('q').value); const box = $('results');
+  if (!q) { box.hidden = true; return; }
+  const seen = new Set(); const hits = [];
+  for (const s of searchIndex) { if (s.k.includes(q) && !seen.has(s.cid)) { seen.add(s.cid); hits.push(s); if (hits.length >= 8) break; } }
+  box.innerHTML = hits.map((h) => `<div data-c="${esc(h.cid)}">${esc(lab(h.cid))}${fold(lab(h.cid)) !== h.k ? ` <span class="muted">← ${esc(h.f)}</span>` : ''}</div>`).join('') || '<div class="muted">no tag matches</div>';
+  box.hidden = false;
+  box.querySelectorAll('[data-c]').forEach((d) => (d.onclick = () => { box.hidden = true; $('q').value = ''; state.focus = null; if (state.mode === 'raw' || state.mode === 'dyadic') { state.focus = d.dataset.c; project(); } selectConcept(d.dataset.c); }));
+};
+$('q').onkeydown = (e) => { if (e.key === 'Enter') { const f = $('results').querySelector('[data-c]'); if (f) f.click(); } if (e.key === 'Escape') { $('results').hidden = true; } };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.activeElement !== $('q')) { if (state.sel) select(null); else if (state.focus) { state.focus = null; project(); } } });
+$('toggleLeft').onclick = () => $('left').classList.toggle('open');
+$('toggleRight').onclick = () => $('right').classList.toggle('open');
+if (matchMedia('(max-width:1000px)').matches) { $('toggleLeft').style.display = ''; $('toggleRight').style.display = ''; }
+
+function fit() { const r = $('stage').getBoundingClientRect(); G.width(r.width).height(r.height); }
+new ResizeObserver(fit).observe($('stage'));
+fit();
+
+$('modehelp').innerHTML = MODE_HELP[state.mode];
+buildControls();
+relabel();
+project();
+renderPanel();
+requestAnimationFrame(tickLabels);
+window.__rtz = { U, G, state, project, select, selectConcept };
+})();
+</script>
+</body>
+</html>

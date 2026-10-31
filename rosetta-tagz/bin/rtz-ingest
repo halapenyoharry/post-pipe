@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+import { cli, die, toJSONL } from '../lib/io.js';
+import { ADAPTERS, runAdapter } from '../lib/adapters/index.js';
+
+const usage = `rtz-ingest — native tag data -> JSONL records on stdout
+
+usage: rtz-ingest <adapter> <path> [--source NAME] [--field PATH] [--inline]
+       rtz-ingest --list
+
+  adapters:
+${Object.entries(ADAPTERS).map(([k, v]) => `    ${k.padEnd(12)} ${v.about}`).join('\n')}
+
+  --source NAME   tag-system name (default: taken from the data, else the folder/file name)
+  --field PATH    frontmatter adapter: which key holds the tags (default "tags"; dotted ok: idea.topology)
+  --inline        markdown adapter: also read #hashtags in the body
+
+Run it once per tag-system and concatenate:  (rtz-ingest … ; rtz-ingest … ) > records.jsonl`;
+
+const { values, positionals } = cli('rtz-ingest', usage, {
+  source: { type: 'string' },
+  field: { type: 'string' },
+  inline: { type: 'boolean' },
+  list: { type: 'boolean' },
+});
+
+if (values.list) {
+  for (const [k, v] of Object.entries(ADAPTERS)) console.log(`${k}\t${v.about}`);
+  process.exit(0);
+}
+const [adapter, target] = positionals;
+if (!adapter || !target) die(usage, 2);
+try {
+  process.stdout.write(toJSONL(runAdapter(adapter, target, { source: values.source, field: values.field, inline: values.inline })));
+} catch (e) {
+  die(`rtz-ingest: ${e.message}`);
+}

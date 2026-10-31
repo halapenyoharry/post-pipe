@@ -1,0 +1,13 @@
+{
+  "_about": "Every key rtz-override can write. Copy to overrides.json (next to your config) to use. Labels match by spelling-insensitive key: AI, ai and A.I. are one argument.",
+  "same": [["labor", "labour"]],
+  "notSame": [["ai", "agi"]],
+  "pin": { "ml": "Machine Learning" },
+  "relations": [
+    { "a": "ai", "b": "labor", "type": "synergy", "note": "automation reshapes care work" },
+    { "a": "prison", "b": "oversight", "type": "related" }
+  ],
+  "ignore": [],
+  "sourceWeights": { "Science": 0.5 },
+  "canon": { "prefer": "expanded" }
+}

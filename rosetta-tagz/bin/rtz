@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+// Dispatcher, git-style: `rtz stone …` runs `rtz-stone …`. Each subcommand is a separate program.
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const [sub, ...rest] = process.argv.slice(2);
+const programs = fs.readdirSync(here).filter((f) => f.startsWith('rtz-')).map((f) => f.slice(4)).sort();
+
+if (!sub || sub === '-h' || sub === '--help' || sub === 'help') {
+  process.stdout.write(`rtz — a Rosetta stone for tags
+
+usage: rtz <command> [args]      (each command is its own program: rtz-<command>)
+
+pipeline:
+  ingest     native tag data -> records.jsonl
+  pairs      records -> pair evidence (optional; stone computes it itself)
+  stone      records -> stone.json   (concepts, canonical labels, relations)
+  emerge     records + stone -> tags earned by text
+  universe   stone + records -> universe.json
+  graph      universe -> {nodes, links}   (raw | hyper | dyadic | concepts)
+  view       universe -> standalone 3D HTML viewer
+  build      the whole pipeline from one config file
+
+reading and editing:
+  lookup     concept card / review queue / merged list
+  translate  rewrite tag records through the stone
+  override   record a human decision in overrides.json
+  norm       add normalization keys to tag records
+
+available: ${programs.join(', ')}
+`);
+  process.exit(sub ? 0 : 2);
+}
+if (!programs.includes(sub)) {
+  process.stderr.write(`rtz: unknown command "${sub}". try: rtz help\n`);
+  process.exit(2);
+}
+const child = spawn(process.execPath, [path.join(here, `rtz-${sub}`), ...rest], { stdio: 'inherit' });
+child.on('exit', (code, signal) => process.exit(signal ? 1 : code ?? 0));

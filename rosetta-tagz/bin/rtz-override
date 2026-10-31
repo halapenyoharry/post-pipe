@@ -1,0 +1,69 @@
+#!/usr/bin/env node
+// Edits overrides.json, the only file in the system that holds human decisions.
+import fs from 'node:fs';
+import { cli, die, log } from '../lib/io.js';
+
+const usage = `rtz-override — record a human decision in overrides.json (never overwritten by the engine)
+
+usage: rtz-override same     <label> <label>…       these are the same concept
+       rtz-override notsame  <label> <label>        these must never merge
+       rtz-override pin      <label> <canonical>    the concept containing <label> is displayed as <canonical>
+       rtz-override relate   <label> <type> <label> [note]   type: broader|related|synergy|opposes|adjacent
+       rtz-override ignore   <label>…               drop this tag entirely
+       rtz-override trust    <tag-system> <0..2>    how much to trust a tag-system when picking canonical labels
+       rtz-override prefer   expanded|short|neutral
+       rtz-override show
+
+  --file FILE   default ./overrides.json
+
+After changing overrides, re-run rtz-stone (or rtz-build). Labels are matched by spelling-insensitive
+key, so "AI", "ai" and "A.I." are all the same argument.`;
+
+const { values, positionals } = cli('rtz-override', usage, { file: { type: 'string', default: 'overrides.json' } });
+const [verb, ...args] = positionals;
+if (!verb) die(usage, 2);
+
+const file = values.file;
+const data = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+const push = (key, value) => {
+  data[key] ??= [];
+  if (!data[key].some((x) => JSON.stringify(x) === JSON.stringify(value))) data[key].push(value);
+};
+
+switch (verb) {
+  case 'show':
+    process.stdout.write(JSON.stringify(data, null, 2) + '\n');
+    process.exit(0);
+  case 'same':
+    if (args.length < 2) die('same needs at least two labels');
+    push('same', args);
+    break;
+  case 'notsame':
+    if (args.length < 2) die('notsame needs at least two labels');
+    push('notSame', args);
+    break;
+  case 'pin':
+    if (args.length !== 2) die('pin <label> <canonical>');
+    (data.pin ??= {})[args[0]] = args[1];
+    break;
+  case 'relate':
+    if (args.length < 3) die('relate <label> <type> <label> [note]');
+    push('relations', { a: args[0], type: args[1], b: args[2], ...(args[3] ? { note: args[3] } : {}) });
+    break;
+  case 'ignore':
+    for (const a of args) push('ignore', a);
+    break;
+  case 'trust':
+    if (args.length !== 2 || Number.isNaN(Number(args[1]))) die('trust <tag-system> <number>');
+    (data.sourceWeights ??= {})[args[0]] = Number(args[1]);
+    break;
+  case 'prefer':
+    if (!['expanded', 'short', 'neutral'].includes(args[0])) die('prefer expanded|short|neutral');
+    (data.canon ??= {}).prefer = args[0];
+    break;
+  default:
+    die(`unknown verb "${verb}"\n\n${usage}`, 2);
+}
+
+fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+log(`rtz-override: wrote ${file}`);

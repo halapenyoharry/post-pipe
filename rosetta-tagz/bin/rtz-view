@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import { cli, die, readJSON, writeOut, log } from '../lib/io.js';
+
+const usage = `rtz-view — universe.json -> ONE standalone HTML file with an interactive 3D viewer
+
+usage: rtz-view <universe.json> [-o view.html]
+
+No server, no network: the 3D library, the scoring code and your data are all inside the file.
+Open it in a browser. Modes: raw | hyper | dyadic | concepts. Click a tag to see why it has its name
+and what each tag-system calls it; "Explore" pulls its neighbourhood up; the sliders re-run the
+canonical-name scoring live and print the overrides.json fragment that would keep your choice.`;
+
+const { values, positionals } = cli('rtz-view', usage, { o: { type: 'string', short: 'o' } });
+const [file] = positionals;
+if (!file) die(usage, 2);
+
+const root = new URL('..', import.meta.url).pathname;
+const read = (p) => fs.readFileSync(root + p, 'utf8');
+// canon.js and graph.js are import-free ES modules; as classic <script> text they only need `export ` removed.
+const plain = (src) => src.replace(/^export\s+/gm, '');
+// split/join, never String.replace: the library contains `$&`-style sequences.
+const inject = (html, token, text) => html.split(token).join(text);
+const safe = (s) => s.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
+
+try {
+  const universe = readJSON(file);
+  let html = read('viewer/viewer.html');
+  html = inject(html, '/*__LIB__*/', safe(read('vendor/3d-force-graph.min.js')));
+  html = inject(html, '/*__CANON__*/', plain(read('lib/canon.js')));
+  html = inject(html, '/*__GRAPH__*/', plain(read('lib/graph.js')));
+  html = inject(html, '/*__UNIVERSE__*/', safe(JSON.stringify(universe)));
+  writeOut(html, values.o);
+  if (values.o) log(`rtz-view: wrote ${values.o} (${(html.length / 1e6).toFixed(2)} MB)`);
+} catch (e) {
+  die(`rtz-view: ${e.message}`);
+}
