@@ -294,6 +294,25 @@ function checkContainerGuard(results, universe, containment = []) {
   return { ok: true };
 }
 
+// Each container tag resolved to the concept it landed in, at corpus time:
+// the concept whose canonical is the tag (the pins and the guard above make
+// every container tag a piece carries canonical), else the one with a
+// variant spelled so. { <tag>: <concept id> }; a container tag no concept
+// holds (no piece carries it) is left out and keeps the string path
+// (src/lib/containers.js).
+function resolveContainerConcepts(universe, containment = []) {
+  const out = {};
+  const concepts = Array.isArray(universe && universe.concepts) ? universe.concepts : [];
+  for (const c of containment || []) {
+    if (!c || typeof c.tag !== 'string' || !c.tag || out[c.tag]) continue;
+    const tag = c.tag;
+    const hit = concepts.find((k) => k && k.canonical === tag && typeof k.id === 'string')
+      || concepts.find((k) => k && typeof k.id === 'string' && Array.isArray(k.variants) && k.variants.some((v) => v && (v.label === tag || (v.forms && Object.prototype.hasOwnProperty.call(v.forms, tag)))));
+    if (hit) out[tag] = hit.id;
+  }
+  return out;
+}
+
 // The five SKOS mapping properties. A relation of one of these types is a
 // mapping whatever it points at: an external vocabulary's concept, or one of
 // rosetta-tagz's own in another scheme (a closeMatch or broadMatch across two
@@ -980,6 +999,10 @@ async function runRtagzPhase(results, options = {}) {
     const siteTitle = typeof options.siteTitle === 'string' ? options.siteTitle : '';
 
     const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, { siteTitle });
+    // The container tags as concept ids, for containment by concept
+    // (generate-index stamps each container with its concept).
+    const containerConcepts = resolveContainerConcepts(universe, options.containment || []);
+    if (Object.keys(containerConcepts).length) summary.containers = containerConcepts;
     // cacheDir is where rtz-build wrote its files, for whoever copies the
     // SKOS serialization beside the feed.
     return { ran: true, rtagz: summary, cacheDir };
@@ -1003,6 +1026,7 @@ module.exports = {
   buildConfig,
   buildRecords,
   checkContainerGuard,
+  resolveContainerConcepts,
   applyUniverse,
   runRtzBuild,
   runRtagzPhase,

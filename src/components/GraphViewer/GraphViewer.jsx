@@ -36,6 +36,7 @@ import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
 import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
 import { tagEdgeLabel } from '../../lib/provenance';
+import { containerHas } from '../../lib/containers';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 
 // The settings a link node's newTab rule is read from.
@@ -79,7 +80,7 @@ function feedToGraph(feed, config = {}) {
     let containerColor = null;
     const containersList = feed.containers || config.containment || [];
     for (const c of containersList) {
-      if (c.parent && c.tag && (item.tags || []).includes(c.tag)) {
+      if (c.parent && c.tag && containerHas(c, item)) {
         containerColor = c.badgeColor || c.color || c.stroke;
         break;
       }

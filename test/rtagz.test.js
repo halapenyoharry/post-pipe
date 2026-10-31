@@ -1063,6 +1063,10 @@ test('rtagz: real engine integration builds universe.json and merges concepts ac
     // Container tag act-1 stayed canonical on post-1
     const post1 = items.find((i) => i.id === 'https://example.test/post-1.html');
     assert.ok(post1.tags.includes('act-1'), 'pinned container tag act-1 preserved on item');
+    // ...and resolved to its concept at corpus time, the concept post-1's reference names
+    assert.ok(rtagz.containers && typeof rtagz.containers['act-1'] === 'string', 'the container tag is resolved to a concept id');
+    const actRef = post1._references.find((r) => r.type === 'tag' && r.value === 'act-1');
+    assert.strictEqual(actRef.concept, rtagz.containers['act-1']);
 
     // What holds for the engine as it is and as it is planned: every summary
     // concept has its id, the schemes list the site and every tag-system, every

@@ -16,6 +16,8 @@ function slugOf(item) {
   return item.url.split('/').pop().replace('.html', '');
 }
 
+const { containerOfTag } = require('../lib/containers');
+
 function buildEdges(items, options = {}) {
   const edges = [];
   const idBySlug = new Map();
@@ -28,8 +30,13 @@ function buildEdges(items, options = {}) {
 
   const containmentConfigs = options.containment || [];
   const containerByTag = new Map();
+  // A container whose tag the build resolved to a concept (rosetta-tagz on)
+  // also takes a piece whose tag reference names that concept, whatever
+  // label it shows (src/lib/containers.js).
+  const containerByConcept = new Map();
   for (const c of containmentConfigs) {
     if (c.tag) containerByTag.set(c.tag, c);
+    if (typeof c.concept === 'string' && c.concept && !containerByConcept.has(c.concept)) containerByConcept.set(c.concept, c);
   }
 
   // Hierarchical containment edges between containers (e.g. Epic contains Act 1)
@@ -66,9 +73,9 @@ function buildEdges(items, options = {}) {
     // Subject keywords. Check if any tags belong to containment hierarchy.
     const itemContainers = [];
     for (const tag of item.tags || []) {
-      const container = containerByTag.get(tag);
+      const container = containerOfTag(item, tag, containerByTag, containerByConcept);
       if (container) {
-        itemContainers.push(container);
+        if (!itemContainers.includes(container)) itemContainers.push(container);
       } else {
         // Regular tag -> normal undirected tag edge
         const edge = {

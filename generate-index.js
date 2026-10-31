@@ -888,9 +888,17 @@ async function main() {
   }
 
   const feed = buildFeed(items);
-  feed.edges = buildEdges(items, SETTINGS);
+  // A container whose tag rosetta-tagz resolved to a concept carries it as
+  // concept, so containment follows the concept, not only the tag string
+  // (src/lib/containers.js); without rosetta-tagz the settings go as they are.
+  const conceptOfContainer = (rtagz && rtagz.containers) || {};
+  const withConcept = (c) => (c && typeof c.tag === 'string' && conceptOfContainer[c.tag] ? { ...c, concept: conceptOfContainer[c.tag] } : c);
+  const EDGE_SETTINGS = rtagz && rtagz.containers && Array.isArray(SETTINGS.containment)
+    ? { ...SETTINGS, containment: SETTINGS.containment.map(withConcept) }
+    : SETTINGS;
+  feed.edges = buildEdges(items, EDGE_SETTINGS);
   // rosetta-tagz's SKOS relations as tag-to-tag edges, when it ran this build.
-  if (rtagz) feed.edges.push(...relationEdges(rtagz, items, SETTINGS));
+  if (rtagz) feed.edges.push(...relationEdges(rtagz, items, EDGE_SETTINGS));
   if (SETTINGS.containment) {
     // settings.containers.<id> carries per-container extras: a status line
     // such as "soon"; an anchor, where the container rests on the cover's
@@ -901,7 +909,7 @@ async function main() {
     const extras = SETTINGS.containers || {};
     feed.containers = SETTINGS.containment.map((c) => {
       const extra = extras[c.id] || extras[String(c.id).replace(/^container:/, '')] || {};
-      const out = { ...c };
+      const out = { ...withConcept(c) };
       const status = extra.status != null ? extra.status : c.status;
       if (status != null && status !== '') out.status = String(status); else delete out.status;
       const anchor = extra.anchor != null ? extra.anchor : c.anchor;
