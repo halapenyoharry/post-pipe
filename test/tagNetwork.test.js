@@ -308,3 +308,23 @@ test('a bubble\'s arrow points where its members\' directed relations agree, and
   assert.strictEqual(both.relatives[0].broader, null);
   assert.deepStrictEqual(relativeLabel(both.relatives[0]).split('\n'), ['jazz · broader · weight 0.5', 'blues · broader · weight 0.4'], 'the label still says each');
 });
+
+test('a tag that is not present (the panel\'s source coherence ratio hides it) draws no line, folded or not, and has none of its own', () => {
+  const relations = [
+    rel('x', 'jazz', 'related', 0.9),
+    rel('x', 'blues', 'related', 0.8),
+    rel('x', 'a', 'related', 0.7),
+    rel('x', 'b', 'related', 0.6),
+  ];
+  const bubbleOf = foldedInto({ 'tag:jazz': 'tag:music', 'tag:blues': 'tag:music' });
+  const gone = new Set(['tag:jazz', 'tag:a']);
+  const present = (id) => !gone.has(id);
+  const net = drawnRelativesOf(relations, 'tag:x', { bubbleOf, present, limit: Infinity });
+  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:music', 'tag:b']);
+  assert.deepStrictEqual(net.relatives[0].members.map((m) => m.id), ['tag:blues'], 'the bubble stands only for the folded tag that is present');
+  assert.strictEqual(net.relatives[0].weight, 0.8);
+  assert.strictEqual(net.total, 2);
+  const none = drawnRelativesOf(relations, 'tag:jazz', { bubbleOf, present });
+  assert.deepStrictEqual(none, { from: null, relatives: [], total: 0, more: 0 }, 'a selected tag not present has no lines');
+  assert.deepStrictEqual(drawnRelativesOf(relations, 'tag:x', { bubbleOf, present: () => true }), drawnRelativesOf(relations, 'tag:x', { bubbleOf }), 'everything present is as without it');
+});

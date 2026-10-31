@@ -174,3 +174,11 @@ test('title: the cards the tag is on, the colour, then the feeds and their count
   const hiddenB = tagListModel(feed, { hiddenSources: ['src:b'] }).find((r) => r.id === 'tag:quiet');
   assert.strictEqual(tagRowTitle(hiddenB), `3 cards · ${hiddenB.color} · Feed A 2`);
 });
+
+test('a tag the graph counts as 0 (hidden by the ratio setting) leaves the list, even with the slider at 1', () => {
+  const byTag = { 'tag:quiet': 3, 'tag:craft': 0 };
+  assert.deepStrictEqual(tagListModel(feed, { tagCounts: byTag }).map((r) => r.id),
+    ['tag:quiet', 'tag:alone', 'tag:Outdoors']);
+  assert.deepStrictEqual(tagListModel(feed, { tagCounts: byTag, minPieces: 1 }).map((r) => r.id),
+    ['tag:quiet', 'tag:alone', 'tag:Outdoors']);
+});

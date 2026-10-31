@@ -115,6 +115,11 @@ const byWeight = (a, b) => {
 //                 draws none and is not counted.
 //   visible(id):  whether a bubble is drawn; a relative whose bubble is not
 //                 is left out before any counting.
+//   present(id):  whether a tag itself shows, wherever it is drawn (the
+//                 panel's source coherence ratio can hide a tag folded into
+//                 a bubble that still shows); a relative that does not is
+//                 left out before it is folded or counted, and a tagId that
+//                 does not has no relatives. Without it every tag does.
 //   limit:        as relativesOf, counted in bubbles.
 // from is the bubble the lines start at: tagId's own, or the one it is
 // folded into. A relative in that same bubble draws nothing. Each relative
@@ -126,8 +131,9 @@ const byWeight = (a, b) => {
 // its relations every member's, strongest first, and broader the bubble the
 // members' directed relations point at, or null when none is directed or
 // they point both ways. The bubbles go strongest first, ties by id.
-function drawnRelativesOf(relations, tagId, { visible, limit = STRONGEST, bubbleOf, folded = 'bubble' } = {}) {
-  if (!tagId) return { from: null, relatives: [], total: 0, more: 0 };
+function drawnRelativesOf(relations, tagId, { visible, present, limit = STRONGEST, bubbleOf, folded = 'bubble' } = {}) {
+  const isPresent = (id) => typeof present !== 'function' || Boolean(present(id));
+  if (!tagId || !isPresent(tagId)) return { from: null, relatives: [], total: 0, more: 0 };
   const bubble = (id) => {
     const b = typeof bubbleOf === 'function' ? bubbleOf(id) : null;
     return typeof b === 'string' && b ? b : id;
@@ -138,6 +144,7 @@ function drawnRelativesOf(relations, tagId, { visible, limit = STRONGEST, bubble
   const bubbleEnd = (end, relBubble) => (end === null ? null : (end === tagId ? from : relBubble));
   const byBubble = new Map();
   for (const r of relativesOf(relations, tagId, { limit: Infinity }).relatives) {
+    if (!isPresent(r.id)) continue;
     const b = bubble(r.id);
     if (b === from) continue;
     if (b !== r.id && omit) continue;

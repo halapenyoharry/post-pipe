@@ -14,9 +14,10 @@ import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
 import { clampTightness } from '../../lib/tightness';
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
-import { PREF as MIN_PIECES_PREF, minPiecesSummary, pieceCountsFromFeed } from '../../lib/minPieces';
+import { PREF as MIN_PIECES_PREF, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
 import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
+import { PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText } from '../../lib/sourceRatio';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -228,6 +229,9 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const hasRelations = useMemo(() => (
     Boolean(feedData && Array.isArray(feedData.edges) && feedData.edges.some(isRelationEdge))
   ), [feedData]);
+  // The feed's source coherence ratios (lib/sourceRatio.js): whether any tag
+  // carries one, the slider's ends, and the build's own bar.
+  const sourceRatios = useMemo(() => ratioRange(feedData), [feedData]);
 
   // Reading choices are attributes on <html>, so the reader pane and every
   // open node read them from one place.
@@ -467,7 +471,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
         // count beside the slider keeps one width: dragging moves the thumb
         // and nothing else.
         <label className={styles.choiceRow} data-pref={MIN_PIECES_PREF} title="Tagz on fewer cards than this are hidden.">
-          <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-min-pieces-label>Hide tagz on fewer than {minPieces.min} cards</span>
+          <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-min-pieces-label>{minPiecesLabel(minPieces.min)}</span>
           <span className={styles.rangeRow}>
             <span className={styles.rangeEnd} aria-hidden="true">1</span>
             <input
@@ -477,7 +481,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
               max={minPieces.max}
               step="1"
               aria-label={`Hide tagz on fewer than this many cards, from 1 to ${minPieces.max}`}
-              aria-valuetext={`${minPieces.min} cards: ${minPieces.shown} of ${minPieces.total} tagz`}
+              aria-valuetext={`${minPieces.min} ${minPieces.min === 1 ? 'card' : 'cards'}: ${minPieces.shown} of ${minPieces.total} tagz`}
               value={minPieces.min}
               onChange={(e) => {
                 const v = Math.round(Number(e.target.value));
@@ -488,6 +492,40 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           </span>
           <output className={styles.rangeEnd} data-tag-count aria-live="polite">
             <span className={styles.steadyCount} style={{ minWidth: `${String(minPieces.total).length}ch` }}>{minPieces.shown}</span> of {minPieces.total} tagz
+          </output>
+        </label>
+      )}
+      {W === 'graph' && sourceRatios.has && (
+        // Source coherence ratio (preference minSourceRatio, null for the
+        // build's own bar; lib/sourceRatio.js): a discovered tag under it is
+        // hidden, as a build at that bar would not have made it. Laid out as
+        // the cards slider above it, its value beside it.
+        <label
+          className={styles.choiceRow}
+          data-pref={SOURCE_RATIO_PREF}
+          title={`Discovered tagz under this ratio are hidden; tagz a person wrote always show. The build's own bar is ${ratioText(sourceRatios.bar)}.`}
+        >
+          <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-source-ratio-label>Source coherence ratio</span>
+          <span className={styles.rangeRow}>
+            <span className={styles.rangeEnd} aria-hidden="true">{ratioText(sourceRatios.lo)}</span>
+            <input
+              type="range"
+              className={styles.range}
+              min={sourceRatios.lo}
+              max={sourceRatios.hi}
+              step={SOURCE_RATIO_STEP}
+              aria-label={`Source coherence ratio, from ${ratioText(sourceRatios.lo)} to ${ratioText(sourceRatios.hi)}`}
+              aria-valuetext={ratioText(clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios))}
+              value={clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios)}
+              onChange={(e) => {
+                const v = clampRatio(e.target.value, sourceRatios);
+                viewState.setPreference(SOURCE_RATIO_PREF, Math.abs(v - sourceRatios.bar) < 1e-9 ? null : v);
+              }}
+            />
+            <span className={styles.rangeEnd} aria-hidden="true">{ratioText(sourceRatios.hi)}</span>
+          </span>
+          <output className={styles.rangeEnd} data-source-ratio aria-live="polite">
+            {ratioText(clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios))}
           </output>
         </label>
       )}

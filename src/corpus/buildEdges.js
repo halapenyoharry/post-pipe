@@ -88,6 +88,9 @@ function buildEdges(items, options = {}) {
           if (ref.why !== undefined && ref.why !== null) edge.attrs.why = ref.why;
           if (ref.wasDerivedFrom !== undefined && ref.wasDerivedFrom !== null) edge.attrs.wasDerivedFrom = ref.wasDerivedFrom;
           if (ref.wasGeneratedBy !== undefined && ref.wasGeneratedBy !== null) edge.attrs.wasGeneratedBy = ref.wasGeneratedBy;
+          // The source coherence ratio the viewer filters discovered tags by
+          // (src/lib/sourceRatio.js), only where rosetta-tagz gave one.
+          if (typeof ref.sourceRatio === 'number' && Number.isFinite(ref.sourceRatio)) edge.attrs.sourceRatio = ref.sourceRatio;
         }
         edges.push(edge);
       }

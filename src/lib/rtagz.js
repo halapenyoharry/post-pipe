@@ -494,6 +494,13 @@ function buildSchemes(universe, systems, siteTitle) {
   return out;
 }
 
+// A sourceRatio as rosetta-tagz writes it (a number, three decimals), or
+// undefined for anything else, so a field is only ever written where the
+// universe has one.
+function ratioOf(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, options = {}) {
   const conceptById = new Map();
   for (const c of universe.concepts || []) {
@@ -587,6 +594,10 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
           prefLabel: skos.referencePrefLabel(concept),
           wasDerivedFrom: t.wasDerivedFrom !== undefined && t.wasDerivedFrom !== null ? t.wasDerivedFrom : undefined,
           wasGeneratedBy: t.wasGeneratedBy !== undefined && t.wasGeneratedBy !== null ? t.wasGeneratedBy : undefined,
+          // The source coherence ratio a viewer must be set at or below to
+          // show this tag (rosetta-tagz's "Trying another bar"), only when
+          // the universe gives one: a tag a human wrote never has it.
+          sourceRatio: ratioOf(t.sourceRatio),
         };
 
         if (origin === 'explicit') {
@@ -628,6 +639,7 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
         if (e.prefLabel) ref.prefLabel = { ...e.prefLabel };
         if (e.wasDerivedFrom !== undefined) ref.wasDerivedFrom = e.wasDerivedFrom;
         if (e.wasGeneratedBy !== undefined) ref.wasGeneratedBy = e.wasGeneratedBy;
+        if (e.sourceRatio !== undefined) ref.sourceRatio = e.sourceRatio;
         newTagRefs.push(ref);
       }
 
@@ -676,6 +688,10 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
       rank,
     };
     if (typeof c.id === 'string' && c.id) sc.id = c.id;
+    // The concept's source coherence ratio (the highest of its variants',
+    // when every variant has one), only where rosetta-tagz gave it.
+    const conceptRatio = ratioOf(c.sourceRatio);
+    if (conceptRatio !== undefined) sc.sourceRatio = conceptRatio;
     // SKOS, as rosetta-tagz wrote it, only where it did.
     if (Array.isArray(c.inScheme) && c.inScheme.length) {
       sc.inScheme = c.inScheme.filter((s) => typeof s === 'string' && s);

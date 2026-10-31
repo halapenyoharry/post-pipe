@@ -4,7 +4,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  PREF, clampMinPieces, pieceCounts, tagsBelow, minPiecesSummary, pieceCountsFromFeed,
+  PREF, clampMinPieces, pieceCounts, tagsBelow, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed,
 } = require('../src/lib/minPieces');
 
 test('the preference has a plain key', () => {
@@ -79,4 +79,10 @@ test('the counts read from a feed: tag edges to the feed\'s items, each piece on
   assert.deepStrictEqual([...pieceCountsFromFeed(feed)], [['tag:a', 2], ['tag:b', 1]]);
   assert.strictEqual(pieceCountsFromFeed(null).size, 0);
   assert.strictEqual(pieceCountsFromFeed({ items: [] }).size, 0);
+});
+
+test('the slider\'s label: one card at 1, cards otherwise', () => {
+  assert.strictEqual(minPiecesLabel(1), 'Hide tagz on fewer than 1 card');
+  assert.strictEqual(minPiecesLabel(2), 'Hide tagz on fewer than 2 cards');
+  assert.strictEqual(minPiecesLabel(13), 'Hide tagz on fewer than 13 cards');
 });

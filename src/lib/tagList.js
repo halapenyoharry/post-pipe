@@ -101,7 +101,7 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, m
   const rows = [];
   for (const [id, pieceIds] of tags) {
     const total = sliderCount(id);
-    if (min > 1 && total < min) continue;
+    if (total < 1 || (min > 1 && total < min)) continue;
     const pieces = [...pieceIds].map((pid) => byId.get(pid)).filter((it) => !hidden.has(sourceIdOf(it)));
     if (!pieces.length) continue;
     const perSource = new Map();

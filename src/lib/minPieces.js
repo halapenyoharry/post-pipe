@@ -1,7 +1,9 @@
 // Pieces per tag: the panel's slider for the fewest pieces a tag node must
 // join to be drawn (the viewState preference 'minTagPieces', null for 1),
-// shown as "Hide tagz on fewer than N cards" with "S of T tagz" beside it
-// (src/components/Settings; cards and tagz are the viewer's words).
+// shown as "Hide tagz on fewer than N cards" ("1 card" at 1) with "S of T
+// tagz" beside it (src/components/Settings; cards and tagz are the viewer's
+// words). The graph counts only the tags the panel's source coherence ratio
+// leaves showing (src/lib/sourceRatio.js), each on the cards it shows on.
 // A tag joining fewer is hidden with its edges, through the graph's own
 // visibility path (applyVisibility in src/components/GraphViewer); the pieces
 // themselves are never hidden by it. At 1, the default, nothing is hidden,
@@ -70,6 +72,12 @@ function minPiecesSummary(counts, value) {
   return { min, max, shown, total: list.length };
 }
 
+// The slider's label at a value: "Hide tagz on fewer than 3 cards", and
+// "card" at 1.
+function minPiecesLabel(n) {
+  return `Hide tagz on fewer than ${n} ${Number(n) === 1 ? 'card' : 'cards'}`;
+}
+
 // The counts read from a feed's edges of layer 'tag', for when the graph has
 // not said: each tag's distinct pieces among the feed's items.
 function pieceCountsFromFeed(feedData) {
@@ -89,4 +97,4 @@ function pieceCountsFromFeed(feedData) {
   return pieceCounts(pieces);
 }
 
-module.exports = { PREF, clampMinPieces, pieceCounts, tagsBelow, minPiecesSummary, pieceCountsFromFeed };
+module.exports = { PREF, clampMinPieces, pieceCounts, tagsBelow, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed };

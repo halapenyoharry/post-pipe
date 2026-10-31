@@ -1034,3 +1034,49 @@ test('rtagz: real engine integration builds universe.json and merges concepts ac
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('rtagz: a discovered tag\'s sourceRatio reaches its reference, its tag edge and its concept, and only where the universe gives one', () => {
+  const results = cloneResults();
+  const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
+  const concept = (id, canonical, more = {}) => ({
+    id, canonical, pinned: false, discovered: false, n: 1, nEmergent: 0,
+    variants: [{ label: canonical, count: 1, formsBySource: { Journal: { [canonical]: 1 } } }], rank: [], ...more,
+  });
+  const universe = {
+    concepts: [
+      concept('c_ml', 'ML'),
+      concept('c_cancer', 'cancer', { discovered: true, sourceRatio: 2.964 }),
+      concept('c_instead', 'instead', { discovered: true, sourceRatio: 1.008 }),
+      concept('c_odd', 'odd', { discovered: true, sourceRatio: 'high' }),
+    ],
+    items: [{
+      key: 'Journal::j-1', source: 'Journal', url: 'https://journal.test/ml-review', title: 'Review of Machine Learning',
+      tags: [
+        { c: 'c_ml', w: 1, origin: 'explicit', raw: [{ l: 'ML', n: 'ml', s: 'Journal' }], sys: ['Journal'], via: 'known' },
+        { c: 'c_cancer', w: 0.4, origin: 'discovered', raw: [{ l: 'cancer', n: 'cancer', s: 'discovered' }], sys: ['Journal'], via: 'discovered', why: 'recurs', sourceRatio: 2.964 },
+        { c: 'c_instead', w: 0.3, origin: 'discovered', raw: [{ l: 'instead', n: 'instead', s: 'discovered' }], sys: ['Journal'], via: 'discovered', why: 'recurs', sourceRatio: 1.008 },
+        { c: 'c_odd', w: 0.2, origin: 'discovered', raw: [{ l: 'odd', n: 'odd', s: 'discovered' }], sys: ['Journal'], via: 'discovered', why: 'recurs', sourceRatio: 'high' },
+      ],
+    }],
+    relations: [],
+  };
+  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, { built: 'x', stages: [] }, { siteTitle: 'Fixture Site' });
+  const item = results.find((r) => r.feedMeta.id === 'journal' || r.feedMeta.title === 'Journal').items.find((i) => i.id === 'j-1');
+  const refs = new Map(item._references.filter((r) => r.type === 'tag').map((r) => [r.value, r]));
+  assert.strictEqual(refs.get('cancer').sourceRatio, 2.964);
+  assert.strictEqual(refs.get('instead').sourceRatio, 1.008);
+  assert.ok(!('sourceRatio' in refs.get('ML')), 'a tag a human wrote carries none');
+  assert.ok(!('sourceRatio' in refs.get('odd')), 'anything but a number is no ratio');
+  const concepts = new Map(summary.concepts.map((c) => [c.canonical, c]));
+  assert.strictEqual(concepts.get('cancer').sourceRatio, 2.964);
+  assert.strictEqual(concepts.get('instead').sourceRatio, 1.008);
+  assert.ok(!('sourceRatio' in concepts.get('ML')));
+  assert.ok(!('sourceRatio' in concepts.get('odd')));
+
+  const edges = buildEdges([item]);
+  const tagEdge = (label) => edges.find((e) => e.layer === 'tag' && e.target === `tag:${label}`);
+  assert.strictEqual(tagEdge('cancer').attrs.sourceRatio, 2.964);
+  assert.strictEqual(tagEdge('instead').attrs.sourceRatio, 1.008);
+  assert.deepStrictEqual(tagEdge('ML').attrs, { concept: 'c_ml', weight: 1, origin: 'explicit' }, 'an explicit tag\'s attrs are as before');
+  assert.ok(!('sourceRatio' in tagEdge('odd').attrs));
+});

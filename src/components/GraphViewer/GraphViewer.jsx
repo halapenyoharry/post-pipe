@@ -34,6 +34,7 @@ import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
 import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
+import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -197,7 +198,14 @@ function feedToGraph(feed, config = {}) {
     // What the line says when hovered or tapped: its own label if it has one
     // (a flashback, say), otherwise its role.
     const label = edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
-    links.push({ source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label });
+    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label };
+    // A discovered tag's source coherence ratio, for the panel's slider of
+    // that name (lib/sourceRatio.js): only a tag edge carries one.
+    if (edge.layer === 'tag' && edge.attrs) {
+      const ratio = ratioOf(edge.attrs.sourceRatio);
+      if (ratio !== null) link.sourceRatio = ratio;
+    }
+    links.push(link);
   }
 
   // Each tag node's systems: the source id of every piece it joins, one per
@@ -272,22 +280,53 @@ function nodesById(svg) {
   return byId;
 }
 
-// The article nodes each tag node joins, by the tag's id, read from the
-// drawn edges of layer 'tag'. An edge's ends are ids until the simulation
-// binds them to nodes, so both forms are resolved through the nodes drawn.
-function piecesByTag(svg, byId) {
-  const pieces = new Map();
-  svg.selectAll('.link').each((l) => {
-    if (!l || l.layer !== 'tag' || l._dupByGroup) return;
+// The edges of layer 'tag' between a piece and a tag node, one entry each:
+// { piece, bubble, tag, ratio, link, pieceNode, bubbleNode }. bubble is the
+// tag node the edge is drawn to (a depth above 0 points a folded tag's edges
+// at the bubble that shows it), tag the tag it was written as (_origTarget,
+// else the bubble), ratio its source coherence ratio or null (for
+// lib/sourceRatio.js shownAt). An edge's ends are ids until the simulation
+// binds them to nodes, so both forms are resolved through byId.
+function tagEdgeEntries(links, byId) {
+  const out = [];
+  for (const l of links || []) {
+    if (!l || l.layer !== 'tag') continue;
     const s = typeof l.source === 'object' ? l.source : byId.get(l.source);
     const t = typeof l.target === 'object' ? l.target : byId.get(l.target);
     const tag = t && t.type === 'tag' ? t : (s && s.type === 'tag' ? s : null);
     const piece = tag === t ? s : t;
-    if (!tag || !piece || piece.type !== 'article') return;
-    if (!pieces.has(tag.id)) pieces.set(tag.id, []);
-    pieces.get(tag.id).push(piece);
-  });
+    if (!tag || !piece || piece.type !== 'article') continue;
+    const orig = l._origTarget !== undefined && l._origTarget !== null
+      ? (typeof l._origTarget === 'object' ? l._origTarget.id : l._origTarget)
+      : tag.id;
+    out.push({
+      piece: piece.id, bubble: tag.id, tag: orig, ratio: l.sourceRatio === undefined ? null : l.sourceRatio,
+      link: l, pieceNode: piece, bubbleNode: tag,
+    });
+  }
+  return out;
+}
+
+// The article nodes each tag node joins, by the tag's id, from tagEdgeEntries
+// (one edge per piece and bubble: the copies a depth above 0 makes,
+// _dupByGroup, are left out). With view (shownAt's, for the panel's source
+// coherence ratio) only a pair with an attachment showing counts; one
+// showing is enough, whichever of the pair's edges it is.
+function piecesFrom(entries, view = null) {
+  const pieces = new Map();
+  for (const e of entries) {
+    if (e.link._dupByGroup) continue;
+    if (view && !view.pairs.has(pairKey(e.piece, e.bubble))) continue;
+    if (!pieces.has(e.bubble)) pieces.set(e.bubble, []);
+    pieces.get(e.bubble).push(e.pieceNode);
+  }
   return pieces;
+}
+
+// The article nodes each tag node joins, by the tag's id, read from the
+// drawn edges of layer 'tag'.
+function piecesByTag(svg, byId) {
+  return piecesFrom(tagEdgeEntries(svg.selectAll('.link').data(), byId));
 }
 
 // A tag node's fill: the feed colours of the pieces it joins, blended
@@ -311,17 +350,21 @@ function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
 }
 
 // The number of pieces on each tag bubble drawn, for the panel's pieces per
-// tag slider (src/components/Settings): kept on window.PostPipeGraphTags
-// (counts, a list of numbers) and announced as 'graph:tag-counts' when it
-// changes, at a depth above 0 too, where one bubble stands for a group.
-function publishTagCounts(counts) {
+// tag slider (src/components/Settings) and the top bar's tag list
+// (src/lib/tagList.js): kept on window.PostPipeGraphTags and announced as
+// 'graph:tag-counts' when it changes. counts: a list of numbers, one per
+// bubble that exists at the panel's source coherence ratio, at a depth above
+// 0 too, where one bubble stands for a group. byTag: every tag node's count
+// by id, a tag folded into a bubble given the bubble's, a tag the ratio
+// hides given 0.
+function publishTagCounts(counts, byTag = {}) {
   if (typeof window === 'undefined') return;
   const list = [...counts.values()].sort((a, b) => a - b);
-  const sig = list.join(',');
+  const sig = `${list.join(',')}|${Object.keys(byTag).sort().map((k) => `${k}=${byTag[k]}`).join('\u0000')}`;
   const prev = window.PostPipeGraphTags;
   if (prev && prev.sig === sig) return;
-  window.PostPipeGraphTags = { sig, counts: list };
-  window.dispatchEvent(new CustomEvent('graph:tag-counts', { detail: { counts: list } }));
+  window.PostPipeGraphTags = { sig, counts: list, byTag };
+  window.dispatchEvent(new CustomEvent('graph:tag-counts', { detail: { counts: list, byTag } }));
 }
 
 // Walk article nodes + links and toggle their display based on whether
@@ -333,22 +376,41 @@ function publishTagCounts(counts) {
 // hidden here; their tags stay. A tag joining fewer pieces than the panel's
 // pieces per tag (minPieces, the preference minTagPieces; lib/minPieces.js)
 // is hidden too, with its edges; at 1, or with nothing chosen, none is.
-function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces) {
+// The panel's source coherence ratio (minRatio, the preference
+// minSourceRatio, null for no filtering; lib/sourceRatio.js) hides a tag
+// edge under it, and a tag with no edge left showing, as though a build at
+// that bar had never made them: such a tag is not counted at all, and a tag
+// counts only the pieces it shows on.
+function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces, minRatio = null) {
   const isHiddenArticle = (d) =>
     Boolean(d && d.type === 'article' && d._source && hiddenSet.has(d._source.id));
   const byId = nodesById(svg);
-  const pieces = piecesByTag(svg, byId);
-  const hiddenTags = new Set();
+  const entries = tagEdgeEntries(svg.selectAll('.link').data(), byId);
+  const view = minRatio === null || minRatio === undefined ? null : shownAt(entries, minRatio);
+  const pieces = piecesFrom(entries, view);
+  const hiddenTags = new Set(view ? view.hiddenBubbles : []);
   for (const [tagId, list] of pieces) {
     if (list.length && list.every(isHiddenArticle)) hiddenTags.add(tagId);
   }
   const bubbleIds = [];
-  for (const d of byId.values()) if (d.type === 'tag' && !d._groupedInto) bubbleIds.push(d.id);
+  for (const d of byId.values()) {
+    if (d.type === 'tag' && !d._groupedInto && !(view && view.hiddenBubbles.has(d.id))) bubbleIds.push(d.id);
+  }
   const counts = pieceCounts(pieces, bubbleIds);
   let most = 0;
   for (const n of counts.values()) if (n > most) most = n;
   for (const id of tagsBelow(counts, clampMinPieces(minPieces, most))) hiddenTags.add(id);
-  publishTagCounts(counts);
+  const byTag = {};
+  for (const d of byId.values()) {
+    if (d.type !== 'tag') continue;
+    const bubble = d._groupedInto || d.id;
+    byTag[d.id] = view && view.hiddenTags.has(d.id) ? 0 : (counts.get(bubble) || 0);
+  }
+  publishTagCounts(counts, byTag);
+  // A tag edge the ratio hides: one whose piece and bubble have no edge
+  // showing between them.
+  const ratioHidden = new Set();
+  if (view) for (const e of entries) if (!view.pairs.has(pairKey(e.piece, e.bubble))) ratioHidden.add(e.link);
   // A member of a closed container stays hidden whatever its source, and so
   // does a tag collapsed into another at the depth chosen (_groupedInto).
   const isHidden = (d) => Boolean(d && (
@@ -365,7 +427,7 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces) {
     .style('display', (l) => {
       const sNode = typeof l.source === 'object' ? l.source : byId.get(l.source);
       const tNode = typeof l.target === 'object' ? l.target : byId.get(l.target);
-      if (l._dupByGroup || isHidden(sNode) || isHidden(tNode)) return 'none';
+      if (l._dupByGroup || ratioHidden.has(l) || isHidden(sNode) || isHidden(tNode)) return 'none';
       return null;
     });
 
@@ -521,6 +583,18 @@ export function GraphViewer({
     const vs = viewStateRef.current;
     return vs && vs.preference ? vs.preference(MIN_PIECES_PREF) : null;
   };
+  // The panel's source coherence ratio (the preference minSourceRatio, null
+  // for the build's bar; lib/sourceRatio.js), in force for this feed: null
+  // when the feed carries no ratio. Read by applyVisibility, which hides the
+  // tag edges under it and the tags left with none; nothing moves.
+  const ratioRangeRef = useRef(null);
+  if (!ratioRangeRef.current || ratioRangeRef.current.feed !== feedData) {
+    ratioRangeRef.current = { feed: feedData, range: ratioRange(feedData) };
+  }
+  const minRatioChosen = () => {
+    const vs = viewStateRef.current;
+    return clampRatio(vs && vs.preference ? vs.preference(SOURCE_RATIO_PREF) : null, ratioRangeRef.current.range);
+  };
 
   // The live graph, reachable from effects that must not rebuild it.
   const cardSizeFor = makeCardSizeFor(CARD);
@@ -594,7 +668,7 @@ export function GraphViewer({
       ? hiddenSources
       : new Set(hiddenSources || []);
     if (!svgRef.current || !cardsLayerRef.current) return;
-    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
+    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
     if (relationsUpdateRef.current) relationsUpdateRef.current();
   }, [hiddenSources]);
 
@@ -636,7 +710,7 @@ export function GraphViewer({
       // A colour the reader gives a feed reaches its tag nodes as well, and
       // the pieces per tag chosen in the panel hides or shows tags.
       if (svgRef.current && cardsLayerRef.current) {
-        applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
+        applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
       }
       if (relationsUpdateRef.current) relationsUpdateRef.current();
     });
@@ -3716,7 +3790,7 @@ export function GraphViewer({
       articleNodes.filter(nd => nd.id === id).raise().style('z-index', 10);
       loadFullContent(d).then(() => { if (pinnedIdsRef.current.has(id)) renderArticleBody(d); });
     });
-    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
+    applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
 
     // Hover / click handlers. mouseover/mouseout (not mouseenter/leave)
     // because the card's inner HTML gets replaced on re-render
@@ -4112,7 +4186,9 @@ export function GraphViewer({
     // selected bubble when it has more (-N takes them away again). They are
     // never links: the force never sees them and nothing moves. Only a
     // bubble drawn counts, at either end: not one hidden with its feeds or by
-    // the panel's pieces per tag. A tag collapsed into another at the depth
+    // the panel's pieces per tag or source coherence ratio, and a tag the
+    // ratio hides draws no line even folded into a bubble that still shows
+    // (ratioHiddenTags). A tag collapsed into another at the depth
     // chosen (_groupedInto) is drawn by that bubble: a relative folded into
     // one draws its line to it (one line to a bubble for every relative it
     // stands for, its label naming each), or none when the panel's folded
@@ -4144,11 +4220,20 @@ export function GraphViewer({
       const vs = viewStateRef.current;
       return foldedChoice(vs && vs.preference ? vs.preference(FOLDED_PREF) : null);
     }
+    // The tags the panel's source coherence ratio hides wherever they are
+    // drawn (a tag folded into a bubble that still shows among them), or
+    // null when it hides none (lib/sourceRatio.js).
+    function ratioHiddenTags() {
+      const min = minRatioChosen();
+      return min === null ? null : shownAt(tagEdgeEntries(data.links, nodeBySlug), min).hiddenTags;
+    }
     function relationNet() {
       const tag = chosenTag || activeTag;
       if (!tag || !data.relations.length || !tagShown(bubbleIdOf(tag))) return null;
+      const hiddenByRatio = ratioHiddenTags();
       return drawnRelativesOf(data.relations, tag, {
         visible: tagShown,
+        present: hiddenByRatio ? (id) => !hiddenByRatio.has(id) : undefined,
         bubbleOf: bubbleIdOf,
         folded: foldedChosen(),
         limit: relationsExpanded ? Infinity : STRONGEST,
@@ -4658,7 +4743,7 @@ export function GraphViewer({
         simulation.force('link').links(data.links.filter((l) => !l._dupByGroup));
         simulation.force('charge').strength(simulation.force('charge').strength());
         simulation.force('collide').radius(simulation.force('collide').radius());
-        applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen());
+        applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
         applyPositions();
         simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
       } else {
