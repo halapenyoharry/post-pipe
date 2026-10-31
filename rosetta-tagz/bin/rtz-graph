@@ -5,7 +5,7 @@ import { normalizeLabel } from '../lib/normalize.js';
 
 const usage = `rtz-graph — universe.json -> {nodes, links} for any force-graph renderer
 
-usage: rtz-graph <universe.json> --mode ${MODES.join('|')} [--focus LABEL] [--hops N]
+usage: rtz-graph <universe.json> --mode ${MODES.join('|')} [--focus LABEL] [--hops N] [--broader-depth N]
                  [--no-relations] [--no-emergent] [--types broader,related,…] [--neighbors N] [-o FILE]
 
   raw       items + one node per (tag-system, spelling): the duplication before rtz-stone
@@ -19,6 +19,7 @@ const { values, positionals } = cli('rtz-graph', usage, {
   mode: { type: 'string', default: 'hyper' },
   focus: { type: 'string' },
   hops: { type: 'string', default: '2' },
+  'broader-depth': { type: 'string', default: '0' },
   'no-relations': { type: 'boolean' },
   'no-emergent': { type: 'boolean' },
   types: { type: 'string' },
@@ -39,6 +40,7 @@ try {
   const graph = projectGraph(U, values.mode, {
     focus,
     hops: Number(values.hops),
+    broaderDepth: Number(values['broader-depth']),
     relations: !values['no-relations'],
     emergent: !values['no-emergent'],
     relationTypes: values.types ? new Set(values.types.split(',')) : null,

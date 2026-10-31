@@ -228,6 +228,13 @@ test('lexical broader: "brain scans" contains the words of "brain", when usage c
   assert.equal(byType(cross, 'broader').length, 0);
   assert.deepEqual(pairOf(cross, byType(cross, 'broadMatch')[0]), ['brain', 'brain scans']);
   assert.equal(byType(cross, 'broadMatch')[0].skos, true);
+  // config exposes provisional lexicalBroader and broaderDepth defaults, and honours overrides
+  assert.deepEqual(s.config.lexicalBroader, { minP: 0.5, minN: 2 });
+  assert.equal(s.config.broaderDepth, 0);
+  const stricter = buildStone(rec('Science', tags(ids(1, 8), ids(4, 9))), { cfg: { relate: { lexicalBroader: { minP: 0.9, minN: 6 }, broaderDepth: 1 } } });
+  assert.equal(byType(stricter, 'broader').length, 0, 'stricter lexicalBroader thresholds suppress the relation');
+  assert.deepEqual(stricter.config.lexicalBroader, { minP: 0.9, minN: 6 });
+  assert.equal(stricter.config.broaderDepth, 1);
 });
 
 test('lexical and usage broader on one pair stay one relation that cites both', () => {

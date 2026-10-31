@@ -37,7 +37,9 @@ export const DEFAULTS = {
     minAdjacent: 0.3, // text cosine between concept profiles; also the text support a cross-scheme `related` needs to be a relatedMatch
     perConcept: 12,
     lexicalBroader: { minP: 0.5, minN: 2 }, // (provisional) "brain" ⊃ "brain scans" when P(brain | brain scans) >= minP on >= minN shared items
+    broaderDepth: 0, // (provisional) steps up skos:broader when projecting or grouping concept labels (0 = concept itself)
   },
+  broaderDepth: 0, // (provisional) top-level alias for relate.broaderDepth
 
   discover: {
     minDf: 2, // a phrase must recur in at least two items to connect anything

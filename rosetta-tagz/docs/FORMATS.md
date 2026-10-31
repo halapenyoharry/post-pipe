@@ -205,7 +205,7 @@ member of a seed alias group (`artificial general intelligence` finds the corpus
 ## `stone.json`
 
 ```
-schema, generated, config{mergeThreshold, link, canon, sourceWeights, signals}, stats{…}
+schema, generated, config{mergeThreshold, link, canon, sourceWeights, signals, lexicalBroader, broaderDepth}, stats{…}
 systems{ <source>: {items, tagged, untagged, occurrences, distinctTags, weight, color} }
 concepts[]: {
   id, canonical, pinned, locked, discovered, sourceRatio?, items, sources{src:nItems},
@@ -300,7 +300,10 @@ where each comes from:
 **Direction.** `broader {a, b}` means b `skos:broader` a (a is the wider one), and so `broadMatch {a, b}`
 means b `skos:broadMatch` a. `narrower` and `narrowMatch` are never emitted: the inverse is implied. An
 override written with `narrower`, `contains` or `narrowMatch` is stored flipped onto `broader` /
-`broadMatch`.
+`broadMatch`. Both `relate.lexicalBroader` (`{ minP: 0.5, minN: 2 }`; `false` or `null` disables lexical
+containment) and `relate.broaderDepth` / `broaderDepth` (default `0`: steps up `skos:broader` a projection
+or viewer walks when reading or grouping concept labels) are exposed in `lib/config.js` (`DEFAULTS`) and
+`stone.json.config` as provisional parameters.
 
 **SKOS typing.** After the concepts know their schemes, two concepts *share a scheme* when
 `inScheme(a) ∩ inScheme(b)` minus `site` is non-empty (every concept is in `site`, so it says nothing).

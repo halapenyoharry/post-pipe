@@ -225,7 +225,15 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   return {
     schema: STONE_SCHEMA,
     generated: now,
-    config: { mergeThreshold: cfg.mergeThreshold, link: cfg.link, canon: cfg.canon, sourceWeights: cfg.sourceWeights, signals: cfg.signals },
+    config: {
+      mergeThreshold: cfg.mergeThreshold,
+      link: cfg.link,
+      canon: cfg.canon,
+      sourceWeights: cfg.sourceWeights,
+      signals: cfg.signals,
+      lexicalBroader: cfg.relate.lexicalBroader,
+      broaderDepth: cfg.relate.broaderDepth ?? cfg.broaderDepth ?? 0,
+    },
     stats: {
       tags: corpus.terms.size,
       concepts: concepts.length,
