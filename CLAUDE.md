@@ -1,87 +1,36 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code in this repository. This file holds rules and pointers only. It does not describe the architecture: a description kept here went stale while the engine moved on, and every session that trusted it started wrong (corrected 2026-10-22). The code, the tests and the documents below are canonical. When they disagree with anything written elsewhere, they win.
 
-## What This Is
+## Read first
 
-post-pipe is a **corpus viewer with optional publishing routes** — not a blog pipeline.
+- `README.md` — what post-pipe is, in its current voice.
+- `ARCHITECTURE.md` — what is built. Check its date against the code before relying on a detail.
+- `vision/DECOMPOSITION.md` — the layer vocabulary (Exoskeleton, Bundle, Corpus, Lens, Renderer, Tile and Panel, Flow, Infeed). `vision/` also holds FUTURE-STATE, VIEWS and JSON-TREES.
+- `docs/` — contracts. `docs/ACTIONS.md` names the graph's actions and gestures; `docs/STONE-SEAM.md` is the tag-translation seam (2026-10-22).
+- `package.json` — the commands. `npm test` runs the suite in `test/`. `npm run build`, `build:lib` and `build:embed` make the three bundles (`dist/`, `dist-lib/`, `dist-embed/`), which are committed after engine changes, in their own commit, "rebuilt the three bundles".
+- `TCP.json` — the collaboration protocol.
+- `_handoff/` — task briefs and reports, T1 onward, the recent history of why things are the way they are. Local only: git ignores it, so a fresh clone lacks it.
 
-It points at a user-chosen content root (default `~/Posts/`), walks the folder tree, detects what kind of content each subfolder contains (essay, image, audio, video, multi-substrate work, archive, fragment), and produces a spatial D3 graph view of the entire intellectual topology. Text pieces can optionally route to Medium/Substack/GitHub Pages; other substrates have their own routes as they're built.
+## Rules
 
-Metadata is a gradient, not a gate. Folders with rich `frontmatter.json` produce rich nodes; legacy `.qmd` folders read in lossy mode; unstructured folders still appear, flagged `scattered` with a TODO.
+1. **The engine stays content-agnostic.** Nothing specific to one site or corpus (names, tags, colours, authors, chapter lists) goes in here. It goes in that site's `settings.json`. A site is a folder holding `settings.json` and `feeds.opml`, built with `POSTPIPE_SITE=<folder> node generate-index.js`.
+2. **Emergence.** A node exists because a file or a feed item exists. The engine never synthesizes content.
+3. **Prose rule.** Never write, alter or correct prose of The Epic of Elinor Jones, in any file, for any reason.
+4. **Nothing leaves this Mac without Harold.** No push, deploy, server, or GitHub change unless he asks for that specific action.
+5. **No deleting without a backup.** Git history or an archive tag counts.
+6. **Commits are Harold's.** Author `halapenyoharry`, never Claude or any AI name, no co-author or AI trailers. Messages in the repo's voice: lower-case, first person, plain, saying what changed. On `main`, pause and ask before committing.
+7. **Humans name things.** Use the names already in the code and docs. When something has no name, describe it plainly and ask Harold.
+8. **Design is Harold's.** Implement what he hands over. If a visual decision is unavoidable, describe the options and build the plainest.
+9. **Metadata is a gradient, not a gate.** Never refuse to show a piece because it lacks metadata.
+10. **Least-interfering TTS highlighting.** Ambient confirmation, never wayfinding.
+11. **No network beyond the feeds a site lists.** Nothing fetches at build or run time except what `feeds.opml` names, and no CDNs.
+12. **Add before you override (Harold, 2026-10-25).** When Harold says "change this to that" about something that works but is not perfect, first ask whether it should be a new option, feature or view beside the existing one rather than a replacement, and name the choices. He says "add a blur shadow to the toolbar so a node under it shows"; answer "we can add that as a choice: blur shadow, darker shadow, no shadow" and let him pick. A working thing is only overridden when he says so after seeing the options.
 
-## Commands
+## Neighbours
 
-```bash
-npm install
-
-# Build the graph viewer from ~/Posts/
-node generate-index.js
-# → _site/feed.json + _site/index.html
-
-# Publish an essay to a platform (draft by default)
-node index.js medium article.md
-node index.js medium --publish article.md
-
-# Pipe from stdin
-cat article.md | node index.js medium
-
-# Login flows (saves session to auth/)
-npm run login:medium
-npm run login:substack
-npm run login:youtube
-```
-
-Local preview:
-```bash
-cd _site && python3 -m http.server 8891
-# → http://localhost:8891/
-```
-
-No test suite or linter yet.
-
-## Architecture
-
-**Content root:** `~/Posts/` (configured in [`settings.json`](./settings.json) `content_dir`). This is where Harold's writing, images, podcast episodes, and other creative output live — one folder per piece. Old `post-pipe/articles/` directory is retained under `archive/` for reference only.
-
-**Ingester:** [`ingest.js`](./ingest.js) walks the content root and produces `Content[]` objects. Substrate detection is metadata-aware (reads `frontmatter.json` → `idea.substrate`) with filesystem fallback (file extensions). See `ARCHITECTURE.md` for the full `Content` shape.
-
-**Graph generator:** [`generate-index.js`](./generate-index.js) consumes the ingester output, copies cover images to `_site/covers/`, emits JSON Feed 1.1 (extended with rich fields) to `_site/feed.json`, and builds a self-contained `_site/index.html` with embedded D3 graph + reader panel + TTS toolbar.
-
-**Reader panel substrate dispatch:** `renderSubstrate(article, body, headerHTML)` in the inline script routes by `content.kind`:
-- `essay` / `multi` → `fetch()` rendered HTML from GitHub Pages
-- `image` → `<img>` inline
-- everything else → placeholder + metadata summary
-
-**Platform modules** ([`platforms/{name}.js`](./platforms/)) each export `{ login, post }`:
-- `medium.js` — Working for essays. Pushes to GitHub Pages, then imports via Playwright.
-- `substack.js`, `youtube.js` — Stubs.
-- `github-pages.js` — `pushArticle()` / `pushFile()` via GitHub Contents API.
-- `feed-ingester.js` — Pulls external RSS feeds (listed in `settings.json.feeds`) as peer graph nodes. All currently `enabled: false`.
-
-## Content Schemas (three generations coexist)
-
-**Gen 2 (canonical):** `frontmatter.json` + `index.md` per folder. Rich — encodes `idea.seed`, `idea.topology`, `idea.energy`, `forms.potential`, `connected_to`. Status vocabulary: `scattered | drafted | bloomed | published`. Examples: `~/Posts/art-is-pattern/`, `~/Posts/smile-end-of-world/`.
-
-**Gen 1 (legacy):** `index.qmd` with YAML frontmatter. Read in lossy mode — no topology/seed/energy. Each Gen 1 folder has a `_TODO-MIGRATE.md` with auto-extracted YAML and fields needing human judgment.
-
-**Gen 0 (unstructured):** Folders with just files (a PNG, a raw `.md`, a podcast bundle). Substrate detected from file mix. Each has a `_TODO-METADATA.md` with a research checklist.
-
-Full migration procedures: [`~/Posts/_MIGRATION-GUIDE.md`](../Posts/_MIGRATION-GUIDE.md) and [`~/Posts/_METADATA-GUIDE.md`](../Posts/_METADATA-GUIDE.md).
-
-## Key Design Decisions
-
-- **Content root is user-chosen.** `~/Posts/` is the default, not a hard dependency. Any folder with one-subfolder-per-piece works.
-- **Metadata is a gradient.** Never refuse to show a piece because it lacks metadata. Surface what's there.
-- **Substrate is first-class.** Every piece has a `kind` (`essay | image | podcast-episode | video | multi | archive | fragment`). The reader and publishing routes dispatch on kind.
-- **TDD idea: `idea.topology` ≠ `tags`.** Tags are subject keywords; topology is substrate-independent structural pattern. Both are useful; they cluster differently.
-- **`connected_to` edges are authored, not inferred.** When Harold writes a piece that echoes another, he lists the slug. Graph renders these distinct from tag-cluster edges.
-- **Least-interfering TTS highlighting** is a load-bearing principle. Sentence highlighting must be ambient confirmation, not wayfinding. No sidebar progress, no karaoke, no forceful scroll. See memory: `feedback_least_interfering_highlighting.md`.
-- **Adaptive Execution Flow (Act or Ask):** This pipeline is designed for AI operation. Handle all mechanical decisions autonomously. Escalate only at structural barriers (paywall, CAPTCHA, missing credentials) with exact reason + one specific request.
-- **canonical_url** is still always the GitHub Pages URL for cross-posted essays. Every platform receives this as canonical to prevent duplicate-content penalties.
-
-## Operational Context
-
-Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) and [`TCP.json`](./TCP.json) before starting work. They contain the full design context, known issues, and collaboration protocol. Do not ask Harold to re-explain what is already documented there.
-
-Commits must be made as `halapenyoharry`, never as Claude or any AI agent name.
+- `rosetta-tagz/` is its own git repository nested here. post-pipe's tracked gitignore does not mention it; the local `.git/info/exclude` does, so a fresh clone of post-pipe lacks it and builds must work without it. post-pipe never imports its `lib/`; it calls its programs through the contract in `docs/STONE-SEAM.md`.
+- With no `POSTPIPE_SITE`, every script uses the made-up example site in `examples/site/`, which also holds the notes explaining each setting. No user's site lives in this folder.
+- `~/Projects/haroldyounghumxn.site` is Harold's own site, a downstream user of this engine like the novel's. The phone preview service (`com.harold.postpipe-preview`, port 8891, all interfaces) serves its `_site/`.
+- `~/Projects/epicofelinorjones.com` is a site built on this engine. Its build script requires this checkout directly, or the one `POSTPIPE_ENGINE` names. Engine changes made for that site belong here, on `main`.
+- `~/Posts/` is Harold's own corpus. It is loaded when a site's `feeds.opml` lists it as `local://~/Posts`.
