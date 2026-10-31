@@ -9,6 +9,7 @@ const flags = args.slice(1);
 
 const isDraft   = !flags.includes('--publish');
 const isLogin   = flags.includes('--login');
+const headless  = flags.includes('--headless');
 const fileArg   = flags.find(f => !f.startsWith('--'));
 
 const PLATFORMS = ['medium', 'substack', 'youtube'];
@@ -21,9 +22,10 @@ post-pipe — markdown in, platform post out
     cat article.md | node index.js <platform> [--draft|--publish]
     node index.js <platform> [--draft|--publish] article.md
     node index.js <platform> --login
+    --headless  run the browser without a window (Medium blocks this today)
 
   Platforms: ${PLATFORMS.join(', ')}
-  Default:   --draft (safe)
+  Default:   --draft (safe). Medium stops at the draft even with --publish for now.
 `);
   process.exit(1);
 }
@@ -49,8 +51,8 @@ async function main() {
     content = fs.readFileSync(0, 'utf8'); // stdin
   }
 
-  const result = await mod.post(content, { draft: isDraft });
-  console.log(isDraft ? `draft: ${result.url}` : `published: ${result.url}`);
+  const result = await mod.post(content, { draft: isDraft, headless });
+  console.log(result.draft === false ? `published: ${result.url}` : `draft: ${result.url}`);
 }
 
 main().catch(err => {
