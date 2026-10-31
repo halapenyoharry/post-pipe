@@ -1,5 +1,7 @@
 # post-pipe, full behavior diagram
 
+**Last updated:** 2026-10-31
+
 This diagram enumerates every behavior I can identify in the current post-pipe codebase. Items flagged with ⊕ are collapsed, meaning multiple distinct responsibilities are currently implemented in one file or one function and would be worth separating in any serious refactor. Items without a flag are discrete responsibilities already living in their own identifiable slot.
 
 ```mermaid
@@ -28,28 +30,32 @@ subgraph BUILD["Build phase: node generate-index.js"]
         buildunstr["builder: unstructured"]
     end
 
-    subgraph FEED_SOURCES["platforms/feed-ingester.js ⊕<br/>(RSS/JSON feed fetcher + cache,<br/>.feed-cache/)"]
-        feedfetch["fetch external feeds"]
-        feedparse["parse XML/JSON"]
-        feedcache["cache results"]
+    subgraph FEED_SOURCES["src/lib/opml.js + src/aggregator.js + src/adapters/<br/>(LocalFolderAdapter, RssAdapter, AtomAdapter, JsonFeedAdapter,<br/>.feed-cache/colors.json + .feed-cache/last-good/)"]
+        opmlparse["parseOpml(feeds.opml)"]
+        feedfetch["fetch external feeds (fetchText)"]
+        feedparse["parse RSS / Atom / JSON Feed"]
+        feedcache["cache last good copy + feed colors"]
     end
 
-    subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + renderer + data transformer)"]
+    subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + HTML emitter)"]
         direction TB
-        loadlocal["loadLocalContent()<br/>local Content → JSON Feed items"]
+        loadlocal["LocalFolderAdapter.load()<br/>local Content → JSON Feed items + per-item HTML"]
         covercopy["cover image copy<br/>into _site/covers/"]
         toiso["toIsoDate() date normalizer"]
         statusbucket["statusBucket()<br/>(status → draft/published for graph color)"]
-        buildfeed["buildFeed() JSON Feed 1.1"]
+        buildfeed["buildFeed() JSON Feed 1.1 + buildEdges()"]
         icons["inline SVG icon library<br/>(play, pause, stop, medium,<br/>substack, youtube, etc.)"]
-        buildhtml["buildIndexHTML() ⊕<br/>(reads D3 + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
-        mergesort["merge local + feed, sort by date"]
+        buildhtml["buildIndexHTML() ⊕<br/>(reads dist/ bundles + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
+        mergesort["aggregator.loadCorpus()<br/>(merge adapters, resolve colors, run rtagz, sort by date)"]
         writefiles["write feed.json + index.html<br/>to _site/"]
     end
 
+    settings --> opmlparse
     settings --> loadlocal
     settings --> buildhtml
     envfile --> buildhtml
+    opmlparse --> loadlocal
+    opmlparse --> feedfetch
     walk --> detect
     walk --> readfm
     walk --> readqmd
@@ -267,7 +273,7 @@ Items marked ⊕ above, in order of refactor priority.
 
 **Tier 2, structural but not urgent:**
 
-4. `generate-index.js` ⊕ as a whole. Orchestrator (scans content, calls ingester, calls feed-ingester, merges, sorts) + data transformer (Content → JSON Feed item) + HTML emitter are three jobs. The orchestrator is small, the transformer is medium, the emitter is huge, and they share one file.
+4. `generate-index.js` ⊕ as a whole. Orchestrator (reads `feeds.opml` via `src/lib/opml.js`, calls `src/aggregator.js` across `src/adapters/*`, builds edges) + HTML emitter (`buildIndexHTML()`) share one file; local `Content` → JSON Feed transformation now lives in `src/adapters/LocalFolderAdapter.js`.
 
 5. Reader panel ⊕ inside index.html. Phone mode, sidebar mode, swap logic, substrate dispatch, toolbar, frontmatter panel, syndication links, all one module's worth of code with no boundary.
 
@@ -281,7 +287,7 @@ Items marked ⊕ above, in order of refactor priority.
 
 **Tier 3, minor:**
 
-10. `platforms/feed-ingester.js` ⊕. Fetcher, parser, cache all in one file. Fine for now.
+10. Feed ingestion (formerly `platforms/feed-ingester.js`). Split into `src/lib/opml.js` (OPML parser), `src/aggregator.js` (concurrent adapter runner, color resolution, rosetta-tagz phase, source stamping), `src/adapters/` (`LocalFolderAdapter.js`, `RssAdapter.js`, `AtomAdapter.js`, `JsonFeedAdapter.js`, `fetchText.js`, `detectFeedColor.js`, `lastGoodCopy.js`), and `src/lib/colorCache.js`.
 
 11. `index.js` CLI ⊕. Argparse + stdin handling + platform dispatch. Small enough that it's fine.
 
