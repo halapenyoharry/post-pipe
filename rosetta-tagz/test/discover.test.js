@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { discover } from '../lib/discover.js';
 import { makeConfig } from '../lib/config.js';
 import { buildStone } from '../lib/stone.js';
@@ -102,7 +103,7 @@ test('every discovered record carries its provenance', () => {
     assert.equal(d.inTitle, it.title.toLowerCase().split(/[^\p{L}\p{N}]+/u).join(' ').includes(d.phrase), `inTitle for "${d.phrase}" on ${t.item}`);
     assert.equal(t.wasGeneratedBy.activity, 'discover');
     const P = t.wasGeneratedBy.parameters;
-    const keys = ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'nearCopy', 'nearCopyWords', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio'];
+    const keys = ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'nearCopy', 'nearCopyGrouping', 'nearCopyWords', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio'];
     if ('sourceRatio' in t) keys.push('sourceRatio');
     else assert.equal(P.sourceBaseline, 0, 'the ratio is missing only when there was nothing to divide by');
     if (P.sourceRatio < P.sourceCoherenceRatio) keys.push('sourceRatioFloor'); // only on a hub the floor admitted
@@ -249,6 +250,69 @@ test('a word spread over distinct items is still a tag, and a tag still lands on
   }
 });
 
+// How near-copy pairs make groups (`nearCopyGrouping`). A roundup retells two different stories, as on
+// haroldyounghumxn.site's corpus of 2026-10-31, where a ProPublica roundup was a near-copy of one story
+// (0.485) and of another (0.396) that are not copies of each other (0.098). Here the roundup retells all
+// of the lawyer story and most of the ballots story; the two stories share only "election officials in
+// the county". Three tellings of the flood story above are near-copies every pair, and a wire item
+// says "election officials" too.
+const lawyer = 'marguerite vance lawyer halloway conference denial movement donors trained volunteers poll observers lawsuits fraud claims caucus foundation strategy memo canvass precinct challengers podcast seminar playbook audit recount affidavits';
+const ballots = 'mail ballots rejections rural postal service sorting plant consolidation delays postmarks deadline tamsin clerks envelopes carriers routes overnight processing rejected signature cure letters trucks';
+const roundupRecords = [
+  ...rec('Paper', { roundup: [], ballots: [], lawyer: [], flood1: [], flood2: [], flood3: [] }, {
+    roundup: { title: 'Key findings from our election reporting', text: `${lawyer}. ${ballots.split(' ').slice(0, 19).join(' ')}. election officials in the county` },
+    ballots: { title: 'Rural ballots rejected after postal cuts', text: `${ballots} ${ballots}. election officials in the county weighed certification` },
+    lawyer: { title: 'How a lawyer built a movement', text: `${lawyer} ${lawyer}. election officials in the county delayed certification` },
+    flood1: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met` },
+    flood2: { title: 'The river cannot be trusted', text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response` },
+    flood3: { title: 'After the flood, a reckoning', text: `${story}. families described the night` },
+  }),
+  ...rec('Wire', { w1: [] }, {
+    w1: { title: 'Certification fights reach county boards', text: 'county election officials weighed certification after mail ballots were rejected and poll observers filed lawsuits; certification deadlines loom' },
+  }),
+  ...rec('Filler', filler, fillerMeta),
+];
+const chained = {};
+const allPaired = {};
+const byChain = discover(roundupRecords, makeConfig(), chained);
+const byAllPairs = discover(roundupRecords, makeConfig({ discover: { nearCopyGrouping: 'all-pairs' } }), allPaired);
+const paper = (...ids) => ids.map((id) => `Paper::${id}`);
+const floods = paper('flood1', 'flood2', 'flood3');
+
+test('chain, the default: any near-copy pair joins two groups, so a roundup that retells two different stories makes them one item', () => {
+  assert.deepEqual(chained.nearCopies, [paper('ballots', 'lawyer', 'roundup'), floods]);
+  assert.deepEqual(chained.nearCopiesApart, []);
+  for (const t of byChain) assert.equal(t.wasGeneratedBy.parameters.nearCopyGrouping, 'chain');
+});
+
+test('all-pairs: a group holds only items that are near-copies every pair, and the roundup joins the story it is more alike to', () => {
+  assert.equal(makeConfig().discover.nearCopyGrouping, 'chain', 'chain is the default');
+  assert.deepEqual(allPaired.nearCopies, [floods, paper('lawyer', 'roundup')], 'the ballots story comes first in item order, but the roundup is more alike to the lawyer story');
+  assert.deepEqual(allPaired.nearCopiesApart.map(([a, b]) => [a, b]), [paper('ballots', 'roundup')], 'the near-copy pair left in different groups');
+  assert.ok(allPaired.nearCopiesApart[0][2] >= 0.35, 'with the likeness that made it a near-copy pair');
+  for (const t of byAllPairs) assert.equal(t.wasGeneratedBy.parameters.nearCopyGrouping, 'all-pairs');
+});
+
+test('a true triple of copies is one group under either value', () => {
+  for (const info of [chained, allPaired]) assert.ok(info.nearCopies.some((g) => JSON.stringify(g) === JSON.stringify(floods)), JSON.stringify(info.nearCopies));
+});
+
+test('under all-pairs the two stories are two pieces of evidence; so are the roundup and the story it did not join', () => {
+  const [c] = byChain.filter((t) => t.label === 'election officials');
+  const [a] = byAllPairs.filter((t) => t.label === 'election officials');
+  assert.equal(c.wasGeneratedBy.parameters.df, 2, 'chain: the roundup and both stories are one item, the wire item another');
+  assert.match(c.why, /^recurs in 4 of 47 items \(2 of 43 counting near-copies once\)/);
+  assert.equal(a.wasGeneratedBy.parameters.df, 3, 'all-pairs: the two stories count apart');
+  assert.match(a.why, /^recurs in 4 of 47 items \(3 of 44 counting near-copies once\)/);
+  // what all-pairs costs: a detail of the ballots story that the roundup retells now recurs in two items
+  assert.ok(!hubsOf(byChain).has('postal'));
+  assert.deepEqual(byAllPairs.filter((t) => t.label === 'postal').map((t) => t.item).sort(), ['ballots', 'roundup']);
+});
+
+test('an unknown nearCopyGrouping is an error that names the values', () => {
+  assert.throws(() => discover(roundupRecords, makeConfig({ discover: { nearCopyGrouping: 'complete' } })), /unknown discover\.nearCopyGrouping "complete" \(all-pairs, chain\)/);
+});
+
 // The floor. On the shipped synthetic corpus every hub clears 1.6, so the bar is raised to 9 to put
 // some below it; what is tested is the shape, not the number.
 const synth = syntheticRecords();
@@ -273,4 +337,22 @@ test('a lower floor only adds: every record of the build at the bar is there unc
     assert.match(t.why, /under the 9× bar, admitted by the 1× floor/);
   }
   assert.equal(JSON.stringify(atBar(toOne, 9)), JSON.stringify(atNine), 'a viewer at the bar shows exactly the build at the bar, in the same order');
+});
+
+// The SHA-256 of discovery's output on the synthetic corpus before nearCopyGrouping existed (post-pipe
+// 1.0.1, commit 5897101, default config). A deliberate change to that output puts its new digest here.
+const BEFORE_THE_SWITCH = 'bdc7b3b503becf4e37025989a625b45f0f1546c9839812095262120f6986ee2b';
+const withoutGrouping = (found) =>
+  found.map((t) => {
+    const { nearCopyGrouping, ...parameters } = t.wasGeneratedBy.parameters;
+    return { ...t, wasGeneratedBy: { ...t.wasGeneratedBy, parameters } };
+  });
+
+test('with chain, discovery on the synthetic corpus is byte for byte what it was before the switch existed', () => {
+  const chain = discover(synth, makeConfig({ discover: { nearCopyGrouping: 'chain' } }));
+  assert.ok(chain.length > 0 && chain.every((t) => t.wasGeneratedBy.parameters.nearCopyGrouping === 'chain'), 'the switch is recorded on every record');
+  const digest = createHash('sha256').update(JSON.stringify(withoutGrouping(chain))).digest('hex');
+  assert.equal(digest, BEFORE_THE_SWITCH, 'taken out of the parameters, nothing else differs');
+  // the synthetic corpus holds no near-copies, so all-pairs has nothing to group differently
+  assert.equal(JSON.stringify(withoutGrouping(discover(synth))), JSON.stringify(withoutGrouping(chain)));
 });

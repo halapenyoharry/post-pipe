@@ -25,7 +25,7 @@ preserved where it matters, so other programs can add their own.
  "why":"recurs in 7 of 102 items, which stay alike without it (0.05, 3.0× the 0.016 that items from the same sources share)",
  "wasDerivedFrom":[{"type":"text","phrase":"cancer","count":1,"inTitle":false}],
  "wasGeneratedBy":{"activity":"discover","parameters":{"minDf":2,"maxDfRatio":0.12,"perItem":3,"nearCopy":0.35,"nearCopyWords":3,
-   "sourceCoherenceRatio":1.6,"df":7,"items":7,"coherence":0.046,"sourceBaseline":0.016,"sourceRatio":2.964}}}
+   "nearCopyGrouping":"chain","sourceCoherenceRatio":1.6,"df":7,"items":7,"coherence":0.046,"sourceBaseline":0.016,"sourceRatio":2.964}}}
 ```
 
 A phrase becomes a hub when it is on at least `discover.minDf` items, on no more than `maxDfRatio` of
@@ -59,13 +59,13 @@ bar rejects it.
 **Near-copies count once.** Two items are near-copies when their TF-IDF cosine reaches `nearCopy`
 (0.35) and still reaches it once their `nearCopyWords` (3) strongest shared words (the largest products
 of the two weights) are taken out of both: one story told twice shares its names, places and details,
-two items about one topic share only the topic's few words. Groups are the connected pairs. When a
-phrase's df, the item count, its coherence and its `sourceBaseline` are measured, each group is one
-item (the first item of the group that holds the phrase stands for it), because two copies of a story
-are not two pieces of evidence. Attachment does not change: the hub lands on every copy, `items` and
-`why` count the items it lands on, and when copies made a difference `why` says so, `recurs in 6 of 102
-items (5 of 101 counting near-copies once)`. `df` is the count with copies once, so `items` can exceed
-it. `nearCopy: 0` turns this off.
+two items about one topic share only the topic's few words. How pairs make groups is `nearCopyGrouping`
+(below). When a phrase's df, the item count, its coherence and its `sourceBaseline` are measured, each
+group is one item (the first item of the group that holds the phrase stands for it), because two copies
+of a story are not two pieces of evidence. Attachment does not change: the hub lands on every copy,
+`items` and `why` count the items it lands on, and when copies made a difference `why` says so, `recurs
+in 6 of 102 items (5 of 101 counting near-copies once)`. `df` is the count with copies once, so `items`
+can exceed it. `nearCopy: 0` turns this off.
 
 Why those numbers, from post-pipe's site corpus of 2026-10-31 (102 items, 5151 pairs) and the test
 corpora. Raw cosine cannot tell a copy from two short items on one topic, and removing one word is not
@@ -84,6 +84,38 @@ The flood pair stays at 0.38 or more with up to ten of its strongest shared word
 pair in the three corpora falls to 0.26 or less by three. 0.35 sits between 0.489 and 0.260 (about 1.4× from each). Before
 this, those two articles alone lifted 18 incidental words into hubs (`memory`, `danger`, `onto`,
 `staying`, …) and their relations (`memory` broadMatch `Climate and Environment`).
+
+**How near-copies group** (`nearCopyGrouping`). Below, a pair's likeness is the lower of its two figures
+(its cosine, and its cosine without its `nearCopyWords` strongest shared words), the one that has to
+reach `nearCopy`.
+
+| value | a group holds |
+|---|---|
+| `"all-pairs"` | items that are each other's near-copies, every pair. Pairs are taken from the most alike down, ties in item order (by key), and a pair joins its two groups only when every item of one is a near-copy of every item of the other. So an item two groups could take joins the group of the item it is most alike to, as long as it is a near-copy of every item already there |
+| `"chain"` (default) | the connected pairs: any near-copy pair joins its two groups (how groups were made before the switch) |
+
+The two differ only where an item is a near-copy of two items that are not near-copies of each other:
+a roundup that retells two different stories. On haroldyounghumxn.site's corpus of 2026-10-31 a
+ProPublica roundup ("Trump Has Tried to Exert More Control Over Elections. Here Are the Key Findings
+From Our Reporting.") is a near-copy of the Cleta Mitchell story (0.485) and of the mail-ballot story
+(0.396), which are 0.098 apart. `chain` makes the three one item, so the two stories are one piece of
+evidence. `all-pairs` groups the roundup with the Cleta Mitchell story and leaves the mail-ballot story
+its own item, so the roundup and the mail-ballot story count twice, though one retells the other. A
+grouping cannot say that one item overlaps two others, so neither value is right everywhere. On that
+corpus, at the 1.6× bar, `all-pairs` adds `class`, `extraordinary` and `regional` (on the roundup and
+the mail-ballot story), `procedures` and `switch` (on the two stories), and `available` and `delivered`
+(on all three; `delivered` was 1.439×, now 1.79×), and loses `injection` and `digital`: the one
+ScienceDaily item that chose each now chooses `procedures` or `switch` instead. A different grouping also
+changes N and the items the baselines are sampled from, so other hubs' `sourceRatio` moves slightly
+too: 71 of the 103 hubs both values admit, by 1% at the median (`atmosphere` 4.448× to 4.402×).
+`chain` is the default: on that corpus `all-pairs` brings in more generic words than it fixes, and
+loses a real cross-source topic (`injection`).
+
+The value is in every discovered record's parameters, and an unknown value is an error naming the two.
+Set it like the other discovery parameters, `{"discover": {"nearCopyGrouping": "all-pairs"}}`, in the file
+`rtz-discover --config` reads, or under `engine` in rtz-build's config. rtz-discover logs each group of
+two or more items on stderr, and each near-copy pair `all-pairs` left in different groups, with its
+likeness.
 
 **Below the bar.** Hubs whose `sourceRatio` is under `sourceCoherenceRatio` but at least
 `sourceRatioFloor` (1.0) are chosen in a second pass, after the first, from the slots the first pass
@@ -118,7 +150,7 @@ bar" below for what this is for.
 | `ignore` | `["untagged"]` | drop these tags entirely |
 | `sourceWeights` | `{"ScienceDaily":0.4}` | trust per tag-system when picking canonical labels |
 | `canon` | `{"weights":{…},"prefer":"short"}` | override the scoring weights / length preference |
-| `config` | partial `lib/config.js` defaults | e.g. `{"mergeThreshold":0.75}` |
+| `config` | partial `lib/config.js` defaults | e.g. `{"mergeThreshold":0.75}`; read by rtz-stone only: rtz-discover and rtz-emerge take theirs from `--config` (rtz-build's `engine`) |
 
 Labels are matched by `norm`, so `AI`, `ai`, `A.I.` are the same argument.
 

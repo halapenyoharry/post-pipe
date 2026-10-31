@@ -50,6 +50,7 @@ export const DEFAULTS = {
     sourceRatioFloor: 1.0, // hubs under sourceCoherenceRatio but at or above this are chosen in a second pass (never taking a first-pass slot), so a viewer can try a lower bar; at or above sourceCoherenceRatio it adds nothing
     nearCopy: 0.35, // two items whose TF-IDF cosine reaches this, and still reaches it once their nearCopyWords strongest shared words are removed, are near-copies (one story told twice) and count as one item when a phrase is measured; 0 turns it off
     nearCopyWords: 3, // how many of a pair's strongest shared words (its topic) are removed before asking whether it is still alike
+    nearCopyGrouping: 'chain', // chain | all-pairs; chain is the default because on haroldyounghumxn.site's corpus of 2026-10-31 it gave the better tagz (docs/FORMATS.md, How near-copies group). all-pairs: a group holds only items that are each other's near-copies, every pair; pairs join groups from the most alike down, so an item two groups could take (a roundup retelling two stories) joins the group of the item it is most alike to. chain: any near-copy pair joins two groups, so that roundup makes its two stories one item
     weight: 0.35,
     taggedToo: false, // also pick hubs FROM tagged items (default: hubs come from the untagged)
     bridgeTagged: true, // but attach selected hubs to tagged items that contain them, so the wire bridges into your vocabulary

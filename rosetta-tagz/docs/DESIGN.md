@@ -93,8 +93,13 @@ applied again at attachment, so a `why` could claim six items while two carried 
 Since 2026-10-31 near-copies count once. Two items that stay alike (`nearCopy`, 0.35) even after the
 three words they share most are removed are one story told twice, and when a phrase is measured (its
 df, the item count, its coherence, its source likeness) each such group is one item; the hub still lands
-on every copy. On post-pipe's site corpus two ProPublica articles about one Ruidoso flood had carried 18
-incidental words into hubs (`memory`, `danger`, `onto`, …) and junk relations (`memory` broadMatch
+on every copy. Which copies make a group is a switch, `nearCopyGrouping`: by default (`chain`) any near-copy
+pair joins two groups, which makes a roundup and the two different stories it retells one item;
+`all-pairs` keeps only items that are near-copies every pair, so the roundup joins the story it is most
+alike to and the other stays its own item. `chain` is the default because it gave the better tagz on
+haroldyounghumxn.site (FORMATS.md has the case and what each changes). On post-pipe's site
+corpus two ProPublica articles about one Ruidoso flood had carried 18 incidental words into hubs
+(`memory`, `danger`, `onto`, …) and junk relations (`memory` broadMatch
 `Climate and Environment`); raw cosine could not be the test, because two short items on one topic are
 more alike by it than the two articles (FORMATS.md has the numbers). Also since then every discovered
 record carries its measured `sourceRatio`, and hubs down to `sourceRatioFloor` are chosen in a second
@@ -118,7 +123,7 @@ assertions, not every edge it ends up with.
 
 ## What was verified, and how
 
-- 158 `node:test` tests (2026-10-31): normalisation, each signal, clustering, overrides, canonical scoring,
+- 165 `node:test` tests (2026-10-31): normalisation, each signal, clustering, overrides, canonical scoring,
   emergence/discovery, all four graph projections, and the real programs run as separate processes
   (including the fully piped form and an external scorer).
 - Real corpus runs (your Posts + post-pipe's feed) found five defects the synthetic data hid; each now

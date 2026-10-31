@@ -20,7 +20,8 @@
 // same story in two articles, not two articles on one topic) are not two pieces of evidence: when a
 // phrase's df, the item count and the coherence and source likeness are measured, each group of
 // near-copies is one item. The hub is still attached to every copy, and `why` still counts the items
-// it lands on.
+// it lands on. How pairs make groups is `nearCopyGrouping`: "all-pairs" (every two items of a group are
+// near-copies) or "chain" (any near-copy pair joins two groups); see nearCopyGroups below.
 // Below the bar, down to `sourceRatioFloor`, hubs are chosen in a second pass after the first, from
 // the slots the first pass left, so they never take a slot from (or change) a hub at or above it.
 // Selected hubs are attached to every item containing them, tagged items included, so the wire
@@ -80,29 +81,55 @@ function likenessBeyond(A, B, d, k) {
   return den > 1e-9 ? num / den : 0;
 }
 
-// near-copy groups among the representative items (sorted by key): item key -> the group's first
-// key. A pair whose cosine reaches `threshold` and still reaches it without its `words` strongest
-// shared words is one story told twice; groups are the connected pairs. A falsy threshold turns it off.
-function nearCopies(reps, vec, threshold, words) {
-  const head = new Map(reps.map((it) => [it.key, it.key]));
-  if (!threshold) return head;
-  const find = (k) => {
-    while (head.get(k) !== k) k = head.get(k);
-    return k;
-  };
+// The near-copy pairs among the representative items (sorted by key), as [i, j, likeness] with i < j
+// indexes into reps. A pair whose cosine reaches `threshold` and still reaches it without its `words`
+// strongest shared words is one story told twice; `likeness` is the lower of those two figures, the one
+// that had to reach `threshold`. A falsy threshold finds none.
+function nearCopyPairs(reps, vec, threshold, words) {
+  const pairs = [];
+  if (!threshold) return pairs;
   for (let i = 0; i < reps.length; i++) {
     const A = vec.get(reps[i].key);
     for (let j = i + 1; j < reps.length; j++) {
       const B = vec.get(reps[j].key);
       const d = dot(A, B);
-      if (d < threshold || likenessBeyond(A, B, d, words) < threshold) continue;
-      const x = find(reps[i].key);
-      const y = find(reps[j].key);
-      if (x !== y) head.set(x < y ? y : x, x < y ? x : y);
+      if (d < threshold) continue;
+      const beyond = likenessBeyond(A, B, d, words);
+      if (beyond < threshold) continue;
+      pairs.push([i, j, Math.min(d, beyond)]);
     }
   }
-  for (const it of reps) head.set(it.key, find(it.key));
-  return head;
+  return pairs;
+}
+
+const NEAR_COPY_GROUPINGS = ['all-pairs', 'chain'];
+
+// Near-copy groups: item key -> the group's first key (reps are sorted by key, so that is its smallest).
+//   chain      any near-copy pair joins its two groups: the groups are the connected pairs, so a roundup
+//              that retells two different stories makes the two stories one item
+//   all-pairs  a group holds only items that are each other's near-copies, every pair. Pairs are taken
+//              from the most alike down (ties in item order), and a pair joins its two groups only when
+//              every item of one is a near-copy of every item of the other. So an item two groups could
+//              take joins the group of the item it is most alike to, as long as it is a near-copy of
+//              every item already there; the roundup joins one story and the other stays its own item.
+function nearCopyGroups(reps, pairs, grouping) {
+  const n = reps.length;
+  const of = reps.map((_, i) => i); // item index -> group, named by its smallest item index
+  const members = reps.map((_, i) => [i]);
+  const near = new Set(pairs.map(([i, j]) => i * n + j));
+  const isNear = (x, y) => near.has(x < y ? x * n + y : y * n + x);
+  const order = grouping === 'chain' ? pairs : [...pairs].sort((p, q) => q[2] - p[2] || p[0] - q[0] || p[1] - q[1]);
+  for (const [i, j] of order) {
+    const [gi, gj] = of[i] < of[j] ? [of[i], of[j]] : [of[j], of[i]];
+    if (gi === gj) continue;
+    if (grouping === 'all-pairs' && !members[gi].every((x) => members[gj].every((y) => isNear(x, y)))) continue;
+    for (const x of members[gj]) {
+      members[gi].push(x);
+      of[x] = gi;
+    }
+    members[gj] = [];
+  }
+  return new Map(reps.map((it, i) => [it.key, reps[of[i]].key]));
 }
 
 // contiguous unigram/bigram candidates, never spanning punctuation
@@ -139,9 +166,13 @@ function withoutPhrase(tf, idf, drop) {
 }
 
 // `info`, when given, is filled with what the run measured beside the records: { nearCopies: [[item
-// keys] per group of two or more] }.
+// keys] per group of two or more], nearCopiesApart: [[key, key, likeness] per near-copy pair whose items
+// ended in different groups, which only "all-pairs" leaves] }.
 export function discover(records, cfg = makeConfig(), info = null) {
   const D = cfg.discover;
+  if (!NEAR_COPY_GROUPINGS.includes(D.nearCopyGrouping)) {
+    throw new Error(`unknown discover.nearCopyGrouping ${JSON.stringify(D.nearCopyGrouping)} (${NEAR_COPY_GROUPINGS.join(', ')})`);
+  }
   const corpus = loadCorpus(records);
   const reps = [...corpus.items.values()].filter((it) => (corpus.canonItem.get(it.key) ?? it.key) === it.key).sort((a, b) => (a.key < b.key ? -1 : 1));
   const perItem = new Map(reps.map((it) => [it.key, candidates(it)]));
@@ -155,7 +186,8 @@ export function discover(records, cfg = makeConfig(), info = null) {
   const sim = (a, b) => dot(full.get(a), full.get(b));
 
   // near-copies count as one item: `units` holds each group's first item, and N counts groups
-  const groupOf = nearCopies(reps, full, D.nearCopy, D.nearCopyWords);
+  const copyPairs = nearCopyPairs(reps, full, D.nearCopy, D.nearCopyWords);
+  const groupOf = nearCopyGroups(reps, copyPairs, D.nearCopyGrouping);
   const units = reps.filter((it) => groupOf.get(it.key) === it.key);
   const N = units.length || 1;
   if (info) {
@@ -166,6 +198,9 @@ export function discover(records, cfg = makeConfig(), info = null) {
       groups.get(g).push(it.key);
     }
     info.nearCopies = [...groups.values()].filter((g) => g.length > 1);
+    info.nearCopiesApart = copyPairs
+      .filter(([i, j]) => groupOf.get(reps[i].key) !== groupOf.get(reps[j].key))
+      .map(([i, j, likeness]) => [reps[i].key, reps[j].key, Number(likeness.toFixed(3))]);
   }
   const distinctItems = (keys) => new Set(keys.map((k) => groupOf.get(k))).size;
 
@@ -399,6 +434,7 @@ export function discover(records, cfg = makeConfig(), info = null) {
             perItem: D.perItem,
             nearCopy: D.nearCopy,
             nearCopyWords: D.nearCopyWords,
+            nearCopyGrouping: D.nearCopyGrouping,
             sourceCoherenceRatio: D.sourceCoherenceRatio,
             ...(below ? { sourceRatioFloor: floor } : {}),
             df: df.get(key),

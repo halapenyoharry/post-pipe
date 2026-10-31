@@ -27,6 +27,7 @@ try {
   const under = found.filter((r) => r.wasGeneratedBy?.parameters?.sourceRatioFloor !== undefined);
   if (under.length) log(`rtz-discover: ${new Set(under.map((r) => r.label)).size} of those phrases (${under.length} tags) are under the ${under[0].wasGeneratedBy.parameters.sourceCoherenceRatio}× bar, admitted by the ${under[0].wasGeneratedBy.parameters.sourceRatioFloor}× floor for a viewer to try lower bars`);
   for (const g of info.nearCopies ?? []) log(`rtz-discover: near-copies counted as one item: ${g.join(' = ')}`);
+  for (const [a, b, likeness] of info.nearCopiesApart ?? []) log(`rtz-discover: near-copies counted apart, since not every item of one group is a near-copy of every item of the other: ${a} ~ ${b} (${likeness})`);
 } catch (e) {
   die(`rtz-discover: ${e.message}`);
 }
