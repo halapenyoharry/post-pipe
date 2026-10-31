@@ -501,6 +501,31 @@ function ratioOf(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+// What an untagged entry carries beside its id, source and why, only where
+// rosetta-tagz wrote it: reason and reasons (codes, rosetta-tagz/docs/FORMATS.md),
+// under (its tags under the bar: concept, label, origin, sourceRatio) and
+// candidates (every candidate phrase, grouped by what became of it).
+function untaggedExtra(u) {
+  const out = {};
+  if (typeof u.reason === 'string' && u.reason) out.reason = u.reason;
+  if (Array.isArray(u.reasons)) out.reasons = u.reasons.filter((r) => typeof r === 'string' && r);
+  if (Array.isArray(u.under)) {
+    out.under = [];
+    for (const t of u.under) {
+      if (!t || typeof t !== 'object') continue;
+      const e = {};
+      if (typeof t.concept === 'string') e.concept = t.concept;
+      if (typeof t.label === 'string') e.label = t.label;
+      if (typeof t.origin === 'string') e.origin = t.origin;
+      const r = ratioOf(t.sourceRatio);
+      if (r !== undefined) e.sourceRatio = r;
+      out.under.push(e);
+    }
+  }
+  if (u.candidates && typeof u.candidates === 'object' && !Array.isArray(u.candidates)) out.candidates = u.candidates;
+  return out;
+}
+
 function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, options = {}) {
   const conceptById = new Map();
   for (const c of universe.concepts || []) {
@@ -556,7 +581,7 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
       }
       if (uItem.key) {
         if (!joinedByKey.has(uItem.key)) joinedByKey.set(uItem.key, []);
-        joinedByKey.get(uItem.key).push({ id, source: sysName });
+        joinedByKey.get(uItem.key).push({ id, source: sysName, item });
       }
 
       const originalTags = Array.isArray(item.tags) ? item.tags : [];
@@ -643,8 +668,10 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
         newTagRefs.push(ref);
       }
 
+      // A reference saying why the tag list is empty is this build's to
+      // write (below), so one an earlier build or an upstream feed left goes.
       const nonTagRefs = Array.isArray(item._references)
-        ? item._references.filter((ref) => ref && ref.type !== 'tag')
+        ? item._references.filter((ref) => ref && ref.type !== 'tag' && ref.type !== 'untagged')
         : [];
 
       item.tags = newTags;
@@ -744,12 +771,24 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
   if (Object.keys(skos.mappingCounts).length) summary.mappings = skos.mappingCounts;
 
   // rosetta-tagz's untagged items (from the universe, else build.json, which
-  // rtz-build writes too), on post-pipe's ids: a universe key joined by one or
+  // rtz-build writes), on post-pipe's ids: a universe key joined by one or
   // more post-pipe items names each of them; one joined by none keeps the id
-  // and source rosetta-tagz gave. An empty list writes nothing.
+  // and source rosetta-tagz gave. build.json's report is an object, { bar,
+  // count, none, items }; a bare list (rosetta-tagz before 2026-10-31, or a
+  // universe carrying one) is read the same. Each entry keeps its why, and,
+  // where rosetta-tagz gave them, its reason codes, its tags under the bar
+  // (each with the ratio a viewer must be set at or below to show it, so the
+  // viewer can tell which cards it tags again at another ratio without a
+  // rebuild) and its candidates. Each joined item also gets a reference of
+  // type untagged with the same why, reasons and under (the candidates stay
+  // in the summary), so its own reference list says why it shows no tag. Nothing is forced onto it. An empty list writes nothing.
+  const report = buildManifest && buildManifest.untagged && typeof buildManifest.untagged === 'object'
+    && !Array.isArray(buildManifest.untagged) && Array.isArray(buildManifest.untagged.items)
+    ? buildManifest.untagged
+    : null;
   const untaggedList = Array.isArray(universe.untagged)
     ? universe.untagged
-    : (buildManifest && Array.isArray(buildManifest.untagged) ? buildManifest.untagged : null);
+    : (report ? report.items : (buildManifest && Array.isArray(buildManifest.untagged) ? buildManifest.untagged : null));
   if (untaggedList && untaggedList.length) {
     const items = [];
     for (const u of untaggedList) {
@@ -760,17 +799,32 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
       const why = Array.isArray(u.why)
         ? u.why.filter((w) => typeof w === 'string' && w)
         : (typeof u.why === 'string' && u.why ? [u.why] : []);
+      const extra = untaggedExtra(u);
       const joined = joinedByKey.get(key);
       if (joined && joined.length) {
-        for (const j of joined) items.push({ id: j.id, source: j.source, why: [...why] });
+        for (const j of joined) {
+          items.push({ id: j.id, source: j.source, why: [...why], ...JSON.parse(JSON.stringify(extra)) });
+          if (j.item) {
+            const refs = Array.isArray(j.item._references) ? j.item._references : [];
+            const ref = { type: 'untagged', why: [...why], ...JSON.parse(JSON.stringify(extra)) };
+            delete ref.candidates; // the full candidate lists stay in feed._rtagz.untagged
+            j.item._references = [...refs, ref];
+          }
+        }
       } else {
         const sep = key.indexOf('::');
         const id = u.id !== undefined && u.id !== null ? String(u.id) : (sep >= 0 ? key.slice(sep + 2) : key);
         const source = typeof u.source === 'string' ? u.source : (sep >= 0 ? key.slice(0, sep) : '');
-        items.push({ id, source, why });
+        items.push({ id, source, why, ...extra });
       }
     }
-    if (items.length) summary.untagged = { count: items.length, items };
+    if (items.length) {
+      summary.untagged = { count: items.length, items };
+      if (report) {
+        if (typeof report.bar === 'number' || report.bar === null) summary.untagged = { bar: report.bar, ...summary.untagged };
+        summary.untagged.none = items.filter((x) => !Array.isArray(x.under) || x.under.length === 0).length;
+      }
+    }
   }
 
   if (skos.external && Object.keys(skos.external).length) summary.external = JSON.parse(JSON.stringify(skos.external));

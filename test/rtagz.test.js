@@ -783,6 +783,60 @@ test('rtagz: untagged is read from build.json when the universe lacks it, and an
   assert.ok(!('external' in empty), 'an empty external map is not written');
 });
 
+test('rtagz: build.json\'s untagged report carries the bar, the count, each card\'s reasons and its tags under the bar, and each untagged card\'s own references say why its list is empty', () => {
+  const results = cloneResults();
+  const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
+  const universe = {
+    concepts: [
+      { id: 'c_x', canonical: 'X', pinned: false, discovered: false, n: 1, nEmergent: 0, variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }], rank: [] },
+      { id: 'c_killed', canonical: 'killed', pinned: false, discovered: true, n: 0, nEmergent: 1, sourceRatio: 1.514, variants: [{ label: 'killed', count: 1, formsBySource: { discovered: { killed: 1 } } }], rank: [] },
+    ],
+    items: [
+      { key: 'ScienceWire::wire-1', source: 'ScienceWire', url: 'https://www.EXAMPLE.test/shared-article/?utm=1#top', title: 'Thinking With Artificial Intelligence',
+        tags: [{ c: 'c_killed', w: 0.4, origin: 'discovered', raw: [], sys: ['ScienceWire'], via: 'unmapped', why: 'recurs in 2 of 9 items', sourceRatio: 1.514 }] },
+      { key: 'Posts::https://example.test/post-2.html', source: 'Posts', url: 'https://example.test/post-2.html', title: 'On Machine Learning and Systems', tags: [{ c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' }] },
+    ],
+    relations: [],
+  };
+  const candidates = { phrases: 5, single: 4, underFloor: [{ phrase: 'crisis', sourceRatio: 0.983 }] };
+  const manifest = {
+    built: 'x', stages: [],
+    untagged: {
+      bar: 1.6, count: 2, none: 1,
+      items: [
+        { key: 'ScienceWire::wire-1', source: 'ScienceWire', id: 'wire-1', title: 'Thinking', reason: 'underBar', reasons: ['underBar', 'underFloor'],
+          why: ['only tagz under the 1.6× source coherence bar: killed 1.514', 'phrases under the 1× floor: crisis 0.983'],
+          under: [{ concept: 'c_killed', label: 'killed', origin: 'discovered', sourceRatio: 1.514 }], candidates },
+        { key: 'Journal::j-gone', source: 'Journal', id: 'j-gone', title: 'Gone', reason: 'noRecurring', reasons: ['noRecurring'], why: ['none of its 3 candidate phrases recurs on another item'], under: [] },
+      ],
+    },
+  };
+  // a reference an earlier build left on post-1 says nothing about this build
+  const post1 = results.find((r) => r.config && r.config.title === 'Posts').items.find((i) => i.id === 'https://example.test/post-1.html');
+  post1._references = [...(post1._references || []), { type: 'untagged', why: ['stale'] }];
+  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, manifest, { siteTitle: 'Fixture Site' });
+  const why = manifest.untagged.items[0].why;
+  const under = manifest.untagged.items[0].under;
+  assert.deepStrictEqual(summary.untagged, {
+    bar: 1.6,
+    count: 3,
+    items: [
+      { id: 'https://example.test/post-1.html', source: 'Posts', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under, candidates },
+      { id: 'wire-1', source: 'ScienceWire', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under, candidates },
+      { id: 'j-gone', source: 'Journal', why: ['none of its 3 candidate phrases recurs on another item'], reason: 'noRecurring', reasons: ['noRecurring'], under: [] },
+    ],
+    none: 1,
+  });
+  const wire1 = results.find((r) => r.config && r.config.title === 'ScienceWire').items.find((i) => i.id === 'wire-1');
+  for (const item of [post1, wire1]) {
+    const notes = item._references.filter((r) => r.type === 'untagged');
+    assert.deepStrictEqual(notes, [{ type: 'untagged', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under }], 'one note, this build\'s, without the candidate lists');
+    assert.deepStrictEqual(item.tags, ['killed'], 'nothing is forced onto it: it keeps exactly the tag rosetta-tagz gave, under the bar');
+  }
+  const post2 = results.find((r) => r.config && r.config.title === 'Posts').items.find((i) => i.id === 'https://example.test/post-2.html');
+  assert.ok(!post2._references.some((r) => r.type === 'untagged'), 'a tagged card gets no note');
+});
+
 test('rtagz: with rosetta-tagz off, items and the corpus carry none of the new fields', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-rtagz-off-'));
   try {
