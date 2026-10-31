@@ -23,7 +23,7 @@ containment / opposition / synergy / near-equivalence. Mapping:
 | adjacency | `adjacent`, `related` |
 | synergy, opposition | human-authored in `overrides.json` only |
 | "user picks which system to display labels through" | `sourceWeights` / per-system **trust** and `canon.prefer` |
-| SKOS as prior art | the model is SKOS-shaped: concept ≈ `skos:Concept`, canonical ≈ `prefLabel`, variants ≈ `altLabel`, `broader`/`related` carry over. A SKOS export is a small addition, not a redesign |
+| SKOS as prior art | the model is SKOS-shaped: concept ≈ `skos:Concept`, canonical ≈ `prefLabel`, variants ≈ `altLabel`, `broader`/`related` carry over. `rtz-skos` writes it out as SKOS with PROV (FORMATS.md) |
 
 ## Principles
 
@@ -148,7 +148,8 @@ assertions, not every edge it ends up with.
 ## Not done (candidates, in rough order of value)
 
 1. Feed `overrides.json` edits back from the viewer (it shows the fragment; applying it is manual).
-2. SKOS / JSON-LD export for interchange.
-3. Persist concept ids across membership changes (today ids move if the smallest member changes).
-4. Use embeddings as an *optional* `rtz-pairs` scorer for synonyms with no lexical or item overlap.
-5. Non-English stemmers and generic-word lists.
+2. Use embeddings as an *optional* `rtz-pairs` scorer for synonyms with no lexical or item overlap.
+3. Non-English stemmers and generic-word lists.
+
+(The SKOS export, `rtz-skos`, was built on 2026-10-31, and concept ids persist through the ledger
+since 2026-10-25; both are in FORMATS.md.)

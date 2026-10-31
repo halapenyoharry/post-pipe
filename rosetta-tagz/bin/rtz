@@ -20,6 +20,7 @@ pipeline:
   stone      records -> stone.json   (concepts, canonical labels, relations)
   emerge     records + stone.json -> tags earned by text
   universe   stone.json + records -> universe.json
+  skos       universe -> skos.jsonld + skos.ttl (SKOS with PROV)
   graph      universe -> {nodes, links}   (raw | hyper | dyadic | concepts)
   view       universe -> standalone 3D HTML viewer
   build      the whole pipeline from one config file

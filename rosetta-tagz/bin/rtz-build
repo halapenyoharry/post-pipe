@@ -29,11 +29,13 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
     "noSeed": false,
     "discover": false,                 propose new tags for untagged items from recurring phrases
     "emerge": true,                    earn tags from item text (concepts rtz-stone already made)
-    "engine": { "mergeThreshold": 0.7 }   optional overrides of lib/config.js defaults
+    "engine": { "mergeThreshold": 0.7 },  optional overrides of lib/config.js defaults
+    "skos": { "base": "urn:rosetta-tagz:", "lang": "en" }   the SKOS files' base IRI and label language
+                                       (both provisional; defaults shown); false writes no SKOS files
   }
 
 Writes to OUTDIR: records.jsonl, [records.discovered.jsonl, discover.report.json], stone.json, records.all.jsonl, universe.json,
-view.html, build.json (stages; the ledger summary: path, minted, reused, retired, splits, merges, this build's events;
+skos.jsonld and skos.ttl (rtz-skos; a failure there is one line, never a failed build), view.html, build.json (stages; the ledger summary: path, minted, reused, retired, splits, merges, this build's events;
 and untagged: every item with no tag shown at the build's bar, and why), and the ledger at its path`;
 
 const { values } = cli('rtz-build', usage, {
@@ -106,6 +108,24 @@ if (config.emerge !== false && !values['no-emerge']) {
 }
 log('universe');
 stage('universe', 'rtz-universe', [path.join(out, 'stone.json'), finalRecords, '-o', path.join(out, 'universe.json')]);
+// The SKOS serialization never fails a build: a failure is one line, and neither file is written.
+if (config.skos !== false) {
+  const skos = config.skos && typeof config.skos === 'object' ? config.skos : {};
+  const args = [path.join(out, 'universe.json'), '-o', out];
+  if (typeof skos.base === 'string') args.push('--base', skos.base);
+  if (skos.lang === null || skos.lang === false || skos.lang === '') args.push('--no-lang');
+  else if (typeof skos.lang === 'string') args.push('--lang', skos.lang);
+  log('skos');
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, [path.join(bin, 'rtz-skos'), ...args], { encoding: 'utf8', maxBuffer: 1 << 30 });
+  if (r.status === 0) {
+    if (r.stderr) process.stderr.write(r.stderr.split('\n').filter(Boolean).map((l) => `  ${l}\n`).join(''));
+    manifest.stages.push({ name: 'skos', program: 'rtz-skos', ms: Date.now() - t0 });
+  } else {
+    const last = (r.stderr || '').trim().split('\n').pop() || `exit ${r.status}`;
+    log(`rtz-build: skos files not written (${last})`);
+  }
+}
 if (!values['no-view']) {
   log('view');
   stage('view', 'rtz-view', [path.join(out, 'universe.json'), '-o', path.join(out, 'view.html')]);

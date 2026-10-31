@@ -164,9 +164,9 @@ test('rtz build runs the whole pipeline from a config file', () => {
   fs.writeFileSync(cfg, JSON.stringify({ out, sources: [{ adapter: 'jsonfeed', path: `${SYN}wire.feed.json` }, { adapter: 'pairs', path: `${SYN}archive.tsv`, source: 'Archive' }] }));
   const r = run('rtz', ['build', '--config', cfg]);
   assert.equal(r.status, 0, r.err);
-  for (const f of ['records.jsonl', 'stone.json', 'records.all.jsonl', 'universe.json', 'view.html', 'build.json', 'ledger.json']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  for (const f of ['records.jsonl', 'stone.json', 'records.all.jsonl', 'universe.json', 'skos.jsonld', 'skos.ttl', 'view.html', 'build.json', 'ledger.json']) assert.ok(fs.existsSync(path.join(out, f)), f);
   const build = JSON.parse(fs.readFileSync(path.join(out, 'build.json'), 'utf8'));
-  assert.deepEqual(build.stages.map((s) => s.name), ['ingest jsonfeed', 'ingest pairs', 'stone', 'emerge', 'universe', 'view']);
+  assert.deepEqual(build.stages.map((s) => s.name), ['ingest jsonfeed', 'ingest pairs', 'stone', 'emerge', 'universe', 'skos', 'view']);
   const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
   assert.deepEqual(build.ledger, { path: path.join(out, 'ledger.json'), minted: stone.concepts.length, reused: 0, retired: 0, splits: 0, merges: 0, events: [] });
   const universe = JSON.parse(fs.readFileSync(path.join(out, 'universe.json'), 'utf8'));

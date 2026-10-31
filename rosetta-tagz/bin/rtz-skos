@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+// Writes the SKOS serialization of a universe beside it: skos.jsonld and skos.ttl, the same triples
+// in two syntaxes (docs/FORMATS.md, "SKOS serialization"). Both files are written or neither is.
+import fs from 'node:fs';
+import path from 'node:path';
+import { cli, die, readJSON, log } from '../lib/io.js';
+import { buildSkos, DEFAULT_BASE, DEFAULT_LANG } from '../lib/skos.js';
+
+const usage = `rtz-skos — write a universe as SKOS with PROV: skos.jsonld and skos.ttl
+
+usage: rtz-skos <universe.json> [-o DIR] [--base IRI] [--lang TAG | --no-lang]
+
+  -o DIR     where to write (default: the folder of universe.json)
+  --base     the IRI concepts, schemes and items are named under (default ${DEFAULT_BASE}, provisional)
+  --lang     the language tag on every label (default ${DEFAULT_LANG}); --no-lang writes plain literals`;
+
+const { values, positionals } = cli('rtz-skos', usage, {
+  o: { type: 'string', short: 'o' },
+  base: { type: 'string' },
+  lang: { type: 'string' },
+  'no-lang': { type: 'boolean' },
+});
+const [universeFile] = positionals;
+if (!universeFile) die(usage, 2);
+try {
+  const out = path.resolve(values.o ?? path.dirname(universeFile));
+  const { turtle, jsonld, triples } = buildSkos(readJSON(universeFile), {
+    base: values.base ?? DEFAULT_BASE,
+    lang: values['no-lang'] ? null : (values.lang ?? DEFAULT_LANG),
+  });
+  fs.mkdirSync(out, { recursive: true });
+  const files = [['skos.jsonld', jsonld], ['skos.ttl', turtle]];
+  for (const [name, text] of files) fs.writeFileSync(path.join(out, `${name}.tmp`), text);
+  for (const [name] of files) fs.renameSync(path.join(out, `${name}.tmp`), path.join(out, name));
+  log(`rtz-skos: ${triples} triples -> ${files.map(([n]) => path.join(out, n)).join(', ')}`);
+} catch (e) {
+  die(`rtz-skos: ${e.message}`);
+}
