@@ -86,3 +86,64 @@ test('an unrecognised prominence falls back to the default rather than through',
   ));
   assert.strictEqual(feed.prominence, 'primary');
 });
+
+test('per-feed display attributes (cardScale, itemCap, defaultHidden) are parsed from OPML and applied by the aggregator', async () => {
+  const { loadCorpus } = require('../src/aggregator');
+  const { createViewState } = require('../src/lib/viewState');
+  const feeds = parseOpml(wrap(
+    `<outline type="rss" text="Busy" xmlUrl="https://busy.test/rss" cardScale="0.8" itemCap="2" defaultHidden="true"/>` +
+    `<outline type="rss" text="Plain" xmlUrl="https://plain.test/rss"/>`,
+  ));
+  assert.strictEqual(feeds[0].cardScale, 0.8);
+  assert.strictEqual(feeds[0].itemCap, 2);
+  assert.strictEqual(feeds[0].defaultHidden, true);
+  assert.strictEqual(feeds[1].cardScale, null);
+  assert.strictEqual(feeds[1].itemCap, null);
+  assert.strictEqual(feeds[1].defaultHidden, false);
+
+  const fakeAdapter = {
+    id: 'rss',
+    async load(cfg) {
+      return {
+        feedMeta: { id: cfg.id, title: cfg.title },
+        items: [
+          { id: `${cfg.id}#1`, url: `${cfg.id}/1.html`, title: 'One', date_published: '2026-01-01T00:00:00Z' },
+          { id: `${cfg.id}#2`, url: `${cfg.id}/2.html`, title: 'Two', date_published: '2026-01-03T00:00:00Z' },
+          { id: `${cfg.id}#3`, url: `${cfg.id}/3.html`, title: 'Three', date_published: '2026-01-02T00:00:00Z' },
+        ],
+      };
+    },
+  };
+
+  const corpus = await loadCorpus(
+    feeds.map((f) => ({ adapter: fakeAdapter, config: { ...f, id: f.xmlUrl } })),
+    {
+      feeds: {
+        'https://plain.test/rss': { cardScale: 1.25, itemCap: 1, defaultHidden: true },
+      },
+    },
+  );
+
+  const busySource = corpus.sources.find((s) => s.id === 'https://busy.test/rss');
+  const plainSource = corpus.sources.find((s) => s.id === 'https://plain.test/rss');
+  assert.strictEqual(busySource.cardScale, 0.8);
+  assert.strictEqual(busySource.itemCap, 2);
+  assert.strictEqual(busySource.defaultHidden, true);
+  assert.strictEqual(busySource.itemCount, 2, 'busy feed capped at 2 newest items');
+
+  assert.strictEqual(plainSource.cardScale, 1.25, 'settings.feeds overrides per-feed display parameters');
+  assert.strictEqual(plainSource.itemCap, 1);
+  assert.strictEqual(plainSource.defaultHidden, true);
+  assert.strictEqual(plainSource.itemCount, 1);
+
+  // ViewState seeds defaultHidden sources once and lets the reader unhide them.
+  const vs = createViewState({ debounceMs: 0 });
+  await vs.ready();
+  vs.seedHiddenSources(corpus.sources.filter((s) => s.defaultHidden).map((s) => s.id));
+  assert.strictEqual(vs.isHidden('https://busy.test/rss'), true);
+  vs.toggleSource('https://busy.test/rss');
+  assert.strictEqual(vs.isHidden('https://busy.test/rss'), false);
+  vs.seedHiddenSources(corpus.sources.filter((s) => s.defaultHidden).map((s) => s.id));
+  assert.strictEqual(vs.isHidden('https://busy.test/rss'), false, 're-seeding does not override reader choice');
+});
+

@@ -70,6 +70,11 @@ function feedToGraph(feed, config = {}) {
     }
   }
 
+  const sourceScaleById = new Map();
+  for (const s of (feed._sources || [])) {
+    if (s && s.id && Number(s.cardScale) > 0) sourceScaleById.set(s.id, Number(s.cardScale));
+  }
+
   for (const item of feed.items) {
     const slug = item.url.split('/').pop().replace('.html', '');
     idToSlug.set(item.id, slug);
@@ -83,6 +88,11 @@ function feedToGraph(feed, config = {}) {
         break;
       }
     }
+
+    const rawSourceScale = Number(item._source && item._source.cardScale)
+      || (item._source && sourceScaleById.get(item._source.id))
+      || 1;
+    const sourceCardScale = Number.isFinite(rawSourceScale) && rawSourceScale > 0 ? rawSourceScale : 1;
 
     nodes.push({
       id: slug,
@@ -132,6 +142,8 @@ function feedToGraph(feed, config = {}) {
       link: isLinkItem(item) ? linkOf(item) : '',
       subtitle: item.subtitle || '',
       _source: item._source || null,
+      _sourceCardScale: sourceCardScale,
+      _cardScale: sourceCardScale,
       originalItem: item
     });
   }
@@ -650,13 +662,19 @@ export function GraphViewer({
 
   // Apply visibility from outside the main simulation effect.
   useEffect(() => {
-    hiddenSourcesRef.current = hiddenSources instanceof Set
-      ? hiddenSources
-      : new Set(hiddenSources || []);
+    if (hiddenSources instanceof Set) {
+      hiddenSourcesRef.current = hiddenSources;
+    } else if (Array.isArray(hiddenSources)) {
+      hiddenSourcesRef.current = new Set(hiddenSources);
+    } else {
+      hiddenSourcesRef.current = new Set(
+        ((feedData && feedData._sources) || []).filter((s) => s && s.defaultHidden).map((s) => s.id),
+      );
+    }
     if (!svgRef.current || !cardsLayerRef.current) return;
     applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
     if (relationsUpdateRef.current) relationsUpdateRef.current();
-  }, [hiddenSources]);
+  }, [hiddenSources, feedData]);
 
   // Settings writes a color profile to viewState; this repaints instantly by
   // setting the CSS custom properties every bubble and card already reads
@@ -1967,10 +1985,12 @@ export function GraphViewer({
       }
       res = run();
       CL = res;
-      // Each laid-out card is drawn at its container's cardScale.
+      // Each laid-out card is drawn at its container's cardScale and its feed's cardScale.
       for (const n of data.nodes) {
         const p = CL.nodes.get(n.id);
-        n._cardScale = p && p.scale > 0 ? p.scale : 1;
+        const containerScale = p && p.scale > 0 ? p.scale : 1;
+        const feedScale = n._sourceCardScale > 0 ? n._sourceCardScale : 1;
+        n._cardScale = containerScale * feedScale;
       }
     }
 

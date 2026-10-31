@@ -226,6 +226,9 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
     viewStateRef.current = vs;
     vs.ready().then(() => {
       vs.prune((feedData.items || []).map((i) => i.id));
+      if (vs.seedHiddenSources) {
+        vs.seedHiddenSources((feedData._sources || []).filter((s) => s && s.defaultHidden).map((s) => s.id));
+      }
       if (vs.state.layout === 'timeline') vs.setLayout('force');
       setViewState(vs);
       setHydrated(true);

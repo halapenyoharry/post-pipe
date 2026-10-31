@@ -63,6 +63,9 @@ function configFor(entry) {
     customColor: entry.customColor,
     folder: entry.folder,
     prominence: entry.prominence,
+    cardScale: entry.cardScale,
+    itemCap: entry.itemCap,
+    defaultHidden: entry.defaultHidden,
   };
   if (entry.type === 'local') {
     let localPath = entry.xmlUrl.replace(/^local:\/\//, '');
@@ -583,6 +586,9 @@ ${reactJs}
         let off = null;
         viewState.ready().then(function () {
           viewState.prune((feed.items || []).map(function (i) { return i.id; }));
+          if (viewState.seedHiddenSources) {
+            viewState.seedHiddenSources((feed._sources || []).filter(function (s) { return s && s.defaultHidden; }).map(function (s) { return s.id; }));
+          }
           // Timeline was pulled from the layout picker below — a reader
           // stranded on it from before would otherwise have no button left
           // that could get them off it.
@@ -872,6 +878,7 @@ async function main() {
     rtagz: rtagzSettings(SETTINGS),
     siteRoot: SITE_ROOT,
     containment: SETTINGS.containment,
+    feeds: SETTINGS.feeds,
     siteTitle: SETTINGS.site && typeof SETTINGS.site.title === 'string' ? SETTINGS.site.title : '',
     cacheDir: rtagzCacheDir,
   });

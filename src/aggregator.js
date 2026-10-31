@@ -5,6 +5,35 @@ const { fetchText }       = require('./adapters/fetchText');
 const { readLastGood, writeLastGood, DEFAULT_DIR: LAST_GOOD_DIR } = require('./adapters/lastGoodCopy');
 const { ColorCache }      = require('./lib/colorCache');
 const { runRtagzPhase }   = require('./lib/rtagz');
+const { parseCardScale, parseItemCap, parseDefaultHidden } = require('./lib/opml');
+
+function resolveFeedDisplay(config = {}, feedMeta = {}, feedsMap = null) {
+  const map = feedsMap && typeof feedsMap === 'object' ? feedsMap : (config.settings && config.settings.feeds) || {};
+  const keys = [
+    feedMeta.id,
+    config.id,
+    config.xmlUrl,
+    feedMeta.title,
+    config.title,
+  ].filter((k) => typeof k === 'string' && k);
+  let override = null;
+  for (const k of keys) {
+    if (map[k] && typeof map[k] === 'object') { override = map[k]; break; }
+  }
+  const rawScale = override && override.cardScale !== undefined ? override.cardScale : config.cardScale;
+  const rawCap = override && (override.itemCap !== undefined || override.maxItems !== undefined)
+    ? (override.itemCap !== undefined ? override.itemCap : override.maxItems)
+    : (config.itemCap !== undefined ? config.itemCap : config.maxItems);
+  const rawHidden = override && (override.defaultHidden !== undefined || override.hidden !== undefined)
+    ? (override.defaultHidden !== undefined ? override.defaultHidden : override.hidden)
+    : (config.defaultHidden !== undefined ? config.defaultHidden : config.hidden);
+
+  return {
+    cardScale: parseCardScale(rawScale),
+    itemCap: parseItemCap(rawCap),
+    defaultHidden: parseDefaultHidden(rawHidden),
+  };
+}
 
 // What went wrong, in one line: the error's message and, for a failed
 // network fetch, the network's own reason ("fetch failed (ECONNREFUSED)").
@@ -104,6 +133,21 @@ async function loadCorpus(entries, options = {}) {
     cache.set(r.feedMeta.id || r.config.id, r.color);
   }
 
+  // Apply per-feed display parameters (cardScale, itemCap, defaultHidden)
+  // from the OPML outline or settings.feeds before rosetta-tagz and stamping.
+  for (const r of results) {
+    const display = resolveFeedDisplay(r.config, r.feedMeta, options.feeds);
+    r.display = display;
+    if (display.itemCap !== null && Array.isArray(r.items) && r.items.length > display.itemCap) {
+      const sorted = r.items.slice().sort((a, b) => {
+        const da = new Date((a && a.date_published) || 0);
+        const db = new Date((b && b.date_published) || 0);
+        return db - da;
+      });
+      r.items = sorted.slice(0, display.itemCap);
+    }
+  }
+
   // rosetta-tagz phase: translate tags across systems after colours are
   // resolved and before provenance is stamped.
   const rtagzResult = await runRtagzPhase(results, options);
@@ -114,7 +158,7 @@ async function loadCorpus(entries, options = {}) {
   // its cards come from its last good copy, stale and copyDate (when that
   // copy was fetched). A feed that loaded as it should carries neither, so
   // its entry is exactly what it always was.
-  const sources = results.map(({ adapter, config, feedMeta, color, items, ok, stale, copyDate, error }) => {
+  const sources = results.map(({ adapter, config, feedMeta, color, items, ok, stale, copyDate, error, display }) => {
     const source = {
       id: feedMeta.id || config.id,
       title: feedMeta.title || config.title,
@@ -126,6 +170,9 @@ async function loadCorpus(entries, options = {}) {
       itemCount: items.length,
       ok,
     };
+    if (display && display.cardScale !== null) source.cardScale = display.cardScale;
+    if (display && display.itemCap !== null) source.itemCap = display.itemCap;
+    if (display && display.defaultHidden) source.defaultHidden = true;
     if (stale) {
       source.stale = true;
       source.copyDate = copyDate || null;
@@ -134,7 +181,7 @@ async function loadCorpus(entries, options = {}) {
     return source;
   });
 
-  const stamped = results.flatMap(({ adapter, config, items, feedMeta, color }) => {
+  const stamped = results.flatMap(({ adapter, config, items, feedMeta, color, display }) => {
     const source = {
       id: feedMeta.id || config.id,
       title: feedMeta.title || config.title,
@@ -142,6 +189,8 @@ async function loadCorpus(entries, options = {}) {
       color,
       prominence: config.prominence || 'secondary',
     };
+    if (display && display.cardScale !== null) source.cardScale = display.cardScale;
+    if (display && display.defaultHidden) source.defaultHidden = true;
     return items.map(item => ({ ...item, _source: source }));
   });
 
@@ -158,4 +207,4 @@ async function loadCorpus(entries, options = {}) {
   return out;
 }
 
-module.exports = { loadCorpus, describeError };
+module.exports = { loadCorpus, describeError, resolveFeedDisplay };

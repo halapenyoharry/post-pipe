@@ -544,6 +544,24 @@ function createViewState(opts = {}) {
       });
     },
 
+    // Seed sources marked defaultHidden on first visit without re-hiding one
+    // the reader later chose to show.
+    seedHiddenSources(sourceIds) {
+      const ids = Array.isArray(sourceIds) ? sourceIds.filter((id) => typeof id === 'string' && id) : [];
+      if (!ids.length) return;
+      const seeded = new Set(Array.isArray(state.seededHiddenSources) ? state.seededHiddenSources : []);
+      const fresh = ids.filter((id) => !seeded.has(id));
+      if (!fresh.length) return;
+      updateSilent((s) => {
+        const nextSeeded = new Set(Array.isArray(s.seededHiddenSources) ? s.seededHiddenSources : []);
+        for (const id of fresh) {
+          nextSeeded.add(id);
+          if (s.hiddenSources.indexOf(id) === -1) s.hiddenSources.push(id);
+        }
+        s.seededHiddenSources = Array.from(nextSeeded);
+      });
+    },
+
     isHidden(sourceId) { return state.hiddenSources.indexOf(sourceId) !== -1; },
 
     // A color the reader chose for one feed's dot, from the pill's ring
