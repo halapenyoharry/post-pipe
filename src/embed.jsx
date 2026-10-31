@@ -43,6 +43,7 @@ import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
 import { toolbarConfig } from './lib/toolbar';
 import { topBarConfig } from './lib/topBar';
+import { autodiscoverEnabled } from './lib/feedAutodiscovery';
 import './themes/sketchbook.css';
 
 // ── Default settings (mirrors settings.json structure) ───────────────────────
@@ -418,6 +419,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           onToggleSource={toggleSource}
           viewState={viewState}
           showAddButton={features.addFeed}
+          autodiscover={autodiscoverEnabled(settings)}
           showCount={showContainerCount(settings.graph)}
           links={topBarConfig(settings).links}
           subscribe={topBarConfig(settings).subscribe}

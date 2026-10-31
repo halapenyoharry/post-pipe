@@ -3,6 +3,7 @@ import styles from './FeedZ.module.css';
 import { Icon } from '../Icon/Icon';
 import { Subscribe } from './Subscribe';
 import { sourceStatus } from '../../lib/sourceStatus';
+import { discoverFeedUrl } from '../../lib/feedAutodiscovery';
 
 /**
  * FeedZ — pill-shaped feed list across a side of the viewport.
@@ -65,7 +66,7 @@ import { sourceStatus } from '../../lib/sourceStatus';
  * the copy's day and age; with no copy, the pill is struck through, its title
  * saying why.
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
@@ -160,7 +161,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
         if (k.startsWith('link:')) { const l = links.find((x) => `link:${x.id}` === k); return l ? renderLink(l) : null; }
         return null;
       })}
-      {showAddButton !== false && <AddPill />}
+      {showAddButton !== false && <AddPill autodiscover={autodiscover} />}
       {controls}
       {intro && <div className={styles.intro} data-graph-intro dangerouslySetInnerHTML={{ __html: intro }} />}
     </div>
@@ -336,7 +337,7 @@ function FeedDot({ color, sourceId, viewState }) {
   );
 }
 
-function AddPill() {
+function AddPill({ autodiscover = true }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   // pendingUrl is the URL the user just submitted; the result panel stays
@@ -353,9 +354,17 @@ function AddPill() {
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
     if (!urlIsValid) return;
-    setPendingUrl(value.trim());
+    const submitted = value.trim();
+    setPendingUrl(submitted);
     setValue('');
     setOpen(false);
+    if (autodiscover !== false) {
+      discoverFeedUrl(submitted, { autodiscover: true }).then((resolved) => {
+        if (resolved && resolved !== submitted) {
+          setPendingUrl((cur) => (cur === submitted ? resolved : cur));
+        }
+      });
+    }
   };
 
   const close = () => {
