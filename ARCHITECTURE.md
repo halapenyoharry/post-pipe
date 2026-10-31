@@ -120,7 +120,7 @@ Rich, topologically-native. Encodes the structure Harold actually thinks in.
   },
 
   "meta": {
-    "author": "harold young [humxn]",
+    "author": "Example Author",
     "written": "2025",
     "updated": null,
     "reading_time": "6 min",

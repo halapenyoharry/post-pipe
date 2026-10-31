@@ -189,8 +189,8 @@ test('author fallback: piece with no author takes site author (name, else displa
   }
 });
 
-test('author suffix kept: an author written as \'Harold Young [humxn]\' comes out as \'harold young [humxn]\'', async () => {
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-author-humxn-'));
+test('author suffix kept: an author written as \'Ada Lovelace [tag]\' comes out as \'ada lovelace [tag]\'', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-author-suffix-'));
   const contentDir = path.join(tmpRoot, 'items');
   const coversDir = path.join(tmpRoot, 'covers');
   const pagesDir = path.join(tmpRoot, 'pages');
@@ -199,11 +199,11 @@ test('author suffix kept: an author written as \'Harold Young [humxn]\' comes ou
     fs.mkdirSync(path.join(contentDir, 'with-author'), { recursive: true });
     fs.writeFileSync(
       path.join(contentDir, 'with-author', 'frontmatter.json'),
-      JSON.stringify({ title: 'Piece', meta: { author: 'Harold Young [humxn]' }, posted: true })
+      JSON.stringify({ title: 'Piece', meta: { author: 'Ada Lovelace [tag]' }, posted: true })
     );
 
     const { contents } = ingestFolder(contentDir);
-    assert.strictEqual(contents[0].author, 'harold young [humxn]');
+    assert.strictEqual(contents[0].author, 'ada lovelace [tag]');
 
     const { items } = await LocalFolderAdapter.load({
       id: 'local://items',
@@ -216,8 +216,8 @@ test('author suffix kept: an author written as \'Harold Young [humxn]\' comes ou
       settings: {},
     });
 
-    assert.strictEqual(items[0].author, 'harold young [humxn]');
-    assert.strictEqual(items[0].authors[0].name, 'harold young [humxn]');
+    assert.strictEqual(items[0].author, 'ada lovelace [tag]');
+    assert.strictEqual(items[0].authors[0].name, 'ada lovelace [tag]');
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }

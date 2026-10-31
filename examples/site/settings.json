@@ -6,7 +6,9 @@
     "base_url": "https://example.org/"
   },
   "author": {
-    "name": "Example Author"
+    "name": "Example Author",
+    "display": "Example Author",
+    "_note": "Default author for local pieces that do not name one in their own frontmatter (ingest.js, src/adapters/LocalFolderAdapter.js, src/lib/byline.js). name (or display) is used when a piece has no author of its own; empty leaves unauthored pieces without an author."
   },
   "content_dir": "pieces",
   "frontmatter_display": [

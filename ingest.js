@@ -230,7 +230,7 @@ function buildFromQmd(id, yaml, files, dir, defaultAuthor = '') {
     written:        yaml.publish_date || null,
     updated:        yaml.updated_date || null,
     reading_time:   yaml.reading_time || null,
-    author:         yaml.author || defaultAuthor,
+    author:         cleanAuthor(yaml.author) || defaultAuthor,
     tags:           yaml.tags || [],
     references:     Array.isArray(yaml._references) ? yaml._references : (Array.isArray(yaml.references) ? yaml.references : []),
     series:         yaml.series || null,
@@ -303,6 +303,7 @@ function withFrontMatter(c, data) {
   const out = { ...c };
   if (pick('title')) out.title = pick('title');
   if (pick('short_title')) out.short_title = pick('short_title');
+  if (pick('author')) out.author = cleanAuthor(pick('author'));
   if (blurbFromFrontMatter(data)) out.summary = blurbFromFrontMatter(data);
   if (Array.isArray(data.tags)) out.tags = data.tags;
   if (Array.isArray(data._references)) out.references = data._references;
