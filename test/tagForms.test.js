@@ -251,8 +251,14 @@ test('an rtagz summary in SKOS: the same concept by id and by canonical, with it
     altLabel: { ScienceDaily: ['A.I.'] },
     mappings: [{ type: 'exactMatch', target: 'iptc-mediatopics:20000763', weight: 1, why: 'same label' }],
   });
-  // The lines a tag bubble shows are unchanged by the new fields.
-  assert.deepStrictEqual(tagFormsLines(byId), ['ScienceDaily writes AI, A.I.', 'My Posts writes artificial intelligence', 'named by coverage']);
+  // The lines a tag bubble shows: what each system writes and who named it,
+  // as before, then the label in each scheme and the mappings (named in full
+  // in the tests below, with the schemes' names).
+  assert.deepStrictEqual(tagFormsLines(byId), [
+    'ScienceDaily writes AI, A.I.', 'My Posts writes artificial intelligence', 'named by coverage',
+    'in site: Artificial Intelligence', 'in My Posts: artificial intelligence', 'in ScienceDaily: AI',
+    'exactMatch iptc-mediatopics:20000763 · weight 1',
+  ]);
 
   // A concept with one system writing its canonical still shows nothing, by id or by label.
   assert.strictEqual(tagForms(RTAGZ_SKOS, 'u_neural_hardware'), null);
@@ -267,4 +273,62 @@ test('an rtagz summary in SKOS: the same concept by id and by canonical, with it
   byId.mappings[0].type = 'changed';
   assert.strictEqual(RTAGZ_SKOS.concepts[0].prefLabel.site, 'Artificial Intelligence');
   assert.strictEqual(RTAGZ_SKOS.concepts[0].mappings[0].type, 'exactMatch');
+});
+
+test('the tag detail: the label in each scheme, the site\'s own named by the site\'s title, one line per scheme', () => {
+  const lines = tagFormsLines(tagForms(RTAGZ_SKOS, 'c_ai'), { rtagz: RTAGZ_SKOS });
+  assert.deepStrictEqual(lines.filter((l) => l.startsWith('in ')), [
+    'in A Site: Artificial Intelligence',
+    'in My Posts: artificial intelligence',
+    'in ScienceDaily: AI',
+  ]);
+  // the feed itself works as well as its summary
+  assert.deepStrictEqual(tagFormsLines(tagForms(RTAGZ_SKOS, 'c_ai'), { rtagz: { _rtagz: RTAGZ_SKOS } }), lines);
+});
+
+test('the tag detail: each mapping with its type and weight, the target named by its label', () => {
+  const withExternal = {
+    ...RTAGZ_SKOS,
+    external: { 'iptc-mediatopics:20000763': { scheme: 'iptc-mediatopics', prefLabel: 'artificial intelligence' } },
+    concepts: [
+      ...RTAGZ_SKOS.concepts,
+      {
+        canonical: 'magnetic', pinned: false, discovered: true, items: 3, forms: { discovered: { magnetic: 3 } }, rank: [],
+        id: 'c_magnetic', inScheme: ['discovered', 'site'], prefLabel: { discovered: 'magnetic', site: 'magnetic' },
+        mappings: [
+          { type: 'closeMatch', target: 'c_ai', weight: 0.55, why: 'probably the same' },
+          { type: 'relatedMatch', target: 'c_nowhere' },
+        ],
+      },
+    ],
+  };
+  const ai = tagFormsLines(tagForms(withExternal, 'c_ai'), { rtagz: withExternal });
+  assert.ok(ai.includes('exactMatch artificial intelligence (IPTC Media Topics) · weight 1'), ai.join(' | '));
+  const magnetic = tagFormsLines(tagForms(withExternal, 'c_magnetic'), { rtagz: withExternal });
+  assert.deepStrictEqual(magnetic, [
+    'discovered writes magnetic',
+    'in A Site: magnetic',
+    'in discovered: magnetic',
+    'closeMatch Artificial Intelligence · weight 0.55',
+    'relatedMatch c_nowhere',
+  ], 'a concept with only a mapping to say is shown; a target the feed does not name is shown as written');
+});
+
+test('the tag detail: a bubble standing for several tags at the depth chosen names its members', () => {
+  const info = tagForms(RTAGZ_SKOS, 'c_ai');
+  const lines = tagFormsLines(info, { rtagz: RTAGZ_SKOS, members: ['Artificial Intelligence', 'neural hardware'] });
+  assert.strictEqual(lines[lines.length - 1], 'stands for Artificial Intelligence, neural hardware');
+  // members alone, when the concept has nothing else to show
+  assert.deepStrictEqual(tagFormsLines(null, { members: ['jazz', 'blues'] }), ['stands for jazz, blues']);
+  // one member is the bubble itself: nothing to say
+  assert.deepStrictEqual(tagFormsLines(null, { members: ['jazz'] }), []);
+  assert.deepStrictEqual(tagFormsLines(null), []);
+});
+
+test('the tag detail of an older summary (no schemes, no prefLabel) is what it was', () => {
+  assert.deepStrictEqual(tagFormsLines(tagForms(RTAGZ, 'Artificial Intelligence'), { rtagz: RTAGZ }), [
+    'ScienceDaily writes AI, A.I.',
+    'My Posts writes artificial intelligence',
+    'named by coverage',
+  ]);
 });

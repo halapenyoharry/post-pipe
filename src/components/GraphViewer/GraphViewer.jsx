@@ -3519,12 +3519,18 @@ export function GraphViewer({
     }
 
     // The small lines beside a tag bubble (lib/tagForms.js: what each system
-    // writes, who named it), shown while the tag is hovered or active. The
-    // concept is looked up by its id where rosetta-tagz named one, else by the
-    // label. Null when there is nothing to show.
+    // writes, who named it, its label in each scheme, its mappings, and the
+    // tags a bubble stands for at the depth chosen), shown while the tag is
+    // hovered or active. The concept is looked up by its id where rosetta-tagz
+    // named one, else by the label. Null when there is nothing to show.
+    const groupMembersOf = (d) => {
+      if (!d._groupKey) return null;
+      const folded = data.nodes.filter((n) => n._groupedInto === d.id);
+      return folded.length ? [d, ...folded].map((n) => n.label) : null;
+    };
     function buildTagForms(el, d, fontSize) {
       const formLines = d.type === 'tag'
-        ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items))
+        ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items), { rtagz: feedData._rtagz, members: groupMembersOf(d) })
         : [];
       if (!formLines.length) return null;
       const formFontSize = Math.round(fontSize * 0.65);
@@ -4604,7 +4610,11 @@ export function GraphViewer({
     function relabelBubble(entry, label, fallback) {
       const { d, el, textEl, fontSize } = entry;
       const shown = label || d.label;
-      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback)) return;
+      // the members a bubble stands for are in its forms, so a change of them
+      // redraws it too
+      const membersKey = (groupMembersOf(d) || []).join('\u0000');
+      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback) && entry.membersKey === membersKey) return;
+      entry.membersKey = membersKey;
       d._shownLabel = shown;
       entry.fallback = Boolean(fallback);
       const p = tagProbe();
