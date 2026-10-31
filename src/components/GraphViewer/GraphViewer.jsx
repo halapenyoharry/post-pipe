@@ -35,6 +35,7 @@ import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
 import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
+import { tagEdgeLabel } from '../../lib/provenance';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 
 // The settings a link node's newTab rule is read from.
@@ -197,8 +198,11 @@ function feedToGraph(feed, config = {}) {
     }
 
     // What the line says when hovered or tapped: its own label if it has one
-    // (a flashback, say), otherwise its role.
-    const label = edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
+    // (a flashback, say), otherwise its role; a card-to-tag edge adds its why
+    // and the PROV pair when rosetta-tagz wrote them (lib/provenance.js).
+    const label = edge.layer === 'tag'
+      ? tagEdgeLabel(edge)
+      : edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
     const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label };
     // A discovered tag's source coherence ratio, for the panel's slider of
     // that name (lib/sourceRatio.js): only a tag edge carries one.
@@ -3194,7 +3198,9 @@ export function GraphViewer({
       edgeLabelTimer = null;
       edgeLabelFor = l;
       edgeLabelEl = el;
-      if (l && l.layer === 'relation') { edgeLabel.raise(); edgeLabelLifted = true; }
+      // a label of several lines (a relation's, or a card-to-tag edge with
+      // its why and provenance) is lifted over the cards that would cover it
+      if (l && (l.layer === 'relation' || String(l.label).includes('\n'))) { edgeLabel.raise(); edgeLabelLifted = true; }
       else lowerEdgeLabel();
       placeEdgeLabel();
     }
