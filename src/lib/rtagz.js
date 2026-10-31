@@ -1,4 +1,5 @@
-// stone.js — the Rosetta stone seam between post-pipe and rosetta-tagz.
+// rtagz.js — how post-pipe uses rosetta-tagz (rtagz for short), the project
+// that finds and categorizes tags (docs/POST-PIPE-USES-RTAGZ.md).
 //
 // Everything here speaks files and JSON only; post-pipe never imports from
 // rosetta-tagz/lib/. Pure functions handle records, overrides, HTML reduction,
@@ -12,7 +13,7 @@ const { spawn } = require('child_process');
 
 const POSTPIPE_ROOT = path.resolve(__dirname, '../..');
 
-// The stone's SKOS serialization, written beside universe.json when its
+// rosetta-tagz's SKOS serialization, written beside universe.json when its
 // skos stage ran, and copied beside feed.json by generate-index.
 const SKOS_FILES = ['skos.jsonld', 'skos.ttl'];
 
@@ -87,7 +88,7 @@ function cacheDirForSite(siteRoot, cacheBase = './.feed-cache') {
   const abs = path.resolve(siteRoot || POSTPIPE_ROOT);
   const base = path.basename(abs);
   const hash = crypto.createHash('sha1').update(abs).digest('hex').slice(0, 8);
-  return path.join(cacheBase, 'stone', `${base}-${hash}`);
+  return path.join(cacheBase, 'rtagz', `${base}-${hash}`);
 }
 
 function mergeOverrides(siteOverrides = {}, containment = []) {
@@ -113,14 +114,53 @@ function sitePath(p, siteRoot) {
   return path.resolve(siteRoot, s);
 }
 
-// The stone's build config. conceptSchemes (settings.stone.conceptSchemes,
+// The names post-pipe gives rosetta-tagz's files in a site folder when the
+// site's rtagz settings name none: the ids file (rtz-stone's ledger) and the
+// site's own overrides. Before 2026-10-31 they were stone.ledger.json and
+// stone.overrides.json; a site that still holds only the old file has it
+// read, with one logged line, so its concept ids and decisions carry over
+// until the file is renamed.
+const IDS_FILE = 'rtagz-ids.json';
+const OVERRIDES_FILE = 'rtagz-overrides.json';
+const FORMER_NAMES = {
+  [IDS_FILE]: 'stone.ledger.json',
+  [OVERRIDES_FILE]: 'stone.overrides.json',
+};
+
+// A file a site holds under one of the default names above, made absolute
+// against the site root: the current name, or the former one when only that
+// exists in the site.
+function defaultSiteFile(name, siteRoot) {
+  const current = path.resolve(siteRoot, name);
+  const former = FORMER_NAMES[name] ? path.resolve(siteRoot, FORMER_NAMES[name]) : null;
+  if (former && !fs.existsSync(current) && fs.existsSync(former)) {
+    console.warn(`rtagz: read ${FORMER_NAMES[name]}, whose name is now ${name}; rename the file in the site`);
+    return former;
+  }
+  return current;
+}
+
+// A site's rtagz settings (settings.rtagz). A site whose settings still name
+// the block stone, its name before 2026-10-31, is read the same, with one
+// logged line, so it builds until the key is renamed.
+function rtagzSettings(settings) {
+  if (!settings || typeof settings !== 'object') return undefined;
+  if (settings.rtagz !== undefined) return settings.rtagz;
+  if (settings.stone !== undefined) {
+    console.warn('rtagz: the settings key "stone" is now "rtagz"; read as rtagz, rename it in settings.json');
+    return settings.stone;
+  }
+  return undefined;
+}
+
+// The build config for rtz-build. conceptSchemes (settings.rtagz.conceptSchemes,
 // each { id, path }) are the published vocabularies the site vendors, their
 // paths made absolute against the site root; left out when there are none.
-// ledger (settings.stone.ledger, default stone.ledger.json in the site) is
-// where the stone keeps its concept ids between builds, so the ids stay
-// stable in the site, not in post-pipe's disposable cache. Written only when
-// a site root is known: no user's site lives in post-pipe's own folder, so a
-// caller without one leaves the ledger to the stone's own default.
+// ledger (settings.rtagz.ledger, default rtagz-ids.json in the site) is the
+// ids file where rtz-stone keeps its concept ids between builds, so the ids
+// stay stable in the site, not in post-pipe's disposable cache. Written only
+// when a site root is known: no user's site lives in post-pipe's own folder,
+// so a caller without one leaves the ledger to rosetta-tagz's own default.
 function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, siteRoot } = {}) {
   const root = path.resolve(siteRoot || POSTPIPE_ROOT);
   const config = {
@@ -141,14 +181,14 @@ function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, 
       if (typeof s.path !== 'string' || !s.path) missing.push('path');
     }
     if (missing.length) {
-      console.warn(`stone: conceptSchemes[${i}] skipped, no ${missing.join(' or ')}`);
+      console.warn(`rtagz: conceptSchemes[${i}] skipped, no ${missing.join(' or ')}`);
       continue;
     }
     schemes.push({ id: s.id, path: sitePath(s.path, root) });
   }
   if (schemes.length) config.conceptSchemes = schemes;
   if (siteRoot) {
-    config.ledger = sitePath(typeof ledger === 'string' && ledger ? ledger : 'stone.ledger.json', root);
+    config.ledger = typeof ledger === 'string' && ledger ? sitePath(ledger, root) : defaultSiteFile(IDS_FILE, root);
   }
   return config;
 }
@@ -256,15 +296,15 @@ function checkContainerGuard(results, universe, containment = []) {
 
 // The five SKOS mapping properties. A relation of one of these types is a
 // mapping whatever it points at: an external vocabulary's concept, or one of
-// the stone's own in another scheme (a closeMatch or broadMatch across two
-// tag-systems). Neither is reinterpreted: a's mapping to b is written as the
-// stone wrote it.
+// rosetta-tagz's own in another scheme (a closeMatch or broadMatch across two
+// tag-systems). Neither is reinterpreted: a's mapping to b is written as
+// rosetta-tagz wrote it.
 const MAPPING_TYPES = new Set(['exactMatch', 'closeMatch', 'broadMatch', 'narrowMatch', 'relatedMatch']);
 // The relation types with a direction: in each, a is the broader concept.
 const DIRECTED_TYPES = new Set(['broader', 'broadMatch']);
 
 // The SKOS side of the universe, read once: which relations are SKOS
-// (skos: true; the stone's near and adjacent are not and are ignored), which
+// (skos: true; rosetta-tagz's near and adjacent are not and are ignored), which
 // of those are mappings (one of MAPPING_TYPES, or b an external id: one in
 // universe.external, or no concept at all and spelled <scheme>:<id>), each
 // concept's broader concepts (broader {a, b} means a is broader than b), and
@@ -284,8 +324,8 @@ function indexSkos(universe, conceptById) {
   const mappingCounts = {};
   const mappingsByConcept = new Map();
   const broaderByConcept = new Map();
-  // Every SKOS relation between two of the stone's own concepts, typed, with
-  // its weight, why and PROV as the stone wrote them, each pair once: a
+  // Every SKOS relation between two of rosetta-tagz's own concepts, typed,
+  // with its weight, why and PROV as rosetta-tagz wrote them, each pair once: a
   // directed type (broader, broadMatch: a is the broader concept) once per
   // (type, a, b), a symmetric one (related and the other mappings) once per
   // unordered pair, the first entry kept. The pair list the relation edges
@@ -372,7 +412,7 @@ function indexSkos(universe, conceptById) {
     return '';
   };
 
-  // A concept's prefLabel per scheme as a reference carries it: the stone's
+  // A concept's prefLabel per scheme as a reference carries it: rosetta-tagz's
   // own, plus an external scheme's label only through an exactMatch mapping.
   const prefLabelCache = new Map();
   const referencePrefLabel = (concept) => {
@@ -402,14 +442,14 @@ function indexSkos(universe, conceptById) {
 // out of the published feed.
 const SCHEME_KEYS = ['id', 'label', 'kind', 'sourceId', 'iri', 'license', 'concepts'];
 
-// The concept schemes a feed carries: the stone's own list when the universe
+// The concept schemes a feed carries: rosetta-tagz's own list when the universe
 // has one, then whatever it leaves out that post-pipe knows anyway: the site
 // scheme (labelled with the site's title), one scheme per tag-system with its
 // source id, and the discovered scheme when any concept is filed in it or
-// flagged discovered. A scheme the stone lists bare gets the kind and label
+// flagged discovered. A scheme rosetta-tagz lists bare gets the kind and label
 // post-pipe knows for it. No label is invented: a scheme without one is
-// labelled with its id (the site's with the site's title) until the stone, or
-// Harold, names it.
+// labelled with its id (the site's with the site's title) until rosetta-tagz,
+// or Harold, names it.
 function buildSchemes(universe, systems, siteTitle) {
   const out = [];
   const seen = new Set();
@@ -460,7 +500,7 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
     conceptById.set(c.id, c);
   }
   const skos = indexSkos(universe, conceptById);
-  // Which post-pipe items joined each universe item, for reading the stone's
+  // Which post-pipe items joined each universe item, for reading rosetta-tagz's
   // untagged list back onto post-pipe ids (a folded representative stands for
   // every item folded into it).
   const joinedByKey = new Map();
@@ -636,7 +676,7 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
       rank,
     };
     if (typeof c.id === 'string' && c.id) sc.id = c.id;
-    // SKOS, as the stone wrote it, only where it did.
+    // SKOS, as rosetta-tagz wrote it, only where it did.
     if (Array.isArray(c.inScheme) && c.inScheme.length) {
       sc.inScheme = c.inScheme.filter((s) => typeof s === 'string' && s);
     }
@@ -682,15 +722,15 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
   };
 
   if (Object.keys(skos.relationCounts).length) summary.relations = skos.relationCounts;
-  // Each SKOS relation between two of the stone's own concepts, with its why
+  // Each SKOS relation between two of rosetta-tagz's own concepts, with its why
   // and PROV, for the relation edges (corpus/relationEdges.js); none, nothing.
   if (skos.relationList.length) summary.relationList = skos.relationList;
   if (Object.keys(skos.mappingCounts).length) summary.mappings = skos.mappingCounts;
 
-  // The stone's untagged items (from the universe, else build.json, which the
-  // stone writes too), on post-pipe's ids: a universe key joined by one or
+  // rosetta-tagz's untagged items (from the universe, else build.json, which
+  // rtz-build writes too), on post-pipe's ids: a universe key joined by one or
   // more post-pipe items names each of them; one joined by none keeps the id
-  // and source the stone gave. An empty list writes nothing.
+  // and source rosetta-tagz gave. An empty list writes nothing.
   const untaggedList = Array.isArray(universe.untagged)
     ? universe.untagged
     : (buildManifest && Array.isArray(buildManifest.untagged) ? buildManifest.untagged : null);
@@ -783,30 +823,29 @@ function runRtzBuild(engineBin, configPath, cwd, timeoutMs) {
   });
 }
 
-async function runStonePhase(results, options = {}) {
-  const stoneCfg = options.stone;
-  if (!stoneCfg || !stoneCfg.enabled) {
-    return { ran: false, stone: null };
+async function runRtagzPhase(results, options = {}) {
+  const rtagzCfg = options.rtagz;
+  if (!rtagzCfg || !rtagzCfg.enabled) {
+    return { ran: false, rtagz: null };
   }
 
   try {
     const siteRoot = options.siteRoot ? path.resolve(options.siteRoot) : POSTPIPE_ROOT;
     const postpipeRoot = options.postpipeRoot ? path.resolve(options.postpipeRoot) : POSTPIPE_ROOT;
-    const engineSetting = stoneCfg.engine || 'rosetta-tagz';
+    const engineSetting = rtagzCfg.engine || 'rosetta-tagz';
     const engineDir = path.isAbsolute(engineSetting)
       ? engineSetting
       : path.resolve(postpipeRoot, engineSetting);
     const engineBin = path.join(engineDir, 'bin', 'rtz-build');
 
     if (!fs.existsSync(engineBin)) {
-      console.warn(`stone: engine not found at ${engineBin}, tags left as written`);
-      return { ran: false, stone: null };
+      console.warn(`rtagz: engine not found at ${engineBin}, tags left as written`);
+      return { ran: false, rtagz: null };
     }
 
-    const overridesSetting = stoneCfg.overrides || 'stone.overrides.json';
-    const overridesPath = path.isAbsolute(overridesSetting)
-      ? overridesSetting
-      : path.resolve(siteRoot, overridesSetting);
+    const overridesPath = rtagzCfg.overrides
+      ? (path.isAbsolute(rtagzCfg.overrides) ? rtagzCfg.overrides : path.resolve(siteRoot, rtagzCfg.overrides))
+      : defaultSiteFile(OVERRIDES_FILE, siteRoot);
     let siteOverrides = {};
     if (fs.existsSync(overridesPath)) {
       siteOverrides = JSON.parse(fs.readFileSync(overridesPath, 'utf8'));
@@ -819,7 +858,7 @@ async function runStonePhase(results, options = {}) {
       ? path.resolve(options.cacheDir)
       : path.resolve(cacheDirForSite(siteRoot));
     fs.mkdirSync(cacheDir, { recursive: true });
-    // The stone writes its SKOS files only when that stage runs and succeeds,
+    // rtz-build writes its SKOS files only when that stage runs and succeeds,
     // and never clears its out folder, so last build's are removed first: a
     // file left in the cache after the build is this build's.
     for (const name of SKOS_FILES) {
@@ -836,22 +875,22 @@ async function runStonePhase(results, options = {}) {
     fs.writeFileSync(overridesOutPath, JSON.stringify(mergedOverrides, null, 2) + '\n', 'utf8');
 
     const rtzConfig = buildConfig({
-      emerge: stoneCfg.emerge !== false,
-      discover: Boolean(stoneCfg.discover),
-      conceptSchemes: stoneCfg.conceptSchemes,
-      ledger: stoneCfg.ledger,
+      emerge: rtagzCfg.emerge !== false,
+      discover: Boolean(rtagzCfg.discover),
+      conceptSchemes: rtagzCfg.conceptSchemes,
+      ledger: rtagzCfg.ledger,
       siteRoot: options.siteRoot ? siteRoot : undefined,
     });
     fs.writeFileSync(configPath, JSON.stringify(rtzConfig, null, 2) + '\n', 'utf8');
 
-    const timeoutMs = Number.isFinite(Number(stoneCfg.timeoutMs)) && Number(stoneCfg.timeoutMs) > 0
-      ? Number(stoneCfg.timeoutMs)
+    const timeoutMs = Number.isFinite(Number(rtagzCfg.timeoutMs)) && Number(rtagzCfg.timeoutMs) > 0
+      ? Number(rtagzCfg.timeoutMs)
       : 120000;
 
     const runRes = await runRtzBuild(engineBin, configPath, cacheDir, timeoutMs);
     if (!runRes.ok) {
-      console.warn(`stone: build failed (${runRes.reason}), tags left as written`);
-      return { ran: false, stone: null };
+      console.warn(`rtagz: build failed (${runRes.reason}), tags left as written`);
+      return { ran: false, rtagz: null };
     }
 
     const universePath = path.join(cacheDir, 'universe.json');
@@ -861,8 +900,8 @@ async function runStonePhase(results, options = {}) {
 
     const guard = checkContainerGuard(results, universe, options.containment || []);
     if (!guard.ok) {
-      console.warn(`stone: container tag "${guard.tag}" is not canonical after build, tags left as written`);
-      return { ran: false, stone: null };
+      console.warn(`rtagz: container tag "${guard.tag}" is not canonical after build, tags left as written`);
+      return { ran: false, rtagz: null };
     }
 
     // The site scheme is labelled with the site's title, which the caller
@@ -871,17 +910,20 @@ async function runStonePhase(results, options = {}) {
     const siteTitle = typeof options.siteTitle === 'string' ? options.siteTitle : '';
 
     const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, { siteTitle });
-    // cacheDir is where the stone wrote its files, for whoever copies the
+    // cacheDir is where rtz-build wrote its files, for whoever copies the
     // SKOS serialization beside the feed.
-    return { ran: true, stone: summary, cacheDir };
+    return { ran: true, rtagz: summary, cacheDir };
   } catch (err) {
-    console.warn(`stone: ${err.message}, tags left as written`);
-    return { ran: false, stone: null };
+    console.warn(`rtagz: ${err.message}, tags left as written`);
+    return { ran: false, rtagz: null };
   }
 }
 
 module.exports = {
   SKOS_FILES,
+  IDS_FILE,
+  OVERRIDES_FILE,
+  rtagzSettings,
   htmlToText,
   itemText,
   canonicalUrl,
@@ -893,5 +935,5 @@ module.exports = {
   checkContainerGuard,
   applyUniverse,
   runRtzBuild,
-  runStonePhase,
+  runRtagzPhase,
 };

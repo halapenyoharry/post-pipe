@@ -1,12 +1,12 @@
 // What a tag node is called when the reader chooses a concept scheme and a
-// depth (docs/STONE-SEAM.md). Pure: it reads feed._stone and answers; the
+// depth (docs/POST-PIPE-USES-RTAGZ.md). Pure: it reads feed._rtagz and answers; the
 // graph applies the answers to its bubbles.
 //
-// A scheme is one of the lists in _stone.schemes: the site's own ('site',
+// A scheme is one of the lists in _rtagz.schemes: the site's own ('site',
 // whose prefLabel is today's canonical), one per tag-system (its id is the
-// system's name), 'discovered' (the stone's phrase scheme), or an external
+// system's name), 'discovered' (rosetta-tagz's phrase scheme), or an external
 // vocabulary the site vendors (kind 'external'; its concepts are reached
-// through a concept's mappings and live in _stone.external).
+// through a concept's mappings and live in _rtagz.external).
 //
 // Depth is how many steps up skos:broader the label is read from: 0 is the
 // concept itself, 1 its broader concept in the chosen scheme, 2 that one's.
@@ -14,7 +14,7 @@
 // reach the same concept belong to one group (groupsFor), which the graph
 // collapses into one bubble.
 //
-// No label is invented here: every label returned is a prefLabel the stone
+// No label is invented here: every label returned is a prefLabel rosetta-tagz
 // wrote, a vocabulary's own label, or the canonical the feed already shows.
 
 const SITE_SCHEME = 'site';
@@ -26,46 +26,46 @@ const LAYOUTS = ['force', 'radial', 'timeline'];
 const TAG_PREFIX = 'tag:';
 const CONCEPT_PREFIX = 'concept:';
 
-// _stone, from a feed or from the summary itself.
-function stoneOf(source) {
+// _rtagz, from a feed or from the summary itself.
+function rtagzOf(source) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
-  if (source._stone && typeof source._stone === 'object' && !Array.isArray(source._stone)) return source._stone;
+  if (source._rtagz && typeof source._rtagz === 'object' && !Array.isArray(source._rtagz)) return source._rtagz;
   if (Array.isArray(source.concepts) || Array.isArray(source.schemes)) return source;
   return null;
 }
 
-// The concept schemes a feed carries: _stone.schemes as the build wrote it,
-// each with an id; nothing without a stone.
+// The concept schemes a feed carries: _rtagz.schemes as the build wrote it,
+// each with an id; nothing without rosetta-tagz.
 function schemesOf(feed) {
-  const stone = stoneOf(feed);
-  if (!stone || !Array.isArray(stone.schemes)) return [];
-  return stone.schemes.filter((s) => s && typeof s === 'object' && typeof s.id === 'string' && s.id);
+  const rtagz = rtagzOf(feed);
+  if (!rtagz || !Array.isArray(rtagz.schemes)) return [];
+  return rtagz.schemes.filter((s) => s && typeof s === 'object' && typeof s.id === 'string' && s.id);
 }
 
-// One index per stone object, so a graph of hundreds of tags asks for its
+// One index per rtagz summary, so a graph of hundreds of tags asks for its
 // labels without rebuilding the maps each time.
 const indexes = new WeakMap();
 
-function indexOf(stone) {
-  if (indexes.has(stone)) return indexes.get(stone);
+function indexOf(rtagz) {
+  if (indexes.has(rtagz)) return indexes.get(rtagz);
   const byId = new Map();
-  for (const c of Array.isArray(stone.concepts) ? stone.concepts : []) {
+  for (const c of Array.isArray(rtagz.concepts) ? rtagz.concepts : []) {
     if (!c || typeof c !== 'object') continue;
     if (typeof c.id === 'string' && c.id && !byId.has(c.id)) byId.set(c.id, c);
   }
   const schemes = new Map();
   const sourceToScheme = new Map();
-  for (const s of schemesOf(stone)) {
+  for (const s of schemesOf(rtagz)) {
     schemes.set(s.id, s);
     if (typeof s.sourceId === 'string' && s.sourceId && !sourceToScheme.has(s.sourceId)) sourceToScheme.set(s.sourceId, s.id);
   }
-  const systems = stone.systems && typeof stone.systems === 'object' && !Array.isArray(stone.systems) ? stone.systems : {};
+  const systems = rtagz.systems && typeof rtagz.systems === 'object' && !Array.isArray(rtagz.systems) ? rtagz.systems : {};
   for (const [name, info] of Object.entries(systems)) {
     if (info && typeof info.sourceId === 'string' && info.sourceId && !sourceToScheme.has(info.sourceId)) sourceToScheme.set(info.sourceId, name);
   }
-  const external = stone.external && typeof stone.external === 'object' && !Array.isArray(stone.external) ? stone.external : {};
+  const external = rtagz.external && typeof rtagz.external === 'object' && !Array.isArray(rtagz.external) ? rtagz.external : {};
   const idx = { byId, schemes, systems, sourceToScheme, external };
-  indexes.set(stone, idx);
+  indexes.set(rtagz, idx);
   return idx;
 }
 
@@ -125,7 +125,7 @@ function mappedTarget(idx, concept, scheme) {
 }
 
 // Whether a concept is filed in a scheme. Every concept is in the site's;
-// a concept the stone wrote without inScheme is read by the forms it holds.
+// a concept rosetta-tagz wrote without inScheme is read by the forms it holds.
 function inScheme(concept, scheme) {
   if (scheme === SITE_SCHEME) return true;
   if (Array.isArray(concept.inScheme)) return concept.inScheme.includes(scheme);
@@ -143,7 +143,7 @@ function prefLabelIn(concept, scheme) {
 }
 
 // One step up skos:broader within a scheme: the first broader concept that
-// the feed carries and that is in the scheme, in the stone's order.
+// the feed carries and that is in the scheme, in rosetta-tagz's order.
 function broaderIn(idx, concept, scheme) {
   const list = Array.isArray(concept.broader) ? concept.broader : [];
   for (const b of list) {
@@ -195,18 +195,18 @@ function depthOf(depth) {
 
 // The label a tag node shows for a concept in a scheme at a depth:
 //   { label, scheme, fallback, groupId }
-// label      what to write on the bubble (null when the concept is not in the
-//            stone: the caller keeps what it has)
+// label      what to write on the bubble (null when rosetta-tagz does not
+//            know the concept: the caller keeps what it has)
 // scheme     the scheme the label is in
 // fallback   true when the label is not in the chosen scheme
 // groupId    the concept the walk reached: the concept's own id at depth 0,
 //            a broader concept's id (or an external id) further up; tags
 //            sharing one are one group
 // systems    one source id per piece the tag joins, for the majority fallback
-function labelFor(stone, conceptId, { scheme, depth, systems } = {}) {
+function labelFor(rtagz, conceptId, { scheme, depth, systems } = {}) {
   const chosen = typeof scheme === 'string' && scheme ? scheme : SITE_SCHEME;
   const steps = depthOf(depth);
-  const st = stoneOf(stone);
+  const st = rtagzOf(rtagz);
   if (!st || typeof conceptId !== 'string' || !conceptId) {
     return { label: null, scheme: null, fallback: false, groupId: conceptId || null };
   }
@@ -241,12 +241,12 @@ function labelFor(stone, conceptId, { scheme, depth, systems } = {}) {
 }
 
 // Which group each concept falls in at a scheme and depth: Map conceptId ->
-// groupId (labelFor's). A concept the stone does not know is its own group.
-function groupsFor(stone, conceptIds, { scheme, depth } = {}) {
+// groupId (labelFor's). A concept rosetta-tagz does not know is its own group.
+function groupsFor(rtagz, conceptIds, { scheme, depth } = {}) {
   const out = new Map();
   for (const id of Array.isArray(conceptIds) ? conceptIds : []) {
     if (typeof id !== 'string' || !id || out.has(id)) continue;
-    const r = labelFor(stone, id, { scheme, depth });
+    const r = labelFor(rtagz, id, { scheme, depth });
     out.set(id, r.groupId || id);
   }
   return out;
@@ -256,7 +256,7 @@ function groupsFor(stone, conceptIds, { scheme, depth } = {}) {
 // [[oldKey, newKey], ...], for every tag node that names its concept, under
 // each layout's prefix (placeOf(layout), as the graph files them) and bare,
 // from its label today and from the label it had before (d.previousLabel,
-// the ledger's). Nodes without a concept (no stone) have no pairs.
+// the ledger's). Nodes without a concept (no rosetta-tagz) have no pairs.
 function migrationPairs(nodes, placeOf) {
   const pairs = [];
   const seen = new Set();

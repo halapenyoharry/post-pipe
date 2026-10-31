@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// Measures a built feed's tags, so a change to the stone can be judged with
+// Measures a built feed's tags, so a change to rosetta-tagz can be judged with
 // the same numbers before and after. Reads one feed.json and prints:
 // items; tag edges by origin; distinct tag nodes; tags on exactly one item;
 // items with no tag; item pairs sharing a tag, overall, within each source
 // and across each pair of sources; and, for discovered tags, whether the N in
 // "recurs in N of M items" equals the number of items carrying the tag.
 //
-//   node tools/stone-report.js [path/to/feed.json] [--scheme ID] [--depth N]
+//   node tools/rtagz-report.js [path/to/feed.json] [--scheme ID] [--depth N]
 //
 // Default feed: ~/Projects/haroldyounghumxn.site/_site/feed.json. --scheme and
-// --depth re-key the tags through feed._stone (src/lib/schemeLabels.js) when
+// --depth re-key the tags through feed._rtagz (src/lib/schemeLabels.js) when
 // that module exists, so the same report can be read in another scheme or one
 // step broader; without it they are ignored with one line.
 'use strict';
@@ -42,13 +42,13 @@ let keyOf = (tagId, edge) => tagId;
 if (opt.scheme || opt.depth) {
   let schemeLabels = null;
   try { schemeLabels = require('../src/lib/schemeLabels'); } catch (_) { schemeLabels = null; }
-  if (!schemeLabels || !f._stone) {
-    console.log('note: --scheme/--depth ignored (no src/lib/schemeLabels.js or no feed._stone)');
+  if (!schemeLabels || !f._rtagz) {
+    console.log('note: --scheme/--depth ignored (no src/lib/schemeLabels.js or no feed._rtagz)');
   } else {
     keyOf = (tagId, edge) => {
       const c = edge && edge.attrs && edge.attrs.concept;
       if (!c) return tagId;
-      const r = schemeLabels.labelFor(f._stone, c, { scheme: opt.scheme || 'site', depth: opt.depth });
+      const r = schemeLabels.labelFor(f._rtagz, c, { scheme: opt.scheme || 'site', depth: opt.depth });
       return r && r.groupId ? 'concept:' + r.groupId : (r && r.label ? 'tag:' + r.label : tagId);
     };
   }
@@ -149,10 +149,10 @@ console.log('  of the disagreeing, N > actual:', over, ' N < actual:', rows.leng
 console.log('  examples (largest gap first):');
 for (const r of rows.slice(0, 5)) console.log('   ', JSON.stringify(r));
 
-if (f._stone) {
-  const s = f._stone;
+if (f._rtagz) {
+  const s = f._rtagz;
   const rel = s.relations ? JSON.stringify(s.relations) : 'n/a';
   const map = s.mappings ? JSON.stringify(s.mappings) : 'n/a';
   const led = s.ledger ? JSON.stringify(s.ledger) : 'n/a';
-  console.log('_stone: concepts', (s.concepts || []).length, ' schemes', (s.schemes || []).map((x) => x.id).join(',') || 'n/a', ' relations', rel, ' mappings', map, ' untagged', s.untagged ? s.untagged.count : 'n/a', ' ledger', led);
+  console.log('_rtagz: concepts', (s.concepts || []).length, ' schemes', (s.schemes || []).map((x) => x.id).join(',') || 'n/a', ' relations', rel, ' mappings', map, ' untagged', s.untagged ? s.untagged.count : 'n/a', ' ledger', led);
 }

@@ -5,9 +5,9 @@ const path = require('path');
 
 const { relationEdges } = require('../src/corpus/relationEdges');
 const { buildEdges } = require('../src/corpus/buildEdges');
-const { mergeOverrides, buildRecords, applyUniverse } = require('../src/lib/stone');
+const { mergeOverrides, buildRecords, applyUniverse } = require('../src/lib/rtagz');
 
-// Items as the stone leaves them: item.tags rewritten to the concepts' site
+// Items as rosetta-tagz leaves them: item.tags rewritten to the concepts' site
 // prefLabels, and one tag reference per tag naming its concept.
 function item(id, tags) {
   return {
@@ -33,19 +33,19 @@ const ITEMS = [
 ];
 const CONTAINMENT = [{ id: 'container:act', tag: 'Act' }];
 
-const stoneWith = (relationList) => ({ built: 'x', concepts: [], relationList });
+const rtagzWith = (relationList) => ({ built: 'x', concepts: [], relationList });
 
-test('relationEdges: no stone, or a stone with no relations, gives no edges', () => {
+test('relationEdges: no rtagz summary, or one with no relations, gives no edges', () => {
   assert.deepStrictEqual(relationEdges(null, ITEMS), []);
   assert.deepStrictEqual(relationEdges(undefined, ITEMS), []);
   assert.deepStrictEqual(relationEdges({}, ITEMS), []);
   assert.deepStrictEqual(relationEdges({ built: 'x', concepts: [], relations: { related: 1 } }, ITEMS), []);
-  assert.deepStrictEqual(relationEdges(stoneWith([]), ITEMS), []);
-  assert.deepStrictEqual(relationEdges(stoneWith([{ a: 'c_alpha', b: 'c_beta', type: 'related' }]), []), []);
+  assert.deepStrictEqual(relationEdges(rtagzWith([]), ITEMS), []);
+  assert.deepStrictEqual(relationEdges(rtagzWith([{ a: 'c_alpha', b: 'c_beta', type: 'related' }]), []), []);
 });
 
-test('relationEdges: a symmetric relation is one undirected edge per unordered pair, a → b as the stone wrote it', () => {
-  const edges = relationEdges(stoneWith([
+test('relationEdges: a symmetric relation is one undirected edge per unordered pair, a → b as rosetta-tagz wrote it', () => {
+  const edges = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6 },
     { a: 'c_beta', b: 'c_alpha', type: 'related', weight: 0.6 },
     { a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6 },
@@ -59,7 +59,7 @@ test('relationEdges: a symmetric relation is one undirected edge per unordered p
     attrs: { concept: 'c_alpha', target: 'c_beta', weight: 0.6 },
   }]);
   // Each undirected type is its own edge on the same pair; each is once.
-  const typed = relationEdges(stoneWith([
+  const typed = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'closeMatch' },
     { a: 'c_beta', b: 'c_alpha', type: 'closeMatch' },
     { a: 'c_alpha', b: 'c_beta', type: 'relatedMatch' },
@@ -74,8 +74,8 @@ test('relationEdges: a symmetric relation is one undirected edge per unordered p
 
 test('relationEdges: broader {a, b} (a is broader than b) is drawn from the narrower b to the broader a', () => {
   // The arrow points at the broader concept: source is the narrower tag,
-  // target the broader. attrs keep the pair as the stone wrote it.
-  const edges = relationEdges(stoneWith([
+  // target the broader. attrs keep the pair as rosetta-tagz wrote it.
+  const edges = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'broader', weight: 1, why: 'every item with Beta also carries Alpha' },
   ]), ITEMS);
   assert.deepStrictEqual(edges, [{
@@ -87,16 +87,16 @@ test('relationEdges: broader {a, b} (a is broader than b) is drawn from the narr
     attrs: { concept: 'c_alpha', target: 'c_beta', weight: 1, why: 'every item with Beta also carries Alpha' },
   }]);
   // The same assertion listed twice is one edge.
-  assert.strictEqual(relationEdges(stoneWith([
+  assert.strictEqual(relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'broader' },
     { a: 'c_alpha', b: 'c_beta', type: 'broader' },
   ]), ITEMS).length, 1);
 });
 
 test('relationEdges: broadMatch {a, b} is written as broader is (a the broader concept), so it is drawn b → a too', () => {
-  // The stone renames a cross-scheme broader to broadMatch and keeps the
-  // pair, so a is the broader concept in both (docs/STONE-SEAM.md).
-  const edges = relationEdges(stoneWith([
+  // rtz-stone renames a cross-scheme broader to broadMatch and keeps the
+  // pair, so a is the broader concept in both (docs/POST-PIPE-USES-RTAGZ.md).
+  const edges = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'broadMatch', weight: 0.7 },
   ]), ITEMS);
   assert.deepStrictEqual(edges, [{
@@ -110,12 +110,12 @@ test('relationEdges: broadMatch {a, b} is written as broader is (a the broader c
 });
 
 test('relationEdges: the first entry for a pair wins when a later one disagrees on weight or why', () => {
-  const [related] = relationEdges(stoneWith([
+  const [related] = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6, why: 'first' },
     { a: 'c_beta', b: 'c_alpha', type: 'related', weight: 0.9, why: 'second' },
   ]), ITEMS);
   assert.deepStrictEqual(related.attrs, { concept: 'c_alpha', target: 'c_beta', weight: 0.6, why: 'first' });
-  const [broader] = relationEdges(stoneWith([
+  const [broader] = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'broader', weight: 1 },
     { a: 'c_alpha', b: 'c_beta', type: 'broader', weight: 0.8, why: 'later' },
   ]), ITEMS);
@@ -123,7 +123,7 @@ test('relationEdges: the first entry for a pair wins when a later one disagrees 
 });
 
 test('relationEdges: an endpoint exists only where a tag edge does; a container tag or a concept on no joined item gives no edge', () => {
-  const edges = relationEdges(stoneWith([
+  const edges = relationEdges(rtagzWith([
     // Act is a container tag: intercepted by containment in buildEdges, no tag node.
     { a: 'c_act', b: 'c_alpha', type: 'broader' },
     { a: 'c_alpha', b: 'c_act', type: 'related' },
@@ -135,14 +135,14 @@ test('relationEdges: an endpoint exists only where a tag edge does; a container 
   ]), ITEMS, { containment: CONTAINMENT });
   assert.deepStrictEqual(edges.map((e) => [e.source, e.target]), [['tag:Gamma', 'tag:Beta']]);
   // Without the containment setting, Act is an ordinary tag and gets its edges.
-  const noContainment = relationEdges(stoneWith([
+  const noContainment = relationEdges(rtagzWith([
     { a: 'c_act', b: 'c_alpha', type: 'broader' },
   ]), ITEMS);
   assert.deepStrictEqual(noContainment.map((e) => [e.source, e.target]), [['tag:Alpha', 'tag:Act']]);
 });
 
 test('relationEdges: a relation to an external vocabulary\'s concept, or of a type that is not drawn, gives no edge', () => {
-  const edges = relationEdges(stoneWith([
+  const edges = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'voc:20000763', type: 'exactMatch', weight: 1 },
     { a: 'c_beta', b: 'voc:20000763', type: 'broadMatch', weight: 0.5 },
     { a: 'c_alpha', b: 'c_beta', type: 'narrower' },
@@ -156,8 +156,8 @@ test('relationEdges: a relation to an external vocabulary\'s concept, or of a ty
   assert.deepStrictEqual(edges, []);
 });
 
-test('relationEdges: attrs carry weight, why and PROV where the stone gave them, and only concept and target where it did not', () => {
-  const [withProv, bare] = relationEdges(stoneWith([
+test('relationEdges: attrs carry weight, why and PROV where rosetta-tagz gave them, and only concept and target where it did not', () => {
+  const [withProv, bare] = relationEdges(rtagzWith([
     { a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6, why: 'co-occur on 2 of 4 items', ...PROV },
     { a: 'c_beta', b: 'c_gamma', type: 'related', weight: null, why: '', wasDerivedFrom: null, wasGeneratedBy: undefined },
   ]), ITEMS);
@@ -205,7 +205,7 @@ test('buildEdges: tag-edge attrs carry why and PROV from the reference when pres
     },
     { concept: 'c_gamma', weight: 0.5, origin: 'discovered', why: 'recurs in 2 of 4 items' },
   ]);
-  // A tag with no stone reference keeps no attrs at all, as before.
+  // A tag with no rosetta-tagz reference keeps no attrs at all, as before.
   const [plain] = buildEdges([{ id: 'https://example.test/b.html', url: 'https://example.test/b.html', tags: ['Alpha'] }]);
   assert.ok(!('attrs' in plain));
 });
@@ -215,7 +215,7 @@ test('buildEdges: tag-edge attrs carry why and PROV from the reference when pres
 // create; the mappings to the external vocabulary and the non-SKOS relation
 // draw nothing.
 test('relationEdges: from the canned universe, each relation edge joins two tags that have tag edges, broader drawn narrower → broader', () => {
-  const FIXTURES_DIR = path.join(__dirname, 'fixtures', 'stone');
+  const FIXTURES_DIR = path.join(__dirname, 'fixtures', 'rtagz');
   const corpus = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'corpus.json'), 'utf8'));
   const overrides = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'overrides.json'), 'utf8'));
   const universe = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'universe.json'), 'utf8'));
@@ -251,10 +251,10 @@ test('relationEdges: from the canned universe, each relation edge joins two tags
     wasDerivedFrom: [{ type: 'cooccurrence', items: 1 }],
     wasGeneratedBy: { activity: 'relate', parameters: { broaderP: 0.8, narrowerMaxP: 0.6, minSupport: 1 } },
   });
-  // The emergent tag edges carry the stone's why and PROV; an explicit one
+  // The emergent tag edges carry rosetta-tagz's why and PROV; an explicit one
   // carries the PROV the universe wrote on it (ingested categories) and no
   // why, its why being null; the fixture's act-1 tag entry has no PROV, and
-  // act-1 is the container tag, so no tag edge is without a stone reference.
+  // act-1 is the container tag, so no tag edge is without a rosetta-tagz reference.
   const wire2Emergent = tagEdges.find((e) => e.source === 'wire-2' && e.target === 'tag:Artificial Intelligence');
   assert.ok(wire2Emergent, 'wire-2 has the emergent tag edge');
   assert.strictEqual(wire2Emergent.attrs.why, 'text mentions "artificial intelligence" ×2 (in title)');

@@ -1,4 +1,4 @@
-// A tag's network: its relatives through the stone's relation edges, the
+// A tag's network: its relatives through rosetta-tagz's relation edges, the
 // strongest first, kept aside from the graph's links.
 
 const { test } = require('node:test');
@@ -17,7 +17,7 @@ const rel = (source, target, layer, weight, why) => ({
   attrs: { ...(weight === undefined ? {} : { weight }), ...(why ? { why } : {}) },
 });
 
-test('the relation layers are the SKOS names the stone writes, and five show at first', () => {
+test('the relation layers are the SKOS names rosetta-tagz writes, and five show at first', () => {
   assert.deepStrictEqual(RELATION_LAYERS.slice().sort(), ['broadMatch', 'broader', 'closeMatch', 'exactMatch', 'related', 'relatedMatch']);
   assert.strictEqual(STRONGEST, 5);
 });
@@ -37,8 +37,8 @@ test('every edge relationEdges writes is a relation edge', () => {
   const items = [
     { id: 'i1', tags: ['Alpha', 'Beta'], _references: [{ type: 'tag', value: 'Alpha', concept: 'c_a' }, { type: 'tag', value: 'Beta', concept: 'c_b' }] },
   ];
-  const stone = { relationList: [{ a: 'c_a', b: 'c_b', type: 'broader', weight: 1 }, { a: 'c_a', b: 'c_b', type: 'related', weight: 0.3 }] };
-  const edges = relationEdges(stone, items);
+  const rtagz = { relationList: [{ a: 'c_a', b: 'c_b', type: 'broader', weight: 1 }, { a: 'c_a', b: 'c_b', type: 'related', weight: 0.3 }] };
+  const edges = relationEdges(rtagz, items);
   assert.strictEqual(edges.length, 2);
   for (const e of edges) assert.ok(isRelationEdge(e), e.layer);
 });

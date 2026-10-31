@@ -2,16 +2,16 @@
 
 const { detectExplicitFeedColor, hashFeedColor } = require('./adapters/detectFeedColor');
 const { ColorCache }      = require('./lib/colorCache');
-const { runStonePhase }   = require('./lib/stone');
+const { runRtagzPhase }   = require('./lib/rtagz');
 
 /**
  * @param {Array<{ adapter, config }>} entries
  * @param {Object} [options]
  * @param {string} [options.colorCachePath]  defaults to './.feed-cache/colors.json'
- * @param {Object} [options.stone]           site stone settings (settings.stone)
+ * @param {Object} [options.rtagz]           site rosetta-tagz settings (settings.rtagz)
  * @param {string} [options.siteRoot]        site root path
  * @param {Array}  [options.containment]     site containment entries (settings.containment)
- * @returns {Promise<{ items: JsonFeedItem[], sources: Source[], stone?: Object }>}
+ * @returns {Promise<{ items: JsonFeedItem[], sources: Source[], rtagz?: Object }>}
  */
 async function loadCorpus(entries, options = {}) {
   const cache = new ColorCache(options.colorCachePath || './.feed-cache/colors.json');
@@ -55,9 +55,9 @@ async function loadCorpus(entries, options = {}) {
     cache.set(r.feedMeta.id || r.config.id, r.color);
   }
 
-  // Stone phase: translate tags across systems after colours are resolved and
-  // before provenance is stamped.
-  const stoneResult = await runStonePhase(results, options);
+  // rosetta-tagz phase: translate tags across systems after colours are
+  // resolved and before provenance is stamped.
+  const rtagzResult = await runRtagzPhase(results, options);
 
   // Phase 3: build the sources list (what FeedZ shows) and stamp every
   // item with its source provenance.
@@ -91,8 +91,8 @@ async function loadCorpus(entries, options = {}) {
   });
 
   const out = { items: stamped, sources };
-  if (stoneResult && stoneResult.ran && stoneResult.stone) {
-    out.stone = stoneResult.stone;
+  if (rtagzResult && rtagzResult.ran && rtagzResult.rtagz) {
+    out.rtagz = rtagzResult.rtagz;
   }
   return out;
 }

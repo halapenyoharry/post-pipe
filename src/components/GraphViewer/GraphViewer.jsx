@@ -57,12 +57,12 @@ function feedToGraph(feed, config = {}) {
   const topologyColor = config.topologyColor || '#9b59b6';
   const placeholderColor = config.placeholderColor || '#7f8c8d';
 
-  // What the stone's ledger says a concept was called before this build
-  // (feed._stone.concepts[].ledger.previousLabel), so a position filed under
+  // What rtz-stone's ledger says a concept was called before this build
+  // (feed._rtagz.concepts[].ledger.previousLabel), so a position filed under
   // the old label can move to the concept's key.
   const previousLabelOf = new Map();
-  const stoneConcepts = feed._stone && Array.isArray(feed._stone.concepts) ? feed._stone.concepts : [];
-  for (const c of stoneConcepts) {
+  const rtagzConcepts = feed._rtagz && Array.isArray(feed._rtagz.concepts) ? feed._rtagz.concepts : [];
+  for (const c of rtagzConcepts) {
     if (c && typeof c.id === 'string' && c.ledger && typeof c.ledger.previousLabel === 'string' && c.ledger.previousLabel) {
       previousLabelOf.set(c.id, c.ledger.previousLabel);
     }
@@ -144,7 +144,7 @@ function feedToGraph(feed, config = {}) {
   }
 
   const containmentEdges = [];
-  // The stone's relations between two tags (broader, related and the
+  // rosetta-tagz's relations between two tags (broader, related and the
   // mappings, corpus/relationEdges.js; lib/tagNetwork.js): kept aside, never
   // a link, so the force never sees them and the layout is what it would be
   // without them. They are drawn only from a selected tag to its relatives.
@@ -176,8 +176,8 @@ function feedToGraph(feed, config = {}) {
     const target = resolveEndpoint(edge.target);
 
     if (edge.layer === 'tag' && !auxNodes.has(target)) {
-      // A tag node knows its concept (the first tag edge's attrs.concept, the
-      // stone's id; none without a stone), the label the ledger says the
+      // A tag node knows its concept (the first tag edge's attrs.concept,
+      // rosetta-tagz's id; none without rosetta-tagz), the label the ledger says the
       // concept had before, and the source ids of the pieces it joins
       // (systems, filled once every edge is read). Positions key on the
       // concept (persistKey), and the scheme and depth chosen in the panel
@@ -556,10 +556,10 @@ export function GraphViewer({
 
   // Where a node's arrangement is filed. Articles key by their item id — the
   // permalink — so the arrangement survives a rebuild that renumbers or
-  // reorders everything. A tag node whose concept the stone named keys on
+  // reorders everything. A tag node whose concept rosetta-tagz named keys on
   // the concept id ('concept:<id>'), which survives a relabel; a tag
   // collapsed with others at the chosen depth keys on the group's concept
-  // (_groupKey). Without a stone, tag and topology nodes key by their own
+  // (_groupKey). Without rosetta-tagz, tag and topology nodes key by their own
   // synthetic id ('tag:<label>'), as they always did.
   const persistKey = (d) => d._groupKey
     || (d.type === 'tag' && d.concept ? 'concept:' + d.concept : ((d.originalItem && d.originalItem.id) || d.id));
@@ -1102,7 +1102,7 @@ export function GraphViewer({
     //
     // The check is area: a layout needs room for its nodes. Anything occupying
     // a small fraction of that is not an arrangement, whatever produced it.
-    // Tag positions key on the concept id where the stone named one
+    // Tag positions key on the concept id where rosetta-tagz named one
     // (persistKey). An arrangement filed under the label is moved to the
     // concept's key, once per feed, under every layout's prefix and bare,
     // and from the label the ledger says the concept had before
@@ -1147,12 +1147,12 @@ export function GraphViewer({
           d._size = { width: savedSize.w, height: savedSize.h };
         }
       }
-      // A tag keyed on a concept (a stone's) with no saved force position
+      // A tag keyed on a concept (rosetta-tagz's) with no saved force position
       // starts at the centroid of the saved positions of the pieces it joins,
       // when any has one, so a concept whose key is new comes up among its
       // pieces rather than wherever the simulation drops it. Seeded, not
       // pinned (no fx/fy). Only in the force layout, the only one that reads
-      // a seed; and never for a tag keyed on its label (no stone), whose
+      // a seed; and never for a tag keyed on its label (no rosetta-tagz), whose
       // first frame stays as it was.
       if (layoutRef.current === 'force' && data.nodes.some((d) => d.type === 'tag' && d.concept)) {
         const nodeByIdForCentroid = new Map(data.nodes.map((n) => [n.id, n]));
@@ -3448,11 +3448,11 @@ export function GraphViewer({
 
     // The small lines beside a tag bubble (lib/tagForms.js: what each system
     // writes, who named it), shown while the tag is hovered or active. The
-    // concept is looked up by its id where the stone named one, else by the
+    // concept is looked up by its id where rosetta-tagz named one, else by the
     // label. Null when there is nothing to show.
     function buildTagForms(el, d, fontSize) {
       const formLines = d.type === 'tag'
-        ? tagFormsLines(tagForms(feedData._stone, d.concept || d.label, feedData.items))
+        ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items))
         : [];
       if (!formLines.length) return null;
       const formFontSize = Math.round(fontSize * 0.65);
@@ -4092,7 +4092,7 @@ export function GraphViewer({
     buildReaders();
 
     // ── Relations ─────────────────────────────────────────────────────────
-    // While a tag is selected, thin lines run from it to the tags the stone
+    // While a tag is selected, thin lines run from it to the tags rosetta-tagz
     // relates to it (data.relations: broader, related and the mappings,
     // lib/tagNetwork.js), the strongest five by weight, with +N under the
     // selected bubble when it has more (-N takes them away again). They are
@@ -4457,7 +4457,7 @@ export function GraphViewer({
     // (_origTarget kept; a second link to one piece hidden, _dupByGroup).
     // Depth 0 puts everything back. No node is made or removed and d.id
     // never changes, so select, highlight and the tag list go on working.
-    const stoneForLabels = feedData && feedData._stone;
+    const rtagzForLabels = feedData && feedData._rtagz;
     const tagEntries = tagBubbles.filter((e) => e.d.type === 'tag' && e.d.concept);
     const tagLinks = data.links.filter((l) => l.layer === 'tag');
     let schemeShown = { scheme: SITE_SCHEME, depth: 0 };
@@ -4475,7 +4475,7 @@ export function GraphViewer({
     };
     const depthSteps = (n) => (Number.isFinite(n) && n > 0 ? n : 0);
     // The bubble's text, outline and forms for a label (the tag's own when
-    // the stone does not know the concept).
+    // rosetta-tagz does not know the concept).
     function relabelBubble(entry, label, fallback) {
       const { d, el, textEl, fontSize } = entry;
       const shown = label || d.label;
@@ -4547,7 +4547,7 @@ export function GraphViewer({
       const reached = new Map();
       const groups = new Map();
       for (const e of tagEntries) {
-        const r = labelFor(stoneForLabels, e.d.concept, { scheme, depth, systems: e.d.systems });
+        const r = labelFor(rtagzForLabels, e.d.concept, { scheme, depth, systems: e.d.systems });
         reached.set(e.d.id, r);
         const gid = r.groupId || e.d.concept;
         if (!groups.has(gid)) groups.set(gid, []);

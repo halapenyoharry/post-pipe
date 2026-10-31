@@ -10,9 +10,10 @@ post-pipe is an engine. It holds no user's site. A **site** is a separate folder
 A site is a folder holding at least:
 
 - `settings.json` — the site's values (title, author, base address, graph and reader settings, which engines it subscribes to). The notes that explain every setting live in `examples/site/settings.json`; copy a setting and its `_note` from there.
-- `feeds.opml` — the site's sources. Each `<outline>` is one source: a publisher's RSS, Atom or JSON feed, or a local folder as `local://<path>` (a leading `~` expands; a relative path resolves against the site). One source is one tag-system to the stone.
+- `feeds.opml` — the site's sources. Each `<outline>` is one source: a publisher's RSS, Atom or JSON feed, or a local folder as `local://<path>` (a leading `~` expands; a relative path resolves against the site). One source is one tag-system to rosetta-tagz.
 - optionally `auth/.env` — credentials for publishing (GitHub token, API keys). Read from the site first; the engine's own `auth/.env` is the fallback, announced with one logged line.
-- optionally `stone.overrides.json` — human decisions for the tag stone (see `docs/STONE-SEAM.md`).
+- optionally `rtagz-overrides.json` — human decisions for rosetta-tagz (see `docs/POST-PIPE-USES-RTAGZ.md`).
+- optionally `rtagz-ids.json` — written by rosetta-tagz when the site turns it on: the concept ids it keeps from one build to the next. Worth tracking in the site's git.
 - `_site/` — build output, git-ignored.
 - `archive/` — by convention, git-ignored and Syncthing-synced, for material the site's owner keeps but the engine never reads.
 
@@ -36,9 +37,9 @@ Another checkout of the engine can be used with `POSTPIPE_ENGINE=<folder>` in a 
 - Rules about one person's brand. "humxn" in an author name is shown as written; the engine neither adds nor strips it.
 - Text from one site's content in the engine's tests. The unit tests use plain invented sentences. Browser checks for a site live in that site's repository (`test/e2e/` in the novel's) and load Playwright from the engine's `node_modules`.
 
-## The tag stone
+## rosetta-tagz
 
-A site subscribes to `rosetta-tagz` with a `stone` block in its settings; off by default, full contract in `docs/STONE-SEAM.md`. The `discover` switch makes the stone propose tags from words that recur across a source with no tags of its own. Finding from the first real run (2026-10-22, 102 items): translation merged nothing because the sources shared no spellings; emergence tagged 18 items from the owner's own vocabulary; discovery connected everything but mostly with generic words, and a discovered word can rename an owner's tag (`process` became `processing`). A site that wants its own spellings to win can pin them or weight its own source in `stone.overrides.json`. Since 2026-10-25 the block can also name `conceptSchemes` (published vocabularies the site vendors, each `{ id, path }`) and `ledger` (where the stone keeps its concept ids between builds, `stone.ledger.json` in the site by default, provisional), and the feed's `_stone` then carries `schemes[]`, each concept's `prefLabel` per scheme, and the stone's `skos.jsonld` and `skos.ttl` are copied into `_site/` when this build wrote them (one left there by an earlier build is removed, so a file beside `feed.json` always describes it).
+A site subscribes to rosetta-tagz (rtagz for short, a folder in this repository with its own programs, tests and docs) with an `rtagz` block in its settings; off by default, full contract in `docs/POST-PIPE-USES-RTAGZ.md`. The block was named `stone` before 2026-10-31; a site whose settings still say `stone` builds the same, with one logged line asking for the rename. The `discover` switch makes `rtz-discover` propose tags from words that recur across a source with no tags of its own. Finding from the first real run (2026-10-22, 102 items): translation merged nothing because the sources shared no spellings; emergence tagged 18 items from the owner's own vocabulary; discovery connected everything but mostly with generic words, and a discovered word can rename an owner's tag (`process` became `processing`). A site that wants its own spellings to win can pin them or weight its own source in `rtagz-overrides.json`. Since 2026-10-25 the block can also name `conceptSchemes` (published vocabularies the site vendors, each `{ id, path }`) and `ledger` (the ids file, where `rtz-stone` keeps its concept ids between builds, `rtagz-ids.json` in the site by default, provisional), and the feed's `_rtagz` then carries `schemes[]`, each concept's `prefLabel` per scheme, and rosetta-tagz's `skos.jsonld` and `skos.ttl` are copied into `_site/` when this build wrote them (one left there by an earlier build is removed, so a file beside `feed.json` always describes it).
 
 ## Serving a build locally
 

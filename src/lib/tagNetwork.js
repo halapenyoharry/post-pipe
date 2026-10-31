@@ -1,4 +1,4 @@
-// A tag's network: the tags the stone relates to it (feed edges of the SKOS
+// A tag's network: the tags rosetta-tagz relates to it (feed edges of the SKOS
 // layers, src/corpus/relationEdges.js), drawn from a selected tag node to its
 // relatives while it is selected (src/components/GraphViewer). The edges are
 // kept aside from the graph's links: they never reach the link force, so
@@ -12,7 +12,7 @@
 // Pure, so it can be tested without the DOM.
 
 // The layers a relation edge can be on. narrower and narrowMatch are the same
-// assertions read the other way; the stone does not write them.
+// assertions read the other way; rosetta-tagz does not write them.
 const RELATION_LAYERS = ['broader', 'broadMatch', 'related', 'relatedMatch', 'closeMatch', 'exactMatch'];
 const LAYER_SET = new Set(RELATION_LAYERS);
 // broader and broadMatch run from the narrower tag to the broader one.

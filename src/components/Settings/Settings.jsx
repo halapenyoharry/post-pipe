@@ -190,7 +190,7 @@ export function SettingsButton({ className, size = 15, ...rest }) {
 // where: 'graph' (the main view's panel) or 'reader' (the reader's).
 // ownButton: draw the panel's own button at the top right; by default the
 // main view's panel does when the graph's controls are not in the top bar.
-// schemes: the feed's concept schemes (feed._stone.schemes, as
+// schemes: the feed's concept schemes (feed._rtagz.schemes, as
 // schemesOf(feedData) reads them when the prop is left out); with two or
 // more, the view group offers the scheme and the depth the tags are read at.
 export function Settings({ viewState, feedData, subject, readerOpen, where = 'graph', ownButton, schemes }) {

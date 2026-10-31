@@ -2,7 +2,7 @@
 
 #post-pipe #architecture #vision #decomposition #negentropy
 
-**Last updated:** 2026-05-12 (revised same day, additions for Layer 0 Exoskeleton, Bundle relaxations, Layer 2 edges-first and Rosetta stone, Layer 3 multi-corpus, Layer 5 split into Tile and Panel, source adapters and feed caching)
+**Last updated:** 2026-05-12 (revised same day, additions for Layer 0 Exoskeleton, Bundle relaxations, Layer 2 edges-first and rosetta-tagz, Layer 3 multi-corpus, Layer 5 split into Tile and Panel, source adapters and feed caching)
 **Status:** Active. Companion to [[FUTURE-STATE]] and to [[ARCHITECTURE]] in the project root.
 
 ---
@@ -89,7 +89,7 @@ The leaf-versus-branch distinction is still useful. Leaf bundle is one piece (on
 
 The collection of bundles plus the edges between them, where edges are first-class citizens.
 
-**Role.** A walked set of bundles, plus explicit `connected_to` edges authored by you, plus derivable edges (tag overlap, topology overlap, substrate clusters). Optionally extended with external bundles ingested from RSS or JSON feeds via source adapters, which appear as peer nodes alongside your own work. Optionally extended further with cross-corpus edges derived via the Rosetta stone (see below).
+**Role.** A walked set of bundles, plus explicit `connected_to` edges authored by you, plus derivable edges (tag overlap, topology overlap, substrate clusters). Optionally extended with external bundles ingested from RSS or JSON feeds via source adapters, which appear as peer nodes alongside your own work. Optionally extended further with cross-corpus edges derived via rosetta-tagz (see below).
 
 **What it holds.** A pure data structure. Shape only. No styling, no projection, no rendering.
 
@@ -111,7 +111,7 @@ Multiple edges between the same pair of bundles coexist without contradiction. A
 
 This is the structural difference between a graph viewer and a graph-shaped viewer. A viewer that treats edges as derived properties of nodes ends up showing constellations of points; a viewer where edges are first-class can show the topology itself, which is the thing TopoThink is actually about.
 
-### Rosetta stone of tags
+### rosetta-tagz
 
 A graph-of-graphs structure for translating between tag-systems.
 
@@ -120,8 +120,8 @@ A graph-of-graphs structure for translating between tag-systems.
 **The structure.**
 
 - Each tag-system is its own graph. Nodes are tag-labels, edges are within-system relationships (hierarchy, hyponymy, near-synonymy, opposition).
-- The Rosetta stone is the graph between systems. Nodes are tag-systems or specific tags within them. Edges are cross-system relationships (identity, synergy, adjacency, opposition, containment, near-equivalence).
-- The user picks which system to display labels through. The viewer translates tag-labels via the Rosetta stone before drawing them.
+- rosetta-tagz is the graph between systems. Nodes are tag-systems or specific tags within them. Edges are cross-system relationships (identity, synergy, adjacency, opposition, containment, near-equivalence).
+- The user picks which system to display labels through. The viewer translates tag-labels via rosetta-tagz before drawing them.
 
 **Prior art.** W3C's SKOS (Simple Knowledge Organization System) is exactly this shape and exists specifically for representing tag-vocabularies and their cross-mappings. WordNet is the canonical English example. Not required to adopt SKOS directly, but the wheel is already round and worth knowing.
 
@@ -164,7 +164,7 @@ A choice of basis, a way of observing the corpus.
 
 ### Multi-corpus lenses
 
-A lens currently observes one corpus. A multi-corpus lens observes a stack of corpora, with the Rosetta stone as the cross-corpus edge-deriver. You see "AI" tagged in one corpus and "artificial intelligence" tagged in another, the stone says they are the same, the renderer draws the cross-corpus edge.
+A lens currently observes one corpus. A multi-corpus lens observes a stack of corpora, with rosetta-tagz as the cross-corpus edge-deriver. You see "AI" tagged in one corpus and "artificial intelligence" tagged in another, rosetta-tagz says they are the same, the renderer draws the cross-corpus edge.
 
 This is structurally a relaxation of Layer 3, not a new layer. A single-corpus lens is the case where the stack has one element. A multi-corpus lens is the general form. Worth naming because the renderer behaves differently when there are multiple sub-graphs to show plus inter-graph edges between them.
 
@@ -249,7 +249,7 @@ Layers compose by passing artifacts upward.
 - Exoskeleton hosts the runtime.
 - Bundle is data.
 - Corpus is data plus edges (edges first-class).
-- Lens picks observables from the corpus, possibly across multiple corpora via the Rosetta stone.
+- Lens picks observables from the corpus, possibly across multiple corpora via rosetta-tagz.
 - Renderer paints those observables.
 - Tiles act on selections. Panels frame tiles. Both live inside the exoskeleton.
 - Flow composes tiles into a sequence.
@@ -271,7 +271,7 @@ The artifacts that cross layer boundaries are the long-term commitments. They ar
 | Source adapter → Corpus | Bundle yield, per-adapter format | Adapter-private, just has to yield bundles |
 | Bundle → Corpus | Bundle metadata + content references | Schema must be open for new dimensions |
 | Corpus → Lens | Corpus as queryable structure, edges queryable as objects | Read-only from the lens's perspective |
-| Corpus ↔ Rosetta | Tag-system identifiers + cross-system mappings | Empirical, accretes over time |
+| Corpus ↔ rosetta-tagz | Tag-system identifiers + cross-system mappings | Empirical, accretes over time |
 | Lens → Renderer | Observable specification (what to draw, where) | Declarative, serializable |
 | Renderer → Tile | Current selection + session state | Tile receives, does not pull |
 | Tile ↔ Panel | Tile interface, declared capabilities, mount/unmount | Self-described, registry-discoverable |
@@ -289,7 +289,7 @@ Layer #9 of [[FUTURE-STATE]] points out that existing topology engines already d
 - **Exoskeleton.** The thing being built. OSC server libraries: liblo, node-osc, python-osc. Open-source control-surface authoring: TouchOSC, Open Stage Control, Lemur Editor, Chataigne. Panel-and-layout: any windowing-capable framework, or a thin custom layer.
 - **Bundle, Corpus.** File system plus walker, no library needed. The Hugo leaf bundle convention is the public-domain shape (with the relaxations listed in Layer 1).
 - **Edges first-class.** Property-graph thinking. Neo4j is the canonical example, but the structural shape can live in plain JSON without a graph database, as long as edges are objects with properties not strings in a list field.
-- **Rosetta stone.** SKOS for the data model (W3C standard, RDF-based). WordNet for vocabulary precedent. Lightweight realization: a JSON document per tag-system plus a separate mapping document, no triple-store needed at first.
+- **rosetta-tagz.** SKOS for the data model (W3C standard, RDF-based). WordNet for vocabulary precedent. Lightweight realization: a JSON document per tag-system plus a separate mapping document, no triple-store needed at first.
 - **Source adapters.** RSS / Atom parsers exist everywhere (feedparser, rss-parser, etc.). JSON Feed is just JSON. Obsidian vault reader is a markdown walker plus wikilink resolver.
 - **Lens.** Declarative spec, similar in shape to Mapbox style specs or Vega-Lite graph specs. Could be a JSON or YAML document. Stack-free.
 - **Renderer.** This is where existing engines earn their keep. MapLibre for the geographic HUD. Cosmograph for graph-shaped HUDs. Three.js for true-3D. D3 for bespoke 2D. Deck.gl for layered visualization. Each is its own renderer plugin. None is canonical.
@@ -354,7 +354,7 @@ The schema migration to relaxed leaf bundles affects only Layer 1 and the ingest
 
 post-pipe stays as the live thing: the corpus walker for `~/Posts/`, the publisher, the producer of derivatives, the source of the actual content. It is where bundles live and where they originate.
 
-The universal viewer is what those bundles get viewed in, alongside any other corpus the user mounts (RSS, scattered markdown, anyone else's `~/Posts/`, an Obsidian vault, a live stream). Structurally it is the exoskeleton plus the panels post-pipe extracts, plus a set of source adapters for arrivals from other places, plus the multi-corpus lens, plus the Rosetta stone for cross-corpus tagging.
+The universal viewer is what those bundles get viewed in, alongside any other corpus the user mounts (RSS, scattered markdown, anyone else's `~/Posts/`, an Obsidian vault, a live stream). Structurally it is the exoskeleton plus the panels post-pipe extracts, plus a set of source adapters for arrivals from other places, plus the multi-corpus lens, plus rosetta-tagz for cross-corpus tagging.
 
 The one-line description, from this conversation: **an RSS reader on steroids plus magic plus graphs, made by people who understand that edges are first-class citizens and that reification often interprets the data in a way that isn't helpful for visualization or understanding.**
 
@@ -378,7 +378,7 @@ Not a prioritized roadmap. The dependency order. Earlier moves unblock later one
 
 6. **Split the reader toolbar into tiles** at Layer 5. Tile registry, same pattern as the TTS engine registry. Existing buttons become individual tiles, the toolbar becomes a tile-slot.
 
-7. **Promote edges to first-class objects** at Layer 2. The corpus today stores tags as a list field on each bundle, edges are derived. Reshaping the corpus so edges are objects with their own properties unlocks all subsequent multi-corpus and Rosetta work. This is the structural move that makes the universal viewer different in kind, not just degree, from existing RSS readers.
+7. **Promote edges to first-class objects** at Layer 2. The corpus today stores tags as a list field on each bundle, edges are derived. Reshaping the corpus so edges are objects with their own properties unlocks all subsequent multi-corpus and rosetta-tagz work. This is the structural move that makes the universal viewer different in kind, not just degree, from existing RSS readers.
 
 8. **Migrate the ingester to relaxed leaf bundles** at Layer 1 → 2. Independent of most of the above because `feed.json` shape can stay stable.
 
@@ -386,15 +386,15 @@ Not a prioritized roadmap. The dependency order. Earlier moves unblock later one
 
 10. **Build the view-list panel** at Layer 5. The multi-corpus management surface. Lists corpora, lets the user reorder and toggle them, picks the semantic system for label display.
 
-11. **Build the Rosetta stone** at Layer 2. Empirical, after several source adapters exist. Without source diversity, there is no signal to translate.
+11. **Build rosetta-tagz** at Layer 2. Empirical, after several source adapters exist. Without source diversity, there is no signal to translate.
 
-12. **Build multi-corpus lenses** at Layer 3. Depends on Rosetta and edges-first.
+12. **Build multi-corpus lenses** at Layer 3. Depends on rosetta-tagz and edges-first.
 
 13. **Introduce flow specifications** at Layer 6. Smallest first, "narrate this and queue it." A YAML or JSON shape that names which bundle, which tiles in which order, where the output goes.
 
 14. **Build the personal infeed** at Layer 7. Receives flow outputs. Plays them. Starts as the simplest possible queue and player.
 
-Steps 1, 2, 3 are the Jules-shaped work currently being scoped. Step 4 is the exoskeleton integration. Step 5 is the architectural payoff that splits lens from renderer. Step 6 is the toolbar dissolution from layer #5 of [[FUTURE-STATE]]. Step 7 is the structural shift that makes the viewer different in kind from existing RSS readers. Step 8 is the schema move. Step 9 is when the universal viewer actually starts being useful. Steps 10 through 12 are the cross-corpus / Rosetta arc. Steps 13 and 14 are the part of the dream that has not been touched yet, and turn the system from a viewer into flow-composing personal infrastructure.
+Steps 1, 2, 3 are the Jules-shaped work currently being scoped. Step 4 is the exoskeleton integration. Step 5 is the architectural payoff that splits lens from renderer. Step 6 is the toolbar dissolution from layer #5 of [[FUTURE-STATE]]. Step 7 is the structural shift that makes the viewer different in kind from existing RSS readers. Step 8 is the schema move. Step 9 is when the universal viewer actually starts being useful. Steps 10 through 12 are the cross-corpus / rosetta-tagz arc. Steps 13 and 14 are the part of the dream that has not been touched yet, and turn the system from a viewer into flow-composing personal infrastructure.
 
 ---
 

@@ -9,15 +9,17 @@ const { buildEdges } = require('../src/corpus/buildEdges');
 const {
   htmlToText,
   canonicalUrl,
+  cacheDirForSite,
   mergeOverrides,
   buildConfig,
   buildRecords,
   checkContainerGuard,
   applyUniverse,
-  runStonePhase,
-} = require('../src/lib/stone');
+  rtagzSettings,
+  runRtagzPhase,
+} = require('../src/lib/rtagz');
 
-const FIXTURES_DIR = path.join(__dirname, 'fixtures', 'stone');
+const FIXTURES_DIR = path.join(__dirname, 'fixtures', 'rtagz');
 const CORPUS_FIXTURE = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'corpus.json'), 'utf8'));
 const OVERRIDES_FIXTURE = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'overrides.json'), 'utf8'));
 const UNIVERSE_FIXTURE = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, 'universe.json'), 'utf8'));
@@ -49,7 +51,7 @@ function entriesFromResults(results) {
   }));
 }
 
-test('stone: record writing handles untagged items, shared urls, duplicate feed titles, ignored tags, and duplicate item ids', () => {
+test('rtagz: record writing handles untagged items, shared urls, duplicate feed titles, ignored tags, and duplicate item ids', () => {
   const results = cloneResults();
   // Add a second feed with the same title "Journal" to verify disambiguation
   results.push({
@@ -116,7 +118,7 @@ test('stone: record writing handles untagged items, shared urls, duplicate feed 
   assert.strictEqual(canonicalUrl(post1Item.url), canonicalUrl(wire1Item.url));
 });
 
-test('stone: overrides merging combines site overrides with container pins, site pins winning', () => {
+test('rtagz: overrides merging combines site overrides with container pins, site pins winning', () => {
   const containment = [
     { id: 'container:epic', tag: 'epic' },
     { id: 'container:act-1', tag: 'act-1' },
@@ -132,8 +134,8 @@ test('stone: overrides merging combines site overrides with container pins, site
   });
 });
 
-test('stone: build config carries the site\'s concept schemes and ledger as absolute paths', () => {
-  const siteRoot = path.join(os.tmpdir(), 'postpipe-stone-site');
+test('rtagz: build config carries the site\'s concept schemes and ledger as absolute paths', () => {
+  const siteRoot = path.join(os.tmpdir(), 'postpipe-rtagz-site');
   const warned = [];
   const origWarn = console.warn;
   console.warn = (...args) => warned.push(args.join(' '));
@@ -155,8 +157,8 @@ test('stone: build config carries the site\'s concept schemes and ledger as abso
   }
   // A malformed entry is one logged line naming what it lacks, not a silent drop.
   assert.deepStrictEqual(warned, [
-    'stone: conceptSchemes[2] skipped, no path',
-    'stone: conceptSchemes[3] skipped, no id or path',
+    'rtagz: conceptSchemes[2] skipped, no path',
+    'rtagz: conceptSchemes[3] skipped, no id or path',
   ]);
   assert.deepStrictEqual(cfg, {
     out: '.',
@@ -168,7 +170,7 @@ test('stone: build config carries the site\'s concept schemes and ledger as abso
       { id: 'iptc-mediatopics', path: path.join(siteRoot, 'vocab', 'iptc-mediatopics.json') },
       { id: 'elsewhere', path: '/vocab/elsewhere.json' },
     ],
-    ledger: path.join(siteRoot, 'stone.ledger.json'),
+    ledger: path.join(siteRoot, 'rtagz-ids.json'),
   });
 
   // No schemes: the key is left out. A ledger path of the site's own is kept relative to the site.
@@ -186,7 +188,83 @@ test('stone: build config carries the site\'s concept schemes and ledger as abso
   assert.ok(!('ledger' in buildConfig({ ledger: 'ids.json' })), 'a relative ledger path needs a site root');
 });
 
-test('stone: write-back from canned universe orders tags, resolves folded items, preserves unjoined, emits edge attrs, and builds feed._stone', () => {
+test('rtagz: the settings block is read from rtagz, and from stone, its name before 2026-10-31, with one logged line', () => {
+  const warned = [];
+  const origWarn = console.warn;
+  console.warn = (...args) => warned.push(args.join(' '));
+  try {
+    assert.deepStrictEqual(rtagzSettings({ rtagz: { enabled: true } }), { enabled: true });
+    assert.strictEqual(warned.length, 0, 'the current key logs nothing');
+    assert.deepStrictEqual(rtagzSettings({ rtagz: { enabled: false }, stone: { enabled: true } }), { enabled: false });
+    assert.strictEqual(warned.length, 0, 'rtagz wins over stone, silently');
+    assert.strictEqual(rtagzSettings({ title: 'no block' }), undefined);
+    assert.strictEqual(rtagzSettings(null), undefined);
+    assert.strictEqual(warned.length, 0);
+    assert.deepStrictEqual(rtagzSettings({ stone: { enabled: true, discover: true } }), { enabled: true, discover: true });
+    assert.strictEqual(warned.length, 1);
+    assert.match(warned[0], /^rtagz: the settings key "stone" is now "rtagz"/);
+  } finally {
+    console.warn = origWarn;
+  }
+});
+
+test('rtagz: a site holding only stone.ledger.json or stone.overrides.json has them read, each with one logged line, until renamed', async () => {
+  const siteRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-rtagz-former-'));
+  const warned = [];
+  const origWarn = console.warn;
+  console.warn = (...args) => warned.push(args.join(' '));
+  try {
+    // Neither file: the current names, nothing logged.
+    assert.strictEqual(buildConfig({ siteRoot }).ledger, path.join(siteRoot, 'rtagz-ids.json'));
+    assert.strictEqual(warned.length, 0);
+
+    // Only the former ids file: it is the ledger, with one line.
+    fs.writeFileSync(path.join(siteRoot, 'stone.ledger.json'), '{}', 'utf8');
+    assert.strictEqual(buildConfig({ siteRoot }).ledger, path.join(siteRoot, 'stone.ledger.json'));
+    assert.strictEqual(warned.length, 1);
+    assert.match(warned[0], /^rtagz: read stone\.ledger\.json, whose name is now rtagz-ids\.json/);
+
+    // Both: the current one, silently.
+    fs.writeFileSync(path.join(siteRoot, 'rtagz-ids.json'), '{}', 'utf8');
+    assert.strictEqual(buildConfig({ siteRoot }).ledger, path.join(siteRoot, 'rtagz-ids.json'));
+    assert.strictEqual(warned.length, 1);
+
+    // A ledger the settings name is used as named, whatever is in the site.
+    assert.strictEqual(buildConfig({ siteRoot, ledger: 'stone.ledger.json' }).ledger, path.join(siteRoot, 'stone.ledger.json'));
+    assert.strictEqual(warned.length, 1);
+
+    // Only the former overrides file: its decisions reach rtz-build.
+    fs.writeFileSync(path.join(siteRoot, 'stone.overrides.json'), JSON.stringify({ ignore: ['untagged'] }), 'utf8');
+    const engine = path.join(siteRoot, 'engine');
+    fs.mkdirSync(path.join(engine, 'bin'), { recursive: true });
+    fs.writeFileSync(path.join(engine, 'bin', 'rtz-build'), `
+      const fs = require('fs');
+      fs.writeFileSync('universe.json', ${JSON.stringify(JSON.stringify(UNIVERSE_FIXTURE))});
+      fs.writeFileSync('build.json', JSON.stringify({ built: '2026-10-31T12:00:00Z', stages: [] }));
+    `, 'utf8');
+    const cacheDir = path.join(siteRoot, 'cache');
+    const res = await runRtagzPhase(cloneResults(), { rtagz: { enabled: true, engine }, siteRoot, cacheDir });
+    assert.ok(res.ran, 'rosetta-tagz ran');
+    assert.strictEqual(warned.length, 2);
+    assert.match(warned[1], /^rtagz: read stone\.overrides\.json, whose name is now rtagz-overrides\.json/);
+    const written = JSON.parse(fs.readFileSync(path.join(cacheDir, 'overrides.json'), 'utf8'));
+    assert.deepStrictEqual(written.ignore, ['untagged']);
+    // The cache holds the current ids file's path, now that both exist.
+    const config = JSON.parse(fs.readFileSync(path.join(cacheDir, 'rtz.config.json'), 'utf8'));
+    assert.strictEqual(config.ledger, path.join(siteRoot, 'rtagz-ids.json'));
+  } finally {
+    console.warn = origWarn;
+    fs.rmSync(siteRoot, { recursive: true, force: true });
+  }
+});
+
+test('rtagz: the cache folder for a site is under .feed-cache/rtagz', () => {
+  const dir = cacheDirForSite('/sites/example');
+  assert.strictEqual(path.dirname(dir), path.join('.feed-cache', 'rtagz'));
+  assert.match(path.basename(dir), /^example-[0-9a-f]{8}$/);
+});
+
+test('rtagz: write-back from canned universe orders tags, resolves folded items, preserves unjoined, emits edge attrs, and builds feed._rtagz', () => {
   const results = cloneResults();
   const mergedOverrides = mergeOverrides(OVERRIDES_FIXTURE, [{ id: 'container:act-1', tag: 'act-1' }]);
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergedOverrides);
@@ -203,7 +281,7 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
     {
       built: '2026-10-22T12:00:00.000Z',
       stages: [],
-      ledger: { path: '/sites/fixture/stone.ledger.json', minted: 4, reused: 0, retired: 0, splits: 0, merges: 0 },
+      ledger: { path: '/sites/fixture/rtagz-ids.json', minted: 4, reused: 0, retired: 0, splits: 0, merges: 0 },
     },
     { siteTitle: 'Fixture Site' }
   );
@@ -291,7 +369,7 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   assert.strictEqual(wire2._references[0].origin, 'emergent');
   assert.strictEqual(wire2._references[0].why, 'text mentions "artificial intelligence" ×2 (in title)');
   assert.strictEqual(wire2._references[2].origin, 'discovered');
-  //    Earned tags carry the PROV the stone wrote: the text span and the stage.
+  //    Earned tags carry the PROV rosetta-tagz wrote: the text span and the stage.
   assert.deepStrictEqual(wire2._references[0].wasDerivedFrom, [
     { type: 'text', phrase: 'artificial intelligence', count: 2, inTitle: true },
   ]);
@@ -329,7 +407,7 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   const act1TagEdge = edges.find((e) => e.target === 'tag:act-1');
   assert.strictEqual(act1TagEdge, undefined, 'pinned container tag is intercepted by containment');
 
-  // 6. feed._stone summary has the expected shape and excludes 0-item concepts
+  // 6. feed._rtagz summary has the expected shape and excludes 0-item concepts
   assert.strictEqual(summary.built, '2026-10-22T12:00:00.000Z');
   assert.deepStrictEqual(summary.systems.Posts, { sourceId: 'local://~/Posts', items: 2, tagged: 2 });
   assert.ok(!summary.concepts.some((c) => c.canonical === 'Unused Concept'), '0-item concept excluded');
@@ -354,8 +432,8 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   ]);
 
   //    schemes: the universe's list, the site scheme labelled with the site's
-  //    title and each system scheme given its source id, the stone not knowing
-  //    either; the discovered scheme, which the stone lists without a label,
+  //    title and each system scheme given its source id, rosetta-tagz not knowing
+  //    either; the discovered scheme, which rosetta-tagz lists without a label,
   //    labelled with its id (no label is invented); the external scheme with
   //    the plan's keys only, its file path (a header key) left out of the feed.
   assert.deepStrictEqual(summary.schemes, [
@@ -378,7 +456,7 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   assert.deepStrictEqual(summary.relations, { related: 1, broader: 1 });
   assert.deepStrictEqual(summary.mappings, { exactMatch: 1, broadMatch: 1 });
 
-  //    relationList: each SKOS relation between two of the stone's own
+  //    relationList: each SKOS relation between two of rosetta-tagz's own
   //    concepts, the pair as written (broader {a, b}: a is broader than b),
   //    with its weight, why and PROV, for the relation edges. The two mappings
   //    to the external vocabulary and the adjacent relation (skos: false) are
@@ -404,8 +482,8 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
     },
   ]);
 
-  //    untagged: the stone's note about j-unjoined, which no post-pipe item
-  //    joined, keeps the id and source the stone gave.
+  //    untagged: rosetta-tagz's note about j-unjoined, which no post-pipe item
+  //    joined, keeps the id and source rosetta-tagz gave.
   assert.deepStrictEqual(summary.untagged, {
     count: 1,
     items: [{
@@ -418,7 +496,7 @@ test('stone: write-back from canned universe orders tags, resolves folded items,
   assert.deepStrictEqual(summary.external, UNIVERSE_FIXTURE.external);
   assert.deepStrictEqual(summary.ledger, { minted: 4, reused: 0, retired: 0 });
 
-  //    Concepts: id, inScheme, prefLabel (the stone's own; the external label is
+  //    Concepts: id, inScheme, prefLabel (rosetta-tagz's own; the external label is
   //    reached through mappings and external), altLabel and mappings where they
   //    exist; broader as concept ids, from the broader relation a ⊃ b.
   assert.strictEqual(aiConcept.id, 'c_ai');
@@ -475,7 +553,7 @@ function universeWithoutSkos() {
   return u;
 }
 
-test('stone: a universe from the current engine (no SKOS, no PROV) adds only the derived schemes', () => {
+test('rtagz: a universe from the current engine (no SKOS, no PROV) adds only the derived schemes', () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const { summary } = applyUniverse(
@@ -509,7 +587,7 @@ test('stone: a universe from the current engine (no SKOS, no PROV) adds only the
   }
 });
 
-test('stone: untagged items come back on post-pipe ids through the join rule, a folded representative naming every item folded into it', () => {
+test('rtagz: untagged items come back on post-pipe ids through the join rule, a folded representative naming every item folded into it', () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const universe = {
@@ -540,7 +618,7 @@ test('stone: untagged items come back on post-pipe ids through the join rule, a 
   assert.ok(!('relations' in summary) && !('relationList' in summary) && !('mappings' in summary) && !('external' in summary) && !('ledger' in summary));
 });
 
-test('stone: a concept\'s own mappings[] win over the relations, and only an exactMatch lends a reference the external label', () => {
+test('rtagz: a concept\'s own mappings[] win over the relations, and only an exactMatch lends a reference the external label', () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const universe = {
@@ -615,7 +693,7 @@ function summaryOf(universe, manifest = { built: 'x', stages: [] }) {
   return applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, manifest, { siteTitle: 'Fixture Site' }).summary;
 }
 
-test('stone: an empty mappings[] or broader[] on a concept is no answer, and the relations are read', () => {
+test('rtagz: an empty mappings[] or broader[] on a concept is no answer, and the relations are read', () => {
   const summary = summaryOf(twoConceptUniverse([
     { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true, why: 'same label' },
     { a: 'c_ai', b: 'c_machine_learning', type: 'broader', weight: 0.9, skos: true },
@@ -631,7 +709,7 @@ test('stone: an empty mappings[] or broader[] on a concept is no answer, and the
   assert.deepStrictEqual(summary.mappings, { exactMatch: 1 });
 });
 
-test('stone: a mapping listed twice is read once, and a match between two of the stone\'s own concepts across schemes is a mapping on the first', () => {
+test('rtagz: a mapping listed twice is read once, and a match between two of rosetta-tagz\'s own concepts across schemes is a mapping on the first', () => {
   // broadMatch is written as broader is: a is the broader concept (AI).
   const summary = summaryOf(twoConceptUniverse([
     { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
@@ -661,7 +739,7 @@ test('stone: a mapping listed twice is read once, and a match between two of the
   // Counts are over the relations as written, each mapping once, mappings apart from relations.
   assert.deepStrictEqual(summary.mappings, { exactMatch: 1, broadMatch: 1, closeMatch: 2 });
   assert.deepStrictEqual(summary.relations, { related: 2 });
-  // The pair list holds the three between the stone's own concepts, each
+  // The pair list holds the three between rosetta-tagz's own concepts, each
   // pair once (a symmetric one as first written, whatever a later entry
   // weighs), a cross-scheme mapping among them; the exactMatch to the
   // vocabulary and the near relation are not in it.
@@ -672,7 +750,7 @@ test('stone: a mapping listed twice is read once, and a match between two of the
   ]);
 });
 
-test('stone: a concept flagged discovered with no inScheme still puts the discovered scheme on the list, and a bare scheme list is filled in', () => {
+test('rtagz: a concept flagged discovered with no inScheme still puts the discovered scheme on the list, and a bare scheme list is filled in', () => {
   const summary = summaryOf(twoConceptUniverse([], {
     ai: { discovered: true, inScheme: undefined, prefLabel: undefined },
     universe: { schemes: [{ id: 'Posts' }, { id: 'discovered' }, { id: 'site' }, { id: 'voc', label: 'A Vocabulary', path: '/x/voc.json' }] },
@@ -690,7 +768,7 @@ test('stone: a concept flagged discovered with no inScheme still puts the discov
   assert.ok(!('inScheme' in ai));
 });
 
-test('stone: untagged is read from build.json when the universe lacks it, and an empty untagged list or external map writes nothing', () => {
+test('rtagz: untagged is read from build.json when the universe lacks it, and an empty untagged list or external map writes nothing', () => {
   const fromManifest = summaryOf(twoConceptUniverse([]), {
     built: 'x', stages: [],
     untagged: [{ key: 'Journal::j-unjoined', source: 'Journal', why: ['no phrase recurs'] }],
@@ -705,8 +783,8 @@ test('stone: untagged is read from build.json when the universe lacks it, and an
   assert.ok(!('external' in empty), 'an empty external map is not written');
 });
 
-test('stone: with the stone off, items and the corpus carry none of the new fields', async () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-stone-off-'));
+test('rtagz: with rosetta-tagz off, items and the corpus carry none of the new fields', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-rtagz-off-'));
   try {
     const entries = entriesFromResults(cloneResults());
     const res = await loadCorpus(entries, { colorCachePath: path.join(tmpDir, 'colors.json'), siteRoot: tmpDir });
@@ -726,8 +804,8 @@ test('stone: with the stone off, items and the corpus carry none of the new fiel
   }
 });
 
-test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, container guard) leave tags as written and log one line', async () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-stone-skip-'));
+test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, container guard) leave tags as written and log one line', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-rtagz-skip-'));
   const colorCachePath = path.join(tmpDir, 'colors.json');
 
   const captureWarn = async (fn) => {
@@ -747,10 +825,10 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
     {
       const entries = entriesFromResults(cloneResults());
       const { res, lines } = await captureWarn(() =>
-        loadCorpus(entries, { colorCachePath, stone: { enabled: false }, siteRoot: tmpDir })
+        loadCorpus(entries, { colorCachePath, rtagz: { enabled: false }, siteRoot: tmpDir })
       );
       assert.strictEqual(lines.length, 0);
-      assert.strictEqual(res.stone, undefined);
+      assert.strictEqual(res.rtagz, undefined);
       const p1 = res.items.find((i) => i.id === 'https://example.test/post-1.html');
       assert.deepStrictEqual(p1.tags, ['act-1', 'artificial intelligence', 'AI', 'untagged']);
     }
@@ -762,13 +840,13 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       const { res, lines } = await captureWarn(() =>
         loadCorpus(entries, {
           colorCachePath,
-          stone: { enabled: true, engine: missingEngine },
+          rtagz: { enabled: true, engine: missingEngine },
           siteRoot: tmpDir,
         })
       );
       assert.strictEqual(lines.length, 1);
-      assert.match(lines[0], /^stone: engine not found at .*, tags left as written$/);
-      assert.strictEqual(res.stone, undefined);
+      assert.match(lines[0], /^rtagz: engine not found at .*, tags left as written$/);
+      assert.strictEqual(res.rtagz, undefined);
       const p1 = res.items.find((i) => i.id === 'https://example.test/post-1.html');
       assert.deepStrictEqual(p1.tags, ['act-1', 'artificial intelligence', 'AI', 'untagged']);
     }
@@ -786,14 +864,14 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       const { res, lines } = await captureWarn(() =>
         loadCorpus(entries, {
           colorCachePath,
-          stone: { enabled: true, engine: failEngine },
+          rtagz: { enabled: true, engine: failEngine },
           siteRoot: tmpDir,
           cacheDir: path.join(tmpDir, 'cache-fail'),
         })
       );
       assert.strictEqual(lines.length, 1);
-      assert.match(lines[0], /^stone: .*tags left as written$/);
-      assert.strictEqual(res.stone, undefined);
+      assert.match(lines[0], /^rtagz: .*tags left as written$/);
+      assert.strictEqual(res.rtagz, undefined);
       const p1 = res.items.find((i) => i.id === 'https://example.test/post-1.html');
       assert.deepStrictEqual(p1.tags, ['act-1', 'artificial intelligence', 'AI', 'untagged']);
     }
@@ -811,14 +889,14 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       const { res, lines } = await captureWarn(() =>
         loadCorpus(entries, {
           colorCachePath,
-          stone: { enabled: true, engine: slowEngine, timeoutMs: 80 },
+          rtagz: { enabled: true, engine: slowEngine, timeoutMs: 80 },
           siteRoot: tmpDir,
           cacheDir: path.join(tmpDir, 'cache-slow'),
         })
       );
       assert.strictEqual(lines.length, 1);
       assert.match(lines[0], /timed out after 80ms.*, tags left as written/);
-      assert.strictEqual(res.stone, undefined);
+      assert.strictEqual(res.rtagz, undefined);
     }
 
     // 5. a SKOS file left in the cache by an earlier build is gone after a
@@ -837,10 +915,10 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       fs.writeFileSync(path.join(cacheDir, 'skos.jsonld'), '{"stale": true}', 'utf8');
       const entries = entriesFromResults(cloneResults());
       const { res, lines } = await captureWarn(() =>
-        loadCorpus(entries, { colorCachePath, stone: { enabled: true, engine: skosEngine }, siteRoot: tmpDir, cacheDir })
+        loadCorpus(entries, { colorCachePath, rtagz: { enabled: true, engine: skosEngine }, siteRoot: tmpDir, cacheDir })
       );
       assert.strictEqual(lines.length, 0);
-      assert.ok(res.stone, 'the stone ran');
+      assert.ok(res.rtagz, 'rosetta-tagz ran');
       assert.ok(!fs.existsSync(path.join(cacheDir, 'skos.jsonld')), 'last build\'s skos.jsonld removed before the build');
       assert.ok(fs.existsSync(path.join(cacheDir, 'skos.ttl')), 'this build\'s skos.ttl kept');
     }
@@ -863,7 +941,7 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       const { res, lines } = await captureWarn(() =>
         loadCorpus(entries, {
           colorCachePath,
-          stone: { enabled: true, engine: badCanonEngine },
+          rtagz: { enabled: true, engine: badCanonEngine },
           containment: [{ id: 'container:act-1', tag: 'act-1' }],
           siteRoot: tmpDir,
           cacheDir: path.join(tmpDir, 'cache-guard'),
@@ -871,7 +949,7 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       );
       assert.strictEqual(lines.length, 1);
       assert.match(lines[0], /container tag "act-1" is not canonical after build, tags left as written/);
-      assert.strictEqual(res.stone, undefined);
+      assert.strictEqual(res.rtagz, undefined);
       const p1 = res.items.find((i) => i.id === 'https://example.test/post-1.html');
       assert.deepStrictEqual(p1.tags, ['act-1', 'artificial intelligence', 'AI', 'untagged']);
     }
@@ -880,8 +958,8 @@ test('stone: skip paths (disabled, missing engine, non-zero exit, timeout, conta
   }
 });
 
-test('stone: real engine integration builds universe.json and merges concepts across forms', async (t) => {
-  const envEngine = process.env.POSTPIPE_STONE_ENGINE;
+test('rtagz: real engine integration builds universe.json and merges concepts across forms', async (t) => {
+  const envEngine = process.env.POSTPIPE_RTAGZ_ENGINE;
   const fallbackEngine = path.join(__dirname, '..', 'rosetta-tagz');
   const engineDir = envEngine || fallbackEngine;
   const engineBin = path.join(engineDir, 'bin', 'rtz-build');
@@ -891,23 +969,23 @@ test('stone: real engine integration builds universe.json and merges concepts ac
     return;
   }
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-stone-real-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-rtagz-real-'));
   try {
     const cacheDir = path.join(tmpDir, 'cache');
     const colorCachePath = path.join(tmpDir, 'colors.json');
-    const overridesPath = path.join(tmpDir, 'stone.overrides.json');
+    const overridesPath = path.join(tmpDir, 'rtagz-overrides.json');
     fs.writeFileSync(overridesPath, JSON.stringify({ ignore: ['untagged'] }), 'utf8');
 
     const entries = entriesFromResults(cloneResults());
-    const { items, stone } = await loadCorpus(entries, {
+    const { items, rtagz } = await loadCorpus(entries, {
       colorCachePath,
       siteRoot: tmpDir,
       cacheDir,
       containment: [{ id: 'container:act-1', tag: 'act-1' }],
-      stone: {
+      rtagz: {
         enabled: true,
         engine: engineDir,
-        overrides: 'stone.overrides.json',
+        overrides: 'rtagz-overrides.json',
         emerge: true,
         discover: true,
         timeoutMs: 30000,
@@ -915,11 +993,11 @@ test('stone: real engine integration builds universe.json and merges concepts ac
     });
 
     assert.ok(fs.existsSync(path.join(cacheDir, 'universe.json')), 'universe.json written in cache');
-    assert.ok(stone, 'loadCorpus returns stone summary');
-    assert.ok(Array.isArray(stone.concepts) && stone.concepts.length > 0, 'stone summary has concepts');
+    assert.ok(rtagz, 'loadCorpus returns the rtagz summary');
+    assert.ok(Array.isArray(rtagz.concepts) && rtagz.concepts.length > 0, 'the rtagz summary has concepts');
 
     // Check that at least one concept has two forms across sources (e.g. AI / A.I. / artificial intelligence, or machine-learning / Machine Learning / ML)
-    const multiFormConcept = stone.concepts.find((c) => {
+    const multiFormConcept = rtagz.concepts.find((c) => {
       const allForms = new Set();
       for (const srcForms of Object.values(c.forms || {})) {
         for (const f of Object.keys(srcForms)) allForms.add(f);
@@ -936,14 +1014,14 @@ test('stone: real engine integration builds universe.json and merges concepts ac
     // concept has its id, the schemes list the site and every tag-system, every
     // tag reference names a summary concept whose canonical is its value, and
     // a prefLabel, where the engine writes one, names the site scheme with the value.
-    assert.ok(stone.concepts.every((c) => typeof c.id === 'string' && c.id), 'every summary concept carries its id');
-    assert.ok(Array.isArray(stone.schemes), 'summary carries schemes');
-    const schemeIds = stone.schemes.map((s) => s.id);
+    assert.ok(rtagz.concepts.every((c) => typeof c.id === 'string' && c.id), 'every summary concept carries its id');
+    assert.ok(Array.isArray(rtagz.schemes), 'summary carries schemes');
+    const schemeIds = rtagz.schemes.map((s) => s.id);
     for (const id of ['site', 'Posts', 'ScienceWire', 'Journal']) {
       assert.ok(schemeIds.includes(id), `scheme ${id} present`);
     }
-    assert.ok(stone.schemes.every((s) => typeof s.label === 'string' && s.label && typeof s.kind === 'string' && s.kind));
-    const canonicalById = new Map(stone.concepts.map((c) => [c.id, c.canonical]));
+    assert.ok(rtagz.schemes.every((s) => typeof s.label === 'string' && s.label && typeof s.kind === 'string' && s.kind));
+    const canonicalById = new Map(rtagz.concepts.map((c) => [c.id, c.canonical]));
     for (const item of items) {
       for (const ref of item._references || []) {
         if (ref.type !== 'tag' || !ref.concept) continue;

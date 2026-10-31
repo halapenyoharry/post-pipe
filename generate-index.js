@@ -16,7 +16,7 @@ const RssAdapter         = require('./src/adapters/RssAdapter');
 const AtomAdapter        = require('./src/adapters/AtomAdapter');
 const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
 const { loadCorpus }     = require('./src/aggregator');
-const { cacheDirForSite, SKOS_FILES } = require('./src/lib/stone');
+const { cacheDirForSite, SKOS_FILES, rtagzSettings } = require('./src/lib/rtagz');
 const { parseOpml }      = require('./src/lib/opml');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
@@ -743,14 +743,14 @@ ${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (setting
         // Two panels from one surface (src/lib/panels.js): the main view's,
         // from the sliders in the top bar, and the reader's, from the sliders
         // in its header.
-        // The feed's concept schemes (feed._stone.schemes; none without a
-        // stone), read here rather than through the bundle so a page built
-        // against an older bundle still mounts.
+        // The feed's concept schemes (feed._rtagz.schemes; none without
+        // rosetta-tagz), read here rather than through the bundle so a page
+        // built against an older bundle still mounts.
         React.createElement(Settings, {
           where: 'graph',
           viewState: viewState,
           feedData: feed,
-          schemes: (feed._stone && Array.isArray(feed._stone.schemes)) ? feed._stone.schemes : [],
+          schemes: (feed._rtagz && Array.isArray(feed._rtagz.schemes)) ? feed._rtagz.schemes : [],
           subject: selectedArticle || focusedItem,
           readerOpen: selectedArticle ? selectedArticle.id : null
         }),
@@ -758,7 +758,7 @@ ${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (setting
           where: 'reader',
           viewState: viewState,
           feedData: feed,
-          schemes: (feed._stone && Array.isArray(feed._stone.schemes)) ? feed._stone.schemes : [],
+          schemes: (feed._rtagz && Array.isArray(feed._rtagz.schemes)) ? feed._rtagz.schemes : [],
           subject: selectedArticle || focusedItem,
           readerOpen: selectedArticle ? selectedArticle.id : null
         }),
@@ -821,15 +821,15 @@ function siteLang() {
 async function main() {
   console.log(`Site root: ${SITE_ROOT}`);
   const entries = buildAdapterEntries();
-  // The stone's cache folder for this site, named here once: the phase writes
-  // into it and the SKOS copy below reads from it.
-  const stoneCacheDir = path.resolve(cacheDirForSite(SITE_ROOT));
-  const { items, sources, stone } = await loadCorpus(entries, {
-    stone: SETTINGS.stone,
+  // rosetta-tagz's cache folder for this site, named here once: the phase
+  // writes into it and the SKOS copy below reads from it.
+  const rtagzCacheDir = path.resolve(cacheDirForSite(SITE_ROOT));
+  const { items, sources, rtagz } = await loadCorpus(entries, {
+    rtagz: rtagzSettings(SETTINGS),
     siteRoot: SITE_ROOT,
     containment: SETTINGS.containment,
     siteTitle: SETTINGS.site && typeof SETTINGS.site.title === 'string' ? SETTINGS.site.title : '',
-    cacheDir: stoneCacheDir,
+    cacheDir: rtagzCacheDir,
   });
 
   console.log(`Aggregated ${items.length} item(s) from ${sources.length} source(s)`);
@@ -853,8 +853,8 @@ async function main() {
 
   const feed = buildFeed(items);
   feed.edges = buildEdges(items, SETTINGS);
-  // The stone's SKOS relations as tag-to-tag edges, when it ran this build.
-  if (stone) feed.edges.push(...relationEdges(stone, items, SETTINGS));
+  // rosetta-tagz's SKOS relations as tag-to-tag edges, when it ran this build.
+  if (rtagz) feed.edges.push(...relationEdges(rtagz, items, SETTINGS));
   if (SETTINGS.containment) {
     // settings.containers.<id> carries per-container extras: a status line
     // such as "soon"; an anchor, where the container rests on the cover's
@@ -898,22 +898,22 @@ async function main() {
     });
   }
   feed._sources = sources;
-  if (stone) feed._stone = stone;
+  if (rtagz) feed._rtagz = rtagz;
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 
-  // The stone's SKOS serialization, when this build wrote one, goes beside
-  // feed.json; one left there by an earlier build (the stone off, skipped, or
+  // rosetta-tagz's SKOS serialization, when this build wrote one, goes beside
+  // feed.json; one left there by an earlier build (rosetta-tagz off, skipped, or
   // its skos stage failed) is removed, so a file beside feed.json always
   // describes it. Neither a copy nor a removal can fail the build.
   for (const name of SKOS_FILES) {
-    const from = path.join(stoneCacheDir, name);
+    const from = path.join(rtagzCacheDir, name);
     const to = path.join(SITE_DIR, name);
     try {
-      if (stone && fs.existsSync(from)) fs.copyFileSync(from, to);
+      if (rtagz && fs.existsSync(from)) fs.copyFileSync(from, to);
       else if (fs.existsSync(to)) fs.unlinkSync(to);
     } catch (err) {
-      console.warn(`stone: ${name} left as it was in _site (${err.message})`);
+      console.warn(`rtagz: ${name} left as it was in _site (${err.message})`);
     }
   }
 

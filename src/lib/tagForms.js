@@ -1,5 +1,5 @@
-// What each tag-system calls a tag concept, and which part of the stone's
-// ranking chose its canonical name (docs/STONE-SEAM.md).
+// What each tag-system calls a tag concept, and which part of rosetta-tagz's
+// ranking chose its canonical name (docs/POST-PIPE-USES-RTAGZ.md).
 //
 // Pure, so it can be tested without the DOM.
 
@@ -141,7 +141,7 @@ function fromReferences(source, key, systemNames) {
   };
 }
 
-// Given feed._stone (may be undefined) and a key, a concept id or a canonical
+// Given feed._rtagz (may be undefined) and a key, a concept id or a canonical
 // label (the id is looked up first), returns null when there is nothing to
 // show, else:
 //   { canonical, pinned, discovered, items,
@@ -149,42 +149,42 @@ function fromReferences(source, key, systemNames) {
 //     rank: [{ label, score, parts }],
 //     and, when the concept carries them: id, inScheme, prefLabel, altLabel,
 //     broader, mappings }
-// Concepts without id or prefLabel (feeds built before the stone spoke SKOS)
-// are read as before. Accepts item-level _references entries (or items
-// carrying _references) as a fallback when feed._stone is absent.
-function tagForms(stone, key, fallback) {
+// Concepts without id or prefLabel (feeds built before rosetta-tagz spoke
+// SKOS) are read as before. Accepts item-level _references entries (or items
+// carrying _references) as a fallback when feed._rtagz is absent.
+function tagForms(rtagz, key, fallback) {
   const canonical = key;
   if (!canonical || typeof canonical !== 'string') return null;
 
-  let stoneObj = null;
+  let rtagzObj = null;
   let fallbackSource = fallback;
 
-  if (stone && typeof stone === 'object' && !Array.isArray(stone)) {
-    if (stone.concepts && typeof stone.concepts === 'object') {
-      stoneObj = stone;
-    } else if (stone._stone && typeof stone._stone === 'object') {
-      stoneObj = stone._stone;
-      if (fallbackSource === undefined && stone.items) fallbackSource = stone.items;
+  if (rtagz && typeof rtagz === 'object' && !Array.isArray(rtagz)) {
+    if (rtagz.concepts && typeof rtagz.concepts === 'object') {
+      rtagzObj = rtagz;
+    } else if (rtagz._rtagz && typeof rtagz._rtagz === 'object') {
+      rtagzObj = rtagz._rtagz;
+      if (fallbackSource === undefined && rtagz.items) fallbackSource = rtagz.items;
     } else if (fallbackSource === undefined) {
-      fallbackSource = stone;
+      fallbackSource = rtagz;
     }
-  } else if (fallbackSource === undefined && stone !== undefined) {
-    fallbackSource = stone;
+  } else if (fallbackSource === undefined && rtagz !== undefined) {
+    fallbackSource = rtagz;
   }
 
-  const systemNames = stoneObj && stoneObj.systems && typeof stoneObj.systems === 'object'
-    ? Object.keys(stoneObj.systems)
+  const systemNames = rtagzObj && rtagzObj.systems && typeof rtagzObj.systems === 'object'
+    ? Object.keys(rtagzObj.systems)
     : [];
 
-  if (stoneObj && stoneObj.concepts) {
-    const list = Array.isArray(stoneObj.concepts) ? stoneObj.concepts : null;
+  if (rtagzObj && rtagzObj.concepts) {
+    const list = Array.isArray(rtagzObj.concepts) ? rtagzObj.concepts : null;
     let concept;
     if (list) {
       concept = list.find((c) => c && c.id === canonical)
         || list.find((c) => c && c.canonical === canonical);
     } else {
-      concept = stoneObj.concepts[canonical]
-        || Object.values(stoneObj.concepts).find((c) => c && typeof c === 'object' && c.id === canonical);
+      concept = rtagzObj.concepts[canonical]
+        || Object.values(rtagzObj.concepts).find((c) => c && typeof c === 'object' && c.id === canonical);
     }
     if (!concept || typeof concept !== 'object') return null;
     const label = typeof concept.canonical === 'string' && concept.canonical ? concept.canonical : canonical;

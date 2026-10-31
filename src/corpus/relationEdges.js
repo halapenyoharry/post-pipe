@@ -1,6 +1,6 @@
 // ─── Relation edges ──────────────────────────────────────────────────────────
-// Tag-to-tag edges from the stone's SKOS relations (feed._stone.relationList,
-// written by lib/stone.js applyUniverse). A relation between two concepts
+// Tag-to-tag edges from rosetta-tagz's SKOS relations (feed._rtagz.relationList,
+// written by src/lib/rtagz.js applyUniverse). A relation between two concepts
 // becomes an edge between the two tag nodes that stand for them, so the graph
 // can say that two tags are related, or that one is broader than the other,
 // with no piece between them.
@@ -12,28 +12,28 @@
 //               broader, so the arrow points at the broader concept
 //   undirected  related, closeMatch, relatedMatch, exactMatch: once per
 //               unordered pair
-// narrower and narrowMatch are the same assertions read the other way and the
-// stone does not write them; a relation of any other type is left alone.
+// narrower and narrowMatch are the same assertions read the other way and
+// rosetta-tagz does not write them; a relation of any other type is left alone.
 //
-// Direction follows how the stone writes the pair, and the stone writes both
+// Direction follows how rtz-stone writes the pair, and it writes both
 // directed types the same way: `broader {a, b}` says a is broader than b
 // (rosetta-tagz docs/FORMATS.md, "for broader, a ⊃ b"), and a `broadMatch`
 // between two of its own concepts is a cross-scheme `broader` renamed with the
-// pair kept (its lib/stone.js: "broadMatch {a,b} means b skos:broadMatch a"),
+// pair kept (rosetta-tagz/lib/stone.js: "broadMatch {a,b} means b skos:broadMatch a"),
 // so a is the broader there too. Either way the edge runs b → a and the arrow
-// lands on the broader concept (docs/STONE-SEAM.md pins this). attrs keep the
+// lands on the broader concept (docs/POST-PIPE-USES-RTAGZ.md pins this). attrs keep the
 // pair as written: concept is a's id, target is b's id, then weight, why and
-// the PROV fields where the stone gave them.
+// the PROV fields where rosetta-tagz gave them.
 //
 // An endpoint is `tag:<label>`, the string the items' tag edges use (the
-// concept's site prefLabel, which is item.tags as the stone rewrote it). A
+// concept's site prefLabel, which is item.tags as rosetta-tagz rewrote it). A
 // concept that is a tag on no joined item has no tag node and gets no edge.
 // A container tag (settings.containment[].tag) is intercepted by containment
 // in buildEdges and has no tag node either, so it gets none. A relation to an
 // external vocabulary's concept is a mapping on its concept
-// (_stone.concepts[].mappings), not an edge: its target is no tag here.
+// (_rtagz.concepts[].mappings), not an edge: its target is no tag here.
 //
-// No stone, or a stone with no relations → [].
+// No rosetta-tagz summary, or one with no relations → [].
 
 const DIRECTED = new Set(['broader', 'broadMatch']);
 const UNDIRECTED = new Set(['related', 'closeMatch', 'relatedMatch', 'exactMatch']);
@@ -59,9 +59,9 @@ function tagLabelByConcept(items, options = {}) {
   return labelOf;
 }
 
-function relationEdges(stone, items, options = {}) {
-  if (!stone || typeof stone !== 'object') return [];
-  const relations = Array.isArray(stone.relationList) ? stone.relationList : [];
+function relationEdges(rtagz, items, options = {}) {
+  if (!rtagz || typeof rtagz !== 'object') return [];
+  const relations = Array.isArray(rtagz.relationList) ? rtagz.relationList : [];
   if (!relations.length) return [];
 
   const labelOf = tagLabelByConcept(items, options);

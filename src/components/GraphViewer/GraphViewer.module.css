@@ -231,7 +231,7 @@
   fill: none;
 }
 
-/* A selected tag's lines to its relatives (the stone's relations): thin, in
+/* A selected tag's lines to its relatives (rosetta-tagz's relations): thin, in
    one colour, --gv-relation (the theme's text colour unless a site sets it),
    never touched; their hit areas, under the containers layer, are. The
    arrowhead of a broader or broadMatch lands on the broader tag. */
