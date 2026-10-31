@@ -3,6 +3,7 @@ import styles from './Toolbar.module.css';
 import { dimensionLabels, layerLabels, dimensionGroupLabel } from '../../lib/dimensionLabels';
 import { viewActionsFor, RESET_TITLE, hasGranularity as axisHasGranularity, toggleDimension, nextGranularity, menuModel, menuMove } from '../../lib/toolbar';
 import { SEARCH_FROM, hasTagNodes, tagListModel, filterTagRows, tagRowTitle } from '../../lib/tagList';
+import { PREF as MIN_PIECES_PREF } from '../../lib/minPieces';
 import { iconBody } from '../../lib/icons';
 import { Icon } from '../Icon/Icon';
 import { SettingsButton } from '../Settings/Settings';
@@ -213,12 +214,16 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
 // dimensions as checkbox rows (one on at a time) and the bucket size when
 // the one on has it. The tag list (its button only when the graph draws tag
 // nodes, src/lib/tagList.js hasTagNodes) opens the same way: a row per tag
-// with its colour, its name and how many pieces it joins, a search field
-// first when there are many; a row selects its tag in the graph as a tap on
-// the node does (graph:select-tag), and the graph says which is on
-// (graph:tag-changed), so the row is checked. One of the two is open at a
-// time. Escape or a tap outside closes it; the arrow keys, Home and End move
-// through it. The sliders open the main view's panel (src/components/Settings).
+// with its colour, its name and how many cards it is on (counted as the
+// panel's pieces per tag slider counts them), the most first, a search field
+// first when there are many; the tags the slider hides are left out, and the
+// list follows the slider as it moves (the preference minTagPieces, and the
+// graph's own counts, window.PostPipeGraphTags and 'graph:tag-counts'). A row
+// selects its tag in the graph as a tap on the node does (graph:select-tag),
+// and the graph says which is on (graph:tag-changed), so the row is checked.
+// One of the two is open at a time. Escape or a tap outside closes it; the
+// arrow keys, Home and End move through it. The sliders open the main view's
+// panel (src/components/Settings).
 function TopControls({ viewState, show, layouts, settings, layers, feedData, hiddenSources }) {
   const S = settings || (typeof window !== 'undefined' ? window.SETTINGS : null);
   const [, bump] = useReducer((n) => n + 1, 0);
@@ -236,6 +241,17 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
     const on = (e) => setActiveTag(e.detail && e.detail.id ? e.detail.id : null);
     window.addEventListener('graph:tag-changed', on);
     return () => window.removeEventListener('graph:tag-changed', on);
+  }, []);
+  // The graph's own count of the pieces on each tag bubble it draws, for the
+  // pieces per tag slider's top (window.PostPipeGraphTags, and
+  // 'graph:tag-counts' when it changes, as the panel reads it); null until
+  // the graph has said.
+  const [graphTags, setGraphTags] = useState(() => (typeof window !== 'undefined' ? window.PostPipeGraphTags || null : null));
+  useEffect(() => {
+    const on = () => setGraphTags(window.PostPipeGraphTags || null);
+    on();
+    window.addEventListener('graph:tag-counts', on);
+    return () => window.removeEventListener('graph:tag-counts', on);
   }, []);
 
   const items = () => (menuRef.current ? [...menuRef.current.querySelectorAll('[data-menu-item]')] : []);
@@ -288,7 +304,10 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
 
   // The tag list's rows, made while it is open: the feeds hidden and the
   // reader's own feed colours as the graph has them, a piece without a feed
-  // colour weighing in as the theme's tag colour (paintTagColors).
+  // colour weighing in as the theme's tag colour (paintTagColors); the tags
+  // under the pieces per tag chosen left out, the slider's top being the
+  // largest count the graph published. Made again on every change to the
+  // view state, so the list follows the slider while it is open.
   const hasTags = hasTagNodes(feedData, S && S.graph);
   let tagRows = [];
   if (hasTags && open === 'tags') {
@@ -296,10 +315,16 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
     const themeTag = root && typeof getComputedStyle === 'function'
       ? (getComputedStyle(root).getPropertyValue('--gv-tag-color').trim() || null)
       : null;
+    const graphTop = graphTags && Array.isArray(graphTags.counts)
+      ? graphTags.counts.reduce((m, n) => (Number.isFinite(Number(n)) && Number(n) > m ? Number(n) : m), -1)
+      : -1;
     tagRows = tagListModel(feedData, {
       hiddenSources: hiddenSources || (viewState.state && viewState.state.hiddenSources) || [],
       sourceColorOf: (id) => (typeof viewState.sourceColor === 'function' ? viewState.sourceColor(id) : null),
       fallbackColor: themeTag,
+      minPieces: typeof viewState.preference === 'function' ? viewState.preference(MIN_PIECES_PREF) : null,
+      tagCounts: graphTags && graphTags.byTag && typeof graphTags.byTag === 'object' ? graphTags.byTag : null,
+      maxPieces: graphTop >= 0 ? graphTop : null,
     });
   }
   const shownTagRows = filterTagRows(tagRows, tagQuery);
@@ -357,7 +382,7 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
         <span className={styles.menuCheck} aria-hidden="true">{on && <Icon body={iconBody('check')} size={14} />}</span>
         <span className={styles.tagSwatch} aria-hidden="true" style={{ background: r.color || 'var(--gv-tag-color)' }} />
         <span className={styles.tagLabel}>{r.label}</span>
-        <span className={styles.tagCount}>{r.count}</span>
+        <span className={styles.tagCount}>{r.pieces}</span>
       </button>
     );
   };
@@ -398,20 +423,20 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
       </>)}
       {hasTags && (<>
         <button ref={tagButtonRef} type="button" className={`${styles.topIcon} ${open === 'tags' ? styles.on : ''}`}
-          title="Tags" aria-label="Tags" aria-haspopup="dialog" aria-expanded={open === 'tags'} aria-controls="pp-top-tags" data-top-tags-button
+          title="Tagz" aria-label="Tagz" aria-haspopup="dialog" aria-expanded={open === 'tags'} aria-controls="pp-top-tags" data-top-tags-button
           onClick={toggleTags}
           onKeyDown={(e) => { if (e.key === 'ArrowDown' && open !== 'tags') { e.preventDefault(); toggleTags(); } }}>
           <Icon body={iconBody('tag')} size={15} />
         </button>
         {open === 'tags' && (
-          <div ref={menuRef} id="pp-top-tags" className={`${styles.menu} ${styles.tagMenu}`} role="dialog" aria-label="Tags"
+          <div ref={menuRef} id="pp-top-tags" className={`${styles.menu} ${styles.tagMenu}`} role="dialog" aria-label="Tagz"
             data-top-tags onKeyDown={onMenuKey}>
-            <div role="presentation" className={styles.menuHeading}>Tags</div>
+            <div role="presentation" className={styles.menuHeading}>Tagz</div>
             {showSearch && (
               <input type="search" className={styles.menuSearch} placeholder="find a tag" aria-label="Find a tag"
                 value={tagQuery} onChange={(e) => setTagQuery(e.target.value)} data-menu-search />
             )}
-            <div role="listbox" aria-label="Tags" className={styles.tagRows}>
+            <div role="listbox" aria-label="Tagz, the most cards first" className={styles.tagRows}>
               {shownTagRows.map(tagRow)}
             </div>
             {!shownTagRows.length && <div className={styles.menuEmpty}>none</div>}

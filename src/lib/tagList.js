@@ -5,10 +5,17 @@
 // the way the graph paints the tag node (paintTagColors in
 // src/components/GraphViewer). A hidden feed's pieces count for nothing, so a
 // tag with every piece hidden leaves the list as its node leaves the graph.
+// A tag the panel's pieces per tag slider hides (the preference minTagPieces,
+// src/lib/minPieces.js) leaves it too. The rows run from the tag on the most
+// pieces to the fewest, counted as the slider counts them (every feed's
+// pieces, so a row keeps its place when a feed is hidden), ties by name; so
+// raising the slider trims the list from its end. (Harold chose this order
+// on 2026-10-31; it replaced the alphabetical one.)
 //
 // Pure, so it can be tested without the DOM.
 
 const { blendColors } = require('./blendColors');
+const { clampMinPieces } = require('./minPieces');
 
 // The list offers a search field once it is longer than this.
 const SEARCH_FROM = 20;
@@ -22,16 +29,30 @@ function hasTagNodes(feedData, graphSettings) {
   return edges.some((e) => e && e.layer === 'tag');
 }
 
-// The rows, alphabetical by tag:
-//   { id, label, count, color, contributors: [{ sourceId, title, count }] }
-// id is the node's ('tag:<name>'), label the name. color is '#rrggbb', or
-// null when no piece has a readable colour and no fallback was given.
-// contributors are the feeds the pieces come from, most pieces first.
+// The rows, the tag on the most pieces first, ties by name (case aside):
+//   { id, label, count, pieces, color, contributors: [{ sourceId, title, count }] }
+// id is the node's ('tag:<name>'), label the name. pieces is the number the
+// slider reads, the rows are ordered by and the list shows: the distinct
+// pieces the tag is on, every feed counted (the graph's own count when
+// tagCounts has the tag). count is the pieces showing (a hidden feed's left
+// out). color is '#rrggbb', or null when no piece has a readable colour and
+// no fallback was given. contributors are the feeds the showing pieces come
+// from, most pieces first.
 //   hiddenSources: Set (or array) of source ids whose pieces do not count
 //   sourceColorOf: (sourceId) => the reader's own colour for that feed, or null
 //   fallbackColor: the colour a piece without a feed colour weighs in as (the
 //                  theme's tag colour)
-function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor } = {}) {
+//   minPieces:     the pieces per tag chosen (the preference minTagPieces,
+//                  null for 1): a tag on fewer is left out. It is clamped to
+//                  the slider's top, as the graph and the panel clamp it.
+//   tagCounts:     the graph's count for each tag, by id (a Map or a plain
+//                  object, where a tag collapsed into another at a depth
+//                  above 0 has the count of the bubble that shows it), or
+//                  null to count from the feed
+//   maxPieces:     the slider's top, the largest count the graph published
+//                  (window.PostPipeGraphTags.counts), or null for the largest
+//                  of tagCounts, else of the feed's counts
+function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, minPieces = null, tagCounts = null, maxPieces = null } = {}) {
   const items = feedData && Array.isArray(feedData.items) ? feedData.items : [];
   const edges = feedData && Array.isArray(feedData.edges) ? feedData.edges : [];
   const sources = feedData && Array.isArray(feedData._sources) ? feedData._sources : [];
@@ -59,8 +80,28 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor } 
     return own || (src && src.color) || null;
   };
 
+  // The slider's count for each tag, and the value in force, clamped to the
+  // slider's top: the largest count among every tag (a hidden feed's tags
+  // too), as the graph and the panel read it.
+  const graphCounts = tagCounts instanceof Map ? tagCounts
+    : (tagCounts && typeof tagCounts === 'object' ? new Map(Object.entries(tagCounts)) : null);
+  const sliderCount = (id) => {
+    const n = graphCounts && graphCounts.has(id) ? Number(graphCounts.get(id)) : NaN;
+    return Number.isFinite(n) ? n : tags.get(id).size;
+  };
+  let most = Number(maxPieces);
+  if (maxPieces === null || maxPieces === undefined || !Number.isFinite(most)) {
+    most = 0;
+    for (const n of (graphCounts ? graphCounts.values() : [...tags.values()].map((set) => set.size))) {
+      if (Number(n) > most) most = Number(n);
+    }
+  }
+  const min = clampMinPieces(minPieces, most);
+
   const rows = [];
   for (const [id, pieceIds] of tags) {
+    const total = sliderCount(id);
+    if (min > 1 && total < min) continue;
     const pieces = [...pieceIds].map((pid) => byId.get(pid)).filter((it) => !hidden.has(sourceIdOf(it)));
     if (!pieces.length) continue;
     const perSource = new Map();
@@ -78,11 +119,14 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor } 
       id,
       label: id.slice(4),
       count: pieces.length,
+      pieces: total,
       color: blendColors(pieces.map((it) => ({ color: colorOf(it), weight: 1 })), fallbackColor),
       contributors,
     });
   }
-  rows.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }) || a.label.localeCompare(b.label));
+  rows.sort((a, b) => (b.pieces - a.pieces)
+    || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+    || a.label.localeCompare(b.label));
   return rows;
 }
 
@@ -94,10 +138,13 @@ function filterTagRows(rows, query) {
   return rows.filter((r) => r.label.toLowerCase().includes(q));
 }
 
-// What a row says when hovered: its colour, then the feeds its pieces come
-// from with how many each brings ("#a1b2c3 · Example pieces 3, Posts 1").
+// What a row says when hovered: how many cards the tag is on (the number
+// the row shows), its colour, then the feeds its showing pieces come from
+// with how many each brings ("3 cards · #a1b2c3 · Example pieces 2, Posts 1").
 function tagRowTitle(row) {
   const parts = [];
+  const n = Number.isFinite(row.pieces) ? row.pieces : row.count;
+  if (Number.isFinite(n)) parts.push(`${n} ${n === 1 ? 'card' : 'cards'}`);
   if (row.color) parts.push(row.color);
   const feeds = (row.contributors || []).filter((c) => c.title).map((c) => `${c.title} ${c.count}`);
   if (feeds.length) parts.push(feeds.join(', '));
