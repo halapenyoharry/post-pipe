@@ -8,7 +8,9 @@
 //   site.icons               { ico, svg, png, apple_touch, png_sizes }:
 //                            the files a browser tab and a home screen use,
 //                            relative to the site. Without it the head keeps
-//                            the one ./favicon.svg link it always had.
+//                            the one ./favicon.svg link it always had, and
+//                            the build puts a favicon.svg beside the page
+//                            (faviconPlan, below).
 //
 // Every value is escaped for an attribute, so a description may hold quotes.
 'use strict';
@@ -64,4 +66,47 @@ function iconLinks(site) {
   return out.join('\n');
 }
 
-module.exports = { shareMeta, iconLinks, escAttr };
+// The grey a placeholder icon is drawn in when the site has no accent.
+const NEUTRAL_GREY = '#888888';
+
+// A colour that can go in an SVG fill as it is: #rgb, #rgba, #rrggbb or
+// #rrggbbaa, rgb()/rgba()/hsl()/hsla(), or a colour name; else null.
+function usableColor(v) {
+  const c = typeof v === 'string' ? v.trim() : '';
+  if (/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(c)) return c;
+  if (/^(rgb|rgba|hsl|hsla)\([0-9.,%\s/+-]+\)$/i.test(c)) return c;
+  if (/^[a-z]{3,30}$/i.test(c)) return c;
+  return null;
+}
+
+// The colour a placeholder icon is drawn in: the site's accent
+// (settings.accent), else its theme's accent (settings.theme.accent), else a
+// neutral grey.
+function faviconColor(settings) {
+  const S = settings || {};
+  return usableColor(S.accent) || usableColor(S.theme && S.theme.accent) || NEUTRAL_GREY;
+}
+
+// The placeholder icon: one filled circle in color, on a 32-unit box.
+function placeholderFavicon(color) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="${escAttr(usableColor(color) || NEUTRAL_GREY)}"/></svg>\n`;
+}
+
+// What the build does about the tab icon (generate-index.js), so every site
+// has one:
+//   { action: 'keep' }                     the site sets site.icons: its own
+//                                          icons are left untouched
+//   { action: 'copy' }                     the site folder has a favicon.svg:
+//                                          it is copied beside the page
+//   { action: 'placeholder', color, svg }  neither: a placeholder favicon.svg
+//                                          is written beside the page
+// hasSiteFavicon: whether the site folder holds a favicon.svg.
+function faviconPlan(settings, { hasSiteFavicon = false } = {}) {
+  const site = (settings && settings.site) || {};
+  if (site.icons) return { action: 'keep' };
+  if (hasSiteFavicon) return { action: 'copy' };
+  const color = faviconColor(settings);
+  return { action: 'placeholder', color, svg: placeholderFavicon(color) };
+}
+
+module.exports = { shareMeta, iconLinks, escAttr, faviconPlan, faviconColor, placeholderFavicon, NEUTRAL_GREY };

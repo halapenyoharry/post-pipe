@@ -51,7 +51,11 @@
 /**
  * @typedef {Object} Adapter
  *   id    — short type identifier ('local', 'rss', 'atom', 'json-feed')
- *   load  — async (config) => AdapterResult
+ *   load  — async (config, deps) => AdapterResult
+ *           deps.fetchText (optional, the fetched adapters): async (url) =>
+ *           the feed's text. The aggregator passes one that remembers what a
+ *           fetch returned, so the last good copy can be kept, and after a
+ *           failed fetch one that hands back that copy (lastGoodCopy.js).
  *
  * Color detection lives in a separate helper (detectFeedColor.js) and runs
  * downstream in the aggregator — not inside the adapter. That keeps adapters

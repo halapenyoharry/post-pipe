@@ -6,9 +6,12 @@ const { fetchText } = require('./fetchText');
 
 const ID = 'json-feed';
 
-async function load(config) {
+// deps.fetchText: how the feed's text is fetched (the aggregator passes one
+// that remembers the text, or one that hands back the feed's last good copy
+// after a failed fetch); the plain one by default.
+async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
   const { id, title, xmlUrl } = config;
-  const text = await fetchText(xmlUrl);
+  const text = await fetchFeed(xmlUrl);
   let feed;
   try { feed = JSON.parse(text); }
   catch (err) { throw new Error(`JsonFeedAdapter: invalid JSON at ${xmlUrl}: ${err.message}`); }

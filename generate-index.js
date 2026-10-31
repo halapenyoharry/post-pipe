@@ -90,7 +90,8 @@ const { relationEdges } = require('./src/corpus/relationEdges');
 const { readerFonts } = require('./src/lib/readerSettings');
 const { accentCss } = require('./src/lib/accent');
 const { rightsMeta, rightsFooterHtml } = require('./src/lib/rights');
-const { shareMeta, iconLinks, escAttr } = require('./src/lib/shareMeta');
+const { shareMeta, iconLinks, escAttr, faviconPlan } = require('./src/lib/shareMeta');
+const { fallbackMode } = require('./src/lib/voiceFallback');
 const { introConfig, introHtml } = require('./src/lib/linkNode');
 const { marked } = require('marked');
 
@@ -198,6 +199,26 @@ const { contributionsConfig } = require('./src/lib/contributions');
 const { timeOverlayConfig } = require('./src/lib/timeOverlay');
 const { lookFromSettings } = require('./src/components/GraphViewer/containerLook');
 
+// Every site gets a tab icon. The head links ./favicon.svg unless the site
+// names its own icons (site.icons, left untouched: such a site puts them in
+// place itself). The site folder's favicon.svg is copied beside the page;
+// with none, a placeholder favicon.svg is written there, one circle in the
+// site's accent (src/lib/shareMeta.js faviconPlan), and the build says so.
+// Nothing here touches feed.json.
+function writeFavicon() {
+  const own = path.join(SITE_ROOT, 'favicon.svg');
+  let hasSiteFavicon = false;
+  try { hasSiteFavicon = fs.statSync(own).isFile(); } catch (_) { /* none */ }
+  const plan = faviconPlan(SETTINGS, { hasSiteFavicon });
+  const to = path.join(SITE_DIR, 'favicon.svg');
+  if (plan.action === 'copy') {
+    fs.copyFileSync(own, to);
+  } else if (plan.action === 'placeholder') {
+    fs.writeFileSync(to, plan.svg);
+    console.log(`  favicon: the site has no favicon.svg and no site.icons; wrote a placeholder _site/favicon.svg (a circle in ${plan.color})`);
+  }
+}
+
 // Readers' contributions (settings.contributions) are the site's own file,
 // served beside the page as it is: src names it relative to the page, and
 // the same path under the site root is copied when it is there. A site that
@@ -294,6 +315,8 @@ function buildIndexHTML() {
   const viewStateSource = fs.readFileSync(path.join(__dirname, 'src/lib/viewState.js'), 'utf8');
   // The voice picker's list (src/lib/voices.js), for tts.js on the page.
   const voicesSource = fs.readFileSync(path.join(__dirname, 'src/lib/voices.js'), 'utf8');
+  // The voice fallback (src/lib/voiceFallback.js), for tts.js on the page.
+  const fallbackSource = fs.readFileSync(path.join(__dirname, 'src/lib/voiceFallback.js'), 'utf8');
   const fontB64 = fs.readFileSync(FONT_PATH).toString('base64');
   const fontBoldB64 = fs.readFileSync(FONT_BOLD_PATH).toString('base64');
   const settingsJSON = JSON.stringify(SETTINGS);
@@ -422,6 +445,9 @@ window.TTS_CONFIG = {
   maxVoices: ${JSON.stringify(SETTINGS.tts?.engines?.browser?.maxVoices || null)},
   // The chapters' language: its voices come first, and the default speaks it.
   lang: ${JSON.stringify(siteLang())},
+  // When the voice reading fails, who reads on (settings.tts.fallback,
+  // src/lib/voiceFallback.js): voice-then-browser, browser, or off.
+  fallback: ${JSON.stringify(fallbackMode(SETTINGS.tts && SETTINGS.tts.fallback))},
 ${geminiConfigBlock()}};
 </script>
 <script>
@@ -431,6 +457,12 @@ ${viewStateSource.replace(/module\.exports[\s\S]*?};/, '')}
 window.PPVoices = (function () {
 ${voicesSource.replace(/module\.exports\s*=\s*\{[^}]*\};?/, '')}
   return { voiceList: voiceList, defaultVoice: defaultVoice, voiceGroups: voiceGroups, voiceLabel: voiceLabel, languageName: languageName };
+})();
+</script>
+<script>
+window.PPVoiceFallback = (function () {
+${fallbackSource.replace(/module\.exports\s*=\s*\{[^}]*\};?/, '')}
+  return { fallbackMode: fallbackMode, fallbackPlan: fallbackPlan, isInterruption: isInterruption, errorText: errorText, speakWithFallback: speakWithFallback, fallbackNote: fallbackNote };
 })();
 </script>
 <script>
@@ -727,6 +759,10 @@ ${reactJs}
             },
             showAddButton: TOP_BAR.addFeed,
             showSources: TOP_BAR.showSourcePills,
+            // A stale feed's pill (its fetch failed, its cards from its last
+            // good copy) shows a small mark; topBar.staleAge true adds the
+            // copy's age beside it, for a screen with no hover.
+            staleAge: !!(window.SETTINGS && window.SETTINGS.topBar && window.SETTINGS.topBar.staleAge === true),
             intro: window.PP_INTRO_HTML || '',
             controls: TOOLBAR.position === 'top' ? graphControls : null,
             onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
@@ -927,6 +963,7 @@ async function main() {
   copyThemeFonts();
   copySiteFonts();
   copyContributions();
+  writeFavicon();
   fs.writeFileSync(path.join(SITE_DIR, 'index.html'), buildIndexHTML());
 
   console.log(`Generated _site/feed.json (${feed.items.length} items, ${feed.edges.length} edges)`);

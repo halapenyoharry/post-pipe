@@ -269,3 +269,12 @@
 :global(html[data-pp-theme="sketchbook"]) .ttsGroup { --tts-bg: var(--sk-card); --tts-border: var(--sk-line-soft); }
 :global(html[data-pp-theme="sketchbook"]) .tb { color: var(--sk-ink); }
 :global(html[data-pp-theme="sketchbook"]) .params input[type=range] { background: var(--sk-line-soft); }
+
+/* The quiet line under the voice picker when another voice took over
+   (useTTS fallbackNote): small and muted, in the panel, never over the text. */
+.fallbackNote {
+  margin: 2px 0 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.7;
+}

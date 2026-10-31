@@ -42,3 +42,36 @@ test('og:url ends with one slash', () => {
   assert.ok(shareMeta({}, 'https://x.org').includes('<meta property="og:url" content="https://x.org/">'));
   assert.ok(shareMeta({}, 'https://x.org//').includes('<meta property="og:url" content="https://x.org/">'));
 });
+
+// Every site gets a tab icon (faviconPlan, used by generate-index.js): its
+// own icons untouched when it sets site.icons, else its favicon.svg copied,
+// else a placeholder circle in its accent.
+const { faviconPlan, faviconColor, placeholderFavicon, NEUTRAL_GREY } = require('../src/lib/shareMeta');
+
+test('favicon: a site that sets site.icons keeps its own icons untouched', () => {
+  assert.deepStrictEqual(faviconPlan({ site: { icons: { svg: 'favicon.svg?v=2' } } }, { hasSiteFavicon: true }), { action: 'keep' });
+  assert.deepStrictEqual(faviconPlan({ site: { icons: { ico: 'favicon.ico' } } }, { hasSiteFavicon: false }), { action: 'keep' });
+});
+
+test('favicon: the site folder\'s own favicon.svg is copied', () => {
+  assert.deepStrictEqual(faviconPlan({ site: {}, theme: { accent: '#64ffda' } }, { hasSiteFavicon: true }), { action: 'copy' });
+});
+
+test('favicon: with neither, a placeholder circle in the site\'s accent, else the theme\'s, else grey', () => {
+  const p = faviconPlan({ site: {}, accent: '#c0392b', theme: { accent: '#64ffda' } });
+  assert.strictEqual(p.action, 'placeholder');
+  assert.strictEqual(p.color, '#c0392b', 'the site\'s accent first');
+  assert.strictEqual(p.svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#c0392b"/></svg>\n');
+  assert.strictEqual(faviconPlan({ site: {}, accent: '', theme: { accent: '#64ffda' } }).color, '#64ffda', 'an empty accent leaves the theme\'s');
+  assert.strictEqual(faviconPlan({ theme: {} }).color, NEUTRAL_GREY);
+  assert.strictEqual(faviconPlan(null).color, NEUTRAL_GREY);
+  assert.strictEqual(NEUTRAL_GREY, '#888888');
+});
+
+test('favicon: only a colour an SVG fill can take is used; nothing can break out of the attribute', () => {
+  assert.strictEqual(faviconColor({ accent: 'rgb(10, 20, 30)' }), 'rgb(10, 20, 30)');
+  assert.strictEqual(faviconColor({ accent: 'teal' }), 'teal');
+  assert.strictEqual(faviconColor({ accent: '#abcd' }), '#abcd');
+  assert.strictEqual(faviconColor({ accent: '"/><script>', theme: { accent: 'url(#x)' } }), NEUTRAL_GREY);
+  assert.ok(!placeholderFavicon('"/><script>').includes('<script>'));
+});

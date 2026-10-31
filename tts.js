@@ -12,8 +12,20 @@
 //   get(param),               — read current value
 //   capabilities(),           — returns current engine's declared capabilities
 //   selected(),               — returns current engine id
-//   on(event, fn),            — event: 'state', 'progress', 'ready', 'error', 'capabilitiesChanged'
+//   on(event, fn),            — event: 'state', 'progress', 'ready', 'error', 'capabilitiesChanged',
+//                               'fallback' (another voice took over; see below)
+//   lastFallback(),           — the last fallback since the reader chose a voice, or null
+//   clearFallback(),          — forget it (the reader chose a voice)
 // }
+//
+// Voice fallback: when the voice reading aloud fails (an engine's request
+// errors, a browser voice errors or is not on the device), another voice
+// reads on: src/lib/voiceFallback.js (on the page as window.PPVoiceFallback)
+// gives the order, settings.tts.fallback (TTS_CONFIG.fallback) chooses it:
+// 'voice-then-browser' by default, 'browser', or 'off'. It is said quietly:
+// one console line and a 'fallback' event for the note under the voice
+// picker, never an 'error' over the text. A page without PPVoiceFallback
+// stops with the error, as before.
 //
 // Engine contract:
 //   { id, label, capabilities, init(), speak(text, params), pause(), resume(), stop(), voices() }
@@ -158,6 +170,101 @@
     } catch (e) { /* ignore cleanup errors */ }
   }
 
+  // ── Voice fallback ─────────────────────────────────────────────────────────
+  let lastFallback = null;   // { from, to, error, note, at } since the reader chose a voice
+  let failedVoices = [];     // [{ engine, voice }] found failing since play began
+  let restartOnResume = false; // paused while a fallback was being tried
+
+  function fallbackApi() { return window.PPVoiceFallback || null; }
+
+  function errorMessage(e) {
+    const FB = fallbackApi();
+    if (FB) return FB.errorText(e);
+    return (e && (e.message || e.error)) || String(e);
+  }
+
+  function voiceLabelOf(engineId, voiceId) {
+    const eng = registry[engineId];
+    try {
+      const v = eng && eng.voices ? eng.voices().find(x => x.id === voiceId) : null;
+      return (v && v.label) || voiceId;
+    } catch (e) { return voiceId; }
+  }
+
+  function engineLabelOf(engineId) {
+    return (registry[engineId] && registry[engineId].label) || engineId;
+  }
+
+  // The voices to try after current failed, in the site's order.
+  function planFor(FB, current, engineFailed) {
+    const eng = registry[current.engine];
+    const caps = (eng && eng.capabilities) || {};
+    let voices = [];
+    try { voices = eng && eng.voices ? eng.voices() : []; } catch (e) { voices = []; }
+    const b = registry.browser && isExposed('browser') ? registry.browser : null;
+    let browser = null;
+    if (b) {
+      const listed = (() => { try { return b.voices ? b.voices() : []; } catch (e) { return []; } })();
+      const device = b.deviceVoice ? b.deviceVoice() : null;
+      browser = {
+        defaultVoice: (b.capabilities && b.capabilities.voice && b.capabilities.voice.default) || null,
+        // The device's own voice by name when the picker lists it, so the
+        // picker can show it; else unnamed.
+        deviceVoice: device && listed.some(v => v.id === device) ? device : null,
+      };
+    }
+    return FB.fallbackPlan({
+      mode: (window.TTS_CONFIG || {}).fallback,
+      engine: current.engine,
+      voice: current.voice,
+      voices: voices,
+      engineDefault: (caps.voice && caps.voice.default) || null,
+      browser: browser,
+      engineFailed: Boolean(engineFailed),
+      skip: failedVoices,
+    });
+  }
+
+  // Speaks text in one engine and voice (voice null: none named), starting
+  // that engine first if it is not the one reading. Refuses once reading has
+  // stopped, so a fallback never speaks after Stop.
+  function speakIn(engineId, voice, text) {
+    if (!playing) return Promise.reject(Object.assign(new Error('stopped'), { interrupted: true }));
+    const engine = registry[engineId];
+    if (!engine) return Promise.reject(new Error('no ' + engineId + ' engine'));
+    const same = engineId === activeId && (voice || null) === (params.voice || null);
+    const p = same ? params : Object.assign({}, params, { voice: voice || undefined });
+    if (engine === activeEngine) return engine.speak(text, p);
+    return Promise.resolve(engine.init ? engine.init(p) : null).then(() => engine.speak(text, p));
+  }
+
+  // The voice that spoke reads on: its engine becomes the one reading (its
+  // own settings kept where it has them), and it is said once, quietly.
+  function adoptFallback(FB, from, r) {
+    const to = r.used;
+    failedVoices = failedVoices.concat(r.tried || []);
+    const switched = to.engine !== activeId;
+    if (switched) {
+      const next = registry[to.engine];
+      const caps = next.capabilities || {};
+      const kept = {};
+      for (const [key, spec] of Object.entries(caps)) {
+        if (spec && spec.default !== undefined) kept[key] = params[key] !== undefined ? params[key] : spec.default;
+      }
+      params = kept;
+      activeId = to.engine;
+      activeEngine = next;
+      engineReady = true;
+      engineLoading = false;
+    }
+    params.voice = to.voice || undefined;
+    lastFallback = { from: from, to: to, error: FB.errorText(r.error), at: Date.now() };
+    lastFallback.note = FB.fallbackNote(lastFallback, { label: voiceLabelOf, engineLabel: engineLabelOf });
+    console.info('[tts] ' + lastFallback.note + ' (' + lastFallback.error + ')');
+    if (switched) emit('capabilitiesChanged', activeEngine.capabilities);
+    emit('fallback', lastFallback);
+  }
+
   // ── Playback loop ──────────────────────────────────────────────────────────
   async function speakNext() {
     if (!playing || sentenceIndex >= sentences.length) {
@@ -175,26 +282,42 @@
       }
     }
 
+    const text = sentences[sentenceIndex].text;
+    const FB = fallbackApi();
     try {
-      await activeEngine.speak(sentences[sentenceIndex].text, params);
+      if (FB) {
+        const current = { engine: activeId, voice: params.voice || null };
+        const r = await FB.speakWithFallback({ text: text, current: current, plan: () => planFor(FB, current), speak: speakIn });
+        if (r.fellBack) adoptFallback(FB, current, r);
+      } else {
+        await activeEngine.speak(text, params);
+      }
       sentenceIndex++;
       if (playing) speakNext();
     } catch (e) {
-      emit('error', { engine: activeId, error: e.message });
+      // Stopped or paused while a voice was being tried: nothing failed.
+      if (e && e.interrupted && !playing) {
+        if (paused) restartOnResume = true;
+        return;
+      }
+      if (e && e.tried) failedVoices = failedVoices.concat(e.tried);
+      emit('error', { engine: activeId, error: errorMessage(e) });
       stopAll();
     }
   }
 
+  // Starts the engine once. A failure is not announced here: play() says it
+  // (once), unless another voice takes over.
   async function ensureReady() {
     if (engineReady) return;
     if (engineLoading) {
       // Wait for it
       return new Promise((resolve, reject) => {
-        const onReady = () => { off('ready', onReady); off('error', onErr); resolve(); };
-        const onErr = (e) => { off('ready', onReady); off('error', onErr); reject(e); };
+        const onReady = () => { off('ready', onReady); off('initFailed', onErr); resolve(); };
+        const onErr = (e) => { off('ready', onReady); off('initFailed', onErr); reject(e); };
         const off = (evt, fn) => { listeners[evt] = (listeners[evt]||[]).filter(f => f !== fn); };
         (listeners.ready = listeners.ready || []).push(onReady);
-        (listeners.error = listeners.error || []).push(onErr);
+        (listeners.initFailed = listeners.initFailed || []).push(onErr);
       });
     }
     engineLoading = true;
@@ -207,7 +330,7 @@
       emit('capabilitiesChanged', activeEngine.capabilities);
     } catch (e) {
       engineLoading = false;
-      emit('error', { engine: activeId, error: e.message });
+      emit('initFailed', e);
       throw e;
     }
   }
@@ -304,6 +427,9 @@
       // Always carry voice — but clear it if switching engines (voices are engine-specific)
       delete newParams.voice;
       params = newParams;
+      // The reader chose: a fallback before this is forgotten.
+      lastFallback = null;
+      failedVoices = [];
       emit('capabilitiesChanged', caps);
     },
 
@@ -318,10 +444,11 @@
         playing = true;
         paused = false;
         emit('state', 'playing');
-        if (activeEngine.resume) {
-          activeEngine.resume();
-        } else {
+        if (restartOnResume || !activeEngine.resume) {
+          restartOnResume = false;
           speakNext();
+        } else {
+          activeEngine.resume();
         }
         return;
       }
@@ -337,6 +464,8 @@
       sentenceIndex = 0;
       playing = true;
       paused = false;
+      restartOnResume = false;
+      failedVoices = [];
 
       try {
         emit('state', 'loading');
@@ -346,7 +475,21 @@
         emit('state', 'playing');
         speakNext();
       } catch (e) {
-        emit('error', { engine: activeId, error: e.message });
+        // The engine would not start: another engine reads, when the site's
+        // order has one (its own other voices are not tried), quietly.
+        const FB = fallbackApi();
+        if (FB && playing) {
+          const current = { engine: activeId, voice: params.voice || null };
+          const plan = planFor(FB, current, true);
+          const next = plan.find(c => c.engine !== current.engine && registry[c.engine]);
+          if (next) {
+            adoptFallback(FB, current, { used: next, error: e, tried: [current] });
+            emit('state', 'playing');
+            speakNext();
+            return;
+          }
+        }
+        emit('error', { engine: activeId, error: errorMessage(e) });
         stopAll();
       }
     },
@@ -363,9 +506,10 @@
       playing = true;
       paused = false;
       emit('state', 'playing');
-      if (activeEngine && activeEngine.resume) {
+      if (!restartOnResume && activeEngine && activeEngine.resume) {
         activeEngine.resume();
       } else {
+        restartOnResume = false;
         speakNext();
       }
     },
@@ -399,6 +543,11 @@
 
     isPlaying: function () { return playing; },
     isPaused: function () { return paused; },
+
+    // The last time another voice took over since the reader chose one:
+    // { from, to, error, note, at } ({ engine, voice } each), or null.
+    lastFallback: function () { return lastFallback; },
+    clearFallback: function () { lastFallback = null; },
   };
 
   // ─── Built-in engine: Browser (Web Speech API) ─────────────────────────────
@@ -505,19 +654,44 @@
         }));
       },
 
+      // The device's own default voice by name, or null.
+      deviceVoice: function () {
+        const v = synth.getVoices().find(x => x.default);
+        return v ? v.name : null;
+      },
+
+      // A failure rejects with an Error carrying the device's reason as code
+      // ('synthesis-failed', 'network', ...); 'interrupted' and 'canceled'
+      // are reading being stopped, marked interrupted, never answered with
+      // another voice. A named voice the device does not have (it has
+      // others, so its list has loaded) is a failure too ('voice-missing').
       speak: function (text, p) {
         return new Promise((resolve, reject) => {
           synth.cancel();
           const utt = new SpeechSynthesisUtterance(text);
           if (p.voice) {
-            const match = synth.getVoices().find(v => v.name === p.voice);
+            const all = synth.getVoices();
+            const match = all.find(v => v.name === p.voice);
             if (match) utt.voice = match;
+            else if (all.length) {
+              const missing = new Error('the voice "' + p.voice + '" is not on this device');
+              missing.code = 'voice-missing';
+              reject(missing);
+              return;
+            }
           }
           utt.rate = p.speed || 1;
           utt.pitch = p.pitch || 1;
           utt.volume = p.volume !== undefined ? p.volume : 1;
           utt.onend = () => { currentUtterance = null; resolve(); };
-          utt.onerror = (e) => { currentUtterance = null; reject(e); };
+          utt.onerror = (e) => {
+            currentUtterance = null;
+            const code = (e && e.error) || 'failed';
+            const err = new Error('speech ' + code);
+            err.code = code;
+            err.interrupted = code === 'interrupted' || code === 'canceled';
+            reject(err);
+          };
           currentUtterance = utt;
           resolveSpeak = resolve;
           synth.speak(utt);

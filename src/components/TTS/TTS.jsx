@@ -6,6 +6,12 @@ import { ICONS } from '../../utils/icons';
 // pause, stop, and what it is doing) and the choices in the settings panel's
 // Listening group (engine, voice, speed). Both read and write window.TTS, so
 // a voice chosen in the panel is the one the reader plays.
+//
+// When the voice reading fails and another takes over (tts.js, the
+// 'fallback' event; the order is settings.tts.fallback), the picker shows
+// the voice now reading and one quiet line under it saying so; the
+// transport says nothing, so reading is not interrupted. The line goes when
+// the reader chooses a voice or an engine.
 function useTTS() {
   const [T, setT] = useState(null);
   const [state, setState] = useState('stopped'); // 'playing', 'paused', 'loading', 'stopped'
@@ -19,6 +25,7 @@ function useTTS() {
   const [errorMsg, setErrorMsg] = useState('');
   const [statusMessage, setStatusMessage] = useState(null);
   const [isError, setIsError] = useState(false);
+  const [fallbackNote, setFallbackNote] = useState('');
 
   useEffect(() => {
     // Wait for the window.TTS global to be populated (e.g. from injected tts.js)
@@ -73,13 +80,22 @@ function useTTS() {
         if (key === 'voice') {
           // Keep the reader's choice if it is still on offer; otherwise the
           // engine's default (the first voice in the chapters' language).
+          // A voice another took over to (a fallback) is kept as it is, even
+          // the device's own unnamed one: going back to the default could be
+          // going back to the voice that failed.
           let chosen = tts.get('voice');
-          if (!chosen || (vList.length && !vList.some(v => v.id === chosen))) {
-            chosen = caps.voice.default || (vList[0] && vList[0].id);
-          }
-          if (chosen) {
-            tts.set('voice', chosen);
-            setSelectedVoice(chosen);
+          const fb = tts.lastFallback ? tts.lastFallback() : null;
+          const fellTo = fb && fb.to && fb.to.engine === tts.selected() && (fb.to.voice || null) === (chosen || null);
+          if (fellTo) {
+            setSelectedVoice(chosen || '');
+          } else {
+            if (!chosen || (vList.length && !vList.some(v => v.id === chosen))) {
+              chosen = caps.voice.default || (vList[0] && vList[0].id);
+            }
+            if (chosen) {
+              tts.set('voice', chosen);
+              setSelectedVoice(chosen);
+            }
           }
         } else {
           newParams[key] = tts.get(key) !== undefined ? tts.get(key) : caps[key].default;
@@ -88,14 +104,24 @@ function useTTS() {
       setParams(newParams);
     };
 
+    // Another voice took over: the picker shows it, with the quiet line.
+    const handleFallback = (fb) => {
+      refreshEngines();
+      refreshCapabilities();
+      setFallbackNote((fb && fb.note) || '');
+    };
+
     tts.on('state', updateState);
     tts.on('capabilitiesChanged', refreshCapabilities);
     tts.on('engineProgress', handleEngineProgress);
     tts.on('loadingProgress', handleLoadingProgress);
     tts.on('error', handleError);
+    tts.on('fallback', handleFallback);
 
     refreshEngines();
     refreshCapabilities();
+    const earlier = tts.lastFallback ? tts.lastFallback() : null;
+    if (earlier && earlier.note) setFallbackNote(earlier.note);
 
     // Specific to browser engine
     if (window.speechSynthesis) {
@@ -109,6 +135,7 @@ function useTTS() {
         tts.off('engineProgress', handleEngineProgress);
         tts.off('loadingProgress', handleLoadingProgress);
         tts.off('error', handleError);
+        tts.off('fallback', handleFallback);
       }
       if (window.speechSynthesis) {
         window.speechSynthesis.removeEventListener('voiceschanged', refreshCapabilities);
@@ -123,6 +150,7 @@ function useTTS() {
     setSelectedEngine(engineId);
     setStatusMessage(null);
     setIsError(false);
+    setFallbackNote('');
     setVoices(T.voices());
     setCapabilities(T.capabilities());
   };
@@ -130,7 +158,9 @@ function useTTS() {
   const handleVoiceChange = (e) => {
     if (!T) return;
     const voiceId = e.target.value;
-    T.set('voice', voiceId);
+    if (T.clearFallback) T.clearFallback();
+    setFallbackNote('');
+    T.set('voice', voiceId || undefined);
     setSelectedVoice(voiceId);
   };
 
@@ -142,7 +172,7 @@ function useTTS() {
 
   return {
     T, state, engines, selectedEngine, voices, selectedVoice, capabilities, params, engineProgress,
-    errorMsg, statusMessage, isError, setStatusMessage, setIsError,
+    errorMsg, statusMessage, isError, setStatusMessage, setIsError, fallbackNote,
     handleEngineChange, handleVoiceChange, handleParamChange,
   };
 }
@@ -213,7 +243,7 @@ export function TTS({ targetRef }) {
 // The choices, in the settings panel's Listening group.
 export function TTSSettings() {
   const {
-    T, engines, selectedEngine, voices, selectedVoice, capabilities, params,
+    T, engines, selectedEngine, voices, selectedVoice, capabilities, params, fallbackNote,
     handleEngineChange, handleVoiceChange, handleParamChange,
   } = useTTS();
   if (!T) return null;
@@ -224,12 +254,18 @@ export function TTSSettings() {
   // speaks more than one, the chapters' language first.
   const pp = typeof window !== 'undefined' ? window.PPVoices : null;
   const pageLang = (typeof window !== 'undefined' && window.TTS_CONFIG && window.TTS_CONFIG.lang) || 'en';
+  // A voice another took over to that the list does not hold (the device's
+  // own, unnamed, or one past the site's cap) is shown first, so the picker
+  // says which voice is reading.
+  const unlisted = fallbackNote && !voices.some(v => v.id === selectedVoice)
+    ? <option key="pp-fallback-voice" value={selectedVoice}>{selectedVoice || "This device's own voice"}</option>
+    : null;
   const renderVoiceOptions = () => {
-    if (!voices.length) return <option>Loading...</option>;
+    if (!voices.length) return unlisted || <option>Loading...</option>;
     const option = v => <option key={v.id} value={v.id}>{v.label}</option>;
     const groups = pp && pp.voiceGroups ? pp.voiceGroups(voices, { lang: pageLang }) : [];
-    if (groups.length < 2) return voices.map(option);
-    return groups.map(g => <optgroup key={g.label} label={g.label}>{g.voices.map(option)}</optgroup>);
+    if (groups.length < 2) return [unlisted, ...voices.map(option)];
+    return [unlisted, ...groups.map(g => <optgroup key={g.label} label={g.label}>{g.voices.map(option)}</optgroup>)];
   };
 
   return (
@@ -260,6 +296,9 @@ export function TTSSettings() {
           {renderVoiceOptions()}
         </select>
       </label>
+      {fallbackNote && (
+        <div className={styles.fallbackNote} role="status" data-tts-fallback-note>{fallbackNote}</div>
+      )}
 
       <div className={styles.params}>
         {Object.entries(capabilities).map(([key, spec]) => {

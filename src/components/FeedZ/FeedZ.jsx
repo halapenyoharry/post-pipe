@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import styles from './FeedZ.module.css';
 import { Icon } from '../Icon/Icon';
 import { Subscribe } from './Subscribe';
+import { sourceStatus } from '../../lib/sourceStatus';
 
 /**
  * FeedZ — pill-shaped feed list across a side of the viewport.
@@ -53,8 +54,18 @@ import { Subscribe } from './Subscribe';
  *                    source pills after the first shrink to their dot, then
  *                    the first pill's text gives way (an ellipsis; its whole
  *                    text stays its name)
+ *   staleAge       — optional, default false; true shows the age of a stale
+ *                    feed's copy beside its mark ("! 2d"), not only in the
+ *                    pill's title (settings.topBar.staleAge), for a screen
+ *                    with no hover to show a title
+ *
+ * A feed whose fetch failed when the site was built (src/lib/sourceStatus.js):
+ * when its cards come from its last good copy (source.stale), its pill shows
+ * a small mark after the count, and its title says the fetch failed, why, and
+ * the copy's day and age; with no copy, the pill is struck through, its title
+ * saying why.
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
@@ -139,6 +150,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
           onToggle={() => onToggleSource && onToggleSource(src.id)}
           viewState={viewState}
           showCount={showCount}
+          staleAge={staleAge}
         />
       ))}
       {buttonOrder.map((k) => {
@@ -199,24 +211,40 @@ function fitRow(bar) {
 // nesting <button> inside <button> is invalid HTML that browsers handle
 // inconsistently (the outer control can silently stop receiving events).
 // role="button" + a key handler keep it keyboard-operable regardless.
-function FeedPill({ source, hidden, onToggle, viewState, showCount }) {
+// The build's word on the feed (sourceStatus): a stale feed (its fetch
+// failed, its cards from its last good copy) gets a small mark after the
+// count, the copy's age beside it when staleAge is on; a failed feed with no
+// copy is struck through. Either way the pill's title says why.
+function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge }) {
   const title = source.title || source.id;
-  const ok = source.ok !== false;
+  const status = sourceStatus(source);
+  const failed = Boolean(status && status.kind === 'failed');
+  const stale = Boolean(status && status.kind === 'stale');
   const color = (viewState && viewState.sourceColor(source.id)) || source.color;
+  const action = hidden ? `Show ${title}` : `Hide ${title}`;
   return (
     <div
-      className={`${styles.pill} ${hidden ? styles.hidden : ''} ${!ok ? styles.failed : ''}`}
+      className={`${styles.pill} ${hidden ? styles.hidden : ''} ${failed ? styles.failed : ''}`}
       data-source-pill
+      data-source-stale={stale ? '' : undefined}
+      data-source-failed={failed ? '' : undefined}
       onClick={onToggle}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
       role="button"
       tabIndex={0}
-      title={hidden ? `Show ${title}` : `Hide ${title}`}
+      title={status ? `${action} · ${status.note}` : action}
       style={{ '--pill-color': color }}
     >
       <FeedDot color={color} sourceId={source.id} viewState={viewState} />
       <span className={styles.title}>{title}</span>
       {showCount && <span className={styles.count}>{source.itemCount}</span>}
+      {stale && (
+        <span className={styles.staleMark} data-stale-mark title={status.note}
+          role="img" aria-label={status.age ? `not fetched, the copy is ${status.age.long}` : 'not fetched, an earlier copy'}>
+          <span aria-hidden="true">!</span>
+          {staleAge && status.age && <span className={styles.staleAge} aria-hidden="true" data-stale-age>{status.age.short}</span>}
+        </span>
+      )}
     </div>
   );
 }

@@ -233,6 +233,33 @@
   opacity: 0.5;
 }
 
+/* A feed whose fetch failed when the site was built, its cards from its last
+   good copy (source.stale): a small ringed mark after the count, in the
+   pill's own text colour; the copy's age beside it only when the site sets
+   topBar.staleAge. The pill's title says why and how old the copy is. */
+.staleMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  height: 13px;
+  min-width: 13px;
+  box-sizing: border-box;
+  padding: 0 3px;
+  justify-content: center;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.staleAge {
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
+
 .dotWrap {
   position: relative;
   display: inline-flex;

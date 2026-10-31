@@ -14,9 +14,12 @@ const parser = new XMLParser({
   isArray: (name) => name === 'item',
 });
 
-async function load(config) {
+// deps.fetchText: how the feed's text is fetched (the aggregator passes one
+// that remembers the text, or one that hands back the feed's last good copy
+// after a failed fetch); the plain one by default.
+async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
   const { id, title, xmlUrl } = config;
-  const xml = await fetchText(xmlUrl);
+  const xml = await fetchFeed(xmlUrl);
   const doc = parser.parse(xml);
 
   // RSS 2.0: <rss><channel><item>…
