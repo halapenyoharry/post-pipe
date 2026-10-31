@@ -33,6 +33,24 @@
 // "climate change" can fold into "Climate Change" from an editorial system. Each record carries its
 // provenance: wasDerivedFrom (the phrase in this item's text, how often, whether in the title) and
 // wasGeneratedBy (this stage and the parameters that admitted the hub).
+//
+// Spellings (since 2026-10-31). A label is never invented: a hub's label, and the phrase in each
+// record's wasDerivedFrom, is a spelling the text has, hyphen, capitals and accents as written
+// ("energy-efficient", "Jupiter"). Counting and matching still use the normalized key, so nothing a
+// spelling could change is measured on it; the spelling is chosen at the end, in two steps:
+//   form      the hub's lower-case form ("energy efficient"), chosen exactly as the label was before:
+//             each item's tf goes to the form it wrote first, the most tf wins, ties in code-point
+//             order. So the hub stays the same term downstream.
+//   spelling  the way the text writes that form most often, each place it is written counting once.
+//             A capital that position can explain says nothing about the word: an occurrence in a
+//             title, or at the start of a sentence, whose spelling has a capital is "styled", and
+//             styled occurrences vote only when the text writes the form nowhere else. A spelling
+//             without capitals is never styled. Ties go to a spelling in lower case, then to the one
+//             met first (items in key order, then title before text, left to right).
+// A record's phrase is chosen the same way among its own item's occurrences of the form it wrote
+// first. A phrase none of whose occurrences reads, on its own, as what it was counted as (normalization
+// that depends on the neighbours, a Greek final sigma before an apostrophe; English text has none) is
+// not a candidate, so every label has a spelling.
 import { stem, STOP } from './normalize.js';
 import { words, STOPWORDS, buildItemVectors, buildIdf } from './text.js';
 import { normalize, dot } from './similarity.js';
@@ -132,31 +150,118 @@ function nearCopyGroups(reps, pairs, grouping) {
   return new Map(reps.map((it, i) => [it.key, reps[of[i]].key]));
 }
 
-// contiguous unigram/bigram candidates, never spanning punctuation
-function scan(text, onKey) {
-  for (const chunk of text.split(/[.,;:!?()[\]{}"“”—–]+/)) {
+// A character of a word as written: a letter, digit or mark, or one that normalization turns into
+// letters or digits ("™" reads as "tm"), so that a word read by `words` can be found again in the text.
+const LETTER_DIGIT_MARK = /[\p{L}\p{N}\p{M}]/u;
+const LETTER_DIGIT = /[\p{L}\p{N}]/u;
+const readsAsLetters = new Map();
+function inWord(c) {
+  if (LETTER_DIGIT_MARK.test(c)) return true;
+  if (!readsAsLetters.has(c)) readsAsLetters.set(c, LETTER_DIGIT.test(c.normalize('NFKC')));
+  return readsAsLetters.get(c);
+}
+
+// Where each word `words(chunk)` reads (`ws`) is written in the chunk: { start, end, n } when one run of
+// word characters reads as exactly that word (n counts the words read before it, so two words are
+// neighbours in the text when their n are), null when it does not (a run that reads as several words,
+// "½" as "1" and "2"). Reading the runs one by one gives `ws` back, except where normalization depends
+// on the neighbours (a Greek final sigma before an apostrophe); there only the words both readings
+// agree on, in order, keep their places.
+function places(chunk, ws) {
+  const runs = [];
+  let start = -1;
+  const close = (end) => {
+    const read = words(chunk.slice(start, end));
+    for (const w of read) runs.push({ w, at: read.length === 1 ? { start, end, n: runs.length } : null });
+    start = -1;
+  };
+  let i = 0;
+  for (const c of chunk) {
+    if (inWord(c)) {
+      if (start < 0) start = i;
+    } else if (start >= 0) close(i);
+    i += c.length;
+  }
+  if (start >= 0) close(i);
+  if (runs.length === ws.length && runs.every((x, k) => x.w === ws[k])) return runs.map((x) => x.at);
+  // the longest common subsequence of the two readings
+  const at = ws.map(() => null);
+  if (ws.length * runs.length > 1e6) return at;
+  const L = Array.from({ length: ws.length + 1 }, () => new Int32Array(runs.length + 1));
+  for (let a = ws.length - 1; a >= 0; a--) {
+    for (let b = runs.length - 1; b >= 0; b--) L[a][b] = ws[a] === runs[b].w ? L[a + 1][b + 1] + 1 : Math.max(L[a + 1][b], L[a][b + 1]);
+  }
+  for (let a = 0, b = 0; a < ws.length && b < runs.length; ) {
+    if (ws[a] === runs[b].w) at[a++] = runs[b++].at;
+    else if (L[a + 1][b] >= L[a][b + 1]) a++;
+    else b++;
+  }
+  return at;
+}
+
+const CHUNKS = /([.,;:!?()[\]{}"“”—–]+)/; // the punctuation a candidate never spans, kept by split
+const OPENS = /[.!?:"“([{]/; // after one of these the next word may be capitalized by its position
+const CAPITAL = /[\p{Lu}\p{Lt}]/u;
+
+// contiguous unigram/bigram candidates, never spanning punctuation. onKey(key, form, written): the
+// stem key, the lower-case form, and how the text writes it, { spelling, styled } (null when it has no
+// place). `title`: every spelling with a capital is styled; otherwise only one that begins a sentence.
+function scan(text, onKey, title) {
+  const parts = text.split(CHUNKS);
+  let start = true; // the next word begins a sentence
+  for (let p = 0; p < parts.length; p += 2) {
+    if (p > 0 && OPENS.test(parts[p - 1])) start = true;
+    const chunk = parts[p];
     const ws = words(chunk);
+    if (!ws.length) continue;
+    const at = places(chunk, ws);
+    const written = (a, b) => {
+      if (!at[a] || !at[b] || at[b].n - at[a].n !== b - a) return null;
+      const spelling = chunk.slice(at[a].start, at[b].end).replace(/\s+/g, ' ');
+      return { spelling, styled: (title || (a === 0 && start)) && CAPITAL.test(spelling) };
+    };
     for (let i = 0; i < ws.length; i++) {
       if (!ok(ws[i])) continue;
-      onKey(stem(ws[i]), ws[i]);
-      if (i + 1 < ws.length && ok(ws[i + 1])) onKey(`${stem(ws[i])} ${stem(ws[i + 1])}`, `${ws[i]} ${ws[i + 1]}`);
+      onKey(stem(ws[i]), ws[i], written(i, i));
+      if (i + 1 < ws.length && ok(ws[i + 1])) onKey(`${stem(ws[i])} ${stem(ws[i + 1])}`, `${ws[i]} ${ws[i + 1]}`, written(i, i + 1));
     }
+    start = false;
   }
 }
 
-// the title counts twice in tf; a separate pass over the title alone records which keys it holds
+// The title counts twice in tf, as if read twice before the text (how it was counted before the
+// spellings); `surface` is the form the item writes first, `inTitle` whether the title holds the key,
+// and `written` how the item writes it: spelling -> { form, free, styled }, free and styled counting
+// the occurrences, the title's once, in the order first met.
 function candidates(item) {
-  const found = new Map(); // stemKey -> {tf, surface, inTitle}
-  scan(`${item.title}. ${item.title}. ${item.text}`, (key, surface) => {
-    const f = found.get(key) ?? { tf: 0, surface, inTitle: false };
-    f.tf += 1;
+  const found = new Map(); // stemKey -> {tf, surface, inTitle, written}
+  const visit = (inTitle) => (key, form, w) => {
+    const f = found.get(key) ?? { tf: 0, surface: form, inTitle: false, written: new Map() };
+    f.tf += inTitle ? 2 : 1;
+    if (inTitle) f.inTitle = true;
+    if (w) {
+      const s = f.written.get(w.spelling) ?? { form, free: 0, styled: 0 };
+      s[w.styled ? 'styled' : 'free'] += 1;
+      f.written.set(w.spelling, s);
+    }
     found.set(key, f);
-  });
-  scan(item.title, (key) => {
-    const f = found.get(key);
-    if (f) f.inTitle = true;
-  });
+  };
+  scan(`${item.title}`, visit(true), true);
+  scan(`${item.text}`, visit(false), false);
   return found;
+}
+
+// The spelling carried out among `written` (spelling -> { form, free, styled }, in the order first
+// met), for `form` (any form when null): the free occurrences vote when there are any, else the styled
+// ones; the most votes wins; ties go to a spelling in lower case, then to the one met first. null when
+// the form is not written legibly anywhere in `written`.
+function spell(written, form = null) {
+  const cands = [...written].map(([spelling, s], first) => ({ spelling, ...s, first })).filter((c) => form === null || c.form === form);
+  if (!cands.length) return null;
+  const free = cands.some((c) => c.free > 0);
+  const votes = (c) => (free ? c.free : c.styled);
+  const lower = (c) => Number(c.spelling === c.spelling.toLowerCase());
+  return cands.sort((a, b) => votes(b) - votes(a) || lower(b) - lower(a) || a.first - b.first)[0].spelling;
 }
 
 function withoutPhrase(tf, idf, drop) {
@@ -205,13 +310,22 @@ export function discover(records, cfg = makeConfig(), info = null) {
   const distinctItems = (keys) => new Set(keys.map((k) => groupOf.get(k))).size;
 
   const containing = new Map(); // stemKey -> item keys, in item order
-  const surface = new Map();
+  const surface = new Map(); // stemKey -> form -> the tf of the items that write that form first
+  const written = new Map(); // stemKey -> spelling -> { form, free, styled } over every item, in the order first met
   for (const it of reps) {
     for (const [key, f] of perItem.get(it.key)) {
       if (!containing.has(key)) containing.set(key, []);
       containing.get(key).push(it.key);
       if (!surface.has(key)) surface.set(key, new Map());
       surface.get(key).set(f.surface, (surface.get(key).get(f.surface) ?? 0) + f.tf);
+      if (!written.has(key)) written.set(key, new Map());
+      const all = written.get(key);
+      for (const [spelling, s] of f.written) {
+        const t = all.get(spelling) ?? { form: s.form, free: 0, styled: 0 };
+        t.free += s.free;
+        t.styled += s.styled;
+        all.set(spelling, t);
+      }
     }
   }
   // the items a phrase is measured on: the first of each near-copy group that holds it, in item order
@@ -221,7 +335,22 @@ export function discover(records, cfg = makeConfig(), info = null) {
     distinct.set(key, keys.filter((k) => !seen.has(groupOf.get(k)) && seen.add(groupOf.get(k))));
   }
   const df = new Map([...distinct].map(([key, keys]) => [key, keys.length]));
-  const label = (key) => [...surface.get(key).entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+  // a hub's form: among the forms the text writes legibly (in ordinary text, all of them), the one with
+  // the most tf, ties in code-point order (failing that, the form of the best spelling of any form); its
+  // label is the way the text writes that form most often. Only asked of a key the text spells somewhere.
+  const forms = new Map();
+  const formOf = (key) => {
+    if (!forms.has(key)) {
+      const spelled = new Set([...written.get(key).values()].map((s) => s.form));
+      const ranked = [...surface.get(key).entries()].filter(([form]) => spelled.has(form)).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+      forms.set(key, ranked.length ? ranked[0][0] : written.get(key).get(spell(written.get(key))).form);
+    }
+    return forms.get(key);
+  };
+  const label = (key) => spell(written.get(key), formOf(key));
+  // this item's phrase: how it writes the form it wrote first, else any form of the key it writes legibly
+  // (an item that wrote the key only illegibly, which ordinary text never does, keeps the form)
+  const phrase = (f) => spell(f.written, f.surface) ?? spell(f.written) ?? f.surface;
 
   // baseline: how alike two unrelated items are in this corpus (deterministic sample of pairs)
   let base = 0;
@@ -310,6 +439,7 @@ export function discover(records, cfg = makeConfig(), info = null) {
   const measure = new Map(); // stemKey -> { baseline, ratio }
   for (const [key, d] of df) {
     if (d < D.minDf || d / N > D.maxDfRatio) continue;
+    if (!written.get(key).size) continue; // nothing in the text spells it as written, so it could only be named by an invented label
     const c = coherent(key);
     if (c < threshold) continue;
     const e = expected(key);
@@ -396,15 +526,16 @@ export function discover(records, cfg = makeConfig(), info = null) {
     }
   }
 
-  // output is grouped by hub in label order (the label is what a reader sees; two stem keys may
-  // sort differently from their labels), then by item
-  const byLabel = (a, b) => {
-    const la = label(a);
-    const lb = label(b);
-    return la < lb ? -1 : la > lb ? 1 : a < b ? -1 : 1;
+  // output is grouped by hub in the order of its form (what a reader sees, read without capitals or
+  // joiners, the order a reader looks for it in; two stem keys may sort differently from their forms),
+  // then by item. The order the labels had before they were spelled as written, so it never moves.
+  const byForm = (a, b) => {
+    const fa = formOf(a);
+    const fb = formOf(b);
+    return fa < fb ? -1 : fa > fb ? 1 : a < b ? -1 : 1;
   };
   const out = [];
-  for (const key of [...attached.keys()].sort(byLabel)) {
+  for (const key of [...attached.keys()].sort(byForm)) {
     const carriers = attached.get(key);
     const n = carriers.length;
     const k = distinctItems(carriers.map(({ it }) => it.key));
@@ -415,17 +546,18 @@ export function discover(records, cfg = makeConfig(), info = null) {
     const lift = baseline > 0 ? `, ${(coherence / baseline).toFixed(1)}× the ${baseline.toFixed(3)} that items from the same sources share` : '';
     const bar = below ? `; under the ${D.sourceCoherenceRatio}× bar, admitted by the ${floor}× floor` : '';
     const copies = k < n ? ` (${k} of ${N} counting near-copies once)` : '';
+    const name = label(key);
     for (const { it, f } of carriers) {
       out.push({
         type: 'tag',
         source: it.source,
         item: it.id,
-        label: label(key),
+        label: name,
         weight: Number(Math.min(0.6, D.weight + 0.05 * Math.min(4, f.tf)).toFixed(3)),
         origin: 'discovered',
         ...(ratio === null ? {} : { sourceRatio: ratio }),
         why: `recurs in ${n} of ${reps.length} items${copies}, which stay alike without it (${coherence.toFixed(2)}${lift}${bar})${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
-        wasDerivedFrom: [{ type: 'text', phrase: f.surface, count: f.tf, inTitle: f.inTitle }],
+        wasDerivedFrom: [{ type: 'text', phrase: phrase(f), count: f.tf, inTitle: f.inTitle }],
         wasGeneratedBy: {
           activity: 'discover',
           parameters: {

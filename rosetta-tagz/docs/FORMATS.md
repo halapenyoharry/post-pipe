@@ -56,6 +56,48 @@ anyone comparing it with another value makes exactly the build's comparison. Wit
 with (an expected likeness of exactly 0) nothing is measured: the record has no `sourceRatio`, and no
 bar rejects it.
 
+**Spelling** (since 2026-10-31). No label is invented: `label`, and `phrase` in `wasDerivedFrom`, are
+spellings the text has, with hyphens, capitals and accents as written (`energy-efficient`, `Jupiter`, and
+`Diego` from "UC San Diego", where "San" is too short to be a candidate). Counting and matching still use
+the normalized key, so df, coherence, near-copies, selection and the output order are what they were.
+Only the spelling carried out changed: read back through `words` (lower case, joiners as spaces), every
+record is the one written before. The spelling is chosen in two steps:
+
+| step | chooses | how |
+|---|---|---|
+| form | the hub's lower-case form (`energy efficient`) | as the label was chosen before: each item's tf goes to the form it wrote first, the most tf wins, ties in code-point order |
+| spelling | how the text writes that form | the most occurrences, each place it is written counting once (a title once, though it counts twice toward tf); styled occurrences (below) vote only when the form is written nowhere else; ties go to a spelling in lower case, then to the one met first (items in key order, title before text, left to right) |
+
+A capital that position can explain says nothing about the word. Two positions can capitalize: a title
+(title case capitalizes every word, as ProPublica's do) and the start of a sentence (the first word of a
+text, or the first after `.` `!` `?` `:`, an opening quotation mark or a bracket). An occurrence there whose
+spelling has a capital is *styled*; a spelling without capitals is never styled. Styled occurrences vote only
+when the text writes the form nowhere else, and then as written, since lower case would be a spelling the
+text never writes: a word found only where sentences begin keeps its capital. `phrase` is chosen the same
+way among its own item's occurrences of the form that item wrote first, so it can differ from the label:
+an item that writes only "Drilled cores …" has the phrase `Drilled` under the label `drilled`. A word is
+read back where the text writes it, so `Acme™` stays `Acme™` (before, the label was `acmetm`). A phrase
+none of whose occurrences reads, on its own, as what it was counted as (normalization that depends on the
+neighbours, such as a Greek final sigma before an apostrophe; English text has none) is not a candidate,
+so every hub has a spelling.
+
+On haroldyounghumxn.site's corpus of 2026-10-31, 9 of the 113 hubs changed spelling: `Antarctica`, `Assistance`,
+`Bang`, `Diego`, `Drilled`, `Earth`, `energy-efficient`, `Jupiter`, `Valley`. No tag was gained or lost,
+every concept kept its id under the ledger (which noted each old spelling once as `previousLabel`), and
+post-pipe's labels check (`tools/rtagz-labels-check.js`) went from one label with no origin
+(`energy efficient`) and six found only with case ignored to none of either.
+
+Downstream, rtz-stone files a spelled label under the same norm as before (`normalizeLabel` reads
+`energy-efficient` as `energy efficient`), so clustering, ids, relations and emergence's phrase matching do
+not move. Two rules keep a spelling discovery carries out from deciding anything a lower-case one did not
+decide: within one term a human's spelling wins (`displayForm`: a spelling only discovery wrote, `Labor`, never
+outranks a human's `labor`, though discovery's occurrences of a spelling a human also wrote count toward it),
+and a spelling discovery wrote in capitals (`NASA`) does not make a term acronym-like (only a human's
+does), so emergence still matches it by its stem. One exception: `normalizeLabel` splits camel case and reads
+`&` as "and", as it does for a human's tag, so a hub spelled `mRNA` is the term `m rna` (id `c_m_rna`), not
+the `mrna` a lower-case label made, and emergence does not find it in text, where `words` reads "mRNA" as
+one word. The corpus of 2026-10-31 has no such hub.
+
 **Near-copies count once.** Two items are near-copies when their TF-IDF cosine reaches `nearCopy`
 (0.35) and still reaches it once their `nearCopyWords` (3) strongest shared words (the largest products
 of the two weights) are taken out of both: one story told twice shares its names, places and details,
@@ -169,7 +211,7 @@ concepts[]: {
   id, canonical, pinned, locked, discovered, sourceRatio?, items, sources{src:nItems},
   inScheme[],                                                            // every scheme that wrote a spelling, plus `site`
   prefLabel{scheme: label}, altLabel{scheme: [label]},                   // SKOS, per scheme (below)
-  variants[]: {norm, label, forms{raw:n}, formsBySource{scheme:{raw:n}}, count, explicit, bySource{scheme:n}, acronym, tokens, sourceRatio?},
+  variants[]: {norm, label, forms{raw:n}, formsBySource{scheme:{raw:n}}, count, explicit, bySource{scheme:n}, acronym, tokens, sourceRatio?},  // acronym: a human wrote it like an initialism
   rank[]:     {norm, label, score, parts{freq,cover,trust,quality}},     // why the winner won, over the ranking pool
   links[]:    {a, b, conf, cooc, signals{name:{score,why}}},             // evidence inside the concept
   ledger?:    {since, event, previousLabel?}                             // only when built with a ledger (below)
@@ -210,7 +252,8 @@ only discovery wrote sits under `discovered`, never under the system of the item
 - `inScheme`: every scheme with at least one form for at least one variant, sorted, then `site` last.
 - `prefLabel[scheme]`: the spelling that scheme used most, **as written** (`A.I.` stays `A.I.`); ties
   broken as `displayForm` breaks them (no `-`/`_` joiner first, then a capital, then alphabetical).
-  `prefLabel.site` is `canonical`.
+  `prefLabel.site` is `canonical`. `prefLabel.discovered` is the spelling rtz-discover carried out, as the
+  text writes it (since 2026-10-31; "Spelling" under Discovered tags).
 - `altLabel[scheme]`: every other spelling that scheme wrote, sorted. `altLabel.site` is every
   spelling anyone wrote except the canonical.
 
@@ -220,8 +263,11 @@ scheme's own evidence; the `site` canonical is one of them (or a `pin`, which is
 **Ranking pool.** The canonical is scored over the human-written variants when there are any
 (`rankingPool` in `lib/canon.js`: the variants with `explicit > 0`, or all of them when no human
 wrote any), and `rank[]` lists only the pool. A spelling that only discovery wrote can join a concept
-(as a variant, and as `prefLabel.discovered`) but never outranks a human's spelling. Only a concept
-nobody wrote (`discovered: true`) ranks among its own spellings. The viewer's live re-ranking scores
+(as a variant, and as `prefLabel.discovered`) but never outranks a human's spelling. The same holds one
+level down, inside a term: a variant's `label` (`displayForm`) is chosen among the spellings a human wrote
+whenever a human wrote the term, so the text's `Labor` that discovery carried out never renames a human's
+`labor` (before 2026-10-31 a discovered lower-case `climate change` could outrank a human's `Climate
+Change` this way). Only a concept nobody wrote (`discovered: true`) ranks among its own spellings. The viewer's live re-ranking scores
 the same pool, so it never stars a spelling rtz-stone would not. Within the pool, a variant's `count`
 and `bySource` still include its discovered occurrences (and `discovered` counts as one covering
 scheme, trust weight 1 unless `sourceWeights.discovered` says otherwise), so discovery evidence can

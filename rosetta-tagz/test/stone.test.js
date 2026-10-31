@@ -546,6 +546,39 @@ test("the credit for a human's spelling does not depend on record order", () => 
   check([item, ...earned('Posts', ['p1'], 'process'), human], 'discovery first');
 });
 
+// Since 2026-10-31 rtz-discover carries out the spelling the text writes ("Labor", "NASA"), no longer a
+// lower-case one. One term (norm) can then hold a human's spelling and a different one discovery wrote.
+const laborMeta = { title: 'x', text: 'the department of labor' };
+const laborRecords = (humanLabels, discoveredLabel = 'Labor') => [
+  ...rec('Posts', Object.fromEntries(humanLabels.map((l, i) => [`p${i}`, [l]])), Object.fromEntries(humanLabels.map((_, i) => [`p${i}`, laborMeta]))),
+  ...rec('Wire', { w1: [], w2: [], w3: [] }, { w1: laborMeta, w2: laborMeta, w3: laborMeta }),
+  ...earned('Wire', ['w1', 'w2', 'w3'], discoveredLabel),
+];
+
+test("within one term too, a spelling only discovery wrote never outranks a human's", () => {
+  const c = conceptOf(buildStone(laborRecords(['labor']), {}), 'labor');
+  assert.equal(c.canonical, 'labor', 'the text\'s "Labor" three times does not rename the human\'s "labor"');
+  assert.deepEqual(c.prefLabel, { Posts: 'labor', [DISCOVERED_SCHEME]: 'Labor', [SITE_SCHEME]: 'labor' });
+  assert.deepEqual(c.altLabel[SITE_SCHEME], ['Labor'], 'discovery\'s spelling is still one of the concept\'s');
+  // and the other way round, as it was with lower-case discovered labels: a human's capitals stand
+  assert.equal(conceptOf(buildStone(laborRecords(['Labor'], 'labor'), {}), 'labor').canonical, 'Labor');
+});
+
+test("discovery's occurrences of a spelling a human also wrote still count toward it, as they do between human variants", () => {
+  // the human wrote "labor" twice and "Labor" once; discovery wrote "Labor" three times
+  assert.equal(conceptOf(buildStone(laborRecords(['labor', 'labor', 'Labor']), {}), 'labor').canonical, 'Labor');
+});
+
+test('a spelling discovery carried out in capitals does not make a term an acronym; a human\'s does', () => {
+  const meta = { title: 'y', text: 'news from nasa' };
+  const wire = rec('Wire', { w1: [], w2: [] }, { w1: meta, w2: meta });
+  const found = conceptOf(buildStone([...wire, ...earned('Wire', ['w1', 'w2'], 'NASA')], {}), 'nasa');
+  assert.equal(found.canonical, 'NASA', 'shown as the text writes it');
+  assert.equal(found.variants[0].acronym, false, 'emergence matches it by its stem and canonical scoring treats it as a word, as when it was "nasa"');
+  const human = conceptOf(buildStone([...wire, ...rec('Desk', { d1: ['NASA'] }, { d1: meta }), ...earned('Wire', ['w1', 'w2'], 'NASA')], {}), 'nasa');
+  assert.equal(human.variants[0].acronym, true);
+});
+
 test('a concept nobody wrote ranks among its own spellings and is still flagged discovered', () => {
   const s = buildStone([...rec('Wire', { w1: [], w2: [] }), ...earned('Wire', ['w1', 'w2'], 'qubits')], {});
   const c = conceptOf(s, 'qubits');
@@ -740,7 +773,7 @@ test('a below-bar tag on a spelling a human wrote does not move the choice betwe
   ];
   const below = [...human, ...rated('Wire', ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'], 'climate crisis', 1.3)];
   const overrides = { same: [['Climate Change', 'Climate Crisis']] };
-  assert.equal(conceptOf(buildStone(mixed(below), { overrides }), 'climate change').canonical, 'climate crisis', 'mixed in, the discovered occurrences would win it');
+  assert.equal(conceptOf(buildStone(mixed(below), { overrides }), 'climate change').canonical, 'Climate Crisis', 'mixed in, the discovered occurrences would win it (in the spelling the human wrote, since a human wrote that term)');
   const atBar = buildStone(human, { overrides });
   const s = buildStone(below, { overrides });
   assert.equal(conceptOf(s, 'climate change').canonical, 'Climate Change');

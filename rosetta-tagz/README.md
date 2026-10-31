@@ -122,6 +122,7 @@ carries both vocabularies. That is also the strongest alignment evidence there i
   your writing. On the real post-pipe feed this took 60 isolated ScienceDaily items to 43 connected ones.
   Two copies of one story count as one item, and every discovered tag carries its measured
   `sourceRatio`, so a viewer can try a stricter or looser bar without a rebuild (`docs/FORMATS.md`).
+  A discovered label is always a spelling the text has (`energy-efficient`, `Jupiter`), never invented.
   Quality is decent, not perfect: leftovers like `think` appear dashed, low-weight, with a visible reason.
   Edit `seed/generic-words.txt` (plain data) to teach it more words that are never topics.
 

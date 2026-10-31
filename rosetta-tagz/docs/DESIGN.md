@@ -110,9 +110,21 @@ bar shows exactly the build at the bar (FORMATS.md, "Trying another bar").
 
 Every record either stage emits carries its provenance in PROV terms: `wasDerivedFrom`
 (`[{type: 'text', phrase, count, inTitle}]`, where `phrase` is the span of the item's own words that
-matched, so an item that says "court" is never said to contain "courts") and `wasGeneratedBy`
+matched, so an item that says "court" is never said to contain "courts"; discovery's is spelled as the
+item writes it, emergence's is the matched words in lower case) and `wasGeneratedBy`
 (`{activity: 'discover' | 'emerge', parameters}`, the stage and the numbers that admitted the tag;
 emergence's `context` is present only for a lone word, where it was computed).
+
+Since 2026-10-31 a discovered label is a spelling the text has (Harold's rule of 2026-10-25: no tag
+label is invented). Before, rtz-discover carried out the lower-case words it had counted, so on
+haroldyounghumxn.site `energy efficient` (the text writes "energy-efficient") had no origin at all, and
+`antarctica`, `jupiter` and four others matched the text only with case ignored. Counting and matching
+still run on the normalized key; at the end the hub's lower-case form is chosen exactly as before, and
+then the way the text writes that form most often. Capitals in a title or at the start of a sentence
+vote only when the text writes the word nowhere else, since position, not the word, may have put them
+there (FORMATS.md, "Spelling", has the rule, the ties and what it changed). A spelled label is the same
+term to rtz-stone as before, and two guards keep its capitals from deciding anything: within a term a
+human's spelling wins, and only a human's capitals make a term acronym-like.
 
 Two consequences of filing discovered spellings under their own scheme, noted for the relation work:
 the anti-synonym penalty (`sameSourceCooccurrence` in `lib/cluster.js`) compares item sets per
@@ -123,7 +135,7 @@ assertions, not every edge it ends up with.
 
 ## What was verified, and how
 
-- 165 `node:test` tests (2026-10-31): normalisation, each signal, clustering, overrides, canonical scoring,
+- 178 `node:test` tests (2026-10-31): normalisation, each signal, clustering, overrides, canonical scoring,
   emergence/discovery, all four graph projections, and the real programs run as separate processes
   (including the fully piped form and an external scorer).
 - Real corpus runs (your Posts + post-pipe's feed) found five defects the synthetic data hid; each now

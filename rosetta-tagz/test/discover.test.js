@@ -5,7 +5,20 @@ import { discover } from '../lib/discover.js';
 import { makeConfig } from '../lib/config.js';
 import { buildStone } from '../lib/stone.js';
 import { emerge } from '../lib/emerge.js';
+import { words } from '../lib/text.js';
 import { rec, syntheticRecords } from './helpers.js';
+
+// `text` writes `phrase` exactly as given (case, hyphens and all), with no letter or digit touching
+// either end: the test post-pipe's labels check (tools/rtagz-labels-check.js) makes, whitespace collapsed
+const writes = (text, phrase) => {
+  const hay = String(text).replace(/\s+/g, ' ');
+  const needle = String(phrase).replace(/\s+/g, ' ').trim();
+  const word = /[\p{L}\p{N}\p{M}_]/u;
+  for (let i = hay.indexOf(needle); needle && i !== -1; i = hay.indexOf(needle, i + 1)) {
+    if (!word.test(hay[i - 1] ?? '') && !word.test(hay[i + needle.length] ?? '')) return true;
+  }
+  return false;
+};
 
 // A tagged system, an untagged wire, and filler so that no real phrase is "everywhere".
 const filler = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`f${i}`, []]));
@@ -99,8 +112,8 @@ test('every discovered record carries its provenance', () => {
     assert.ok(d.count >= 1);
     assert.equal(typeof d.inTitle, 'boolean');
     const it = records.find((r) => r.type === 'item' && r.source === t.source && r.id === t.item);
-    assert.ok(`${it.title} ${it.text}`.toLowerCase().includes(d.phrase), `"${d.phrase}" is in the item's text`);
-    assert.equal(d.inTitle, it.title.toLowerCase().split(/[^\p{L}\p{N}]+/u).join(' ').includes(d.phrase), `inTitle for "${d.phrase}" on ${t.item}`);
+    assert.ok(writes(`${it.title} ${it.text}`, d.phrase), `"${d.phrase}" is in the item's text, as written`);
+    assert.equal(d.inTitle, ` ${words(it.title).join(' ')} `.includes(` ${words(d.phrase).join(' ')} `), `inTitle for "${d.phrase}" on ${t.item}`);
     assert.equal(t.wasGeneratedBy.activity, 'discover');
     const P = t.wasGeneratedBy.parameters;
     const keys = ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'nearCopy', 'nearCopyGrouping', 'nearCopyWords', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio'];
@@ -113,10 +126,11 @@ test('every discovered record carries its provenance', () => {
   }
 });
 
-test('output order is by hub, then by item', () => {
-  const keys = out.map((t) => `${t.label}\u0000${t.source}::${t.item}`);
-  const labels = out.map((t) => t.label);
-  assert.deepEqual(labels, [...labels].sort());
+test('output order is by hub, then by item: hubs in the order of their form, the label read without capitals or joiners', () => {
+  const form = (t) => words(t.label).join(' ');
+  const keys = out.map((t) => `${form(t)}\u0000${t.source}::${t.item}`);
+  const forms = out.map(form);
+  assert.deepEqual(forms, [...forms].sort());
   assert.deepEqual(keys, [...keys].sort());
 });
 
@@ -341,18 +355,126 @@ test('a lower floor only adds: every record of the build at the bar is there unc
 
 // The SHA-256 of discovery's output on the synthetic corpus before nearCopyGrouping existed (post-pipe
 // 1.0.1, commit 5897101, default config). A deliberate change to that output puts its new digest here.
+// Since 2026-10-31 labels and phrases are spelled as the text writes them; read back through `words`
+// (lower case, joiners as spaces) they are what that version wrote, so the digest is taken that way.
 const BEFORE_THE_SWITCH = 'bdc7b3b503becf4e37025989a625b45f0f1546c9839812095262120f6986ee2b';
+const asWritten = (s) => words(s).join(' ');
 const withoutGrouping = (found) =>
   found.map((t) => {
     const { nearCopyGrouping, ...parameters } = t.wasGeneratedBy.parameters;
     return { ...t, wasGeneratedBy: { ...t.wasGeneratedBy, parameters } };
   });
+const unspelled = (found) => found.map((t) => ({ ...t, label: asWritten(t.label), wasDerivedFrom: t.wasDerivedFrom.map((d) => ({ ...d, phrase: asWritten(d.phrase) })) }));
 
-test('with chain, discovery on the synthetic corpus is byte for byte what it was before the switch existed', () => {
+test('with chain, discovery on the synthetic corpus is what it was before the switch existed, but for the spellings', () => {
   const chain = discover(synth, makeConfig({ discover: { nearCopyGrouping: 'chain' } }));
   assert.ok(chain.length > 0 && chain.every((t) => t.wasGeneratedBy.parameters.nearCopyGrouping === 'chain'), 'the switch is recorded on every record');
-  const digest = createHash('sha256').update(JSON.stringify(withoutGrouping(chain))).digest('hex');
-  assert.equal(digest, BEFORE_THE_SWITCH, 'taken out of the parameters, nothing else differs');
+  const digest = createHash('sha256').update(JSON.stringify(unspelled(withoutGrouping(chain)))).digest('hex');
+  assert.equal(digest, BEFORE_THE_SWITCH, 'taken out of the parameters and read back without capitals or joiners, nothing else differs');
+  assert.deepEqual([...new Set(chain.filter((t) => t.label !== asWritten(t.label)).map((t) => t.label))], ['Robots'], 'the one label spelled otherwise: written only in titles ("Robots learn to fold laundry", "Warehouse Workers Organize Against Robots"), so the capital is all the text has');
   // the synthetic corpus holds no near-copies, so all-pairs has nothing to group differently
   assert.equal(JSON.stringify(withoutGrouping(discover(synth))), JSON.stringify(withoutGrouping(chain)));
+});
+
+// ---- spellings: a label is a spelling the text has (2026-10-31) -----------------------------------
+// The rule that does not move: no tag label is invented. Each group of items below shares one phrase,
+// written in different ways, and three three-letter words that make its items alike without ever being
+// candidates themselves (a candidate has at least four letters); every title is a word no other item
+// has. Filler keeps any phrase from being everywhere.
+const spelled = {
+  h1: { title: 'Wexley', text: 'a cell that is energy-efficient: ice air sea' },
+  h2: { title: 'Brombat', text: 'ice air sea in an energy-efficient way' },
+  d1: { title: 'Gobbet', text: 'at UC San Diego the elk gnu emu' },
+  d2: { title: 'Fennix', text: 'elk gnu emu in San Diego' },
+  s1: { title: 'Quillet', text: 'Drilled cores of oak yew ant' },
+  s2: { title: 'Varnish', text: 'oak yew ant were drilled deep' },
+  s3: { title: 'Trundle', text: 'oak yew ant. Drilled holes' },
+  r1: { title: 'Mizzle', text: 'Fossils of ram jay asp' },
+  r2: { title: 'Pobble', text: 'ram jay asp! Fossils again' },
+  t1: { title: 'Carbon Capture Grows', text: 'cod eel koi under carbon capture' },
+  t2: { title: 'Carbon Capture Stalls', text: 'cod eel koi wait' },
+  g1: { title: 'Snidget', text: 'the Thwaites Glacier and owl ape fig' },
+  g2: { title: 'Wombel', text: 'owl ape fig on a glacier' },
+  n1: { title: 'Gristle', text: 'bee gut dna from NASA' },
+  n2: { title: 'Hobnail', text: 'bee gut dna from Nasa' },
+};
+const spellingRecords = [...rec('Wire', Object.fromEntries(Object.keys(spelled).map((k) => [k, []])), spelled), ...rec('Filler', filler, fillerMeta)];
+const spelledOut = discover(spellingRecords);
+const hubOf = (found, label) => found.filter((t) => t.label === label);
+const phrasesOf = (found, label) => Object.fromEntries(hubOf(found, label).map((t) => [t.item, t.wasDerivedFrom[0].phrase]));
+
+test('a hyphen is kept as written: "energy-efficient" in the text is the label "energy-efficient"', () => {
+  assert.deepEqual(phrasesOf(spelledOut, 'energy-efficient'), { h1: 'energy-efficient', h2: 'energy-efficient' });
+  assert.equal(hubOf(spelledOut, 'energy efficient').length, 0, 'never the words without their hyphen, which the text does not write');
+});
+
+test('capitals are kept as written: "San Diego" in the text gives the label "Diego", never "diego"', () => {
+  assert.deepEqual(phrasesOf(spelledOut, 'Diego'), { d1: 'Diego', d2: 'Diego' }, '"San" has three letters, too short to be a candidate, so the hub is the one word');
+  assert.equal(hubOf(spelledOut, 'diego').length, 0);
+});
+
+test('a capital where a sentence begins says nothing about the word: "drilled" once mid-sentence beats "Drilled" twice at a sentence start', () => {
+  assert.deepEqual(phrasesOf(spelledOut, 'drilled'), { s1: 'Drilled', s2: 'drilled', s3: 'Drilled' }, 'each phrase is what its own item wrote');
+  assert.equal(hubOf(spelledOut, 'Drilled').length, 0, 'counted as written, "Drilled" would have won two to one');
+});
+
+test('a word written only where a sentence begins keeps its capital: it is the only spelling the text has', () => {
+  assert.deepEqual(phrasesOf(spelledOut, 'Fossils'), { r1: 'Fossils', r2: 'Fossils' }, 'the first word of the text, and the first after "!"');
+  assert.equal(hubOf(spelledOut, 'fossils').length, 0, 'lower case would be a spelling the text never writes');
+});
+
+test("a title's capitals say nothing either: \"Carbon Capture\" in two titles, \"carbon capture\" in one text, and the label is \"carbon capture\"", () => {
+  assert.deepEqual(phrasesOf(spelledOut, 'carbon capture'), { t1: 'carbon capture', t2: 'Carbon Capture' }, 't2 writes it only in its title, and its phrase is that');
+  for (const t of hubOf(spelledOut, 'carbon capture')) assert.equal(t.wasDerivedFrom[0].inTitle, true);
+});
+
+test('ties go to a spelling in lower case, then to the one met first, items in key order', () => {
+  assert.deepEqual(phrasesOf(spelledOut, 'glacier'), { g1: 'Glacier', g2: 'glacier' }, '"Glacier" (in "Thwaites Glacier") and "glacier" once each, both mid-sentence');
+  assert.deepEqual(phrasesOf(spelledOut, 'NASA'), { n1: 'NASA', n2: 'Nasa' }, 'neither in lower case: n1 comes first');
+  const swapped = { ...spelled, n1: spelled.n2, n2: spelled.n1 };
+  const again = discover([...rec('Wire', Object.fromEntries(Object.keys(swapped).map((k) => [k, []])), swapped), ...rec('Filler', filler, fillerMeta)]);
+  assert.deepEqual(phrasesOf(again, 'Nasa'), { n1: 'Nasa', n2: 'NASA' }, 'with the items the other way round, the other spelling');
+});
+
+test('the spelling changes nothing else: read back without capitals or joiners, the output is what the lower-case labels were', () => {
+  assert.deepEqual(spelledOut.map((t) => asWritten(t.label)), ['carbon capture', 'carbon capture', 'diego', 'diego', 'drilled', 'drilled', 'drilled', 'energy efficient', 'energy efficient', 'fossils', 'fossils', 'glacier', 'glacier', 'nasa', 'nasa'], 'hubs in the order of their form, as before');
+  const lower = { ...spelled };
+  for (const [k, v] of Object.entries(lower)) lower[k] = { title: v.title.toLowerCase(), text: v.text.toLowerCase().replaceAll('-', ' ') };
+  const plain = discover([...rec('Wire', Object.fromEntries(Object.keys(lower).map((k) => [k, []])), lower), ...rec('Filler', filler, fillerMeta)]);
+  assert.equal(JSON.stringify(unspelled(spelledOut)), JSON.stringify(plain), 'the same corpus with no capitals or hyphens gives the same records, numbers and why included');
+});
+
+test('every label is written in some item\'s text, and every phrase in its own item\'s, exactly as given, in every corpus here', () => {
+  const corpora = [
+    [records, out], [deskRecords, deskOn], [deskRecords, deskOff], [copyRecords, withCopies], [copyRecords, copiesOff],
+    [roundupRecords, byChain], [roundupRecords, byAllPairs], [synth, atNine], [synth, toOne], [synth, discover(synth)], [spellingRecords, spelledOut],
+  ];
+  for (const [recs, found] of corpora) {
+    const items = new Map(recs.filter((r) => r.type === 'item').map((r) => [`${r.source}::${r.id}`, `${r.title} ${r.text}`]));
+    const texts = [...items.values()];
+    for (const label of new Set(found.map((t) => t.label))) assert.ok(texts.some((x) => writes(x, label)), `label "${label}" is written somewhere`);
+    for (const t of found) assert.ok(writes(items.get(`${t.source}::${t.item}`), t.wasDerivedFrom[0].phrase), `phrase "${t.wasDerivedFrom[0].phrase}" is written in ${t.item}`);
+  }
+});
+
+test('downstream a spelled label is the same term as before: same norm, same id, emergence finds it by phrase', () => {
+  const s = buildStone([...spellingRecords, ...spelledOut], {});
+  const c = s.concepts.find((x) => x.variants.some((v) => v.norm === 'energy efficient'));
+  assert.equal(c.id, 'c_energy_efficient', 'minted from the norm, which the hyphen does not change');
+  assert.equal(c.canonical, 'energy-efficient');
+  assert.deepEqual(c.prefLabel, { discovered: 'energy-efficient', site: 'energy-efficient' });
+  assert.equal(c.variants[0].acronym, false);
+  // an item discovery never saw, which writes the words without the hyphen, earns it through emergence
+  const late = rec('Late', { z1: [] }, { z1: { title: 'Plinth', text: 'an energy efficient pump: ice air sea' } });
+  const earnedHere = emerge(s, [...spellingRecords, ...late, ...spelledOut]).filter((t) => t.concept === c.id);
+  assert.deepEqual(earnedHere.map((t) => [t.item, t.label]), [['z1', 'energy-efficient']], 'h1 and h2 carry it already, and are not doubled');
+});
+
+test('the one exception, pinned so it stays visible: a camel-case spelling is carried out as written ("mRNA"), and rtz-stone reads it as two words, as it reads a human\'s tag spelled so', () => {
+  const m = { m1: { title: 'Wexley', text: 'an mRNA dose: ice air sea' }, m2: { title: 'Brombat', text: 'ice air sea and mRNA' } };
+  const base = [...rec('Wire', { m1: [], m2: [] }, m), ...rec('Filler', filler, fillerMeta)];
+  const found = discover(base);
+  assert.deepEqual([...new Set(found.map((t) => t.label))], ['mRNA'], 'the text never writes "mrna", so that is not a label');
+  const c = buildStone([...base, ...found], {}).concepts.find((x) => x.canonical === 'mRNA');
+  assert.deepEqual([c.id, c.variants.map((v) => v.norm)], ['c_m_rna', ['m rna']], 'normalizeLabel splits camel case, so this is not the term "mrna" a lower-case label made');
 });

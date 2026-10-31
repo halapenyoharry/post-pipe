@@ -131,7 +131,10 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
     if (!t.formsBySource.has(scheme)) t.formsBySource.set(scheme, new Map());
     const fs = t.formsBySource.get(scheme);
     fs.set(info.raw, (fs.get(info.raw) ?? 0) + 1);
-    if (looksLikeAcronym(info.raw)) t.acronymLike = true;
+    // written like an initialism by a human: a spelling discovery carried out as the text writes it
+    // ("NASA", since 2026-10-31) does not turn on acronym handling (displayForm, canonical scoring,
+    // emergence matching only in capitals), which stays as it was when discovered spellings were lower case
+    if (origin !== 'discovered' && looksLikeAcronym(info.raw)) t.acronymLike = true;
     const credited = seenRow.get(rowId);
     if (credited !== undefined) {
       // the same tag twice on one item counts once; when discovery's row came first and a human's
@@ -169,13 +172,18 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
 // records' `sourceRatio`, when every record it has carries one; null when something always shows it.
 export const ratioOf = (term) => (term.unrated || term.ratio === null ? null : term.ratio);
 
-// Best display form of a term, always a spelling somebody wrote. An acronym shows as its most
-// written acronym spelling, a tie going to plain capitals ("AI" over "A.I."; "A.I." stays "A.I."
-// when it is the only one written, never rewritten to "AI"); otherwise a spelling without
+// Best display form of a term, always a spelling somebody wrote. When a human wrote the term, only
+// the spellings a human wrote are candidates: the ranking pool's rule (lib/canon.js) one level down,
+// so a spelling only discovery wrote ("Labor" from the text) never outranks a human's ("labor"),
+// though discovery's occurrences of a spelling a human also wrote still count toward it. An acronym
+// shows as its most written acronym spelling, a tie going to plain capitals ("AI" over "A.I."; "A.I."
+// stays "A.I." when it is the only one written, never rewritten to "AI"); otherwise a spelling without
 // hyphen/underscore joiners wins if any source wrote one (slugs are storage artifacts, not names),
 // then the most frequent, then one with capitals.
 export function displayForm(term) {
-  const entries = [...term.forms.entries()];
+  const human = new Set();
+  for (const [scheme, forms] of term.formsBySource) if (scheme !== DISCOVERED_SCHEME) for (const raw of forms.keys()) human.add(raw);
+  const entries = [...term.forms.entries()].filter(([raw]) => !human.size || human.has(raw));
   if (term.acronymLike && term.tokens.length === 1) {
     const plain = (raw) => Number(!/[.\s]/.test(raw));
     const acro = entries.filter(([raw]) => looksLikeAcronym(raw)).sort((a, b) => b[1] - a[1] || plain(b[0]) - plain(a[0]) || (a[0] < b[0] ? -1 : 1));
