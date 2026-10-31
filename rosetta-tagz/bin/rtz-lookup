@@ -3,7 +3,7 @@ import { cli, die, readJSON } from '../lib/io.js';
 import { indexStone, resolveLabel } from '../lib/stone.js';
 import { scoreVariants } from '../lib/canon.js';
 
-const usage = `rtz-lookup — read the stone
+const usage = `rtz-lookup — read stone.json
 
 usage: rtz-lookup <stone.json> <label>… [--json]
        rtz-lookup <stone.json> --review          pairs the engine thinks are probably the same, for a human to decide
@@ -45,7 +45,7 @@ if (values.systems) {
   for (const label of labels) {
     const hit = resolveLabel(index, label);
     if (!hit) {
-      out(`"${label}": not in the stone`);
+      out(`"${label}": not in stone.json`);
       continue;
     }
     const c = index.concepts.get(hit.concept);

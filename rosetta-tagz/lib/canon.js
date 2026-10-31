@@ -33,7 +33,7 @@ function cleanliness(label) {
 
 // The ranking pool: the spellings a human wrote, whenever there are any. A spelling only discovery
 // proposed may join a concept but never outranks a human's; only a concept nobody wrote ranks among
-// its own spellings. Every caller that picks a canonical (the stone, the viewer's live re-ranking)
+// its own spellings. Every caller that picks a canonical (rtz-stone, the viewer's live re-ranking)
 // scores this pool, so the two never disagree.
 export function rankingPool(variants) {
   return variants.some((v) => v.explicit > 0) ? variants.filter((v) => v.explicit > 0) : variants;

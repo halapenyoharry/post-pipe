@@ -152,7 +152,7 @@ test('pin continuity: a cluster whose only overlap with its prior is the pinned 
   // and without the pin the same cluster mints (c_ai is in use, so the mint is c_ai_2)
   const unpinned = assignIds([{ terms: ['ai', 'smart machines', 'thinking machines'], label: 'ai' }], prior, { now: 't1' });
   assert.deepEqual(unpinned.ids, ['c_ai_2']);
-  // through the stone: `same` forces the cluster, `pin` names the norm
+  // through rtz-stone: `same` forces the cluster, `pin` names the norm
   const records = rec('Journal', { 1: ['ai'], 2: ['smart machines'], 3: ['thinking machines'] });
   const { stone } = ledgered(records, prior, { now: 't1', overrides: { same: [['ai', 'smart machines', 'thinking machines']], pin: { ai: 'AI' } } });
   const c = byMember(stone, 'ai');
@@ -183,7 +183,7 @@ test('the first ledgered build reproduces the ids of a build without a ledger', 
   const plain = buildStone(records, { seeds: [shippedSeed()] });
   const { stone } = ledgered(records, null, { now: 't1' });
   assert.deepEqual(stone.concepts.map((c) => c.id), plain.concepts.map((c) => c.id));
-  assert.equal(plain.ledger, undefined, 'without a ledger the stone carries no ledger summary');
+  assert.equal(plain.ledger, undefined, 'without a ledger stone.json carries no ledger summary');
   assert.ok(plain.concepts.every((c) => c.ledger === undefined));
   assert.ok(stone.concepts.every((c) => c.ledger.event === 'minted' && c.ledger.since === 't1'));
 });

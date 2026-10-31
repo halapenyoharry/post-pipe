@@ -26,7 +26,7 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
     "seeds": [],                       optional extra seed files
     "noSeed": false,
     "discover": false,                 propose new tags for untagged items from recurring phrases
-    "emerge": true,                    earn tags from item text (concepts the stone already knows)
+    "emerge": true,                    earn tags from item text (concepts rtz-stone already made)
     "engine": { "mergeThreshold": 0.7 }   optional overrides of lib/config.js defaults
   }
 

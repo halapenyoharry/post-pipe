@@ -1,11 +1,11 @@
-// The universe: the stone joined to the items it describes. One self-contained JSON document
+// The universe: stone.json joined to the items it describes. One self-contained JSON document
 // with everything a viewer (or any other tool, e.g. exoskeleton) needs to draw any projection.
 //
 // Two rules worth knowing:
 //  - The same article listed in several tag-systems (same URL, or same long title) becomes ONE item
 //    that carries the tags of all of them (item.alsoIn lists the other systems; each tag lists `sys`).
-//  - Tags the stone has never seen become singleton "unmapped" concepts instead of being dropped,
-//    so a stale stone degrades gracefully.
+//  - Tags stone.json has never seen become singleton "unmapped" concepts instead of being dropped,
+//    so a stale stone.json degrades gracefully.
 //  - A tag every one of whose records a viewer can hide by ratio (discovered or emergent records that
 //    carry `sourceRatio`) carries the highest of their ratios: shown when the viewer is set at or
 //    below it. A human's tag, or one any record without a ratio supports, has none and always shows.
@@ -19,7 +19,7 @@ export const UNIVERSE_SCHEMA = 'rosetta-tagz/universe@1';
 
 // The scheme an unmapped label is filed under: a human's category under its system, a discovered
 // phrase under `discovered` (never under the system of the item it was found on), an emergent label
-// under `site` alone, since it is a canonical of the stone that earned it, not a word any system wrote.
+// under `site` alone, since it is a canonical rtz-stone chose, not a word any system wrote.
 const schemeOfUnmapped = (r, origin) => (origin === 'discovered' ? DISCOVERED_SCHEME : origin === 'emergent' ? SITE_SCHEME : schemeOfSource(r.source));
 
 // Golden-angle hues keep adjacent sources visibly distinct without a hand-made palette.
@@ -29,9 +29,9 @@ function sourceColor(i) {
 
 export function buildUniverse(stone, records) {
   const index = indexStone(stone);
-  // a stone built with a ledger says, per concept, since when its id has existed and what happened
+  // a stone.json built with a ledger says, per concept, since when its id has existed and what happened
   // to it this build ({since, event: minted|reused|split|merged, previousLabel?}); carried through
-  // as written, absent when the stone had no ledger (and always absent on a `u_` concept)
+  // as written, absent when stone.json had no ledger (and always absent on a `u_` concept)
   const ledgerNote = (c) => (c.ledger && typeof c.ledger === 'object' ? { ledger: { since: c.ledger.since, event: c.ledger.event, ...(c.ledger.previousLabel !== undefined ? { previousLabel: c.ledger.previousLabel } : {}) } } : {});
   const concepts = new Map(stone.concepts.map((c) => [c.id, { ...c, ...ledgerNote(c), n: 0, nEmergent: 0 }]));
   const items = new Map();
@@ -97,7 +97,7 @@ export function buildUniverse(stone, records) {
         concepts.set(cid, c);
         unmapped.set(cid, c);
       }
-      // the spelling is evidence in the scheme that wrote it, exactly as the stone files its own
+      // the spelling is evidence in the scheme that wrote it, exactly as rtz-stone files its own
       const v = concepts.get(cid).variants[0];
       concepts.get(cid).ratios.push(origin === 'discovered' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null);
       v.forms[r.label] = (v.forms[r.label] ?? 0) + 1;

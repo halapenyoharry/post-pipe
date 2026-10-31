@@ -123,7 +123,7 @@ test('discovery is deterministic', () => {
   assert.deepEqual(discover(records), out);
 });
 
-test('discovered phrases join the stone as evidence and fold into other systems\' vocabulary', () => {
+test('discovered phrases join stone.json as evidence and fold into other systems\' vocabulary', () => {
   const shared = [
     ...rec('Editorial', { e1: ['Quantum'], e2: ['Quantum'] }, { e1: { title: 'Quantum sensing', text: 'quantum sensors' }, e2: { title: 'Quantum networks', text: 'quantum links' } }),
     ...records,
@@ -142,7 +142,7 @@ test('a concept only ever proposed by discovery is flagged, visible to emerge, a
   assert.ok(s.concepts.filter((c) => !c.discovered).every((c) => c.variants.some((v) => v.explicit > 0)));
   const discoveredIds = new Set(hubOnly.map((c) => c.id));
   const eruption = hubOnly.find((c) => c.variants.some((v) => v.norm === 'volcano eruption'));
-  assert.ok(eruption, 'the wire\'s "volcano eruption" is a concept the stone knows only from discovery');
+  assert.ok(eruption, 'the wire\'s "volcano eruption" is a concept stone.json knows only from discovery');
 
   // without the discovered records, emergence sees the concept and earns it where the text says it
   const fresh = emerge(s, records);

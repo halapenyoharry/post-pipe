@@ -1,6 +1,6 @@
 // Graph projections of a universe. IMPORT-FREE: shared by the rtz-graph CLI and the browser viewer.
 //
-//   raw       items + one tag node per (tag-system, spelling). Shows the duplication the stone removes.
+//   raw       items + one tag node per (tag-system, spelling). Shows the duplication rtz-stone removes.
 //   hyper     items + one node per CONCEPT. Tags are vertices (hypergraph incidence form).
 //   dyadic    items only. A tag is no longer a node: it is the label on the edge between two items.
 //   concepts  concepts only, joined by their relations.

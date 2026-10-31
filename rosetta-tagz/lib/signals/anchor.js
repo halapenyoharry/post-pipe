@@ -1,6 +1,6 @@
 // Instance-based alignment: when the SAME item shows up in two tag-systems
 // (same URL, or same long title), the tags each system gave it are candidate translations
-// of each other. This is the closest thing to a literal Rosetta stone: one text, two scripts.
+// of each other. One text under two vocabularies is the strongest evidence that their tags translate.
 //
 // One shared item with 3 tags on one side and 2 on the other supports each of the 6 pairings
 // only weakly (1/3 each). Evidence accumulates across shared items: S = sum of 1/max(kA,kB).

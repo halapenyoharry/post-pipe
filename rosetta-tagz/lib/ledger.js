@@ -9,7 +9,7 @@
 //     events:   [ { type: split|merge|retire, at, … } ] }                        // the 200 most recent
 //
 // Nothing in here is invented: `members` are norms the corpus wrote, `label` is the canonical the
-// stone chose (a spelling somebody wrote, or a human's pin), `pin` is the first pinned member norm
+// rtz-stone chose (a spelling somebody wrote, or a human's pin), `pin` is the first pinned member norm
 // (when several members are pinned the others stay members, which is continuity enough).
 import fs from 'node:fs';
 import path from 'node:path';

@@ -96,7 +96,7 @@ test('unknown mode throws a helpful error', () => {
   assert.throws(() => projectGraph(U, 'sphere'), new RegExp(MODES.join('|')));
 });
 
-test('tags newer than the stone become unmapped singleton concepts instead of vanishing', () => {
+test('tags newer than stone.json become unmapped singleton concepts instead of vanishing', () => {
   const stale = syntheticStone();
   const newer = [
     ...rec('Fresh', { n1: ['quantum gravity', 'AI'], n2: ['quantum gravity'] }),

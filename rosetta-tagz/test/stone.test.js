@@ -523,7 +523,7 @@ test("a discovered spelling never outranks a human's", () => {
   assert.ok(c.altLabel[SITE_SCHEME].includes('processing'));
   assert.deepEqual(c.inScheme, ['Posts', DISCOVERED_SCHEME, SITE_SCHEME]);
   assert.deepEqual(c.rank.map((r) => r.label), ['process'], 'the ranking pool is the human-written spellings');
-  // the viewer re-scores live with the same pool, so it can never star a spelling the stone did not
+  // the viewer re-scores live with the same pool, so it can never star a spelling rtz-stone did not
   assert.deepEqual(rankingPool(c.variants).map((v) => v.norm), ['process']);
   assert.equal(scoreVariants(rankingPool(c.variants), s.config.canon, s.config.sourceWeights)[0].label, c.rank[0].label);
   assert.notEqual(scoreVariants(c.variants, s.config.canon, s.config.sourceWeights)[0].label, c.canonical, 'without the pool, discovery would win: the drift this ends');
@@ -619,7 +619,7 @@ test('universe: tags carry provenance; unmapped concepts carry their scheme', ()
   const emergent = w1.tags.find((t) => t.c === 'u_signals');
   assert.deepEqual(emergent.wasDerivedFrom, [{ type: 'text', phrase: 'signals', count: 1 }]);
   assert.deepEqual(emergent.wasGeneratedBy, { activity: 'emerge', parameters: {} });
-  // an emergent label is a canonical of the stone that earned it, so unmapped it sits in `site` alone
+  // an emergent label is a canonical rtz-stone chose, so unmapped it sits in `site` alone
   const signals = u.concepts.find((c) => c.id === 'u_signals');
   assert.deepEqual(signals.inScheme, [SITE_SCHEME]);
   assert.deepEqual(signals.prefLabel, { [SITE_SCHEME]: 'signals' });
@@ -635,7 +635,7 @@ test('universe: tags carry provenance; unmapped concepts carry their scheme', ()
   for (const it of u.items) for (const t of it.tags) for (const k of ['wasDerivedFrom', 'wasGeneratedBy']) if (k in t) assert.ok(t[k] != null, `${k} is never null`);
 });
 
-test('universe: a discovered label the stone never absorbed is filed under discovered, not under the item\'s system', () => {
+test('universe: a discovered label rtz-stone never absorbed is filed under discovered, not under the item\'s system', () => {
   const s = buildStone(rec('Wire', { w1: ['alpha'] }), {});
   const u = buildUniverse(s, [...rec('Wire', { w1: ['alpha'], w2: [] }), ...earned('Wire', ['w1', 'w2'], 'qubits')]);
   const q = u.concepts.find((c) => c.id === 'u_qubits');
@@ -663,7 +663,7 @@ test('the same essay under two vocabularies counts once: no identical-text flood
 
 // ---- below-bar evidence (rtz-discover's floor) is layered on, never mixed in ---------------------
 // A discovered record whose sourceRatio is under the sourceCoherenceRatio it was generated with is
-// below its bar. `mixed` hands a stone the same tags with the bar lowered to 1, so nothing is below
+// below its bar. `mixed` hands rtz-stone the same tags with the bar lowered to 1, so nothing is below
 // it: that is what a single-layer stone would make of them, and why it must not.
 const BAR = 1.6;
 const rated = (source, items, label, sourceRatio, bar = BAR) =>

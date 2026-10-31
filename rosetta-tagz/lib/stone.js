@@ -1,4 +1,4 @@
-// The stone itself: concepts (clusters of equivalent tags across tag-systems), each with a
+// stone.json itself: concepts (clusters of equivalent tags across tag-systems), each with a
 // canonical label chosen by weight, plus relations between concepts.
 //
 // overrides.json (human-edited, never overwritten by the engine) wins over everything computed:
@@ -81,7 +81,7 @@ function variantOf(t) {
 
 // `ledger` is in/out: { prior, path } read from disk by the caller (prior null when there is none);
 // on return `ledger.next` is the ledger to write. Without it ids are minted exactly as a first
-// ledgered build mints them, and the stone carries no ledger fields.
+// ledgered build mints them, and stone.json carries no ledger fields.
 //
 // Below-bar records (discovered tags rtz-discover's floor admitted under its sourceCoherenceRatio,
 // `belowBar` in lib/corpus.js) are layered on, never mixed in. Everything a build at the bar holds is
@@ -300,7 +300,7 @@ const SAME_SAYING = { near: 'near', closeMatch: 'near', related: 'related', rela
 const saysTheSame = (x, y) => x === y || (SAME_SAYING[x] !== undefined && SAME_SAYING[x] === SAME_SAYING[y]);
 const relationKey = (r) => (SYMMETRIC.has(r.type) ? [r.a, r.b].sort().join('\u0000') : `${r.a}\u0000${r.b}`) + `\u0000${r.type}`;
 
-// "<schemeId>:<externalId>" names a concept of a published vocabulary the stone does not hold; it is
+// "<schemeId>:<externalId>" names a concept of a published vocabulary stone.json does not hold; it is
 // kept verbatim. A label that merely contains a colon but resolves to a concept is that concept.
 const EXTERNAL_REF = /^[^\s:]+:\S+$/;
 const isExternalRef = (label) => typeof label === 'string' && EXTERNAL_REF.test(label);
@@ -363,7 +363,7 @@ function mergeManualRelations(derived, manual, conceptFor, humanList = [], label
 // Two concepts share a scheme when some tag-system (or `discovered`) wrote both; `site` holds every
 // concept and so says nothing. Within a scheme a relation is semantic (skos:broader, skos:related);
 // across schemes it is a mapping (skos:closeMatch, broadMatch, relatedMatch). `skos:false` marks the
-// stone's own vocabulary that SKOS has no word for (adjacent, synergy, opposes, a within-scheme
+// rosetta-tagz vocabulary that SKOS has no word for (adjacent, synergy, opposes, a within-scheme
 // `near`, a cross-scheme `related` with no text support): kept, named as before, for readers that
 // speak SKOS to ignore. A human's relation (locked) keeps the name the human wrote. A relation to an
 // external vocabulary id is a mapping by definition.
@@ -441,7 +441,7 @@ function forbidRelations(relations, notRelated, conceptFor) {
   return { relations: relations.filter((r) => !hits(r)), forbidden };
 }
 
-// ---- reading a stone -------------------------------------------------------
+// ---- reading stone.json ------------------------------------------------------
 
 export function indexStone(stone) {
   const byNorm = new Map();
@@ -465,7 +465,7 @@ export function indexStone(stone) {
 
 const only = (set) => (set && set.size === 1 ? [...set][0] : null);
 
-// Map any label (even one the stone has never seen) to a concept, with provenance.
+// Map any label (even one stone.json has never seen) to a concept, with provenance.
 export function resolveLabel(index, label) {
   const info = normalizeLabel(label);
   if (!info.norm) return null;

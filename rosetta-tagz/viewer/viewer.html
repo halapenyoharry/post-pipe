@@ -158,7 +158,7 @@ const REL_TEXT = {
   exactMatch: 'exactMatch — the same concept in two schemes (human-authored or vocabulary mapping)',
 };
 const MODE_HELP = {
-  raw: '<b>Raw.</b> One node per tag as each tag-system wrote it. The same idea appears several times: this is the duplication the stone removes.',
+  raw: '<b>Raw.</b> One node per tag as each tag-system wrote it. The same idea appears several times: this is the duplication rtz-stone removes.',
   hyper: '<b>Hyper.</b> Tags are vertices. One node per <i>concept</i>, joined to the items that carry it. Gold nodes are concepts that merged several spellings.',
   dyadic: '<b>Dyadic.</b> Tags are not nodes any more: each is the <i>label on an edge</i> between two items that share it. Hover an edge to read its tags.',
   concepts: '<b>Concepts.</b> Only the vocabulary: concepts joined by their relations. Click one, then <i>Explore</i>, to pull its neighbourhood up.',
@@ -183,14 +183,14 @@ function relabel() {
   let changed = [];
   for (const c of U.concepts) {
     if (c.unmapped || c.pinned) { state.labels.set(c.id, c.canonical); continue; }
-    c.live = scoreVariants(rankingPool(c.variants), state.canon, state.trust); // the stone's pool: a discovered spelling never outranks a human's
+    c.live = scoreVariants(rankingPool(c.variants), state.canon, state.trust); // rtz-stone's pool: a discovered spelling never outranks a human's
     const label = c.live[0].label;
     state.labels.set(c.id, label);
     if (label !== c.canonical) changed.push([c.canonical, label]);
   }
   $('renamed').innerHTML = changed.length
-    ? `<b>${changed.length}</b> canonical name${changed.length > 1 ? 's' : ''} differ from the stone: ` + changed.slice(0, 5).map(([a, b]) => `${esc(a)} → <b>${esc(b)}</b>`).join(', ') + (changed.length > 5 ? '…' : '')
-    : 'Same names as the stone.';
+    ? `<b>${changed.length}</b> canonical name${changed.length > 1 ? 's' : ''} differ from stone.json: ` + changed.slice(0, 5).map(([a, b]) => `${esc(a)} → <b>${esc(b)}</b>`).join(', ') + (changed.length > 5 ? '…' : '')
+    : 'Same names as stone.json.';
   const frag = {};
   if (JSON.stringify(state.canon) !== JSON.stringify(defaultCanon)) frag.canon = state.canon;
   if (JSON.stringify(state.trust) !== JSON.stringify(defaultTrust)) frag.sourceWeights = state.trust;
@@ -371,7 +371,7 @@ function renderPanel() {
   const p = $('panel');
   const s = state.sel;
   if (!s) {
-    p.innerHTML = `<h2>Rosetta stone</h2><p class="muted">${U.stats.tags} tags from ${U.sources.length} tag-systems folded into <b>${U.stats.concepts}</b> concepts (${U.stats.merged} of them merged several spellings).${U.stats.emergentTags ? ` ${U.stats.emergentTags} tags were earned from item text.` : ''}</p>
+    p.innerHTML = `<h2>rosetta-tagz</h2><p class="muted">${U.stats.tags} tags from ${U.sources.length} tag-systems folded into <b>${U.stats.concepts}</b> concepts (${U.stats.merged} of them merged several spellings).${U.stats.emergentTags ? ` ${U.stats.emergentTags} tags were earned from item text.` : ''}</p>
       <p class="muted">Click a node to see why it has the name it has, what it is called in each tag-system, and how it relates to everything else. Then <b>Explore</b> to pull its neighbourhood up.</p>
       <h3>Biggest merges</h3>${U.concepts.filter((c) => c.variants.length > 1).sort((a, b) => b.variants.length - a.variants.length || b.items - a.items).slice(0, 8).map((c) => `<div class="chip" data-c="${esc(c.id)}">${esc(lab(c.id))}</div> <span class="muted">← ${esc(c.variants.map((v) => v.label).join(', '))}</span><br>`).join('')}
       <h3>Review queue</h3>${U.relations.filter((r) => r.type === 'near' || r.type === 'closeMatch').sort((a, b) => b.weight - a.weight).slice(0, 6).map((r) => `<div>${chip(r.a)} ~ ${chip(r.b)} <span class="w">${Math.round(r.weight * 100)}%</span></div>`).join('') || '<span class="muted">nothing to review</span>'}`;
@@ -450,7 +450,7 @@ function buildControls() {
   $('relchecks').innerHTML = RELATION_TYPES.filter((t) => present.has(t)).map((t) => `<div class="row"><input type="checkbox" id="r_${t}" data-r="${t}" checked><span class="swatch" style="background:${REL_COLOR[t]}"></span><label for="r_${t}" title="${esc(REL_TEXT[t])}">${t} <span class="muted">${U.relations.filter((r) => r.type === t).length}</span></label></div>`).join('');
   $('relchecks').onchange = (e) => { const t = e.target.dataset.r; if (!t) return; e.target.checked ? state.relTypes.add(t) : state.relTypes.delete(t); project(false); };
   $('emergent').onchange = (e) => { state.emergent = e.target.checked; project(false); };
-  $('legend').innerHTML = `<div><span class="dot" style="background:#ffd166"></span> concept that merged several spellings</div><div><span class="dot" style="background:#efe9d6"></span> concept with one spelling</div><div><span class="dot" style="background:#b9a0d6"></span> discovered from text only (no human wrote it)</div><div><span class="dot" style="background:#8d97ab"></span> tag the stone has not seen</div>${present.has('broader') ? '<div>arrow points broader → narrower</div>' : ''}<div><span class="swatch" style="background:#6ec8f0"></span> tag earned / discovered from text</div>`;
+  $('legend').innerHTML = `<div><span class="dot" style="background:#ffd166"></span> concept that merged several spellings</div><div><span class="dot" style="background:#efe9d6"></span> concept with one spelling</div><div><span class="dot" style="background:#b9a0d6"></span> discovered from text only (no human wrote it)</div><div><span class="dot" style="background:#8d97ab"></span> tag stone.json has not seen</div>${present.has('broader') ? '<div>arrow points broader → narrower</div>' : ''}<div><span class="swatch" style="background:#6ec8f0"></span> tag earned / discovered from text</div>`;
 }
 
 document.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => {

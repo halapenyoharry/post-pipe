@@ -94,7 +94,7 @@ test('rtz-lookup: concept card explains the name; review queue prints the accept
   assert.match(card, /^AI /);
   assert.match(card, /why this name/);
   assert.match(card, /Journal×3/);
-  assert.match(run('rtz-lookup', [stoneFile, 'zzz']).out, /not in the stone/);
+  assert.match(run('rtz-lookup', [stoneFile, 'zzz']).out, /not in stone\.json/);
   const review = run('rtz-lookup', [stoneFile, '--review']).out;
   assert.match(review, /rtz-override same "Labor" "labour"/);
   assert.match(run('rtz-lookup', [stoneFile, '--merged']).out, /Systems Thinking/);
@@ -198,7 +198,7 @@ test('rtz-stone with an unreadable ledger: one warning, ids as a first build, th
   assert.equal(JSON.parse(fs.readFileSync(good, 'utf8')).builds, 2);
 });
 
-test('rtz-stone with a ledger path that cannot be written: the stone is complete, one warning, exit 0', () => {
+test('rtz-stone with a ledger path that cannot be written: stone.json is complete, one warning, exit 0', () => {
   const blocker = path.join(tmpDir(), 'afile');
   fs.writeFileSync(blocker, 'a regular file where the ledger wants a directory');
   const file = path.join(blocker, 'ledger.json');
@@ -214,7 +214,7 @@ test('rtz-stone with a ledger path that cannot be written: the stone is complete
 });
 
 test('rtz dispatcher: help, unknown command, and error reporting', () => {
-  assert.match(run('rtz', ['help']).out, /a Rosetta stone for tags/);
+  assert.match(run('rtz', ['help']).out, /rosetta-tagz \(rtagz\)/);
   assert.equal(run('rtz', ['frobnicate']).status, 2);
   const bad = run('rtz-stone', ['-q'], { input: '{"type":"item"}\nnot json\n' });
   assert.equal(bad.status, 1);

@@ -4,7 +4,7 @@ import { emerge } from '../lib/emerge.js';
 import { makeConfig } from '../lib/config.js';
 import { loadJSONIfExists } from '../lib/seeds.js';
 
-const usage = `rtz-emerge — give items tags that their TEXT earns (no model, phrase matching against the stone)
+const usage = `rtz-emerge — give items tags that their TEXT earns (no model, phrase matching against stone.json)
 
 usage: rtz-emerge <stone.json> [records.jsonl] [--all] [--config FILE] [-o FILE]
 

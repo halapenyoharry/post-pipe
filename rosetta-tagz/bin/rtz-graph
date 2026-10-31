@@ -8,7 +8,7 @@ const usage = `rtz-graph — universe.json -> {nodes, links} for any force-graph
 usage: rtz-graph <universe.json> --mode ${MODES.join('|')} [--focus LABEL] [--hops N]
                  [--no-relations] [--no-emergent] [--types broader,related,…] [--neighbors N] [-o FILE]
 
-  raw       items + one node per (tag-system, spelling): the duplication before the stone
+  raw       items + one node per (tag-system, spelling): the duplication before rtz-stone
   hyper     items + one node per concept: tags as vertices
   dyadic    items only; each tag becomes the LABEL on an item-to-item edge
   concepts  concepts only, joined by relations

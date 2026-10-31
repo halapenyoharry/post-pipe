@@ -15,7 +15,7 @@ import { itemIdentity } from './signals/anchor.js';
 export const itemKey = (source, id) => `${source}::${id}`;
 
 // Schemes (SKOS concept schemes). Each tag-system is a scheme whose id is its source name; the
-// stone's own discovered phrases are their own scheme, so a spelling only discovery wrote is never
+// discovered phrases rosetta-tagz finds are their own scheme, so a spelling only discovery wrote is never
 // filed as if a human in that system had written it. `site` is the cross-scheme canonical. Both
 // names are provisional; a real system that happens to be named `site` or `discovered` gets
 // ` (system)` appended to its scheme id so the two never collide.

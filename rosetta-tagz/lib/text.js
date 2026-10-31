@@ -1,5 +1,5 @@
 // Text profiling: tokenize item text, build TF-IDF profiles for tags and concepts.
-// Deterministic and offline. This is the "distributional" evidence the stone uses
+// Deterministic and offline. This is the "distributional" evidence rtz-stone uses
 // to say "these two tags are used about the same things" without any model.
 import fs from 'node:fs';
 import { foldDiacritics, stem } from './normalize.js';

@@ -1,5 +1,5 @@
 // Emergent tags: items nobody tagged (or under-tagged) get concept tags because their TEXT
-// contains a concept's labels. Deterministic phrase matching against the stone's vocabulary,
+// contains a concept's labels. Deterministic phrase matching against stone.json's vocabulary,
 // no model. Every emitted tag carries `why` so it can be inspected and argued with.
 //
 // Guards against noise (all learned from running on a real corpus):
@@ -121,7 +121,7 @@ export function emerge(stone, records, cfg = makeConfig()) {
   }
 
   // what each item already carries, from any system or stage but emergence itself: a record that names
-  // a concept the stone knows is taken at its word, otherwise its label is resolved
+  // a concept stone.json knows is taken at its word, otherwise its label is resolved
   const carried = new Map(); // "source::item" -> Set<cid>
   for (const r of records) {
     if (r.type !== 'tag' || (r.origin ?? 'explicit') === 'emergent') continue;
