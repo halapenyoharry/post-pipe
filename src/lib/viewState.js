@@ -83,6 +83,8 @@ function emptyState(corpusId, layoutVersion) {
     readerAids: {},    // reading aids the reader turned on: followAlong, boldStart, font, size
     prefs: {},         // how the page looks: theme, mode, timeOfDay
     nodes: {},      // id -> { x, y, w, h, pinned, t }
+    containers: {}, // id -> 'open' | 'closed' (reader's choice; absent means the site's default)
+    rotation: 0,    // degrees the reader turned the view
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
     // culture's reading order, not a property of time.
@@ -403,12 +405,6 @@ function createViewState(opts = {}) {
       return () => { listeners = listeners.filter((f) => f !== fn); };
     },
 
-    resetLayout() {
-      update((s) => {
-        s.nodes = {};
-      });
-    },
-
     // ── typed helpers ────────────────────────────────────────────────────────
 
     nodeState(id) { return state.nodes[id] || null; },
@@ -476,9 +472,55 @@ function createViewState(opts = {}) {
 
     setLayout(layout) { update((s) => { s.layout = layout; }); },
 
+    // Which containers the reader has opened or closed (id -> 'open' | 'closed').
+    // Anything not listed keeps the site's initial state; opening or closing
+    // enters history, and resetLayout clears it so Undo brings it back.
+    containerState(id) {
+      const c = state.containers || {};
+      if (id === undefined) return { ...c };
+      return c[id] || null;
+    },
+
+    isContainerClosed(id, defaultClosed = false) {
+      const st = (state.containers || {})[id];
+      if (st === 'closed') return true;
+      if (st === 'open') return false;
+      return Boolean(defaultClosed);
+    },
+
+    setContainerOpen(id, open, opts = {}) {
+      this.setContainers(open ? { open: [id] } : { close: [id] }, opts);
+    },
+
+    setContainers({ open = [], close = [] } = {}, { transient = false, silent = false } = {}) {
+      const openIds = Array.isArray(open) ? open.filter((id) => typeof id === 'string' && id) : [];
+      const closeIds = Array.isArray(close) ? close.filter((id) => typeof id === 'string' && id) : [];
+      if (!openIds.length && !closeIds.length) return;
+      const apply = silent ? updateSilent : transient ? updateTransient : update;
+      apply((s) => {
+        if (!s.containers || typeof s.containers !== 'object') s.containers = {};
+        for (const id of openIds) s.containers[id] = 'open';
+        for (const id of closeIds) s.containers[id] = 'closed';
+      });
+    },
+
+    // Degrees the reader turned the view (two-finger rotate); undo, redo and
+    // resetLayout put it back.
+    rotation() {
+      return Number(state.rotation) || 0;
+    },
+
+    setRotation(angle, { transient = false, silent = false } = {}) {
+      const deg = Number(angle) || 0;
+      const apply = silent ? updateSilent : transient ? updateTransient : update;
+      apply((s) => { s.rotation = deg; });
+    },
+
     resetLayout() {
       update((s) => {
         s.nodes = {};
+        s.containers = {};
+        s.rotation = 0;
         s.layout = 'force';
       });
       gestureBase = null;

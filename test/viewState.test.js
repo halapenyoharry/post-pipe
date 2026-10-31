@@ -570,3 +570,67 @@ test('migrated keys survive a reload and prune leaves them alone', async () => {
   const b = mk({ backend, corpusId: 'c' }); await b.ready();
   assert.deepStrictEqual({ x: b.nodeState('force@h::concept:c_ml').x, y: b.nodeState('force@h::concept:c_ml').y }, { x: 10, y: 20 });
 });
+
+test('container open and closed state persists and walks undo and redo', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' }); await a.ready();
+  assert.strictEqual(a.containerState('book-1'), null);
+  assert.strictEqual(a.isContainerClosed('book-1', false), false);
+  assert.strictEqual(a.isContainerClosed('book-2', true), true);
+
+  a.setContainerOpen('book-1', false);
+  assert.strictEqual(a.containerState('book-1'), 'closed');
+  assert.strictEqual(a.isContainerClosed('book-1', false), true);
+
+  a.setContainers({ open: ['book-1', 'book-2'], close: ['book-3'] });
+  assert.deepStrictEqual(a.containerState(), {
+    'book-1': 'open',
+    'book-2': 'open',
+    'book-3': 'closed',
+  });
+
+  a.undo();
+  assert.deepStrictEqual(a.containerState(), { 'book-1': 'closed' });
+  a.undo();
+  assert.deepStrictEqual(a.containerState(), {});
+  a.redo();
+  assert.strictEqual(a.containerState('book-1'), 'closed');
+
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' }); await b.ready();
+  assert.strictEqual(b.containerState('book-1'), 'closed');
+});
+
+test('rotation persists, coalesces a gesture into one undo, and resets with layout', async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' }); await a.ready();
+  assert.strictEqual(a.rotation(), 0);
+
+  for (let deg = 5; deg <= 45; deg += 5) a.setRotation(deg, { transient: true });
+  a.commit();
+  assert.strictEqual(a.rotation(), 45);
+
+  a.setContainerOpen('book-1', false);
+  a.resetLayout();
+  assert.strictEqual(a.rotation(), 0);
+  assert.deepStrictEqual(a.containerState(), {});
+
+  // Undo the reset brings back both rotation and container state.
+  a.undo();
+  assert.strictEqual(a.rotation(), 45);
+  assert.strictEqual(a.containerState('book-1'), 'closed');
+
+  // Undo the container close, then undo the whole rotation gesture in one step.
+  a.undo();
+  assert.deepStrictEqual(a.containerState(), {});
+  assert.strictEqual(a.rotation(), 45);
+  a.undo();
+  assert.strictEqual(a.rotation(), 0);
+  a.redo();
+  assert.strictEqual(a.rotation(), 45);
+
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' }); await b.ready();
+  assert.strictEqual(b.rotation(), 45);
+});
+
