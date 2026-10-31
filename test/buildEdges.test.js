@@ -4,7 +4,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { buildEdges } = require('../src/corpus/buildEdges');
+const { buildEdges, nonTagReferences, referenceEdgeLabel } = require('../src/corpus/buildEdges');
 
 const item = (slug, extra = {}) => ({
   id: `https://example.test/${slug}.html`,
@@ -161,4 +161,68 @@ test('tag edges carry concept, weight, and origin attrs from _references when pr
   ];
   const [edge] = buildEdges(items);
   assert.deepStrictEqual(edge.attrs, { concept: 'c_ai', weight: 1, origin: 'explicit' });
+});
+
+test('non-tag _references emit reference edges with types and weights while keeping item.tags behaviour', () => {
+  const items = [
+    item('a', {
+      tags: ['AI'],
+      _references: [
+        { type: 'tag', value: 'AI' },
+        { type: 'image', value: 'covers/shared.png', weight: 0.75, why: 'shared diagram' },
+        { type: 'person', value: 'Ada Lovelace' },
+        { type: 'cite', value: 'b', weight: 0.9, directed: true },
+      ],
+    }),
+    item('b', {
+      tags: ['History'],
+      _references: [
+        { type: 'image', value: 'covers/shared.png', weight: 0.5 },
+      ],
+    }),
+  ];
+
+  assert.deepStrictEqual(nonTagReferences(items[0]), [
+    { type: 'image', value: 'covers/shared.png', weight: 0.75, why: 'shared diagram' },
+    { type: 'person', value: 'Ada Lovelace', weight: 1 },
+    { type: 'cite', value: 'b', weight: 0.9, directed: true },
+  ]);
+
+  const edges = buildEdges(items);
+  const tagEdges = edges.filter((e) => e.layer === 'tag');
+  assert.strictEqual(tagEdges.length, 2, 'item.tags behaviour preserved for sites without rosetta-tagz');
+  assert.strictEqual(tagEdges[0].target, 'tag:AI');
+  assert.strictEqual(tagEdges[1].target, 'tag:History');
+
+  const refEdges = edges.filter((e) => e.layer === 'reference');
+  assert.strictEqual(refEdges.length, 4);
+
+  const imgEdgeA = refEdges.find((e) => e.source === items[0].id && e.role === 'image');
+  assert.strictEqual(imgEdgeA.target, 'image:covers/shared.png');
+  assert.strictEqual(imgEdgeA.directed, false);
+  assert.deepStrictEqual(imgEdgeA.attrs, {
+    type: 'image',
+    value: 'covers/shared.png',
+    weight: 0.75,
+    why: 'shared diagram',
+  });
+  assert.strictEqual(referenceEdgeLabel(imgEdgeA), 'image (0.75)\nshared diagram');
+
+  const personEdge = refEdges.find((e) => e.role === 'person');
+  assert.strictEqual(personEdge.target, 'person:Ada Lovelace');
+  assert.deepStrictEqual(personEdge.attrs, {
+    type: 'person',
+    value: 'Ada Lovelace',
+    weight: 1,
+  });
+  assert.strictEqual(referenceEdgeLabel(personEdge), 'person');
+
+  const citeEdge = refEdges.find((e) => e.role === 'cite');
+  assert.strictEqual(citeEdge.target, items[1].id, 'reference value matching an item slug resolves to that item id');
+  assert.strictEqual(citeEdge.directed, true);
+  assert.deepStrictEqual(citeEdge.attrs, {
+    type: 'cite',
+    value: 'b',
+    weight: 0.9,
+  });
 });

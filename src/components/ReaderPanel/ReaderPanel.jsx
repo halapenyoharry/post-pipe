@@ -14,6 +14,7 @@ import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
 import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
 import { Contributions } from './Contributions';
+import { nonTagReferences } from '../../corpus/buildEdges';
 
 
 // contributions: what readers brought (settings.contributions), already
@@ -531,6 +532,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const progressMode = progressBarMode(settings);
   const canDownload = allowDownload(settings);
   const rights = rightsLine(settings && settings.rights);
+  const nonTagRefs = nonTagReferences(article);
 
   return (
     <>
@@ -718,6 +720,24 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             )}
           </div>
           <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
+          {nonTagRefs.length > 0 && contentHtml && article._posted !== 'title' && (
+            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--rp-border)' }} data-reader-references>
+              <div style={{ color: 'var(--rp-accent)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>references</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {nonTagRefs.map((r, i) => (
+                  <span
+                    key={`${r.type}:${r.value}:${i}`}
+                    className={styles.fmTag}
+                    data-reference-type={r.type}
+                    data-reference-weight={r.weight}
+                    title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
+                  >
+                    {r.type}: {r.label || r.value}{r.weight !== 1 ? ` (${r.weight})` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {contentHtml && navRow('bottom')}
           {rights && contentHtml && (
             <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
@@ -855,7 +875,11 @@ function renderMetadata(article) {
 }
 
 function FrontmatterPanel({ article, settings }) {
-  const fields = settings?.frontmatter_display || [];
+  const baseFields = settings?.frontmatter_display || [];
+  const nonTagRefs = nonTagReferences(article);
+  const fields = nonTagRefs.length && !baseFields.includes('references')
+    ? [...baseFields, 'references']
+    : baseFields;
   let hasData = false;
 
   const renderField = (field) => {
@@ -873,6 +897,21 @@ function FrontmatterPanel({ article, settings }) {
       case 'tags':
         if (article.tags && article.tags.length) {
           value = <>{article.tags.map(t => <span key={t} className={styles.fmTag}>{t}</span>)}</>;
+        }
+        break;
+      case 'references':
+        if (nonTagRefs.length) {
+          value = <>{nonTagRefs.map((r, i) => (
+            <span
+              key={`${r.type}:${r.value}:${i}`}
+              className={styles.fmTag}
+              data-reference-type={r.type}
+              data-reference-weight={r.weight}
+              title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
+            >
+              {r.type}: {r.label || r.value}{r.weight !== 1 ? ` (${r.weight})` : ''}
+            </span>
+          ))}</>;
         }
         break;
       case 'series':

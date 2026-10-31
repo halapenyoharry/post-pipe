@@ -16,10 +16,41 @@ function slugOf(item) {
   return item.url.split('/').pop().replace('.html', '');
 }
 
+function nonTagReferences(item) {
+  const raw = Array.isArray(item && item._references)
+    ? item._references
+    : (item && item.originalItem && Array.isArray(item.originalItem._references) ? item.originalItem._references : []);
+  const out = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue;
+    const type = typeof r.type === 'string' ? r.type.trim() : '';
+    const value = typeof r.value === 'string' ? r.value.trim() : '';
+    if (!type || type === 'tag' || !value) continue;
+    const weight = typeof r.weight === 'number' && Number.isFinite(r.weight) ? r.weight : 1;
+    const entry = { type, value, weight };
+    if (typeof r.label === 'string' && r.label.trim()) entry.label = r.label.trim();
+    if (typeof r.origin === 'string' && r.origin.trim()) entry.origin = r.origin.trim();
+    if (typeof r.concept === 'string' && r.concept.trim()) entry.concept = r.concept.trim();
+    if (r.why !== undefined && r.why !== null) entry.why = r.why;
+    if (r.wasDerivedFrom !== undefined && r.wasDerivedFrom !== null) entry.wasDerivedFrom = r.wasDerivedFrom;
+    if (r.wasGeneratedBy !== undefined && r.wasGeneratedBy !== null) entry.wasGeneratedBy = r.wasGeneratedBy;
+    if (typeof r.sourceRatio === 'number' && Number.isFinite(r.sourceRatio)) entry.sourceRatio = r.sourceRatio;
+    if (r.directed !== undefined) entry.directed = Boolean(r.directed);
+    if (typeof r.role === 'string' && r.role.trim()) entry.role = r.role.trim();
+    if (typeof r.layer === 'string' && r.layer.trim()) entry.layer = r.layer.trim();
+    out.push(entry);
+  }
+  return out;
+}
+
 function buildEdges(items, options = {}) {
   const edges = [];
   const idBySlug = new Map();
-  for (const item of items) idBySlug.set(slugOf(item), item.id);
+  const itemIds = new Set();
+  for (const item of items) {
+    idBySlug.set(slugOf(item), item.id);
+    if (item && item.id) itemIds.add(item.id);
+  }
 
   // An authored target that has no bundle yet keeps its slug as the id. The
   // consumer materializes it as a bare node, so an edge can point at a piece
@@ -126,6 +157,33 @@ function buildEdges(items, options = {}) {
       });
     }
 
+    // Non-tag references (type: 'image' | 'person' | 'place' | 'date' | ...):
+    // emitted with their reference type and weight so downstream graph and
+    // reader consumers see them as typed edges.
+    for (const ref of nonTagReferences(item)) {
+      const target = idBySlug.has(ref.value)
+        ? idBySlug.get(ref.value)
+        : (itemIds.has(ref.value)
+          ? ref.value
+          : (ref.value.startsWith(`${ref.type}:`) ? ref.value : `${ref.type}:${ref.value}`));
+      const attrs = { type: ref.type, value: ref.value, weight: ref.weight };
+      if (ref.label !== undefined) attrs.label = ref.label;
+      if (ref.origin !== undefined) attrs.origin = ref.origin;
+      if (ref.concept !== undefined) attrs.concept = ref.concept;
+      if (ref.why !== undefined) attrs.why = ref.why;
+      if (ref.wasDerivedFrom !== undefined) attrs.wasDerivedFrom = ref.wasDerivedFrom;
+      if (ref.wasGeneratedBy !== undefined) attrs.wasGeneratedBy = ref.wasGeneratedBy;
+      if (ref.sourceRatio !== undefined) attrs.sourceRatio = ref.sourceRatio;
+      edges.push({
+        source,
+        target,
+        directed: Boolean(ref.directed),
+        role: ref.role || ref.type,
+        layer: ref.layer || 'reference',
+        attrs,
+      });
+    }
+
     if (item.series) {
       if (!seriesMembers.has(item.series)) seriesMembers.set(item.series, []);
       seriesMembers.get(item.series).push(item);
@@ -174,4 +232,20 @@ function mergeSequenceDuplicates(edges) {
   });
 }
 
-module.exports = { buildEdges, slugOf };
+function referenceEdgeLabel(edge) {
+  if (!edge) return '';
+  if (edge.label) return edge.label;
+  if (edge.attrs && edge.attrs.label) return edge.attrs.label;
+  const refType = (edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type)
+    || edge.role
+    || edge.layer
+    || 'reference';
+  const weight = edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight)
+    ? edge.attrs.weight
+    : 1;
+  const wPart = weight !== 1 ? ` (${weight})` : '';
+  const whyPart = edge.attrs && typeof edge.attrs.why === 'string' && edge.attrs.why ? `\n${edge.attrs.why}` : '';
+  return `${refType}${wPart}${whyPart}`;
+}
+
+module.exports = { buildEdges, slugOf, nonTagReferences, referenceEdgeLabel };

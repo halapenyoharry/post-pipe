@@ -36,6 +36,7 @@ import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
 import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
+import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -112,6 +113,7 @@ function feedToGraph(feed, config = {}) {
       date: item.date_published ? item.date_published.split('T')[0] : '',
       reading_time: item.reading_time || '',
       tags: item.tags || [],
+      _references: Array.isArray(item._references) ? item._references : [],
       series: item.series || '',
       series_part: item.series_part ?? null,
       timeline: item.timeline || null,
@@ -164,7 +166,34 @@ function feedToGraph(feed, config = {}) {
   // without them. They are drawn only from a selected tag to its relatives.
   const relations = [];
 
-  for (const edge of (feed.edges || [])) {
+  const allEdges = [...(feed.edges || [])];
+  const seenRefEdge = new Set(
+    allEdges
+      .filter((e) => e && e.layer === 'reference' && e.attrs && e.attrs.type && e.attrs.value)
+      .map((e) => `${e.source}\u0000${e.attrs.type}\u0000${e.attrs.value}`)
+  );
+  for (const item of feed.items) {
+    for (const ref of nonTagReferences(item)) {
+      const key = `${item.id}\u0000${ref.type}\u0000${ref.value}`;
+      if (seenRefEdge.has(key)) continue;
+      seenRefEdge.add(key);
+      const target = articleSlugs.has(ref.value)
+        ? ref.value
+        : (idToSlug.has(ref.value)
+          ? idToSlug.get(ref.value)
+          : (ref.value.startsWith(`${ref.type}:`) ? ref.value : `${ref.type}:${ref.value}`));
+      allEdges.push({
+        source: item.id,
+        target,
+        directed: Boolean(ref.directed),
+        role: ref.role || ref.type,
+        layer: ref.layer || 'reference',
+        attrs: { ...ref },
+      });
+    }
+  }
+
+  for (const edge of allEdges) {
     if (edge.layer === 'containment' || edge.role === 'contains') {
       containmentEdges.push({
         source: edge.source,
@@ -185,7 +214,11 @@ function feedToGraph(feed, config = {}) {
       continue;
     }
 
-    if (!visibleLayers.has(edge.layer)) continue;
+    const refType = edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type !== 'tag' ? edge.attrs.type : null;
+    const isRefEdge = edge.layer === 'reference' || Boolean(refType);
+    const layerVisible = visibleLayers.has(edge.layer)
+      || (isRefEdge && (visibleLayers.has('reference') || (refType && visibleLayers.has(refType)) || visibleLayers.has('tag')));
+    if (!layerVisible) continue;
     const source = resolveEndpoint(edge.source);
     const target = resolveEndpoint(edge.target);
 
@@ -202,6 +235,19 @@ function feedToGraph(feed, config = {}) {
       auxNodes.set(target, node);
     } else if (edge.layer === 'topology' && !auxNodes.has(target)) {
       auxNodes.set(target, { id: target, label: target.slice(9), type: 'topology', size: 30, color: topologyColor });
+    } else if (isRefEdge && !articleSlugs.has(target) && !auxNodes.has(target)) {
+      const prefix = refType ? `${refType}:` : 'reference:';
+      const refLabel = (edge.attrs && edge.attrs.label)
+        || (edge.attrs && edge.attrs.value)
+        || (target.startsWith(prefix) ? target.slice(prefix.length) : target);
+      auxNodes.set(target, {
+        id: target,
+        label: refLabel,
+        type: 'reference',
+        refType: refType || edge.role || 'reference',
+        size: 30,
+        color: topologyColor,
+      });
     } else if (edge.layer === 'authored' && !articleSlugs.has(target) && !auxNodes.has(target)) {
       // A connected_to edge pointing at a piece that hasn't been written yet.
       // Not an error — a placeholder with gravity, per buildEdges.js.
@@ -210,8 +256,15 @@ function feedToGraph(feed, config = {}) {
 
     // What the line says when hovered or tapped: its own label if it has one
     // (a flashback, say), otherwise its role.
-    const label = edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
-    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label };
+    const weight = edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight)
+      ? edge.attrs.weight
+      : 1;
+    const label = isRefEdge
+      ? referenceEdgeLabel(edge)
+      : (edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer);
+    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label, weight };
+    if (refType) link.refType = refType;
+    if (edge.attrs) link.attrs = edge.attrs;
     // A discovered tag's source coherence ratio, for the panel's slider of
     // that name (lib/sourceRatio.js): only a tag edge carries one.
     if (edge.layer === 'tag' && edge.attrs) {

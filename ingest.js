@@ -189,6 +189,7 @@ function buildFromFrontmatterJson(id, fm, files, dir, defaultAuthor = '') {
     reading_time:   fm.meta?.reading_time || null,
     author:         cleanAuthor(fm.meta?.author) || defaultAuthor,
     tags:           fm.tags || [],
+    references:     Array.isArray(fm._references) ? fm._references : (Array.isArray(fm.references) ? fm.references : []),
     series:         fm.series || null,
     series_part:    fm.series_part ?? null,
     timeline:       fm.timeline || null,
@@ -231,6 +232,7 @@ function buildFromQmd(id, yaml, files, dir, defaultAuthor = '') {
     reading_time:   yaml.reading_time || null,
     author:         yaml.author || defaultAuthor,
     tags:           yaml.tags || [],
+    references:     Array.isArray(yaml._references) ? yaml._references : (Array.isArray(yaml.references) ? yaml.references : []),
     series:         yaml.series || null,
     series_part:    yaml.series_part ?? null,
     timeline:       null,
@@ -303,6 +305,8 @@ function withFrontMatter(c, data) {
   if (pick('short_title')) out.short_title = pick('short_title');
   if (blurbFromFrontMatter(data)) out.summary = blurbFromFrontMatter(data);
   if (Array.isArray(data.tags)) out.tags = data.tags;
+  if (Array.isArray(data._references)) out.references = data._references;
+  else if (Array.isArray(data.references)) out.references = data.references;
   if (pick('series')) out.series = pick('series');
   if (data.series_part !== undefined && data.series_part !== null) out.series_part = data.series_part;
   if (Array.isArray(data.connected_to)) out.connected_to = data.connected_to;
