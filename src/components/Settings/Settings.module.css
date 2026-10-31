@@ -179,6 +179,20 @@
   flex: 0 0 auto;
 }
 
+/* A row label that carries the slider's value has a line of its own, so its
+   changing width never moves the slider. */
+.rowLabelLine {
+  flex: 1 0 100%;
+}
+
+/* A count beside a slider, as wide as its largest number, so the slider
+   keeps its width while the count changes. Its width is set inline, in
+   ch: the width of a 0, which in most faces no other digit outgrows. */
+.steadyCount {
+  display: inline-block;
+  text-align: right;
+}
+
 .range {
   flex: 1 1 auto;
   min-width: 80px;

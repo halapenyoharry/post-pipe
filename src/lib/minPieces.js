@@ -1,5 +1,7 @@
 // Pieces per tag: the panel's slider for the fewest pieces a tag node must
-// join to be drawn (the viewState preference 'minTagPieces', null for 1).
+// join to be drawn (the viewState preference 'minTagPieces', null for 1),
+// shown as "Hide tagz on fewer than N cards" with "S of T tagz" beside it
+// (src/components/Settings; cards and tagz are the viewer's words).
 // A tag joining fewer is hidden with its edges, through the graph's own
 // visibility path (applyVisibility in src/components/GraphViewer); the pieces
 // themselves are never hidden by it. At 1, the default, nothing is hidden,

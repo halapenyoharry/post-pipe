@@ -33,7 +33,7 @@ import { labelFor, migrationPairs, schemesOf, SITE_SCHEME } from '../../lib/sche
 import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
-import { isRelationEdge, relativesOf, relationLabel, STRONGEST } from '../../lib/tagNetwork';
+import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -3905,6 +3905,12 @@ export function GraphViewer({
     // Bubble click (tag, topology, or placeholder): highlight only — no
     // rearrangement, no simulation restart.
     let activeTag = null;
+    // The tag chosen, by a tap on its bubble or in the top bar's tag list,
+    // whose relatives are drawn (see Relations below). activeTag is the
+    // bubble showing it: the same tag, unless the depth chosen folds it into
+    // another tag's bubble (_groupedInto), and it follows the tag when the
+    // depth changes.
+    let chosenTag = null;
     let hoveredTag = null;
     function updateTagForms() {
       nodes.select('.tag-forms')
@@ -3926,8 +3932,15 @@ export function GraphViewer({
         event.stopPropagation();
         tapOrDouble(event, () => toggleTagHighlight(d));
       });
-    function toggleTagHighlight(d) {
-      activeTag = activeTag === d.id ? null : d.id;
+    // d: the bubble. chosen: the tag picked in the tag list, which may be
+    // folded into d; a tap on the bubble leaves it out. A tap on the
+    // bubble lit turns it off; a pick turns it off only when it picks the
+    // tag already chosen, and otherwise moves the lines to the tag picked.
+    function toggleTagHighlight(d, { chosen = null } = {}) {
+      const chosenId = chosen ? chosen.id : d.id;
+      const off = activeTag === d.id && (!chosen || chosenTag === chosenId);
+      activeTag = off ? null : d.id;
+      chosenTag = off ? null : chosenId;
       // Each selection starts with the strongest relatives only.
       relationsExpanded = false;
       // The lines to the relatives, then the highlight, which keeps them lit.
@@ -3986,6 +3999,7 @@ export function GraphViewer({
       hideEdgeLabel();
       if (activeTag) {
         activeTag = null;
+        chosenTag = null;
         relationsExpanded = false;
         refreshRelations({ force: true });
         updateTagForms();
@@ -4096,13 +4110,19 @@ export function GraphViewer({
     // relates to it (data.relations: broader, related and the mappings,
     // lib/tagNetwork.js), the strongest five by weight, with +N under the
     // selected bubble when it has more (-N takes them away again). They are
-    // never links: the force never sees them and nothing moves. Only a tag
-    // drawn counts, at either end: not one hidden with its feeds or by the
-    // panel's pieces per tag, nor one collapsed into another at the depth
-    // chosen (_groupedInto). The relatives stay lit while the rest fades, and
-    // tapping one selects it in turn. A line of a broader or a broadMatch
-    // carries an arrowhead landing on the broader tag. What a line is (its
-    // type, weight and why) is said only in the edge label, on hover or tap.
+    // never links: the force never sees them and nothing moves. Only a
+    // bubble drawn counts, at either end: not one hidden with its feeds or by
+    // the panel's pieces per tag. A tag collapsed into another at the depth
+    // chosen (_groupedInto) is drawn by that bubble: a relative folded into
+    // one draws its line to it (one line to a bubble for every relative it
+    // stands for, its label naming each), or none when the panel's folded
+    // choice says so (the preference foldedRelatives, lib/tagNetwork.js); a
+    // selected tag folded into one (picked in the tag list) draws from it;
+    // and two tags in one bubble draw nothing between them. The relatives
+    // stay lit while the rest fades, and tapping one selects it in turn. A
+    // line of a broader or a broadMatch carries an arrowhead landing on the
+    // broader tag's bubble. What a line is (its type, weight and why) is said
+    // only in the edge label, on hover or tap.
     const nodeElById = new Map();
     nodes.each(function (d) { nodeElById.set(d.id, this); });
     const bubbleOf = new Map(tagBubbles.map((e) => [e.d.id, e]));
@@ -4115,9 +4135,24 @@ export function GraphViewer({
       const el = nodeElById.get(id);
       return Boolean(el && el.style.display !== 'none');
     }
+    // The bubble a tag is drawn by: the one it is folded into, or its own.
+    function bubbleIdOf(id) {
+      const n = nodeBySlug.get(id);
+      return n && n._groupedInto ? n._groupedInto : id;
+    }
+    function foldedChosen() {
+      const vs = viewStateRef.current;
+      return foldedChoice(vs && vs.preference ? vs.preference(FOLDED_PREF) : null);
+    }
     function relationNet() {
-      if (!activeTag || !data.relations.length || !tagShown(activeTag)) return null;
-      return relativesOf(data.relations, activeTag, { visible: tagShown, limit: relationsExpanded ? Infinity : STRONGEST });
+      const tag = chosenTag || activeTag;
+      if (!tag || !data.relations.length || !tagShown(bubbleIdOf(tag))) return null;
+      return drawnRelativesOf(data.relations, tag, {
+        visible: tagShown,
+        bubbleOf: bubbleIdOf,
+        folded: foldedChosen(),
+        limit: relationsExpanded ? Infinity : STRONGEST,
+      });
     }
     // How far from a bubble's centre its outline lies in the direction
     // (ux, uy), in graph coordinates; the bubble is drawn upright, turned
@@ -4144,23 +4179,27 @@ export function GraphViewer({
       if (!net || !net.relatives.length) { relationsLayer.style('display', 'none'); return; }
       relationsLayer.style('display', null);
       for (const r of net.relatives) {
-        // A broader or broadMatch is drawn from the narrower tag to the
-        // broader, so its arrowhead lands on the broader one.
-        const fromId = r.broader === activeTag ? r.id : activeTag;
-        const toId = fromId === activeTag ? r.id : activeTag;
+        // A broader or broadMatch is drawn from the narrower tag's bubble to
+        // the broader's, so its arrowhead lands on the broader one. net.from
+        // is the selected tag's bubble, r.id the relative's.
+        const fromId = r.broader === net.from ? r.id : net.from;
+        const toId = fromId === net.from ? r.id : net.from;
         const types = [...new Set(r.relations.map((x) => x.layer))];
         const l = {
           source: nodeBySlug.get(fromId),
           target: nodeBySlug.get(toId),
           layer: 'relation',
           directed: r.broader !== null,
-          label: relationLabel(r.relations),
+          label: relativeLabel(r),
         };
         const line = relationsLayer.append('path')
           .attr('class', ['relation-line', ...types.map((t) => `relation-${t}`)].join(' '))
           .attr('fill', 'none')
           .attr('data-relation', r.id)
           .attr('data-relation-types', types.join(' '))
+          // The relatives a line to a bubble stands for, '|' between them
+          // (a tag's name may hold spaces).
+          .attr('data-relation-folded', r.members ? r.members.map((m) => m.id).join('|') : null)
           .attr('marker-end', l.directed ? 'url(#relation-arrow)' : null);
         const hit = relationHitsLayer.append('path')
           .attr('class', 'relation-hit')
@@ -4242,12 +4281,22 @@ export function GraphViewer({
     // force: build again whatever was drawn (a selection, or +N/-N);
     // paintOnly: only follow the nodes (every frame they move). Otherwise
     // build again only when what should be drawn has changed (a tag hidden
-    // or shown by the panel, a feed, or the depth).
+    // or shown by the panel, a feed, the depth, or the folded choice).
     function refreshRelations({ force = false, paintOnly = false } = {}) {
       if (force || !paintOnly) {
+        // The depth may have folded the chosen tag into another bubble, or
+        // let it out of one: the bubble lit follows it, nothing moves.
+        if (chosenTag && bubbleIdOf(chosenTag) !== activeTag) {
+          activeTag = bubbleIdOf(chosenTag);
+          updateTagForms();
+          announceTag();
+        }
         const net = relationNet();
         const sig = net
-          ? [activeTag, relationsExpanded ? 'all' : 'strongest', net.more, ...net.relatives.map((r) => r.id)].join('\u0000')
+          ? [
+            activeTag, chosenTag, relationsExpanded ? 'all' : 'strongest', net.more,
+            ...net.relatives.map((r) => `${r.id}>${r.broader || ''}${r.members ? `=${r.members.map((m) => m.id).join(',')}` : ''}`),
+          ].join('\u0000')
           : '';
         if (force || sig !== relationSig) {
           relationSig = sig;
@@ -5121,6 +5170,7 @@ export function GraphViewer({
       focusNode(null);
       hideEdgeLabel();
       activeTag = null;
+      chosenTag = null;
       relationsExpanded = false;
       refreshRelations({ force: true });
       hoveredTag = null;
@@ -5169,12 +5219,14 @@ export function GraphViewer({
     const handleSelectTag = (e) => {
       const id = e && e.detail ? e.detail.id : null;
       let d = data.nodes.find((n) => n.type === 'tag' && n.id === id);
+      const chosen = d;
       // A tag collapsed into another at the chosen depth (_groupedInto) is
       // hidden and its links point at the representative: that bubble is
-      // what lights up and is panned to.
+      // what lights up and is panned to, and its own relatives are drawn
+      // from it (see Relations).
       if (d && d._groupedInto) d = data.nodes.find((n) => n.id === d._groupedInto) || d;
       if (!d) return;
-      toggleTagHighlight(d);
+      toggleTagHighlight(d, { chosen });
       if (activeTag !== d.id || !Number.isFinite(d.x) || !Number.isFinite(d.y)) return;
       const p = drawnAt(d);
       const [sx, sy] = toScreen(p.x, p.y);

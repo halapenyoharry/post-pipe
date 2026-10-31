@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styles from './Settings.module.css';
 import { readerFonts } from '../../lib/readerSettings';
 import { TTSSettings } from '../TTS/TTS';
@@ -16,6 +16,7 @@ import { clampTightness } from '../../lib/tightness';
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { PREF as MIN_PIECES_PREF, minPiecesSummary, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
+import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -222,6 +223,12 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
     return () => window.removeEventListener('graph:tag-counts', on);
   }, [W]);
 
+  // Whether the feed relates tags to one another (rosetta-tagz's relation
+  // edges, lib/tagNetwork.js), for the folded choice.
+  const hasRelations = useMemo(() => (
+    Boolean(feedData && Array.isArray(feedData.edges) && feedData.edges.some(isRelationEdge))
+  ), [feedData]);
+
   // Reading choices are attributes on <html>, so the reader pane and every
   // open node read them from one place.
   useEffect(() => {
@@ -305,9 +312,9 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const schemeId = typeof schemePref === 'string' && schemeList.some((s) => s.id === schemePref) ? schemePref : siteSchemeId;
   const depthPref = Number(viewState.preference('broaderDepth'));
   const depth = Number.isFinite(depthPref) ? Math.max(0, Math.min(2, Math.round(depthPref))) : 0;
-  // Pieces per tag (preference minTagPieces, null for 1; lib/minPieces.js):
-  // a tag joining fewer pieces is hidden. Offered while the graph draws tag
-  // nodes and some tag joins more than one piece.
+  // Hide tagz on fewer than N cards (preference minTagPieces, null for 1;
+  // lib/minPieces.js): a tag joining fewer pieces is hidden. Offered while
+  // the graph draws tag nodes and some tag joins more than one piece.
   const tagCounts = W !== 'graph' ? []
     : (graphTagCounts || (hasTagNodes(feedData, S && S.graph) ? [...pieceCountsFromFeed(graphFeed(feedData, topBarConfig(S))).values()] : []));
   const minPieces = minPiecesSummary(tagCounts, viewState.preference(MIN_PIECES_PREF));
@@ -456,8 +463,11 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
         </label>
       )}
       {minPieces.max > 1 && (
-        <label className={styles.choiceRow} data-pref={MIN_PIECES_PREF} title="Tags joining fewer pieces than this are hidden.">
-          <span className={styles.rowLabel}>Pieces per tag</span>
+        // The label carries the value, so it has a line of its own, and the
+        // count beside the slider keeps one width: dragging moves the thumb
+        // and nothing else.
+        <label className={styles.choiceRow} data-pref={MIN_PIECES_PREF} title="Tagz on fewer cards than this are hidden.">
+          <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-min-pieces-label>Hide tagz on fewer than {minPieces.min} cards</span>
           <span className={styles.rangeRow}>
             <span className={styles.rangeEnd} aria-hidden="true">1</span>
             <input
@@ -466,8 +476,8 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
               min="1"
               max={minPieces.max}
               step="1"
-              aria-label={`Pieces per tag, from 1 to ${minPieces.max}`}
-              aria-valuetext={`at least ${minPieces.min}: ${minPieces.shown} of ${minPieces.total} tags`}
+              aria-label={`Hide tagz on fewer than this many cards, from 1 to ${minPieces.max}`}
+              aria-valuetext={`${minPieces.min} cards: ${minPieces.shown} of ${minPieces.total} tagz`}
               value={minPieces.min}
               onChange={(e) => {
                 const v = Math.round(Number(e.target.value));
@@ -477,7 +487,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
             <span className={styles.rangeEnd} aria-hidden="true">{minPieces.max}</span>
           </span>
           <output className={styles.rangeEnd} data-tag-count aria-live="polite">
-            at least {minPieces.min} · {minPieces.shown} of {minPieces.total} tags
+            <span className={styles.steadyCount} style={{ minWidth: `${String(minPieces.total).length}ch` }}>{minPieces.shown}</span> of {minPieces.total} tagz
           </output>
         </label>
       )}
@@ -501,6 +511,22 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           ]}
           value={String(depth)}
           onChange={(v) => viewState.setPreference('broaderDepth', v === '0' ? null : Number(v))}
+        />
+      )}
+      {/* While the depth folds tags into broader ones: a selected tag's line
+          to a relative folded into another bubble goes to that bubble, or is
+          left out (preference foldedRelatives, null for the bubble;
+          lib/tagNetwork.js). */}
+      {schemeList.length > 1 && depth > 0 && hasRelations && (
+        <Choice
+          label="Lines to folded tagz"
+          name={FOLDED_PREF}
+          options={[
+            { id: 'bubble', label: 'to their bubble', title: 'Lines to related tagz folded into broader ones go to the bubble that shows them' },
+            { id: 'omit', label: 'left out', title: 'No lines to related tagz folded into broader ones' },
+          ]}
+          value={foldedChoice(viewState.preference(FOLDED_PREF))}
+          onChange={(v) => viewState.setPreference(FOLDED_PREF, v === 'bubble' ? null : v)}
         />
       )}
     </>),
