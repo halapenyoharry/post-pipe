@@ -4,6 +4,7 @@ import { Icon } from '../Icon/Icon';
 import { Subscribe } from './Subscribe';
 import { sourceStatus } from '../../lib/sourceStatus';
 import { discoverFeedUrl } from '../../lib/feedAutodiscovery';
+import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolders';
 
 /**
  * FeedZ — pill-shaped feed list across a side of the viewport.
@@ -66,7 +67,7 @@ import { discoverFeedUrl } from '../../lib/feedAutodiscovery';
  * the copy's day and age; with no copy, the pill is struck through, its title
  * saying why.
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true, groupByFolder = false }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
@@ -141,19 +142,39 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     </button>
   ) : null);
 
+  const renderSourcePill = (src) => (
+    <FeedPill
+      key={src.id}
+      source={src}
+      hidden={hidden.has(src.id)}
+      onToggle={() => onToggleSource && onToggleSource(src.id)}
+      viewState={viewState}
+      showCount={showCount}
+      staleAge={staleAge}
+    />
+  );
+
+  const handleToggleFolder = (folderPath) => {
+    if (!onToggleSource) return;
+    const { ids } = toggleFolderSources(sources || [], folderPath, hidden);
+    for (const id of ids) onToggleSource(id);
+  };
+
   return (
     <div ref={barRef} className={styles.bar} data-feeds>
-      {(sources || []).map(src => (
-        <FeedPill
-          key={src.id}
-          source={src}
-          hidden={hidden.has(src.id)}
-          onToggle={() => onToggleSource && onToggleSource(src.id)}
-          viewState={viewState}
-          showCount={showCount}
-          staleAge={staleAge}
-        />
-      ))}
+      {groupByFolder ? groupSourcesByFolder(sources || []).map((group) => (
+        <React.Fragment key={group.folder || '__root__'}>
+          {group.folder && (
+            <FolderPill
+              group={group}
+              allHidden={group.sources.length > 0 && group.sources.every((s) => hidden.has(s.id))}
+              onToggle={() => handleToggleFolder(group.folder)}
+              showCount={showCount}
+            />
+          )}
+          {group.sources.map(renderSourcePill)}
+        </React.Fragment>
+      )) : (sources || []).map(renderSourcePill)}
       {buttonOrder.map((k) => {
         if (k === 'resume') return renderResume();
         if (k === 'subscribe') return subscribe ? <Subscribe key="subscribe" config={subscribe} /> : null;
@@ -216,6 +237,23 @@ function fitRow(bar) {
 // failed, its cards from its last good copy) gets a small mark after the
 // count, the copy's age beside it when staleAge is on; a failed feed with no
 // copy is struck through. Either way the pill's title says why.
+function FolderPill({ group, allHidden, onToggle, showCount }) {
+  const action = allHidden ? `Show ${group.folder}` : `Hide ${group.folder}`;
+  return (
+    <button
+      type="button"
+      className={`${styles.pill} ${styles.folderPill} ${allHidden ? styles.hidden : ''}`}
+      data-source-folder={group.folder}
+      onClick={onToggle}
+      title={action}
+    >
+      <span className={styles.folderPrefix} aria-hidden="true">/</span>
+      <span className={styles.title}>{group.folder}</span>
+      {showCount && <span className={styles.count}>{group.itemCount}</span>}
+    </button>
+  );
+}
+
 function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge }) {
   const title = source.title || source.id;
   const status = sourceStatus(source);

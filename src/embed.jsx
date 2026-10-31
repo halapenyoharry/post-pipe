@@ -44,6 +44,7 @@ import { createViewState } from './lib/viewState';
 import { toolbarConfig } from './lib/toolbar';
 import { topBarConfig } from './lib/topBar';
 import { autodiscoverEnabled } from './lib/feedAutodiscovery';
+import { groupByFolderEnabled } from './lib/sourceFolders';
 import './themes/sketchbook.css';
 
 // ── Default settings (mirrors settings.json structure) ───────────────────────
@@ -420,6 +421,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           viewState={viewState}
           showAddButton={features.addFeed}
           autodiscover={autodiscoverEnabled(settings)}
+          groupByFolder={groupByFolderEnabled(settings)}
           showCount={showContainerCount(settings.graph)}
           links={topBarConfig(settings).links}
           subscribe={topBarConfig(settings).subscribe}

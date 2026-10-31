@@ -765,6 +765,7 @@ ${reactJs}
             },
             showAddButton: TOP_BAR.addFeed,
             autodiscover: !(window.SETTINGS && ((window.SETTINGS.topBar && window.SETTINGS.topBar.autodiscover === false) || window.SETTINGS.autodiscover === false)),
+            groupByFolder: !!(window.SETTINGS && ((window.SETTINGS.topBar && window.SETTINGS.topBar.groupByFolder === true) || window.SETTINGS.groupByFolder === true)),
             showSources: TOP_BAR.showSourcePills,
             // A stale feed's pill (its fetch failed, its cards from its last
             // good copy) shows a small mark; topBar.staleAge true adds the

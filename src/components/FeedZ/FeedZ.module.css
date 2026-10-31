@@ -89,6 +89,19 @@
   flex-shrink: 0;
 }
 
+.folderPill {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  border-style: dashed;
+  flex-shrink: 0;
+}
+
+.folderPrefix {
+  opacity: 0.5;
+  font-weight: 600;
+}
+
 /* A page or link with an icon (settings.topBar): the icon at the pill's
    height, its label beside it unless the site leaves it off; an icon alone
    is a round button. */
