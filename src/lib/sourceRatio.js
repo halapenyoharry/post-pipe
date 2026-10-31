@@ -123,10 +123,51 @@ function shownAt(entries, min) {
   return { pairs, hiddenTags, hiddenBubbles };
 }
 
+// The slider's travel is logarithmic: equal stretches of it multiply the
+// ratio by equal factors, so the low ratios worth trying are not squeezed
+// into the first sliver by one hub far above the rest. The value stored and
+// shown stays in tenths; the arrow keys move it a tenth at a time (the
+// panel steps the value, not the travel).
+//
+// How many whole positions the travel has: enough that every tenth of the
+// range has positions of its own, even at the top, where one position spans
+// the most (half a position there stays under a quarter of a tenth).
+function travelLength(range) {
+  const lo = range ? Number(range.lo) : NaN;
+  const hi = range ? Number(range.hi) : NaN;
+  if (!(lo > 0) || !(hi > lo)) return 1;
+  return Math.max(1000, Math.ceil(20 * hi * Math.log(hi / lo)));
+}
+
+// The ratio at a position of the travel (0 to travelLength), in tenths;
+// the two ends are lo and hi exactly.
+function ratioAt(position, range) {
+  const lo = Number(range.lo);
+  const hi = Number(range.hi);
+  const length = travelLength(range);
+  const p = Number(position);
+  if (!(hi > lo) || !Number.isFinite(p) || p <= 0) return lo;
+  if (p >= length) return hi;
+  return Math.max(lo, Math.min(hi, toGrid(lo * Math.pow(hi / lo, p / length))));
+}
+
+// The position of a ratio on the travel: a whole number from 0 to
+// travelLength, the nearest to where the ratio falls.
+function positionOf(ratio, range) {
+  const lo = Number(range.lo);
+  const hi = Number(range.hi);
+  const length = travelLength(range);
+  const r = Number(ratio);
+  if (!(hi > lo) || !Number.isFinite(r) || r <= lo) return 0;
+  if (r >= hi) return length;
+  return Math.round((length * Math.log(r / lo)) / Math.log(hi / lo));
+}
+
 // What the slider shows as its value: tenths, always with the decimal.
 const ratioText = (v) => (v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v).toFixed(1) : '');
 
 module.exports = {
   PREF, DEFAULT_BAR, LOWEST, STEP,
   ratioOf, ratioRange, clampRatio, ratioShows, shownAt, pairKey, ratioText,
+  travelLength, ratioAt, positionOf,
 };

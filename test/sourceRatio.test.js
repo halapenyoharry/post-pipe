@@ -113,3 +113,75 @@ test('the value as the panel shows it: always one decimal', () => {
   assert.strictEqual(ratioText('2.04'), '2.0');
   for (const v of [null, undefined, '', 'x']) assert.strictEqual(ratioText(v), '');
 });
+
+// ── The slider's logarithmic travel ────────────────────────────────────
+
+const { travelLength, ratioAt, positionOf } = require('../src/lib/sourceRatio');
+
+const tenthsOf = ({ lo, hi }) => {
+  const out = [];
+  for (let k = Math.round(lo * 10); k <= Math.round(hi * 10); k++) out.push(k / 10);
+  return out;
+};
+const RANGES = [
+  { has: true, lo: 1, hi: 15, bar: 1.6 },
+  { has: true, lo: 1, hi: 5.7, bar: 1.6 },
+  { has: true, lo: 1.2, hi: 2.5, bar: 1.6 },
+  { has: true, lo: 1, hi: 100, bar: 1.6 },
+];
+
+test('the travel\'s two ends are the range\'s two ends, exactly', () => {
+  for (const range of RANGES) {
+    const n = travelLength(range);
+    assert.ok(Number.isInteger(n) && n >= 1000, `${n} positions`);
+    assert.strictEqual(ratioAt(0, range), range.lo);
+    assert.strictEqual(ratioAt(n, range), range.hi);
+    assert.strictEqual(positionOf(range.lo, range), 0);
+    assert.strictEqual(positionOf(range.hi, range), n);
+    assert.strictEqual(ratioAt(-5, range), range.lo, 'before the start is the start');
+    assert.strictEqual(ratioAt(n + 5, range), range.hi, 'past the end is the end');
+  }
+});
+
+test('every tenth of the range goes to a position and back to itself', () => {
+  for (const range of RANGES) {
+    let last = -1;
+    for (const r of tenthsOf(range)) {
+      const p = positionOf(r, range);
+      assert.ok(Number.isInteger(p), `${r}: a whole position`);
+      assert.ok(p > last, `${r}: further along than the tenth before`);
+      last = p;
+      assert.strictEqual(ratioAt(p, range), r, `${r} -> ${p} -> ${ratioAt(p, range)} on ${range.lo}..${range.hi}`);
+    }
+  }
+});
+
+test('every position lands on a tenth within the range', () => {
+  const range = RANGES[0];
+  const n = travelLength(range);
+  for (let p = 0; p <= n; p += 7) {
+    const r = ratioAt(p, range);
+    assert.ok(r >= range.lo && r <= range.hi);
+    assert.strictEqual(Math.round(r * 10) / 10, r, `${p} -> ${r}`);
+  }
+});
+
+test('the travel is logarithmic: equal stretches multiply the ratio by equal factors', () => {
+  const range = { has: true, lo: 1, hi: 16, bar: 1.6 };
+  const n = travelLength(range);
+  assert.strictEqual(positionOf(4, range), n / 2, 'the geometric middle is the middle');
+  assert.strictEqual(positionOf(2, range), n / 4);
+  assert.strictEqual(positionOf(8, range), (3 * n) / 4);
+  const wide = RANGES[0];
+  const share = (r) => positionOf(r, wide) / travelLength(wide);
+  assert.ok(Math.abs(share(1.6) - Math.log(1.6) / Math.log(15)) < 0.001, `1.6 at ${share(1.6)}`);
+  assert.ok(share(3) > 0.4, `1.0 to 3.0 takes ${share(3)} of the travel, not a sliver`);
+});
+
+test('a range with nothing to travel stays at its one value', () => {
+  const flat = { has: true, lo: 1.6, hi: 1.6, bar: 1.6 };
+  assert.strictEqual(travelLength(flat), 1);
+  assert.strictEqual(ratioAt(0, flat), 1.6);
+  assert.strictEqual(ratioAt(1, flat), 1.6);
+  assert.strictEqual(positionOf(1.6, flat), 0);
+});

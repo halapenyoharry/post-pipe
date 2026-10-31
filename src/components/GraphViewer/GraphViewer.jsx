@@ -312,7 +312,7 @@ function tagEdgeEntries(links, byId) {
 // _dupByGroup, are left out). With view (shownAt's, for the panel's source
 // coherence ratio) only a pair with an attachment showing counts; one
 // showing is enough, whichever of the pair's edges it is.
-function piecesFrom(entries, view = null) {
+function piecesByTag(entries, view = null) {
   const pieces = new Map();
   for (const e of entries) {
     if (e.link._dupByGroup) continue;
@@ -321,12 +321,6 @@ function piecesFrom(entries, view = null) {
     pieces.get(e.bubble).push(e.pieceNode);
   }
   return pieces;
-}
-
-// The article nodes each tag node joins, by the tag's id, read from the
-// drawn edges of layer 'tag'.
-function piecesByTag(svg, byId) {
-  return piecesFrom(tagEdgeEntries(svg.selectAll('.link').data(), byId));
 }
 
 // A tag node's fill: the feed colours of the pieces it joins, blended
@@ -387,7 +381,7 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces, m
   const byId = nodesById(svg);
   const entries = tagEdgeEntries(svg.selectAll('.link').data(), byId);
   const view = minRatio === null || minRatio === undefined ? null : shownAt(entries, minRatio);
-  const pieces = piecesFrom(entries, view);
+  const pieces = piecesByTag(entries, view);
   const hiddenTags = new Set(view ? view.hiddenBubbles : []);
   for (const [tagId, list] of pieces) {
     if (list.length && list.every(isHiddenArticle)) hiddenTags.add(tagId);
@@ -435,7 +429,9 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces, m
 }
 
 // Walk article nodes + links and dim non-matching nodes when a time filter is active.
-function applyTimeFilter(svg, cardsLayer, filteredSet) {
+// A tag's pieces are those it shows on at the panel's source coherence ratio
+// (minRatio, null for none), as applyVisibility counts them.
+function applyTimeFilter(svg, cardsLayer, filteredSet, minRatio = null) {
   if (!filteredSet) {
     cardsLayer.selectAll('.node-card').classed('dimmed', false);
     svg.selectAll('.node').classed('dimmed', false);
@@ -448,7 +444,8 @@ function applyTimeFilter(svg, cardsLayer, filteredSet) {
 
   // A tag node follows its pieces here too: dimmed, as they are, once none
   // of them is in the span.
-  const pieces = piecesByTag(svg, nodesById(svg));
+  const entries = tagEdgeEntries(svg.selectAll('.link').data(), nodesById(svg));
+  const pieces = piecesByTag(entries, minRatio === null || minRatio === undefined ? null : shownAt(entries, minRatio));
   svg.selectAll('.node')
     .classed('dimmed', d => {
       if (d.type === 'article') return !filteredSet.has(d.id);
@@ -661,6 +658,11 @@ export function GraphViewer({
   const zoomScaleRef = useRef(1);
   const currentLodRef = useRef('full');
   const hiddenSourcesRef = useRef(new Set());
+  // The time span's article ids (null for none) and the source coherence
+  // ratio its dimming was last counted at, for applying it again when the
+  // ratio changes.
+  const filteredIdsRef = useRef(null);
+  const timeFilterRatioRef = useRef(null);
 
   // Apply visibility from outside the main simulation effect.
   useEffect(() => {
@@ -711,6 +713,12 @@ export function GraphViewer({
       // the pieces per tag chosen in the panel hides or shows tags.
       if (svgRef.current && cardsLayerRef.current) {
         applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
+        // With a time span set, its dimming of tags follows the ratio too.
+        const ratio = minRatioChosen();
+        if (filteredIdsRef.current && ratio !== timeFilterRatioRef.current) {
+          timeFilterRatioRef.current = ratio;
+          applyTimeFilter(svgRef.current, d3.select(cardsLayerRef.current), filteredIdsRef.current, ratio);
+        }
       }
       if (relationsUpdateRef.current) relationsUpdateRef.current();
     });
@@ -722,10 +730,14 @@ export function GraphViewer({
     if (readersUpdateRef.current) readersUpdateRef.current({ rebuild: true });
   }, [contributions]);
 
-  // Apply time filter dimming
+  // Apply time filter dimming, counting a tag's pieces at the panel's source
+  // coherence ratio; the subscription above applies it again when the ratio
+  // changes while a span is set.
   useEffect(() => {
+    filteredIdsRef.current = filteredArticleIds || null;
     if (!svgRef.current || !cardsLayerRef.current) return;
-    applyTimeFilter(svgRef.current, d3.select(cardsLayerRef.current), filteredArticleIds);
+    timeFilterRatioRef.current = minRatioChosen();
+    applyTimeFilter(svgRef.current, d3.select(cardsLayerRef.current), filteredArticleIds, timeFilterRatioRef.current);
   }, [filteredArticleIds]);
 
   useEffect(() => {

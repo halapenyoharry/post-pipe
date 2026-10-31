@@ -17,7 +17,9 @@ import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { PREF as MIN_PIECES_PREF, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
 import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
-import { PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText } from '../../lib/sourceRatio';
+import {
+  PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText, travelLength, ratioAt, positionOf,
+} from '../../lib/sourceRatio';
 
 /**
  * Settings — the panel that slides out from the right edge. One surface,
@@ -322,6 +324,13 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const tagCounts = W !== 'graph' ? []
     : (graphTagCounts || (hasTagNodes(feedData, S && S.graph) ? [...pieceCountsFromFeed(graphFeed(feedData, topBarConfig(S))).values()] : []));
   const minPieces = minPiecesSummary(tagCounts, viewState.preference(MIN_PIECES_PREF));
+  // Source coherence ratio (preference minSourceRatio; lib/sourceRatio.js):
+  // the value in force, in tenths, and the setter, which stores null at the
+  // build's own bar. The slider's travel is logarithmic (positionOf,
+  // ratioAt); the arrow keys step the value a tenth at a time.
+  const ratioNow = sourceRatios.has ? clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios) : null;
+  const setRatio = (v) => viewState.setPreference(SOURCE_RATIO_PREF, Math.abs(v - sourceRatios.bar) < 1e-9 ? null : v);
+  const RATIO_KEYS = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -499,7 +508,8 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
         // Source coherence ratio (preference minSourceRatio, null for the
         // build's own bar; lib/sourceRatio.js): a discovered tag under it is
         // hidden, as a build at that bar would not have made it. Laid out as
-        // the cards slider above it, its value beside it.
+        // the cards slider above it, its value beside it. The input's value
+        // is a position on a logarithmic travel, its value text the ratio.
         <label
           className={styles.choiceRow}
           data-pref={SOURCE_RATIO_PREF}
@@ -511,21 +521,25 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
             <input
               type="range"
               className={styles.range}
-              min={sourceRatios.lo}
-              max={sourceRatios.hi}
-              step={SOURCE_RATIO_STEP}
+              min="0"
+              max={travelLength(sourceRatios)}
+              step="1"
               aria-label={`Source coherence ratio, from ${ratioText(sourceRatios.lo)} to ${ratioText(sourceRatios.hi)}`}
-              aria-valuetext={ratioText(clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios))}
-              value={clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios)}
-              onChange={(e) => {
-                const v = clampRatio(e.target.value, sourceRatios);
-                viewState.setPreference(SOURCE_RATIO_PREF, Math.abs(v - sourceRatios.bar) < 1e-9 ? null : v);
+              aria-valuetext={ratioText(ratioNow)}
+              data-ratio={ratioText(ratioNow)}
+              value={positionOf(ratioNow, sourceRatios)}
+              onChange={(e) => setRatio(ratioAt(e.target.value, sourceRatios))}
+              onKeyDown={(e) => {
+                const dir = RATIO_KEYS[e.key];
+                if (!dir) return;
+                e.preventDefault();
+                setRatio(clampRatio(ratioNow + dir * SOURCE_RATIO_STEP, sourceRatios));
               }}
             />
             <span className={styles.rangeEnd} aria-hidden="true">{ratioText(sourceRatios.hi)}</span>
           </span>
           <output className={styles.rangeEnd} data-source-ratio aria-live="polite">
-            {ratioText(clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios))}
+            {ratioText(ratioNow)}
           </output>
         </label>
       )}
