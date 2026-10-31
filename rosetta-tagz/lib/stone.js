@@ -95,7 +95,7 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   const cfg = makeConfig(userCfg, overrides.config, { canon: overrides.canon, sourceWeights: overrides.sourceWeights });
   const ignore = new Set((overrides.ignore ?? []).map(normOf));
   const corpus = loadCorpus(records, { ignore });
-  const late = records.some(belowBar);
+  const late = records.some((r) => r.origin === 'discovered' && belowBar(r)); // emergent records never reach a stone
   const atBar = late ? loadCorpus(records.filter((r) => !belowBar(r)), { ignore }) : corpus;
 
   const signals = [...(builtin ? computeSignals(atBar, cfg, { seeds }) : []), ...extraSignals];

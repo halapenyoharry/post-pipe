@@ -24,12 +24,12 @@ export const DISCOVERED_SCHEME = 'discovered';
 export const schemeOfSource = (source) => (source === SITE_SCHEME || source === DISCOVERED_SCHEME ? `${source} (system)` : source);
 export const schemeOf = (record) => ((record.origin ?? 'explicit') === 'discovered' ? DISCOVERED_SCHEME : schemeOfSource(record.source));
 
-// A discovered record under its own build's bar: its measured `sourceRatio` is below the
-// `sourceCoherenceRatio` it was generated with, so only rtz-discover's lower floor admitted it. A
-// viewer shows it when set at or below its ratio; rtz-stone never lets it move anything a build at
-// the bar holds (lib/stone.js).
+// An earned record under its own build's bar: its `sourceRatio` is below the `sourceCoherenceRatio`
+// it was generated with. A discovered one only rtz-discover's lower floor admitted; an emergent one
+// only such records made possible (lib/emerge.js). A viewer shows it when set at or below its ratio;
+// nothing a build at the bar holds is moved by it (lib/stone.js, lib/emerge.js, lib/universe.js).
 export const belowBar = (r) =>
-  (r.origin ?? 'explicit') === 'discovered' &&
+  ['discovered', 'emergent'].includes(r.origin ?? 'explicit') &&
   typeof r.sourceRatio === 'number' &&
   typeof r.wasGeneratedBy?.parameters?.sourceCoherenceRatio === 'number' &&
   r.sourceRatio < r.wasGeneratedBy.parameters.sourceCoherenceRatio;

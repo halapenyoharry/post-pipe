@@ -378,7 +378,7 @@ everything a viewer can hide carries the ratio it must be set at or below to sho
 | where | `sourceRatio` |
 |---|---|
 | discovered record | its measured ratio (absent only when there was nothing to compare with) |
-| emergent record | when every spelling it matched has one: the highest of them |
+| emergent record | when every spelling it matched has one: the highest of them; for a tag only below-bar records made possible, the highest below-bar ratio at which it appears, whatever the concept's other spellings (its parameters then carry `sourceCoherenceRatio`) |
 | `stone.json` variant | when every record of the spelling is a discovered one carrying a ratio: the highest |
 | `stone.json` / `universe.json` concept | when every variant has one: the highest (so a concept only discovery made shows when any of its hubs would) |
 | `universe.json` item tag | when every record behind it carries one: the highest; a tag a human wrote never has one |
@@ -413,9 +413,17 @@ clusters holding at-bar spellings never merge:
 - a below-bar tag on a spelling a human also wrote adds nothing to that spelling's counts;
 - a seed, override relation or pin naming a spelling that exists only below the bar inside a concept
   at the bar is not applied (it was not there at the bar);
-- rtz-emerge leaves below-bar spellings of concepts at the bar out of its phrases and profiles, and a
-  below-bar tag on an item does not stop it earning a concept at the bar there; rtz-universe reads
-  below-bar records last, and they never change a tag the other records made.
+- rtz-emerge decides on the at-bar records exactly as a build at the bar does: their spellings, what
+  their items read like, what each item carries. Then, for each concept with below-bar records, from
+  its highest below-bar ratio down, it decides again with the records at or above that ratio added
+  (a decision about one concept depends only on its own spellings, items and records); a tag that
+  first appears at ratio r carries r, and its `why` ends `only with discovered tags under the 1.6× bar
+  (r)`. Before this rule (2026-10-31), a below-bar hub on a word a human also wrote leaked: on
+  post-pipe's panel site, Harold's "power" on one post and a below-bar hub "power" (1.141) on ten
+  items made those ten items read like the concept, and emergence put "power" on all ten with no
+  ratio, so a viewer at 1.6 showed it on eleven cards where the build at 1.6 has one.
+- rtz-universe reads below-bar records (discovered or emergent) last, and they never change a tag the
+  other records made.
 
 Where a viewer at v differs from a fresh build at v:
 

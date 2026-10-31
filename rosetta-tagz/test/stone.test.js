@@ -670,6 +670,7 @@ const rated = (source, items, label, sourceRatio, bar = BAR) =>
   earned(source, items, label, { sourceRatio, wasGeneratedBy: { activity: 'discover', parameters: { sourceCoherenceRatio: bar, sourceRatio } } });
 const mixed = (records) => records.map((r) => (r.sourceRatio < BAR ? { ...r, wasGeneratedBy: { ...r.wasGeneratedBy, parameters: { ...r.wasGeneratedBy.parameters, sourceCoherenceRatio: 1 } } } : r));
 const shownAt = (bar) => (x) => !(x.sourceRatio < bar);
+const tagsAt = (u, bar) => u.items.map((it) => [it.key, it.tags.filter(shownAt(bar))]);
 // what a viewer set at the bar keeps of a concept: its spellings and links at the bar
 const atBarView = (c, norms) => {
   const x = structuredClone(c);
@@ -755,10 +756,43 @@ test('emergence and the universe hand a viewer set at the bar exactly what a bui
   assert.deepEqual(earnedBelow.filter(shownAt(BAR)), earnedAtBar);
   const u16 = buildUniverse(atBarStone, [...volcanoAtBar, ...earnedAtBar]);
   const u10 = buildUniverse(belowStone, [...volcanoBelow, ...earnedBelow]);
-  const tagsAt = (u, bar) => u.items.map((it) => [it.key, it.tags.filter(shownAt(bar))]);
   assert.deepEqual(tagsAt(u10, BAR), tagsAt(u16, BAR), 'every tag a viewer shows at the bar is the bar\'s tag, origin, why and weight included');
   const w7 = u10.items.find((it) => it.key === 'Wire::w7').tags;
   assert.ok(w7.every((t) => t.sourceRatio === 3), 'an item only emergence reached shows with the concept');
   const human = buildUniverse(buildStone(rec('Desk', { d1: ['Geology'] }), {}), [...rec('Desk', { d1: ['Geology'] }), ...rated('Desk', ['d1'], 'Geology', 2)]);
   assert.ok(!('sourceRatio' in human.items[0].tags[0]), 'a tag a human wrote always shows, whatever discovery also said');
+});
+
+test('a below-bar hub on a word a human also wrote earns nothing a viewer at the bar would see', () => {
+  // A human wrote "power" on one post about attention. Under the bar, discovery finds "power" on four
+  // wire items about the grid; a fifth says "powered" and reads like them. At the bar the post is all
+  // "power" is about, so emergence earns it nowhere; the below-bar hub's items must not change that.
+  const grid = (i) => `grid outage ${i}: the utility restored power to the substation after the storm knocked out transformers`;
+  const wire = { w1: grid(1), w2: grid(2), w3: grid(3), w4: grid(4), w5: 'crews powered the substation again after transformers failed in the outage; the utility thanked the grid crews' };
+  const atBar = [
+    ...rec('Posts', { p1: ['power'] }, { p1: { title: 'The power of attention', text: 'attention shapes what a writer notices and keeps' } }),
+    ...rec('Wire', Object.fromEntries(Object.keys(wire).map((k) => [k, []])), Object.fromEntries(Object.entries(wire).map(([k, text]) => [k, { title: `Grid report ${k}`, text }]))),
+    ...rec('Filler', Object.fromEntries(Object.keys(quietMeta).map((k) => [k, []])), quietMeta),
+  ];
+  const below = [...atBar, ...rated('Wire', ['w1', 'w2', 'w3', 'w4'], 'power', 1.141)];
+  const s16 = buildStone(atBar, {});
+  const s10 = buildStone(below, {});
+  const e16 = emerge(s16, atBar);
+  const e10 = emerge(s10, below);
+  assert.deepEqual(e10.filter(shownAt(BAR)), e16, 'a viewer at the bar shows the bar\'s emergent tags, byte for byte, and nothing else');
+  const extra = e10.filter((t) => t.sourceRatio < BAR);
+  assert.deepEqual(extra.map((t) => t.item), ['w5'], 'what the below-bar hub makes possible: the item that reads like its items');
+  for (const t of extra) {
+    assert.equal(t.concept, 'c_power');
+    assert.equal(t.sourceRatio, 1.141, 'the ratio of the below-bar evidence that made it possible, though a human wrote the word');
+    assert.equal(t.wasGeneratedBy.parameters.sourceCoherenceRatio, BAR);
+    assert.match(t.why, /; only with discovered tags under the 1\.6× bar \(1\.141\)$/);
+  }
+  assert.ok(!e10.some((t) => ['w1', 'w2', 'w3', 'w4'].includes(t.item)), 'an item carrying the below-bar tag is not tagged again');
+  const u16 = buildUniverse(s16, [...atBar, ...e16]);
+  const u10 = buildUniverse(s10, [...below, ...e10]);
+  assert.deepEqual(tagsAt(u10, BAR), tagsAt(u16, BAR));
+  const cards = (u, bar) => u.items.filter((it) => it.tags.some((t) => t.c === 'c_power' && shownAt(bar)(t))).map((it) => it.item ?? it.key);
+  assert.deepEqual(cards(u10, BAR), ['Posts::p1'], 'at the bar "power" is on the one post');
+  assert.deepEqual(cards(u10, 1.1).sort(), ['Posts::p1', 'Wire::w1', 'Wire::w2', 'Wire::w3', 'Wire::w4', 'Wire::w5'], 'at 1.1 the below-bar hub and what it made possible show');
 });

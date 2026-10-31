@@ -18,10 +18,13 @@
 //
 // A tag earned only through spellings a viewer can hide (discovered ones that carry a sourceRatio)
 // carries the ratio a viewer must be set at or below to show it: the highest of the matched
-// spellings'. A spelling that only below-bar evidence wrote (rtz-discover's floor) never earns a
-// concept at the bar anything, never shapes what that concept's items read like, and a below-bar tag
-// on an item never stops emergence from earning a concept at the bar there: so a viewer set at the bar
-// shows exactly what a build at the bar earned.
+// spellings'. Records under their build's bar (rtz-discover's floor, `belowBar` in lib/corpus.js)
+// never change what emergence decides at the bar: it decides on the other records exactly as a build
+// at the bar decides, then finds, concept by concept, what the below-bar records add. For each concept
+// with below-bar records, from its highest below-bar ratio down, it decides again with the records at
+// or above that ratio added; a tag that first appears at ratio r carries r (whatever the concept's
+// other spellings), and `sourceCoherenceRatio` in its parameters says it is under the bar. So a viewer
+// set at the bar shows exactly what a build at the bar earned.
 import { normalizeLabel, looksLikeAcronym, stem, STOP } from './normalize.js';
 import { words, STOPWORDS, buildItemVectors, buildIdf, profileFor } from './text.js';
 import { cosine } from './similarity.js';
@@ -41,20 +44,21 @@ function stemSeq(text) {
   return { ws, seq };
 }
 
-// `skip(norm)` leaves a spelling out of the table. Each entry keeps the ratio a viewer must be set at
-// or below to show what it earns: null (always) when any spelling behind it has no sourceRatio.
-export function buildPhraseTable(stone, skip = () => false) {
+// Each entry keeps the ratio a viewer must be set at or below to show what it earns: null (always)
+// when any spelling behind it has no sourceRatio. `first` holds the first stem of every phrase.
+export function buildPhraseTable(stone) {
   const phrases = new Map(); // "stem stem" -> Map<cid, {norm, single, ratio}>
   const acronyms = new Map(); // "AI" -> {cid, ratio}
+  const first = new Set();
   const both = (x, y) => (x === undefined ? y : x === null || y === null ? null : Math.max(x, y));
   const add = (key, cid, norm, single, ratio) => {
     if (!phrases.has(key)) phrases.set(key, new Map());
     const was = phrases.get(key).get(cid);
     phrases.get(key).set(cid, { norm, single, ratio: both(was?.ratio, ratio) });
+    first.add(key.split(' ')[0]);
   };
   for (const c of stone.concepts) {
-    const labels = new Set(c.variants.map((v) => v.norm).filter((n) => !skip(n)));
-    if (!labels.size) continue;
+    const labels = new Set(c.variants.map((v) => v.norm));
     labels.add(normalizeLabel(c.canonical).norm);
     for (const norm of labels) {
       const info = normalizeLabel(norm);
@@ -69,10 +73,11 @@ export function buildPhraseTable(stone, skip = () => false) {
       add(info.stems.join(' '), c.id, norm, info.stems.length === 1, ratio);
     }
   }
-  return { phrases, acronyms };
+  return { phrases, acronyms, first };
 }
 
-function matchText(text, table) {
+// `seq` is stemSeq(text), passed in when it was read already
+function matchText(text, table, { ws, seq } = stemSeq(text)) {
   const found = new Map(); // cid -> {tf, phrase, single, ratio}; phrase is the first matching span of the item's own words
   const bump = (cid, phrase, single, ratio) => {
     const f = found.get(cid) ?? { tf: 0, phrase, single, ratio };
@@ -80,8 +85,8 @@ function matchText(text, table) {
     f.ratio = f.ratio === null || ratio === null ? null : Math.max(f.ratio, ratio);
     found.set(cid, f);
   };
-  const { ws, seq } = stemSeq(text);
   for (let i = 0; i < seq.length; i++) {
+    if (!table.first.has(seq[i].stem)) continue; // no phrase starts with this word
     for (let n = 1; n <= MAX_PHRASE && i + n <= seq.length; n++) {
       const hit = table.phrases.get(seq.slice(i, i + n).map((s) => s.stem).join(' '));
       if (!hit) continue;
@@ -97,26 +102,49 @@ function matchText(text, table) {
   return found;
 }
 
-export function emerge(stone, records, cfg = makeConfig()) {
-  const E = cfg.emerge;
-  const index = indexStone(stone);
-  const canonical = new Map(stone.concepts.map((c) => [c.id, c.canonical]));
+// What every decision over these items shares: their TF-IDF vectors and the stems of their text.
+function prepare(records) {
   const corpus = loadCorpus(records);
-
-  // a spelling only below-bar records wrote, inside a concept that has spellings at the bar, is left
-  // out of everything that concept earns (a concept made only of below-bar spellings keeps them all)
-  const below = (norm) => corpus.terms.get(norm)?.atBar === 0;
-  const lateOnly = new Set(stone.concepts.filter((c) => c.variants.every((v) => below(v.norm))).map((c) => c.id));
-  const conceptOf = new Map(stone.concepts.flatMap((c) => c.variants.map((v) => [v.norm, c.id])));
-  const skip = (norm) => below(norm) && !lateOnly.has(conceptOf.get(norm));
-  const table = buildPhraseTable(stone, skip);
-
-  // what each concept's tagged items read like, to vet single-word matches
   const vecs = buildItemVectors(corpus.items);
   const idf = buildIdf(vecs);
+  const items = records
+    .filter((r) => r.type === 'item')
+    .map((it) => {
+      const body = `${it.title ?? ''}. ${it.text ?? ''}`;
+      const title = it.title ?? '';
+      return { it, body, title, bodySeq: stemSeq(body), titleSeq: stemSeq(title) };
+    });
+  return { vecs, idf, items };
+}
+
+// The stone as a build holding only some spellings would hand it over: every concept keeps the
+// variants `keep` admits, a concept left with none is gone, and the order is a stone's (by smallest
+// spelling). `only` limits it to some concepts.
+function viewOf(stone, keep, only = null) {
+  const concepts = stone.concepts
+    .filter((c) => !only || only.has(c.id))
+    .map((c) => ({ ...c, variants: c.variants.filter((v) => keep(v.norm)) }))
+    .filter((c) => c.variants.length)
+    .sort((x, y) => (x.variants[0].norm < y.variants[0].norm ? -1 : 1));
+  return { ...stone, concepts };
+}
+
+// One emergence decision over `records` with `stone`'s vocabulary. `only` limits what is earned to
+// some concepts (everything else still resolves what items carry); `level` marks every tag as one
+// only below-bar records at or above `level.ratio` made possible.
+function earn(stone, records, cfg, shared, { only = null, level = null } = {}) {
+  const E = cfg.emerge;
+  const index = indexStone(stone);
+  const earning = only ? { ...stone, concepts: stone.concepts.filter((c) => only.has(c.id)) } : stone;
+  const table = buildPhraseTable(earning);
+  const canonical = new Map(earning.concepts.map((c) => [c.id, c.canonical]));
+  const corpus = loadCorpus(records);
+  const { vecs, idf, items } = shared;
+
+  // what each concept's tagged items read like, to vet single-word matches
   const profile = new Map();
-  for (const c of stone.concepts) {
-    const keys = c.variants.filter((v) => !skip(v.norm)).flatMap((v) => [...(corpus.terms.get(v.norm)?.items ?? [])]);
+  for (const c of earning.concepts) {
+    const keys = c.variants.flatMap((v) => [...(corpus.terms.get(v.norm)?.items ?? [])]);
     if (keys.length) profile.set(c.id, profileFor(entitySet(corpus, keys), vecs, idf));
   }
 
@@ -126,17 +154,13 @@ export function emerge(stone, records, cfg = makeConfig()) {
   for (const r of records) {
     if (r.type !== 'tag' || (r.origin ?? 'explicit') === 'emergent') continue;
     const cid = r.concept && index.concepts.has(r.concept) ? r.concept : resolveLabel(index, r.label)?.concept;
-    if (!cid || (belowBar(r) && !lateOnly.has(cid))) continue;
+    if (!cid) continue;
     const k = `${r.source}::${r.item}`;
     if (!carried.has(k)) carried.set(k, new Set());
     carried.get(k).add(cid);
   }
 
-  const items = records.filter((r) => r.type === 'item');
-  const perItem = items.map((it) => {
-    const body = `${it.title ?? ''}. ${it.text ?? ''}`;
-    return { it, inBody: matchText(body, table), inTitle: matchText(it.title ?? '', table) };
-  });
+  const perItem = items.map(({ it, body, title, bodySeq, titleSeq }) => ({ it, inBody: matchText(body, table, bodySeq), inTitle: matchText(title, table, titleSeq) }));
 
   const df = new Map();
   for (const { inBody } of perItem) for (const cid of inBody.keys()) df.set(cid, (df.get(cid) ?? 0) + 1);
@@ -158,6 +182,7 @@ export function emerge(stone, records, cfg = makeConfig()) {
         weight = Math.min(weight, 0.3 + context); // and never more confident than the context supports
       }
       if (weight < E.minWeight) continue;
+      const ratio = level ? level.ratio : typeof f.ratio === 'number' ? f.ratio : null;
       out.push({
         type: 'tag',
         source: it.source,
@@ -166,16 +191,66 @@ export function emerge(stone, records, cfg = makeConfig()) {
         weight: Number(weight.toFixed(3)),
         origin: 'emergent',
         concept: cid,
-        ...(typeof f.ratio === 'number' ? { sourceRatio: f.ratio } : {}),
-        why: `text mentions "${f.phrase}" ×${f.tf}${inTitle.has(cid) ? ' (in title)' : ''}${context === null ? '' : `; reads like its other items (${context.toFixed(2)})`}`,
+        ...(ratio === null ? {} : { sourceRatio: ratio }),
+        why: `text mentions "${f.phrase}" ×${f.tf}${inTitle.has(cid) ? ' (in title)' : ''}${context === null ? '' : `; reads like its other items (${context.toFixed(2)})`}${level ? `; only with discovered tags under the ${level.bar}× bar (${level.ratio})` : ''}`,
         wasDerivedFrom: [{ type: 'text', phrase: f.phrase, count: f.tf, inTitle: inTitle.has(cid) }],
         wasGeneratedBy: {
           activity: 'emerge',
           // `context` only when it was computed (a lone word); a PROV field is never present with null
-          parameters: { maxDfRatio: E.maxDfRatio, minWeight: E.minWeight, minContext: E.minContext, ...(context === null ? {} : { context: Number(context.toFixed(3)) }) },
+          parameters: {
+            maxDfRatio: E.maxDfRatio,
+            minWeight: E.minWeight,
+            minContext: E.minContext,
+            ...(context === null ? {} : { context: Number(context.toFixed(3)) }),
+            ...(level ? { sourceCoherenceRatio: level.bar } : {}),
+          },
         },
       });
     }
   }
   return out;
+}
+
+export function emerge(stone, records, cfg = makeConfig()) {
+  const under = records.filter((r) => r.origin === 'discovered' && belowBar(r));
+  if (!under.length) return earn(stone, records, cfg, prepare(records));
+
+  // at the bar: the other records and the spellings they wrote, decided as a build at the bar decides
+  const atBarRecords = records.filter((r) => !belowBar(r));
+  const shared = prepare(atBarRecords);
+  const atBarTerms = loadCorpus(atBarRecords).terms;
+  const early = (norm) => atBarTerms.has(norm);
+  const base = earn(viewOf(stone, early), atBarRecords, cfg, shared);
+
+  // what the below-bar records add, concept by concept (a decision about one concept depends only on
+  // its own spellings, items and records), from its highest below-bar ratio down
+  const index = indexStone(stone);
+  const byConcept = new Map(); // cid -> its below-bar records
+  for (const r of under) {
+    const cid = r.concept && index.concepts.has(r.concept) ? r.concept : resolveLabel(index, r.label)?.concept;
+    if (!cid) continue;
+    if (!byConcept.has(cid)) byConcept.set(cid, []);
+    byConcept.get(cid).push(r);
+  }
+  const seen = new Set(base.map((t) => `${t.source}::${t.item}\u0000${t.concept}`));
+  const extra = [];
+  for (const cid of [...byConcept.keys()].sort()) {
+    const own = byConcept.get(cid);
+    for (const ratio of [...new Set(own.map((r) => r.sourceRatio))].sort((x, y) => y - x)) {
+      const taken = own.filter((r) => r.sourceRatio >= ratio);
+      const norms = new Set(taken.map((r) => normalizeLabel(r.label).norm));
+      const level = { ratio, bar: Math.min(...taken.map((r) => r.wasGeneratedBy.parameters.sourceCoherenceRatio)) };
+      const view = viewOf(stone, (n) => early(n) || norms.has(n));
+      for (const t of earn(view, [...atBarRecords, ...taken], cfg, shared, { only: new Set([cid]), level })) {
+        const k = `${t.source}::${t.item}\u0000${t.concept}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        extra.push(t);
+      }
+    }
+  }
+
+  // in emergence's own order: by item, then by concept
+  const order = new Map(shared.items.map(({ it }, i) => [`${it.source}::${it.id}`, i]));
+  return [...base, ...extra].sort((a, b) => order.get(`${a.source}::${a.item}`) - order.get(`${b.source}::${b.item}`) || (a.concept < b.concept ? -1 : a.concept > b.concept ? 1 : 0));
 }
