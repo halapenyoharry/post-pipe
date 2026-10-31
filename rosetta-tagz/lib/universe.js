@@ -6,9 +6,14 @@
 //    that carries the tags of all of them (item.alsoIn lists the other systems; each tag lists `sys`).
 //  - Tags the stone has never seen become singleton "unmapped" concepts instead of being dropped,
 //    so a stale stone degrades gracefully.
+//  - A tag every one of whose records a viewer can hide by ratio (discovered or emergent records that
+//    carry `sourceRatio`) carries the highest of their ratios: shown when the viewer is set at or
+//    below it. A human's tag, or one any record without a ratio supports, has none and always shows.
+//    Records under their build's bar (rtz-discover's floor) come last and never change a tag the
+//    other records made, so a viewer set at the bar shows the tags a build at the bar has.
 import { normalizeLabel, slugify } from './normalize.js';
 import { indexStone, resolveLabel, schemeLabels } from './stone.js';
-import { canonicalItems, schemeOfSource, SITE_SCHEME, DISCOVERED_SCHEME } from './corpus.js';
+import { canonicalItems, schemeOfSource, belowBar, SITE_SCHEME, DISCOVERED_SCHEME } from './corpus.js';
 
 export const UNIVERSE_SCHEMA = 'rosetta-tagz/universe@1';
 
@@ -50,7 +55,8 @@ export function buildUniverse(stone, records) {
 
   const unmapped = new Map();
   const unmappedRows = new Set(); // "cid\0item\0scheme": a label counts once per item per scheme
-  for (const r of records) {
+  const under = records.filter(belowBar);
+  for (const r of under.length ? [...records.filter((x) => !belowBar(x)), ...under] : records) {
     const isTag = r.type === 'tag' || (!r.type && r.label !== undefined && r.item !== undefined);
     if (!isTag) continue;
     ensureSource(r.source);
@@ -82,6 +88,7 @@ export function buildUniverse(stone, records) {
           items: 0,
           sources: {},
           variants: [{ norm: info.norm, label: r.label, forms: {}, formsBySource: {}, count: 0, explicit: 0, bySource: {}, acronym: false, tokens: info.tokens.length }],
+          ratios: [], // the ratio of each record naming it, null for one without (dropped below)
           rank: [{ norm: info.norm, label: r.label, score: 1, parts: { freq: 1, cover: 1, trust: 1, quality: 1 } }],
           links: [],
           n: 0,
@@ -92,6 +99,7 @@ export function buildUniverse(stone, records) {
       }
       // the spelling is evidence in the scheme that wrote it, exactly as the stone files its own
       const v = concepts.get(cid).variants[0];
+      concepts.get(cid).ratios.push(origin === 'discovered' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null);
       v.forms[r.label] = (v.forms[r.label] ?? 0) + 1;
       const written = (v.formsBySource[scheme] ??= {});
       written[r.label] = (written[r.label] ?? 0) + 1;
@@ -103,8 +111,11 @@ export function buildUniverse(stone, records) {
       }
     }
     const item = items.get(key);
-    const entry = item.tags.get(cid) ?? { c: cid, w: 0, origin, raw: [], via, why: r.why, sys: [r.source] };
+    const below = under.length > 0 && belowBar(r);
+    if (below && item.tags.has(cid) && !item.tags.get(cid).below) continue; // made at the bar already
+    const entry = item.tags.get(cid) ?? { c: cid, w: 0, origin, raw: [], via, why: r.why, sys: [r.source], ...(below ? { below: true } : {}) };
     entry.w = Math.max(entry.w, r.weight ?? 1);
+    entry.ratios = [...(entry.ratios ?? []), origin !== 'explicit' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null];
     if (origin === 'explicit') {
       entry.origin = 'explicit';
       entry.via = via;
@@ -141,7 +152,15 @@ export function buildUniverse(stone, records) {
       }
     }
   }
-  for (const c of unmapped.values()) Object.assign(c, schemeLabels(c.variants, c.canonical));
+  for (const c of unmapped.values()) {
+    Object.assign(c, schemeLabels(c.variants, c.canonical));
+    const r = ratioOfAll(c.ratios);
+    delete c.ratios;
+    if (r !== null) {
+      c.sourceRatio = r;
+      c.variants[0].sourceRatio = r;
+    }
+  }
 
   const sources = sourceNames.map((name, i) => {
     const sys = stone.systems[name] ?? {};
@@ -184,6 +203,10 @@ export function buildUniverse(stone, records) {
 // activity has no parameters); an earned tag carries whatever its stage recorded, or nothing. A PROV
 // field is never present with a null value.
 function provenance(t) {
+  const r = t.origin === 'explicit' ? null : ratioOfAll(t.ratios ?? []);
+  delete t.ratios;
+  delete t.below;
+  if (r !== null) t.sourceRatio = r;
   if (t.origin === 'explicit') {
     t.wasDerivedFrom = t.raw.map((r) => ({ type: 'category', scheme: schemeOfSource(r.s), label: r.l }));
     t.wasGeneratedBy = { activity: 'ingest', parameters: {} };
@@ -191,6 +214,11 @@ function provenance(t) {
   }
   if (t.wasDerivedFrom == null) delete t.wasDerivedFrom;
   if (t.wasGeneratedBy == null) delete t.wasGeneratedBy;
+}
+
+// The highest of the ratios, or null when any is null (something always shows it) or there are none.
+function ratioOfAll(ratios) {
+  return ratios.length && ratios.every((x) => typeof x === 'number') ? Math.max(...ratios) : null;
 }
 
 // Collapse items that are the same real-world article in different tag-systems.
@@ -208,11 +236,14 @@ function mergeIdentical(items) {
     if (it.source !== target.source && !target.alsoIn.includes(it.source)) target.alsoIn.push(it.source);
     for (const [cid, entry] of it.tags) {
       const have = target.tags.get(cid);
-      if (!have) {
-        target.tags.set(cid, { ...entry, raw: [...entry.raw], sys: [...entry.sys] });
+      if (!have || (have.below && !entry.below)) {
+        // a tag made at the bar on one copy of the article replaces one only below-bar records made
+        target.tags.set(cid, { ...entry, raw: [...entry.raw], sys: [...entry.sys], ratios: [...(entry.ratios ?? [])] });
         continue;
       }
+      if (entry.below && !have.below) continue;
       have.w = Math.max(have.w, entry.w);
+      have.ratios = [...(have.ratios ?? []), ...(entry.ratios ?? [])];
       if (entry.origin === 'explicit') have.origin = 'explicit';
       have.why ??= entry.why;
       if (!have.wasDerivedFrom && entry.wasDerivedFrom) have.wasDerivedFrom = entry.wasDerivedFrom;

@@ -13,18 +13,19 @@ preserved where it matters, so other programs can add their own.
 - `source` names a **tag-system**. An item belongs to exactly one source; the same article in two
   systems is two records with the same `url` (or the same long title), which the engine unifies.
 - `origin`: `explicit` (a human wrote it), `discovered` (rtz-discover), `emergent` (rtz-emerge; ignored
-  when building a stone). Emergent/discovered tags carry `why`; emergent also carries `concept`.
+  by rtz-stone). Emergent/discovered tags carry `why`; emergent also carries `concept`; either carries
+  `sourceRatio` when a viewer can hide it (see "Trying another bar" below).
 - A tag record without `type` but with `item` and `label` is accepted.
 - Items with no tags are meaningful: they are the orphans discovery and emergence exist for.
 
 ### Discovered tags (`rtz-discover`)
 
 ```json
-{"type":"tag","source":"ProPublica","item":"…","label":"cancer","weight":0.4,"origin":"discovered",
- "why":"recurs in 7 of 102 items, which stay alike without it (0.05, 2.9× the 0.016 that items from the same sources share)",
+{"type":"tag","source":"ProPublica","item":"…","label":"cancer","weight":0.4,"origin":"discovered","sourceRatio":2.964,
+ "why":"recurs in 7 of 102 items, which stay alike without it (0.05, 3.0× the 0.016 that items from the same sources share)",
  "wasDerivedFrom":[{"type":"text","phrase":"cancer","count":1,"inTitle":false}],
- "wasGeneratedBy":{"activity":"discover","parameters":{"minDf":2,"maxDfRatio":0.12,"perItem":3,"sourceCoherenceRatio":1.6,
-   "df":7,"items":7,"coherence":0.046,"sourceBaseline":0.016}}}
+ "wasGeneratedBy":{"activity":"discover","parameters":{"minDf":2,"maxDfRatio":0.12,"perItem":3,"nearCopy":0.35,"nearCopyWords":3,
+   "sourceCoherenceRatio":1.6,"df":7,"items":7,"coherence":0.046,"sourceBaseline":0.016,"sourceRatio":2.964}}}
 ```
 
 A phrase becomes a hub when it is on at least `discover.minDf` items, on no more than `maxDfRatio` of
@@ -48,6 +49,52 @@ saying anything about a topic; measured against the likeness of items from their
 come out at 0.9× to 1.3×, while "cancer", "immune system" and "blood pressure" come out at 2.9× to
 5.5×. `why` states the coherence and that multiple; `items` is the number of items the hub is
 attached to, which is the count `why` gives.
+
+`sourceRatio` is that multiple, coherence / `sourceBaseline` to three decimals, on the record and in
+its parameters, and the bar is applied to that same number (`sourceRatio ≥ sourceCoherenceRatio`), so
+anyone comparing it with another value makes exactly the build's comparison. With nothing to compare
+with (an expected likeness of exactly 0) nothing is measured: the record has no `sourceRatio`, and no
+bar rejects it.
+
+**Near-copies count once.** Two items are near-copies when their TF-IDF cosine reaches `nearCopy`
+(0.35) and still reaches it once their `nearCopyWords` (3) strongest shared words (the largest products
+of the two weights) are taken out of both: one story told twice shares its names, places and details,
+two items about one topic share only the topic's few words. Groups are the connected pairs. When a
+phrase's df, the item count, its coherence and its `sourceBaseline` are measured, each group is one
+item (the first item of the group that holds the phrase stands for it), because two copies of a story
+are not two pieces of evidence. Attachment does not change: the hub lands on every copy, `items` and
+`why` count the items it lands on, and when copies made a difference `why` says so, `recurs in 6 of 102
+items (5 of 101 counting near-copies once)`. `df` is the count with copies once, so `items` can exceed
+it. `nearCopy: 0` turns this off.
+
+Why those numbers, from post-pipe's site corpus of 2026-10-31 (102 items, 5151 pairs) and the test
+corpora. Raw cosine cannot tell a copy from two short items on one topic, and removing one word is not
+enough either:
+
+| pair | cosine | without the strongest shared word | without the 3 strongest |
+|---|---|---|---|
+| two ProPublica articles on one Ruidoso flood (the copies) | 0.680 | 0.582 | 0.489 |
+| "Which Universe" (a title-only post) and an article that says "universe" | 0.545 | 0.000 | 0.000 |
+| two ProPublica stories about Ken Paxton | 0.381 | 0.153 | 0.104 |
+| the next pair by the last column (two election stories) | 0.291 | 0.249 | 0.179 |
+| test corpus: two short volcano items, different stories | 0.743 | 0.654 | 0.195 |
+| synthetic corpus: `j2` and `w1`, one topic in two systems | 0.558 | 0.462 | 0.260 |
+
+The flood pair stays at 0.38 or more with up to ten of its strongest shared words removed; every other
+pair in the three corpora falls to 0.26 or less by three. 0.35 sits between 0.489 and 0.260 (about 1.4× from each). Before
+this, those two articles alone lifted 18 incidental words into hubs (`memory`, `danger`, `onto`,
+`staying`, …) and their relations (`memory` broadMatch `Climate and Environment`).
+
+**Below the bar.** Hubs whose `sourceRatio` is under `sourceCoherenceRatio` but at least
+`sourceRatioFloor` (1.0) are chosen in a second pass, after the first, from the slots the first pass
+left: an item that chose `perItem` hubs at or above the bar chooses none below it; a lower unigram
+inside a chosen bigram is skipped as usual; a lower bigram whose word the first pass chose is not added
+beside it (the first pass would have let the bigram replace the word; here the word keeps its place).
+So a hub below the bar never takes a slot from, or changes, one at or above it. Its records carry
+`sourceRatioFloor` in their parameters (only theirs: that floor admitted nothing else), and their `why`
+says `under the 1.6× bar, admitted by the 1× floor`. A floor at or above `sourceCoherenceRatio`,
+or `null`, adds nothing and leaves the output byte for byte as it is without one. See "Trying another
+bar" below for what this is for.
 
 ## Pair evidence (`pairs.jsonl`, from `rtz-pairs` or any external scorer)
 
@@ -87,10 +134,10 @@ member of a seed alias group (`artificial general intelligence` finds the corpus
 schema, generated, config{mergeThreshold, link, canon, sourceWeights, signals}, stats{…}
 systems{ <source>: {items, tagged, untagged, occurrences, distinctTags, weight, color} }
 concepts[]: {
-  id, canonical, pinned, locked, discovered, items, sources{src:nItems},
+  id, canonical, pinned, locked, discovered, sourceRatio?, items, sources{src:nItems},
   inScheme[],                                                            // every scheme that wrote a spelling, plus `site`
   prefLabel{scheme: label}, altLabel{scheme: [label]},                   // SKOS, per scheme (below)
-  variants[]: {norm, label, forms{raw:n}, formsBySource{scheme:{raw:n}}, count, explicit, bySource{scheme:n}, acronym, tokens},
+  variants[]: {norm, label, forms{raw:n}, formsBySource{scheme:{raw:n}}, count, explicit, bySource{scheme:n}, acronym, tokens, sourceRatio?},
   rank[]:     {norm, label, score, parts{freq,cover,trust,quality}},     // why the winner won, over the ranking pool
   links[]:    {a, b, conf, cooc, signals{name:{score,why}}},             // evidence inside the concept
   ledger?:    {since, event, previousLabel?}                             // only when built with a ledger (below)
@@ -102,6 +149,8 @@ ledger?: {path, minted, reused, retired, splits, merges, events[]} // only when 
 ```
 
 `discovered: true` means no human ever wrote any spelling in the concept (only rtz-discover proposed it).
+`sourceRatio` is on a variant every record of which is a discovered one carrying its ratio (the highest
+of them), and on a concept every variant of which has one (the highest): "Trying another bar" below.
 A concept id is `c_` + the lexicographically smallest member norm when it is first minted, and from
 then on it belongs to the concept, not to the spelling: the ledger (below) hands the same id to the
 cluster that continues it, however its membership shifts. Without a ledger every build mints afresh,
@@ -115,7 +164,7 @@ A concept is one `skos:Concept`; each vocabulary that names it is a `skos:Concep
 | scheme id | what it is | status |
 |---|---|---|
 | a source name (`Journal`, `ProPublica`, …) | that tag-system, exactly as `source` names it | the system's own name |
-| `discovered` | the stone's recurring-phrase scheme: spellings rtz-discover proposed | provisional name |
+| `discovered` | rosetta-tagz's recurring-phrase scheme: spellings rtz-discover proposed | provisional name |
 | `site` | the cross-scheme canonical; its prefLabel is `canonical` | provisional name |
 
 If a real tag-system is literally named `site` or `discovered`, its scheme id is `site (system)` /
@@ -141,11 +190,13 @@ scheme's own evidence; the `site` canonical is one of them (or a `pin`, which is
 wrote any), and `rank[]` lists only the pool. A spelling that only discovery wrote can join a concept
 (as a variant, and as `prefLabel.discovered`) but never outranks a human's spelling. Only a concept
 nobody wrote (`discovered: true`) ranks among its own spellings. The viewer's live re-ranking scores
-the same pool, so it never stars a spelling the stone would not. Within the pool, a variant's `count`
+the same pool, so it never stars a spelling rtz-stone would not. Within the pool, a variant's `count`
 and `bySource` still include its discovered occurrences (and `discovered` counts as one covering
 scheme, trust weight 1 unless `sourceWeights.discovered` says otherwise), so discovery evidence can
 still move the choice *between two human spellings*; whether it should is an open question for the
-site owner, not something the engine has decided.
+site owner, not something the engine has decided. Below-bar spellings (rtz-discover's floor) are
+never in the pool of a concept that has spellings at the bar, and never count in it ("Trying another
+bar", below).
 
 `systems[].distinctTags` counts the terms carried by a system's items from any origin, a discovered
 spelling on a wire item included; it is a per-system coverage number, not a per-scheme one.
@@ -180,8 +231,8 @@ becomes `closeMatch`, a `broader` becomes `broadMatch`, and a `related` becomes 
 `evidence.cosine` reaches `minAdjacent` (co-occurrence and text both agree). Everything SKOS has no
 word for keeps its name with `skos: false`: `adjacent`, `synergy`, `opposes`, a `near` within one
 scheme, a `near` a `notSame` kept apart at merge confidence, and a cross-scheme `related` without text
-support. A reader that speaks SKOS reads the `skos: true` rows and ignores the rest; the stone's own
-viewer draws all of them. The typing is additional naming of relations the evidence already made, never
+support. A reader that speaks SKOS reads the `skos: true` rows and ignores the rest; rosetta-tagz's own
+viewer (rtz-view) draws all of them. The typing is additional naming of relations the evidence already made, never
 a new pair; only lexical `broader` adds pairs. A human's relation (`locked`) keeps the name the human
 wrote; `skos` is true when that name is a SKOS one (so a human's `adjacent` or `synergy` is `skos: false`
 even toward a published vocabulary). It replaces the computed relation on the same pair that says the
@@ -228,8 +279,9 @@ A SKOS concept is a URI, so an id must not move because a spelling arrived or le
 --ledger FILE` (`rtz-build`: `"ledger"` in the config, default `OUTDIR/ledger.json`, `false` for none)
 reads the ledger before the build and rewrites it after, through `FILE.tmp` and a rename. The engine
 owns this file; a human never edits it. The default lands in disposable build output, so a config
-should name a persistent path: post-pipe names `stone.ledger.json` in the site folder; the stone's
-own `local/real.config.json` names `ledger.json` beside itself (`local/` is git-ignored).
+should name a persistent path: post-pipe names `rtagz-ids.json` in the site folder (`stone.ledger.json`
+before 2026-10-31); rosetta-tagz's own `local/real.config.json` names `ledger.json` beside itself
+(`local/` is git-ignored).
 
 ```
 { schema: "rosetta-tagz/ledger@1", created, updated, builds,
@@ -238,7 +290,7 @@ own `local/real.config.json` names `ledger.json` beside itself (`local/` is git-
   events:   [ {type:"split", at, parent, children[]} | {type:"merge", at, parents[], child} | {type:"retire", at, ids[]} ] }
 ```
 
-`events` keeps the 200 most recent. `label` is the canonical the stone chose that build (a spelling
+`events` keeps the 200 most recent. `label` is the canonical rtz-stone chose that build (a spelling
 somebody wrote, or a human's pin), `pin` the first member norm (in member order) a human pinned a
 canonical on; when several members are pinned the others stay members, which already carries their
 continuity. The ledger never holds a label that is not a member norm, the canonical, or a pin.
@@ -275,12 +327,12 @@ An absent ledger is created by the build; an unreadable one (not JSON, or not th
 stderr line, `rtz-stone: ledger unreadable at <path>, ids minted afresh; the file was left as is`,
 the build proceeds as if there were none, and the file is not rewritten. A ledger that cannot be
 written (its directory is a file, a permission) earns one stderr line, `rtz-stone: ledger not written
-at <path>: <reason>`, after the stone itself is written; the stage still exits 0.
+at <path>: <reason>`, after `stone.json` itself is written; the stage still exits 0.
 
 What the build reports: `stone.json.ledger {path, minted, reused, retired, splits, merges, events[]}`
 (copied into `build.json.ledger`; `events` holds this build's split, merge and retire events, the same
 objects the ledger file appends, so the parent and children of a split and the parents of a merge are
-in `build.json` without reading the ledger), and on every stone concept `ledger {since, event, previousLabel?}`, where
+in `build.json` without reading the ledger), and on every concept in `stone.json` `ledger {since, event, previousLabel?}`, where
 `event` is `minted`, `reused`, `split` (either child of a split) or `merged` (a child that absorbed a
 prior), and `previousLabel` is the ledger's stored label when it differs from this build's canonical
 (the viewer uses it to carry a saved position over a rename). The universe copies the note through
@@ -290,23 +342,23 @@ unchanged; a `u_` concept never has one.
 
 ```
 schema, generated, canon, sourceWeights, stats, sources[{name,color,weight,items,tagged}]
-concepts[]   as in the stone (ledger{since,event,previousLabel?} included when the stone has it),
+concepts[]   as in stone.json (ledger{since,event,previousLabel?} included when stone.json has it, sourceRatio?),
              plus n (tagged items), nEmergent (earned/discovered), unmapped?
-relations[]  as in the stone (skos, why, PROV); a relation to an external "<scheme>:<id>" passes through
-forbidden[]  as in the stone
+relations[]  as in stone.json (skos, why, PROV); a relation to an external "<scheme>:<id>" passes through
+forbidden[]  as in stone.json
 items[]: {key, source, alsoIn[], title, excerpt, url, kind, date,
           tags[]: {c: conceptId, w, origin, raw[{l,n,s}], sys[], via, why,
-                   wasDerivedFrom?[], wasGeneratedBy?{activity, parameters}}}      // PROV, when known
+                   wasDerivedFrom?[], wasGeneratedBy?{activity, parameters}, sourceRatio?}}   // PROV, when known
 ```
 
 An item's `tags` combine every tag-system it appears in; `sys` says who contributed each tag and `raw`
-what they actually wrote. Tags the stone has never seen become `unmapped` singleton concepts (`u_…`),
-filed like the stone files its own: an explicit label under the scheme of its system, a discovered
+what they actually wrote. Tags `stone.json` does not hold become `unmapped` singleton concepts (`u_…`),
+filed as rtz-stone files its own: an explicit label under the scheme of its system, a discovered
 label under `discovered` (never under the system of the item it was found on), an emergent label under
-`site` alone (it is a canonical of the stone that earned it, not a word any system wrote). Their
+`site` alone (it is a canonical from the `stone.json` that earned it, not a word any system wrote). Their
 `inScheme`, `prefLabel`, `altLabel` and the variant's `forms`, `formsBySource`, `bySource` and
-`explicit` follow from the records that named them, so a `u_` concept has the same shape as a stone
-concept: `inScheme: ["Posts", "site"]`, `prefLabel` with the label under both, `altLabel` with an
+`explicit` follow from the records that named them, so a `u_` concept has the same shape as a concept
+in `stone.json`: `inScheme: ["Posts", "site"]`, `prefLabel` with the label under both, `altLabel` with an
 empty list per scheme.
 
 Provenance on a tag (PROV terms): an `explicit` tag `wasDerivedFrom` one
@@ -316,6 +368,74 @@ ingested it, so nothing is claimed). An earned tag (`discovered`, `emergent`) ca
 `wasDerivedFrom`/`wasGeneratedBy` its stage wrote on the record, if any: `wasDerivedFrom[0].phrase`
 is a span of the item's own words (lower-cased, as `words()` reads them), never the label whose stems
 matched it. A PROV field is either present with a value or absent; it is never `null`.
+
+## Trying another bar (`sourceRatio`)
+
+A viewer cannot rerun discovery, so rosetta-tagz hands over what it needs to filter at view time:
+build with `discover.sourceRatioFloor` under `sourceCoherenceRatio` (1.0 under 1.6 by default), and
+everything a viewer can hide carries the ratio it must be set at or below to show it:
+
+| where | `sourceRatio` |
+|---|---|
+| discovered record | its measured ratio (absent only when there was nothing to compare with) |
+| emergent record | when every spelling it matched has one: the highest of them |
+| `stone.json` variant | when every record of the spelling is a discovered one carrying a ratio: the highest |
+| `stone.json` / `universe.json` concept | when every variant has one: the highest (so a concept only discovery made shows when any of its hubs would) |
+| `universe.json` item tag | when every record behind it carries one: the highest; a tag a human wrote never has one |
+
+The rule for a viewer set at v: show what has no `sourceRatio` or one ≥ v, and a relation when both
+its concepts show. The build's own bar is `sourceCoherenceRatio` in any discovered record's parameters;
+a viewer set there shows exactly what the build at that bar has, apart from the counts noted at the end. On post-pipe's site corpus of 2026-10-31 a
+build with the floor at 1.0, filtered at 1.6, gave the build at 1.6 line for line: its 212 discovered
+tags, its 141 concepts (once the below-bar spellings and their links are set aside), its 86
+relations, its 18 emergent records and every universe tag; the ledger kept all 141 ids, and a first
+build without a prior ledger minted the same ones. The floor added 45 hubs (259 records on 58 items)
+with ratios from 1.008 to 1.523, each its own concept there.
+
+That holds because rtz-stone layers below-bar evidence instead of mixing it in. A discovered record is
+below its bar when its `sourceRatio` is under the `sourceCoherenceRatio` it was generated with
+(`belowBar` in `lib/corpus.js`). Everything a build at the bar holds is computed from the other records
+alone, exactly as that build computes it: the clustering of their spellings, every canonical, rank and
+scheme label, `items` and `sources`, `systems`, and the relations between those concepts. Then the
+below-bar spellings are attached (`attachLate` in `lib/cluster.js`) by the same rules, except that two
+clusters holding at-bar spellings never merge:
+
+- a below-bar spelling that joins a concept at the bar is listed among its variants, with its
+  `sourceRatio`, and its links follow the concept's own; it never ranks (the ranking pool is taken over
+  the concept's at-bar spellings: the human-written ones when there are any, else its at-bar discovered
+  ones), never becomes a scheme label, adds nothing to `items`, and the id is minted from the at-bar
+  spellings (`mint` in `lib/ledger.js`), so neither the canonical nor the id moves, with or without a
+  ledger (with one, the majority rule keeps the id anyway: the concept still holds every prior member);
+- a below-bar spelling with links to two concepts at the bar joins the first it reaches in confidence
+  order and never bridges them;
+- below-bar spellings with no concept at the bar form concepts of their own, whose relations are
+  computed with everything;
+- a below-bar tag on a spelling a human also wrote adds nothing to that spelling's counts;
+- a seed, override relation or pin naming a spelling that exists only below the bar inside a concept
+  at the bar is not applied (it was not there at the bar);
+- rtz-emerge leaves below-bar spellings of concepts at the bar out of its phrases and profiles, and a
+  below-bar tag on an item does not stop it earning a concept at the bar there; rtz-universe reads
+  below-bar records last, and they never change a tag the other records made.
+
+Where a viewer at v differs from a fresh build at v:
+
+- **v above the build's bar.** A hub's ratio does not depend on the bar, but slots do: an item whose
+  hub is hidden at v would, in a fresh build at v, choose its next candidates, which may be hubs this
+  build never chose (on the corpus above, when counting near-copies once removed 21 hubs, `cannot`
+  (1.71) and `energy drink` (1.94) filled the slots they freed). Clustering, canonicals, relations,
+  and emergence's context and `df` were computed with the hidden hubs present; a fresh build at v
+  computes them without, so a concept can stay merged through a spelling hidden at v, or show under a
+  canonical spelling hidden at v.
+- **v below the build's bar.** A fresh build at v would let a hub between v and the bar compete for
+  every slot, so it might drop a hub this build keeps and choose ones the second pass had no slot for,
+  and would let a lower bigram replace its word. In rtz-stone it would mix the lower spellings in: they
+  could rank (a concept only discovery made could be renamed and re-minted), bridge or block merges
+  between concepts, appear as scheme labels, count in `items`, and shift every relation (on the corpus
+  above, mixing the 1.0 hubs in changed the NPMI and weight of 66 of the 86 relations between the 1.6
+  concepts, added one and dropped two). Emergence would match the lower spellings of concepts at the
+  bar, and seeds, override relations and pins naming them would apply.
+- Counts: `universe.json`'s `n` and `nEmergent` count every tag, hidden or not, and `stats` in both
+  files counts everything; a viewer filtering by ratio should count what it shows.
 
 ## Graph (`rtz-graph`)
 

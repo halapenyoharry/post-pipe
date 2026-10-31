@@ -1,13 +1,14 @@
 # rosetta-tagz
 
-A Rosetta stone for tags. It sits **between** tag-systems, notices that `AI`, `ai`, `A.I.` and
+rosetta-tagz (rtagz for short) sits **between** tag-systems. It notices that `AI`, `ai`, `A.I.` and
 `Artificial Intelligence` are one idea, picks the best name by **explainable weights**, and lets you
 pull any tag up as a small graph to see what it relates to.
 
-> **Isolation notice.** This folder is its own git repository living inside `post-pipe/`. It reads
-> from post-pipe's data and writes only inside `rosetta-tagz/`. It does not import, patch or depend on
-> any post-pipe code, and post-pipe's git ignores it locally. Nothing here needs the other agents
-> working in post-pipe to know it exists. It is built to be lifted out into its own repo.
+> **Where it lives.** rosetta-tagz is a folder of post-pipe's git repository (it moved in on
+> 2026-10-31, its history with it). It is still its own part: its own programs (`bin/`), tests (run
+> them from this folder) and docs (`docs/`), no dependencies, and no imports from post-pipe or into it.
+> post-pipe reaches it only by running its programs; post-pipe's side of that contract is
+> `docs/POST-PIPE-USES-RTAGZ.md` in post-pipe. It writes only where a config's `out` and `ledger` point.
 
 No AI inference by default. No dependencies. No network at runtime (the viewer is one offline HTML file).
 
@@ -23,7 +24,7 @@ No AI inference by default. No dependencies. No network at runtime (the viewer i
       │
       ├─ rtz-emerge                          tags an item's TEXT earns from known concepts
       ▼
-   rtz-universe                              stone + items joined                    → universe.json
+   rtz-universe                              stone.json + items joined               → universe.json
       │
       ├─ rtz-graph   raw | hyper | dyadic | concepts   → {nodes, links} for any renderer
       └─ rtz-view                                      → one standalone 3D HTML file
@@ -36,7 +37,7 @@ Every box is a separate program. They pass JSON Lines over stdin/stdout, so you 
 
 ```bash
 cd ~/Projects/post-pipe/rosetta-tagz
-npm test                                            # 98 tests, ~2 s
+npm test                                            # 158 tests, ~2 s
 bin/rtz build --config examples/synthetic/rtz.config.json
 open out/synthetic/view.html                        # or serve out/ on a local port
 ```
@@ -116,9 +117,11 @@ carries both vocabularies. That is also the strongest alignment evidence there i
   carry the tag. Acronyms only match in capitals.
 - **`rtz-discover`** (opt-in): for tag-systems that share no vocabulary with anything (a news wire with no
   categories), finds phrases that **recur** in ≥ 2 items and are not everywhere, and proposes them as
-  tags (`origin: "discovered"`). They enter the stone as ordinary evidence, so they can fold into other
+  tags (`origin: "discovered"`). They enter rtz-stone as ordinary evidence, so they can fold into other
   systems' vocabularies, and are attached to your tagged items that contain them, bridging the wire to
   your writing. On the real post-pipe feed this took 60 isolated ScienceDaily items to 43 connected ones.
+  Two copies of one story count as one item, and every discovered tag carries its measured
+  `sourceRatio`, so a viewer can try a stricter or looser bar without a rebuild (`docs/FORMATS.md`).
   Quality is decent, not perfect: leftovers like `think` appear dashed, low-weight, with a visible reason.
   Edit `seed/generic-words.txt` (plain data) to teach it more words that are never topics.
 
@@ -126,7 +129,7 @@ carries both vocabularies. That is also the strongest alignment evidence there i
 
 `rtz-view` writes **one HTML file** containing the 3D library, the scoring code and your data. No server.
 
-- **Raw**: every tag as each tag-system wrote it (the duplication the stone removes)
+- **Raw**: every tag as each tag-system wrote it (the duplication rtz-stone removes)
 - **Hyper**: items + one node per concept; tags are vertices. Gold = merged several spellings, purple = discovered
 - **Dyadic**: tags are not nodes; each is the **label on an edge** between two items (hover an edge)
 - **Concepts**: vocabulary only, joined by relations
@@ -139,13 +142,15 @@ Browsers block `file://` in some embedded panes; any static server on loopback w
 
 ## Using it from somewhere else (post-pipe, exoskeleton)
 
+post-pipe runs the programs and reads their files; it imports nothing from `lib/`.
+
 - **Data**: `universe.json` (documented in `docs/FORMATS.md`) is the whole model in one file; `rtz-graph` emits
   `{nodes, links}` for any force-graph renderer (the viewer uses `3d-force-graph`; exoskeleton already has it).
 - **Code**: everything in `lib/` is plain ES modules. `lib/canon.js` and `lib/graph.js` import nothing and run
   in the browser unchanged. `buildStone(records, opts)` and `resolveLabel(indexStone(stone), "any spelling")`
   are the two calls most hosts need.
 - **Translation at runtime**: `rtz-translate stone.json < tags.jsonl` rewrites tag records and flags the
-  unmapped, so new data degrades gracefully against an older stone.
+  unmapped, so new data degrades gracefully against an older `stone.json`.
 
 ## Plugging in a model (optional)
 

@@ -53,7 +53,9 @@ export function writeLedger(file, ledger) {
   fs.renameSync(tmp, file);
 }
 
-// clusters: [{ terms: [norm…] (sorted, the smallest first), label }] in deterministic order.
+// clusters: [{ terms: [norm…] (sorted, the smallest first), label, mint? }] in deterministic order;
+//           `mint` (sorted) is what a fresh id is made from when it is not `terms`: the spellings a
+//           build at the bar holds, so a below-bar spelling joining a concept never renames it.
 // prior:    the ledger read from disk, or null/absent (then every cluster mints, by today's rule).
 // pins:     the norms a human pinned a canonical on (iterable); strong continuity evidence.
 //
@@ -71,8 +73,9 @@ export function writeLedger(file, ledger) {
 //  (c) a prior named by several clusters is a split: its id goes to the child with the largest
 //      overlap, ties to the child that named it by pin, then the child holding the prior's label
 //      norm, then the smaller smallest member; the other children mint with `parent`;
-//  (d) no candidate: mint `c_<slugify(C[0])>`, `_2`, `_3`… while the id is live, retired or taken
-//      this build; live priors that overlap C without continuing anywhere are absorbed (a merge);
+//  (d) no candidate: mint `c_<slugify(C[0])>` (the first of `mint` when given), `_2`, `_3`… while
+//      the id is live, retired or taken this build; live priors that overlap C without continuing
+//      anywhere are absorbed (a merge);
 //  (e) live priors no cluster touched are retired.
 export function assignIds(clusters, prior, { pins = [], now = null } = {}) {
   const base = isLedger(prior) ? prior : emptyLedger(now);
@@ -183,7 +186,7 @@ export function assignIds(clusters, prior, { pins = [], now = null } = {}) {
   }
   for (let i = 0; i < clusters.length; i++) {
     if (ids[i]) continue;
-    const stem = `c_${slugify(clusters[i].terms[0])}`;
+    const stem = `c_${slugify((clusters[i].mint ?? clusters[i].terms)[0])}`;
     let id = stem;
     for (let k = 2; taken.has(id); k++) id = `${stem}_${k}`;
     taken.add(id);

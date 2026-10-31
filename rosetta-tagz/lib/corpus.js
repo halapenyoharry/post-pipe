@@ -24,6 +24,16 @@ export const DISCOVERED_SCHEME = 'discovered';
 export const schemeOfSource = (source) => (source === SITE_SCHEME || source === DISCOVERED_SCHEME ? `${source} (system)` : source);
 export const schemeOf = (record) => ((record.origin ?? 'explicit') === 'discovered' ? DISCOVERED_SCHEME : schemeOfSource(record.source));
 
+// A discovered record under its own build's bar: its measured `sourceRatio` is below the
+// `sourceCoherenceRatio` it was generated with, so only rtz-discover's lower floor admitted it. A
+// viewer shows it when set at or below its ratio; rtz-stone never lets it move anything a build at
+// the bar holds (lib/stone.js).
+export const belowBar = (r) =>
+  (r.origin ?? 'explicit') === 'discovered' &&
+  typeof r.sourceRatio === 'number' &&
+  typeof r.wasGeneratedBy?.parameters?.sourceCoherenceRatio === 'number' &&
+  r.sourceRatio < r.wasGeneratedBy.parameters.sourceCoherenceRatio;
+
 // The same article listed in two tag-systems (same URL, or same long title) is ONE thing.
 // Returns Map<itemKey, representativeItemKey>; the representative is the member with the most text.
 export function canonicalItems(items) {
@@ -105,9 +115,15 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
         items: new Set(),
         itemsBySource: new Map(),
         acronymLike: false,
+        ratio: null, // the highest sourceRatio its discovered records carry
+        unrated: false, // a record that a viewer cannot filter by ratio (human, emergent, or discovered without one)
+        atBar: 0, // records that are not under their build's bar
       };
       terms.set(info.norm, t);
     }
+    if (origin === 'discovered' && typeof r.sourceRatio === 'number') t.ratio = Math.max(t.ratio ?? -Infinity, r.sourceRatio);
+    else t.unrated = true;
+    if (!belowBar(r)) t.atBar += 1;
     // forms, counts and item sets are filed by SCHEME: a discovered spelling goes under
     // `discovered`, never under the system of the item it was found on
     const scheme = schemeOf(r);
@@ -148,6 +164,10 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
 
   return { items, sources, terms, canonItem: canonicalItems(items) };
 }
+
+// The ratio a viewer must be set at or below to show this term: the highest of its discovered
+// records' `sourceRatio`, when every record it has carries one; null when something always shows it.
+export const ratioOf = (term) => (term.unrated || term.ratio === null ? null : term.ratio);
 
 // Best display form of a term, always a spelling somebody wrote. An acronym shows as its most
 // written acronym spelling, a tie going to plain capitals ("AI" over "A.I."; "A.I." stays "A.I."

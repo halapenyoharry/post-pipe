@@ -1,6 +1,6 @@
 // Discovery: propose NEW tags from phrases that recur in the corpus, so that items in a tag-system
 // that shares no vocabulary with the others (a news wire with no categories) still get connected.
-// `emerge` can only name concepts the stone already knows; this finds topics it does not.
+// `emerge` can only name concepts stone.json already holds; this finds topics it does not.
 //
 // A phrase becomes a hub only if it is
 //   recurring    in at least two distinct items (otherwise it connects nothing)
@@ -14,6 +14,15 @@
 //                likeness is measured for the same mix of sources: for each pair of the phrase's
 //                items, the mean cosine between items of those two sources that do not both hold
 //                the phrase, averaged over the same item pairs the coherence is taken over.
+//                Its measured multiple, `sourceRatio` (coherence / that expected likeness), is on every
+//                record, so a viewer can try another bar than `sourceCoherenceRatio` without a rebuild.
+// Near-copies count once. Two items that stay alike even without the few words they share most (the
+// same story in two articles, not two articles on one topic) are not two pieces of evidence: when a
+// phrase's df, the item count and the coherence and source likeness are measured, each group of
+// near-copies is one item. The hub is still attached to every copy, and `why` still counts the items
+// it lands on.
+// Below the bar, down to `sourceRatioFloor`, hubs are chosen in a second pass after the first, from
+// the slots the first pass left, so they never take a slot from (or change) a hub at or above it.
 // Selected hubs are attached to every item containing them, tagged items included, so the wire
 // bridges into your own vocabulary. The per-item cap governs which hubs are chosen, never where a
 // chosen hub lands: a hub justified by n items is asserted on those n items, and its `why` says n.
@@ -45,6 +54,55 @@ function samplePairs(as, bs, cap) {
     if (a !== b) out.push([a, b]);
   }
   return out;
+}
+
+// How alike two unit vectors stay once the k shared words that carry most of their likeness (the
+// largest products a_t·b_t) are taken out of both: (d - Σ a_t b_t) / sqrt((1 - Σ a_t²)(1 - Σ b_t²)).
+// Two items about one topic share its few words and fall to nothing; a copy of a story shares its
+// names, places and details as well, and stays alike.
+function likenessBeyond(A, B, d, k) {
+  const shared = [];
+  const [small, big] = A.size <= B.size ? [A, B] : [B, A];
+  for (const [t, x] of small) {
+    const y = big.get(t);
+    if (y !== undefined) shared.push([t, x, y]);
+  }
+  shared.sort((p, q) => q[1] * q[2] - p[1] * p[2] || (p[0] < q[0] ? -1 : 1));
+  let num = d;
+  let ra = 1;
+  let rb = 1;
+  for (const [, x, y] of shared.slice(0, k)) {
+    num -= x * y;
+    ra -= x * x;
+    rb -= y * y;
+  }
+  const den = Math.sqrt(Math.max(0, ra) * Math.max(0, rb));
+  return den > 1e-9 ? num / den : 0;
+}
+
+// near-copy groups among the representative items (sorted by key): item key -> the group's first
+// key. A pair whose cosine reaches `threshold` and still reaches it without its `words` strongest
+// shared words is one story told twice; groups are the connected pairs. A falsy threshold turns it off.
+function nearCopies(reps, vec, threshold, words) {
+  const head = new Map(reps.map((it) => [it.key, it.key]));
+  if (!threshold) return head;
+  const find = (k) => {
+    while (head.get(k) !== k) k = head.get(k);
+    return k;
+  };
+  for (let i = 0; i < reps.length; i++) {
+    const A = vec.get(reps[i].key);
+    for (let j = i + 1; j < reps.length; j++) {
+      const B = vec.get(reps[j].key);
+      const d = dot(A, B);
+      if (d < threshold || likenessBeyond(A, B, d, words) < threshold) continue;
+      const x = find(reps[i].key);
+      const y = find(reps[j].key);
+      if (x !== y) head.set(x < y ? y : x, x < y ? x : y);
+    }
+  }
+  for (const it of reps) head.set(it.key, find(it.key));
+  return head;
 }
 
 // contiguous unigram/bigram candidates, never spanning punctuation
@@ -80,11 +138,12 @@ function withoutPhrase(tf, idf, drop) {
   return normalize(v);
 }
 
-export function discover(records, cfg = makeConfig()) {
+// `info`, when given, is filled with what the run measured beside the records: { nearCopies: [[item
+// keys] per group of two or more] }.
+export function discover(records, cfg = makeConfig(), info = null) {
   const D = cfg.discover;
   const corpus = loadCorpus(records);
   const reps = [...corpus.items.values()].filter((it) => (corpus.canonItem.get(it.key) ?? it.key) === it.key).sort((a, b) => (a.key < b.key ? -1 : 1));
-  const N = reps.length || 1;
   const perItem = new Map(reps.map((it) => [it.key, candidates(it)]));
   const vecs = buildItemVectors(corpus.items);
   const idf = buildIdf(vecs);
@@ -92,29 +151,49 @@ export function discover(records, cfg = makeConfig()) {
   const tagged = new Set();
   for (const t of corpus.terms.values()) for (const k of entitySet(corpus, t.items)) tagged.add(k);
 
-  const df = new Map();
-  const containing = new Map(); // stemKey -> item keys
+  const full = new Map(reps.map((it) => [it.key, withoutPhrase(vecs.get(it.key), idf, new Set())]));
+  const sim = (a, b) => dot(full.get(a), full.get(b));
+
+  // near-copies count as one item: `units` holds each group's first item, and N counts groups
+  const groupOf = nearCopies(reps, full, D.nearCopy, D.nearCopyWords);
+  const units = reps.filter((it) => groupOf.get(it.key) === it.key);
+  const N = units.length || 1;
+  if (info) {
+    const groups = new Map();
+    for (const it of reps) {
+      const g = groupOf.get(it.key);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(it.key);
+    }
+    info.nearCopies = [...groups.values()].filter((g) => g.length > 1);
+  }
+  const distinctItems = (keys) => new Set(keys.map((k) => groupOf.get(k))).size;
+
+  const containing = new Map(); // stemKey -> item keys, in item order
   const surface = new Map();
   for (const it of reps) {
     for (const [key, f] of perItem.get(it.key)) {
-      df.set(key, (df.get(key) ?? 0) + 1);
       if (!containing.has(key)) containing.set(key, []);
       containing.get(key).push(it.key);
       if (!surface.has(key)) surface.set(key, new Map());
       surface.get(key).set(f.surface, (surface.get(key).get(f.surface) ?? 0) + f.tf);
     }
   }
+  // the items a phrase is measured on: the first of each near-copy group that holds it, in item order
+  const distinct = new Map();
+  for (const [key, keys] of containing) {
+    const seen = new Set();
+    distinct.set(key, keys.filter((k) => !seen.has(groupOf.get(k)) && seen.add(groupOf.get(k))));
+  }
+  const df = new Map([...distinct].map(([key, keys]) => [key, keys.length]));
   const label = (key) => [...surface.get(key).entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
-
-  const full = new Map(reps.map((it) => [it.key, withoutPhrase(vecs.get(it.key), idf, new Set())]));
-  const sim = (a, b) => dot(full.get(a), full.get(b));
 
   // baseline: how alike two unrelated items are in this corpus (deterministic sample of pairs)
   let base = 0;
   let pairs = 0;
   for (let i = 0; i < Math.min(N, BASELINE_PAIRS); i++) {
-    const a = reps[i % N];
-    const b = reps[(i * 7 + 3) % N];
+    const a = units[i % N];
+    const b = units[(i * 7 + 3) % N];
     if (a.key === b.key) continue;
     base += sim(a.key, b.key);
     pairs += 1;
@@ -125,7 +204,7 @@ export function discover(records, cfg = makeConfig()) {
   // the same, per pair of sources: a fixed sample of item pairs, one from each source, with their likeness
   const sourceOf = new Map(reps.map((it) => [it.key, it.source]));
   const bySource = new Map();
-  for (const it of reps) {
+  for (const it of units) {
     if (!bySource.has(it.source)) bySource.set(it.source, []);
     bySource.get(it.source).push(it.key);
   }
@@ -135,20 +214,21 @@ export function discover(records, cfg = makeConfig()) {
     const k = blockKey(s, t);
     if (!blocks.has(k)) {
       const [lo, hi] = s < t ? [s, t] : [t, s];
-      blocks.set(k, samplePairs(bySource.get(lo), bySource.get(hi), BASELINE_PAIRS).map(([a, b]) => [a, b, sim(a, b)]));
+      blocks.set(k, samplePairs(bySource.get(lo) ?? [], bySource.get(hi) ?? [], BASELINE_PAIRS).map(([a, b]) => [a, b, sim(a, b)]));
     }
     return blocks.get(k);
   };
 
-  // the items coherence is measured over (the first 25 containing the phrase, in item order)
-  const sample = (key) => containing.get(key).slice(0, 25);
+  // the items coherence is measured over (the first 25 containing the phrase, in item order, one per
+  // near-copy group)
+  const sample = (key) => distinct.get(key).slice(0, 25);
 
   // what coherence the phrase's items would have from their sources alone: the mean, over the same
   // item pairs, of how alike items of those two sources are when they do NOT share the phrase (its
   // own pairs are what is being tested, so they are left out of the comparison). A pair of sources
   // with no such pair to compare with falls back to the corpus-wide baseline.
   const expected = (key) => {
-    const carriers = new Set(containing.get(key));
+    const carriers = new Set(containing.get(key).map((k) => groupOf.get(k)));
     const memo = new Map();
     const pairBase = (s, t) => {
       const k = blockKey(s, t);
@@ -186,19 +266,27 @@ export function discover(records, cfg = makeConfig()) {
     return n ? sum / n : 0;
   };
 
-  const usable = new Map(); // stemKey -> coherence
-  const sourceBaseline = new Map(); // stemKey -> the coherence its items' sources alone would give
+  // `sourceRatio` is the measured multiple, to three decimals, and the bar is applied to that same
+  // number, so a viewer comparing it with another value makes exactly the build's comparison. With no
+  // source likeness to compare with (0), nothing is measured and the bar cannot reject the phrase.
+  const floor = typeof D.sourceRatioFloor === 'number' && D.sourceRatioFloor < D.sourceCoherenceRatio ? D.sourceRatioFloor : null;
+  const usable = new Map(); // stemKey -> coherence, at or above sourceCoherenceRatio
+  const under = new Map(); // stemKey -> coherence, below it but at or above the floor
+  const measure = new Map(); // stemKey -> { baseline, ratio }
   for (const [key, d] of df) {
     if (d < D.minDf || d / N > D.maxDfRatio) continue;
     const c = coherent(key);
     if (c < threshold) continue;
     const e = expected(key);
-    if (c < D.sourceCoherenceRatio * e) continue;
-    usable.set(key, c);
-    sourceBaseline.set(key, e);
+    const ratio = e > 0 ? Number((c / e).toFixed(3)) : null;
+    if (ratio === null || ratio >= D.sourceCoherenceRatio) usable.set(key, c);
+    else if (floor !== null && ratio >= floor) under.set(key, c);
+    else continue;
+    measure.set(key, { baseline: e, ratio });
   }
+  const coherenceOf = (key) => usable.get(key) ?? under.get(key);
 
-  const score = (key, f) => (1 + Math.log(f.tf)) * Math.log(N / df.get(key)) * (key.includes(' ') ? D.bigramBoost : 1) * (1 + usable.get(key));
+  const score = (key, f) => (1 + Math.log(f.tf)) * Math.log(N / df.get(key)) * (key.includes(' ') ? D.bigramBoost : 1) * (1 + coherenceOf(key));
 
   // hubs are chosen from the orphans' point of view...
   const hubs = new Set();
@@ -216,17 +304,51 @@ export function discover(records, cfg = makeConfig()) {
     }
     return chosen;
   };
-  const ranked = (it, only) =>
+  const ranked = (it, pool) =>
     [...perItem.get(it.key).entries()]
-      .filter(([key]) => usable.has(key) && (!only || only.has(key)))
+      .filter(([key]) => pool.has(key))
       .map(([key, f]) => ({ key, tf: f.tf, score: score(key, f) }))
       .sort((a, b) => b.score - a.score || (a.key < b.key ? -1 : 1));
+  const chooses = (it) => !tagged.has(it.key) || D.taggedToo;
 
-  for (const it of reps) if (!tagged.has(it.key) || D.taggedToo) for (const c of pick(ranked(it), D.perItem)) hubs.add(c.key);
+  const first = new Map(); // item key -> the hubs it chose at or above the bar
+  for (const it of reps) {
+    if (!chooses(it)) continue;
+    const chosen = pick(ranked(it, usable), D.perItem);
+    first.set(it.key, chosen);
+    for (const c of chosen) hubs.add(c.key);
+  }
+
+  // ...then, below the bar, a second pass fills only the slots each item left open. The first pass's
+  // picks stay as they are: a lower unigram inside a chosen bigram is skipped as usual, and a lower
+  // bigram whose word the first pass already chose is not added beside it (the first pass would have
+  // let the bigram replace the word; here the word keeps its place).
+  const lower = new Set();
+  if (under.size) {
+    for (const it of reps) {
+      if (!chooses(it)) continue;
+      const kept = first.get(it.key);
+      const chosen = [];
+      for (const c of ranked(it, under)) {
+        if (kept.length + chosen.length >= D.perItem) break;
+        const parts = c.key.split(' ');
+        const all = [...kept, ...chosen];
+        if (parts.length === 1 && all.some((p) => p.key.split(' ').includes(c.key) && df.get(p.key) >= 0.6 * df.get(c.key))) continue;
+        if (parts.length === 2) {
+          if (kept.some((p) => parts.includes(p.key) && df.get(c.key) >= 0.6 * df.get(p.key))) continue;
+          const i = chosen.findIndex((p) => parts.includes(p.key) && df.get(c.key) >= 0.6 * df.get(p.key));
+          if (i >= 0) chosen.splice(i, 1);
+        }
+        chosen.push(c);
+      }
+      for (const c of chosen) lower.add(c.key);
+    }
+    for (const key of lower) hubs.add(key);
+  }
 
   // ...then every hub is attached to every item that contains it: untagged items always, tagged ones
   // when the site bridges. No cap here; the cap governed selection. A hub that lands on fewer than
-  // minDf items would connect nothing and is dropped.
+  // minDf items (near-copies counted once) would connect nothing and is dropped.
   const attached = new Map(); // hub key -> [{it, f}] in item order
   for (const it of reps) {
     if (tagged.has(it.key) && !D.taggedToo && !D.bridgeTagged) continue;
@@ -250,10 +372,14 @@ export function discover(records, cfg = makeConfig()) {
   for (const key of [...attached.keys()].sort(byLabel)) {
     const carriers = attached.get(key);
     const n = carriers.length;
-    if (n < D.minDf) continue;
-    const coherence = usable.get(key);
-    const baseline = sourceBaseline.get(key);
+    const k = distinctItems(carriers.map(({ it }) => it.key));
+    if (k < D.minDf) continue;
+    const coherence = coherenceOf(key);
+    const { baseline, ratio } = measure.get(key);
+    const below = under.has(key);
     const lift = baseline > 0 ? `, ${(coherence / baseline).toFixed(1)}× the ${baseline.toFixed(3)} that items from the same sources share` : '';
+    const bar = below ? `; under the ${D.sourceCoherenceRatio}× bar, admitted by the ${floor}× floor` : '';
+    const copies = k < n ? ` (${k} of ${N} counting near-copies once)` : '';
     for (const { it, f } of carriers) {
       out.push({
         type: 'tag',
@@ -262,7 +388,8 @@ export function discover(records, cfg = makeConfig()) {
         label: label(key),
         weight: Number(Math.min(0.6, D.weight + 0.05 * Math.min(4, f.tf)).toFixed(3)),
         origin: 'discovered',
-        why: `recurs in ${n} of ${N} items, which stay alike without it (${coherence.toFixed(2)}${lift})${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
+        ...(ratio === null ? {} : { sourceRatio: ratio }),
+        why: `recurs in ${n} of ${reps.length} items${copies}, which stay alike without it (${coherence.toFixed(2)}${lift}${bar})${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
         wasDerivedFrom: [{ type: 'text', phrase: f.surface, count: f.tf, inTitle: f.inTitle }],
         wasGeneratedBy: {
           activity: 'discover',
@@ -270,11 +397,15 @@ export function discover(records, cfg = makeConfig()) {
             minDf: D.minDf,
             maxDfRatio: D.maxDfRatio,
             perItem: D.perItem,
+            nearCopy: D.nearCopy,
+            nearCopyWords: D.nearCopyWords,
             sourceCoherenceRatio: D.sourceCoherenceRatio,
+            ...(below ? { sourceRatioFloor: floor } : {}),
             df: df.get(key),
             items: n,
             coherence: Number(coherence.toFixed(3)),
             sourceBaseline: Number(baseline.toFixed(3)),
+            ...(ratio === null ? {} : { sourceRatio: ratio }),
           },
         },
       });

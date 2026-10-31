@@ -4,7 +4,7 @@ import { discover } from '../lib/discover.js';
 import { makeConfig } from '../lib/config.js';
 import { buildStone } from '../lib/stone.js';
 import { emerge } from '../lib/emerge.js';
-import { rec } from './helpers.js';
+import { rec, syntheticRecords } from './helpers.js';
 
 // A tagged system, an untagged wire, and filler so that no real phrase is "everywhere".
 const filler = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`f${i}`, []]));
@@ -102,8 +102,13 @@ test('every discovered record carries its provenance', () => {
     assert.equal(d.inTitle, it.title.toLowerCase().split(/[^\p{L}\p{N}]+/u).join(' ').includes(d.phrase), `inTitle for "${d.phrase}" on ${t.item}`);
     assert.equal(t.wasGeneratedBy.activity, 'discover');
     const P = t.wasGeneratedBy.parameters;
-    assert.deepEqual(Object.keys(P).sort(), ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio']);
-    assert.ok(P.items >= P.minDf && P.items <= P.df);
+    const keys = ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'nearCopy', 'nearCopyWords', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio'];
+    if ('sourceRatio' in t) keys.push('sourceRatio');
+    else assert.equal(P.sourceBaseline, 0, 'the ratio is missing only when there was nothing to divide by');
+    if (P.sourceRatio < P.sourceCoherenceRatio) keys.push('sourceRatioFloor'); // only on a hub the floor admitted
+    assert.deepEqual(Object.keys(P).sort(), keys.sort());
+    assert.equal(t.sourceRatio, P.sourceRatio, 'the record carries the ratio as a plain field too');
+    assert.ok(P.items >= P.minDf && P.items <= P.df, 'no near-copies in this corpus, so every item is its own piece of evidence');
   }
 });
 
@@ -176,11 +181,16 @@ const deskRecords = [
 const deskOn = discover(deskRecords);
 const deskOff = discover(deskRecords, makeConfig({ discover: { sourceCoherenceRatio: 0 } }));
 const hubsOf = (found) => new Set(found.map((t) => t.label));
+// what a build at the bar holds: the records whose measured ratio reaches it (or that have none)
+const atBar = (found, bar = 1.6) => found.filter((t) => !(t.sourceRatio < bar));
 
 test('a word spread over one homogeneous source is not a topic: its items are only as alike as the source makes them', () => {
   assert.ok(hubsOf(deskOff).has('instead'), 'measured against the whole corpus, the newsroom\'s likeness carries "instead" through');
-  assert.ok(!hubsOf(deskOn).has('instead'), 'measured against items from the same source, it adds nothing');
-  assert.equal(deskOn.filter((t) => t.item === 'd8').length, 0, 'the untagged newsroom item had only "instead" to offer');
+  assert.ok(!hubsOf(atBar(deskOn)).has('instead'), 'measured against items from the same source, it adds nothing');
+  assert.equal(atBar(deskOn).filter((t) => t.item === 'd8').length, 0, 'the untagged newsroom item had only "instead" to offer');
+  const instead = deskOn.filter((t) => t.label === 'instead');
+  assert.ok(instead.length > 0 && instead.every((t) => t.sourceRatio >= 1 && t.sourceRatio < 1.6 && t.wasGeneratedBy.parameters.sourceRatioFloor === 1), 'below the bar it is still handed over, with its ratio, for a viewer to try a lower bar');
+  assert.match(instead[0].why, /under the 1\.6× bar, admitted by the 1× floor\)$/);
 });
 
 test('a real topic whose items are alike beyond what their sources share is kept', () => {
@@ -193,4 +203,74 @@ test('a real topic whose items are alike beyond what their sources share is kept
     assert.ok(P.sourceBaseline > 0 && P.coherence >= P.sourceCoherenceRatio * P.sourceBaseline, `coherence ${P.coherence} against baseline ${P.sourceBaseline}`);
     assert.match(t.why, /^recurs in 5 of 50 items, which stay alike without it \(\d\.\d\d, \d+\.\d× the \d\.\d{3} that items from the same sources share\)/);
   }
+});
+
+// Near-copies: one story told twice (two long articles about the same flood) shares its names,
+// places and details, and incidental words besides. As on post-pipe's site corpus of 2026-10-31,
+// each incidental word also turns up on one unrelated item, which picks it as its only hub: counted
+// twice, the copies' likeness carries the word's coherence. Three short items about glaciers share
+// only their topic. Filler keeps any phrase from being everywhere.
+const story = 'flood ruidoso trotter riverview crawford swiftwater lincoln mescalero sierra blanca peak tourist cabins campground bridge culvert gauge sirens shelter levee arroyo burn scar sediment debris river mayor chief volunteers rescue';
+const incidental = ['memory', 'staying', 'moderate', 'danger'];
+const copyRecords = [
+  ...rec('Paper', { a: [], b: [], c: [] }, {
+    a: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met; residents said the memory of the fire was staying with them and a moderate rain could still bring danger` },
+    b: { title: 'The river cannot be trusted', text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response; families described staying near the water, the memory of the night, and the danger of moderate storms` },
+    c: { title: 'A flood in another valley', text: 'waters rose after rain on a burn scar near the river; sediment and debris closed the road' },
+  }),
+  ...rec('Wire', { g1: [], g2: [], g3: [], x0: [], x1: [], x2: [], x3: [] }, {
+    g1: { title: 'Glacier retreat speeds up', text: 'the glacier lost ice as melt ran into the fjord' },
+    g2: { title: 'Ice cores from a shrinking glacier', text: 'scientists drilled the glacier where melt pools spread' },
+    g3: { title: 'Glacier melt raises lake levels', text: 'meltwater from the glacier filled a lake below the ice' },
+    ...Object.fromEntries(incidental.map((w, i) => [`x${i}`, { title: `quillon${i} brask${i}`, text: `${w} ottery${i} frund${i}` }])),
+  }),
+  ...rec('Filler', filler, fillerMeta),
+];
+const copiesOn = {};
+const withCopies = discover(copyRecords, makeConfig(), copiesOn);
+const copiesOff = discover(copyRecords, makeConfig({ discover: { nearCopy: 0 } }));
+
+test('two copies of one story are one piece of evidence: a word only they share is not a tag', () => {
+  assert.deepEqual(copiesOn.nearCopies, [['Paper::a', 'Paper::b']], 'the two flood articles are found as near-copies, the short glacier items are not');
+  for (const w of incidental) {
+    assert.ok(hubsOf(copiesOff).has(w), `counted twice, the copies carry "${w}" through`);
+    assert.ok(!hubsOf(withCopies).has(w), `counted once, "${w}" recurs nowhere`);
+  }
+});
+
+test('a word spread over distinct items is still a tag, and a tag still lands on every copy', () => {
+  assert.ok(hubsOf(withCopies).has('glacier'), `got ${[...hubsOf(withCopies)]}`);
+  const flood = withCopies.filter((t) => t.label === 'flood');
+  assert.deepEqual(flood.map((t) => t.item).sort(), ['a', 'b', 'c'], 'attached to both copies and the other flood item');
+  for (const t of flood) {
+    assert.equal(t.wasGeneratedBy.parameters.df, 2, 'df counts the copies once');
+    assert.equal(t.wasGeneratedBy.parameters.items, 3, 'items counts where it lands');
+    assert.match(t.why, /^recurs in 3 of 50 items \(2 of 49 counting near-copies once\), which stay alike without it/);
+  }
+});
+
+// The floor. On the shipped synthetic corpus every hub clears 1.6, so the bar is raised to 9 to put
+// some below it; what is tested is the shape, not the number.
+const synth = syntheticRecords();
+const bar = (sourceCoherenceRatio, sourceRatioFloor) => discover(synth, makeConfig({ discover: { sourceCoherenceRatio, sourceRatioFloor } }));
+const atNine = bar(9, 9);
+const toOne = bar(9, 1);
+
+test('a floor at the bar adds nothing: the output is the one without a floor, byte for byte', () => {
+  assert.equal(JSON.stringify(atNine), JSON.stringify(bar(9, null)));
+  assert.ok(atNine.length > 0 && atNine.every((t) => t.sourceRatio >= 9 && !('sourceRatioFloor' in t.wasGeneratedBy.parameters)));
+});
+
+test('a lower floor only adds: every record of the build at the bar is there unchanged, and the bar filters the rest away', () => {
+  const key = (t) => `${t.label}\u0000${t.source}::${t.item}`;
+  const lower = new Map(toOne.map((t) => [key(t), t]));
+  for (const t of atNine) assert.deepEqual(lower.get(key(t)), t, `${key(t)} unchanged`);
+  const extra = toOne.filter((t) => t.sourceRatio < 9);
+  assert.ok(extra.length > 0, 'the floor admitted something');
+  for (const t of extra) {
+    assert.ok(t.sourceRatio >= 1);
+    assert.equal(t.wasGeneratedBy.parameters.sourceRatioFloor, 1);
+    assert.match(t.why, /under the 9× bar, admitted by the 1× floor/);
+  }
+  assert.equal(JSON.stringify(atBar(toOne, 9)), JSON.stringify(atNine), 'a viewer at the bar shows exactly the build at the bar, in the same order');
 });

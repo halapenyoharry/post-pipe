@@ -15,9 +15,9 @@
 // Seeds use the same shape (same/broader/related) but are evidence, not commands.
 import { makeConfig } from './config.js';
 import { normalizeLabel } from './normalize.js';
-import { loadCorpus, displayForm, preferredForm, SITE_SCHEME } from './corpus.js';
+import { loadCorpus, displayForm, preferredForm, belowBar, ratioOf, SITE_SCHEME } from './corpus.js';
 import { computeSignals } from './signals/index.js';
-import { resolveConcepts } from './cluster.js';
+import { resolveConcepts, attachLate } from './cluster.js';
 import { scoreVariants, canonicalOf, rankingPool } from './canon.js';
 import { deriveRelations } from './relate.js';
 import { assignIds } from './ledger.js';
@@ -60,46 +60,73 @@ export function schemeLabels(variants, canonical) {
   return { inScheme, prefLabel, altLabel };
 }
 
+// One spelling of a concept, as stone.json reports it. `sourceRatio` is there when every record of
+// the spelling is a discovered one carrying its measured ratio: a viewer shows the spelling when set
+// at or below it.
+function variantOf(t) {
+  const ratio = ratioOf(t);
+  return {
+    norm: t.norm,
+    label: displayForm(t),
+    forms: Object.fromEntries([...t.forms.entries()].sort()),
+    formsBySource: Object.fromEntries([...t.formsBySource.entries()].sort().map(([s, m]) => [s, Object.fromEntries([...m.entries()].sort())])),
+    count: t.count,
+    explicit: t.explicit,
+    bySource: Object.fromEntries([...t.bySource.entries()].sort()),
+    acronym: t.acronymLike,
+    tokens: t.tokens.length,
+    ...(ratio === null ? {} : { sourceRatio: ratio }),
+  };
+}
+
 // `ledger` is in/out: { prior, path } read from disk by the caller (prior null when there is none);
 // on return `ledger.next` is the ledger to write. Without it ids are minted exactly as a first
 // ledgered build mints them, and the stone carries no ledger fields.
+//
+// Below-bar records (discovered tags rtz-discover's floor admitted under its sourceCoherenceRatio,
+// `belowBar` in lib/corpus.js) are layered on, never mixed in. Everything a build at the bar holds is
+// computed from the at-bar records alone, exactly as that build computes it: the clustering of their
+// spellings, every canonical, rank and scheme label, every id, and the relations between those
+// concepts. The below-bar spellings are then attached (lib/cluster.js attachLate): one may join a
+// concept at the bar, as a variant with its sourceRatio, without moving its canonical, its items or
+// its id; the rest form concepts of their own, whose relations are computed with everything. A viewer
+// set at the bar therefore shows exactly the build at the bar.
 export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds = [], extraSignals = [], builtin = true, now = null, ledger = null, warn = () => {} } = {}) {
   const cfg = makeConfig(userCfg, overrides.config, { canon: overrides.canon, sourceWeights: overrides.sourceWeights });
   const ignore = new Set((overrides.ignore ?? []).map(normOf));
   const corpus = loadCorpus(records, { ignore });
+  const late = records.some(belowBar);
+  const atBar = late ? loadCorpus(records.filter((r) => !belowBar(r)), { ignore }) : corpus;
 
-  const signals = [...(builtin ? computeSignals(corpus, cfg, { seeds }) : []), ...extraSignals];
+  const signals = [...(builtin ? computeSignals(atBar, cfg, { seeds }) : []), ...extraSignals];
   const locks = { same: labelGroups(overrides.same), notSame: labelGroups(overrides.notSame) };
   locks.notSame = locks.notSame.flatMap((g) => g.flatMap((x, i) => g.slice(i + 1).map((y) => [x, y])));
-  const { clusters, pairDetail } = resolveConcepts(corpus, signals, cfg, locks);
+  const early = resolveConcepts(atBar, signals, cfg, locks);
+  const { clusters, pairDetail } = late ? attachLate(early, corpus, [...(builtin ? computeSignals(corpus, cfg, { seeds }) : []), ...extraSignals], cfg, locks) : early;
+  // the spellings a build at the bar holds in each cluster (all of them when nothing is below the bar)
+  const atBarTerms = (cl) => (late ? cl.early : cl.terms);
 
   const pinByNorm = new Map(Object.entries(overrides.pin ?? {}).map(([k, v]) => [normOf(k), v]));
   // The canonical never depended on the id, so it is chosen first; the ledger then matches each
   // cluster to the id it continues (or mints one), with the canonical recorded beside the members.
+  // A spelling at the bar is read from the at-bar records only, so its counts are the bar's.
   const named = clusters.map((cl) => {
-    const variants = cl.terms.map((norm) => {
-      const t = corpus.terms.get(norm);
-      return {
-        norm,
-        label: displayForm(t),
-        forms: Object.fromEntries([...t.forms.entries()].sort()),
-        formsBySource: Object.fromEntries([...t.formsBySource.entries()].sort().map(([s, m]) => [s, Object.fromEntries([...m.entries()].sort())])),
-        count: t.count,
-        explicit: t.explicit,
-        bySource: Object.fromEntries([...t.bySource.entries()].sort()),
-        acronym: t.acronymLike,
-        tokens: t.tokens.length,
-      };
-    });
+    const variants = cl.terms.map((norm) => variantOf(atBar.terms.get(norm) ?? corpus.terms.get(norm)));
     // The canonical is chosen among the spellings a human wrote whenever there are any: a
-    // spelling only discovery proposed may join the concept, but it never outranks a human's.
-    const rank = scoreVariants(rankingPool(variants), cfg.canon, cfg.sourceWeights);
-    const pin = cl.terms.map((n) => pinByNorm.get(n)).find(Boolean);
+    // spelling only discovery proposed may join the concept, but it never outranks a human's. A
+    // concept at the bar is named from its at-bar spellings alone; a below-bar one never ranks.
+    const own = atBarTerms(cl);
+    const basis = own.length ? variants.filter((v) => own.includes(v.norm)) : variants;
+    const rank = scoreVariants(rankingPool(basis), cfg.canon, cfg.sourceWeights);
+    const pin = (own.length ? own : cl.terms).map((n) => pinByNorm.get(n)).find(Boolean);
     const canonical = canonicalOf(rank, pin);
-    return { variants, rank, canonical };
+    return { variants, basis, rank, canonical };
   });
   const assigned = assignIds(
-    clusters.map((cl, i) => ({ terms: cl.terms, label: named[i].canonical.label })),
+    clusters.map((cl, i) => {
+      const own = atBarTerms(cl);
+      return { terms: cl.terms, label: named[i].canonical.label, ...(own.length && own.length < cl.terms.length ? { mint: own } : {}) };
+    }),
     ledger?.prior ?? null,
     { pins: pinByNorm.keys(), now },
   );
@@ -108,12 +135,13 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   const conceptOfNorm = new Map();
   const concepts = clusters.map((cl, i) => {
     const id = assigned.ids[i];
-    const { variants, rank, canonical } = named[i];
-    const { inScheme, prefLabel, altLabel } = schemeLabels(variants, canonical.label);
+    const { variants, basis, rank, canonical } = named[i];
+    const { inScheme, prefLabel, altLabel } = schemeLabels(basis, canonical.label);
+    const own = atBarTerms(cl);
     const itemSet = new Set();
     const perSource = {};
-    for (const norm of cl.terms) {
-      const t = corpus.terms.get(norm);
+    for (const norm of own.length ? own : cl.terms) {
+      const t = (own.length ? atBar : corpus).terms.get(norm);
       for (const k of t.items) itemSet.add(k);
     }
     for (const k of itemSet) {
@@ -121,12 +149,16 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
       perSource[s] = (perSource[s] ?? 0) + 1;
     }
     for (const norm of cl.terms) conceptOfNorm.set(norm, id);
+    // a concept made only of rated discovered evidence shows when any of its spellings would
+    const ratios = variants.map((v) => v.sourceRatio);
+    const sourceRatio = ratios.every((r) => typeof r === 'number') ? Math.max(...ratios) : null;
     return {
       id,
       canonical: canonical.label,
       pinned: canonical.pinned,
       locked: cl.locked,
-      discovered: variants.every((v) => v.explicit === 0), // only ever proposed by rtz-discover, never written by a human
+      discovered: basis.every((v) => v.explicit === 0), // only ever proposed by rtz-discover, never written by a human
+      ...(sourceRatio === null ? {} : { sourceRatio }),
       inScheme,
       prefLabel,
       altLabel,
@@ -141,14 +173,33 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
 
   const conceptRefs = clusters.map((cl, i) => ({ id: concepts[i].id, terms: cl.terms, label: concepts[i].canonical }));
   const labelOf = new Map(concepts.map((c) => [c.id, c.canonical]));
-  const derived = [...deriveRelations(corpus, conceptRefs, cfg), ...nearRelations(pairDetail, conceptOfNorm, cfg, labelOf)];
+  // Relations between concepts at the bar come from the at-bar records, as at the bar; a relation
+  // touching a concept only below-bar evidence made is computed with everything.
+  const lateIds = new Set(late ? concepts.filter((c, i) => !clusters[i].early.length).map((c) => c.id) : []);
+  const touchesLate = (r) => lateIds.has(r.a) || lateIds.has(r.b);
+  const derived = !late
+    ? [...deriveRelations(corpus, conceptRefs, cfg), ...nearRelations(pairDetail, conceptOfNorm, cfg, labelOf)]
+    : [
+        ...deriveRelations(atBar, conceptRefs.map((c, i) => ({ ...c, terms: clusters[i].early })).filter((c) => c.terms.length).sort((x, y) => (x.terms[0] < y.terms[0] ? -1 : 1)), cfg),
+        ...nearRelations(early.pairDetail, new Map([...conceptOfNorm].filter(([n]) => atBar.terms.has(n))), cfg, labelOf),
+        ...deriveRelations(corpus, conceptRefs, cfg).filter(touchesLate),
+        ...nearRelations(pairDetail, conceptOfNorm, cfg, labelOf).filter(touchesLate),
+      ];
   const aliasGroups = seeds.flatMap((s) => labelGroups(s.same));
-  const conceptFor = (label) => {
-    const n = normOf(label);
-    if (conceptOfNorm.has(n)) return conceptOfNorm.get(n);
+  const lookup = (n, ok) => {
+    if (conceptOfNorm.has(n) && ok(n)) return conceptOfNorm.get(n);
     const group = aliasGroups.find((g) => g.includes(n)); // "artificial general intelligence" -> corpus only has "agi"
-    return group?.map((x) => conceptOfNorm.get(x)).find(Boolean);
+    return group?.map((x) => (ok(x) ? conceptOfNorm.get(x) : undefined)).find(Boolean);
   };
+  // a seed's or a human's label resolves as it would at the bar first; only failing that, to a
+  // concept only below-bar evidence made (a below-bar spelling inside a concept at the bar was not
+  // there at the bar, and names nothing)
+  const conceptFor = !late
+    ? (label) => lookup(normOf(label), () => true)
+    : (label) => {
+        const n = normOf(label);
+        return lookup(n, (x) => atBar.terms.has(x)) ?? lookup(n, (x) => lateIds.has(conceptOfNorm.get(x)));
+      };
   const merged0 = mergeManualRelations(derived, [...seeds.flatMap(seedRelations), ...(overrides.relations ?? [])], conceptFor, overrides.relations, labelOf, warn);
   const typed = typeRelations(merged0, concepts, cfg);
   const { relations, forbidden } = forbidRelations(typed, overrides.notRelated ?? [], conceptFor);
@@ -156,8 +207,9 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   // A system's distinct tags are the terms on any of its items, from any origin (`bySource` is keyed
   // by scheme, so it cannot say this: a discovered spelling on a wire item sits under `discovered`).
   const systems = {};
-  const sourcesOfTerm = [...corpus.terms.values()].map((t) => new Set([...t.items].map((k) => corpus.items.get(k).source)));
-  for (const s of corpus.sources.values()) {
+  // (described at the bar: below-bar tags do not change a system's coverage)
+  const sourcesOfTerm = [...atBar.terms.values()].map((t) => new Set([...t.items].map((k) => atBar.items.get(k).source)));
+  for (const s of atBar.sources.values()) {
     systems[s.name] = {
       items: s.items.size,
       tagged: s.tagged.size,

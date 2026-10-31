@@ -11,17 +11,22 @@ usage: rtz-discover [records.jsonl] [--all] [--config FILE] [-o FILE]
 For tag-systems that share no vocabulary with the others (a news wire with no categories) nothing
 connects. This finds phrases that are distinctive (not on every item) and recurring (at least two
 items), so each one is a hub that actually connects things. Tags get origin "discovered", a low
-weight, and a "why". Run it BEFORE rtz-stone and the discovered phrases join the stone as ordinary
-evidence, so they can fold into the vocabularies of other tag-systems.
+weight, and a "why". Run it BEFORE rtz-stone and the discovered phrases join stone.json as ordinary
+evidence, so they can fold into the vocabularies of other tag-systems. Near-copies (one story told
+twice) count as one item; every tag carries its measured sourceRatio; see docs/FORMATS.md.
 
   --all     echo the input records first, so the output can be piped straight into rtz-stone`;
 
 const { values, positionals } = cli('rtz-discover', usage, { all: { type: 'boolean' }, config: { type: 'string' }, o: { type: 'string', short: 'o' } });
 try {
   const records = parseJSONL(await readText(positionals[0]), positionals[0] ?? 'stdin');
-  const found = discover(records, makeConfig(loadJSONIfExists(values.config)));
+  const info = {};
+  const found = discover(records, makeConfig(loadJSONIfExists(values.config)), info);
   writeOut(toJSONL(values.all ? [...records.filter((r) => r.origin !== 'discovered'), ...found] : found), values.o);
   log(`rtz-discover: ${found.length} tags on ${new Set(found.map((r) => `${r.source}::${r.item}`)).size} items, ${new Set(found.map((r) => r.label)).size} distinct phrases`);
+  const under = found.filter((r) => r.wasGeneratedBy?.parameters?.sourceRatioFloor !== undefined);
+  if (under.length) log(`rtz-discover: ${new Set(under.map((r) => r.label)).size} of those phrases (${under.length} tags) are under the ${under[0].wasGeneratedBy.parameters.sourceCoherenceRatio}× bar, admitted by the ${under[0].wasGeneratedBy.parameters.sourceRatioFloor}× floor for a viewer to try lower bars`);
+  for (const g of info.nearCopies ?? []) log(`rtz-discover: near-copies counted as one item: ${g.join(' = ')}`);
 } catch (e) {
   die(`rtz-discover: ${e.message}`);
 }

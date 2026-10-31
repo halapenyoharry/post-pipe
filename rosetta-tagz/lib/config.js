@@ -47,6 +47,9 @@ export const DEFAULTS = {
     minCoherence: 0.04, // guard only: mean TF-IDF cosine between the items sharing a phrase, with the phrase removed
     coherenceRatio: 1.6, // ...and at least this multiple of the corpus-wide baseline similarity
     sourceCoherenceRatio: 1.6, // ...and at least this multiple of what items from the same sources share anyway (mean cosine per pair of sources, over the same item pairs); 0 turns it off
+    sourceRatioFloor: 1.0, // hubs under sourceCoherenceRatio but at or above this are chosen in a second pass (never taking a first-pass slot), so a viewer can try a lower bar; at or above sourceCoherenceRatio it adds nothing
+    nearCopy: 0.35, // two items whose TF-IDF cosine reaches this, and still reaches it once their nearCopyWords strongest shared words are removed, are near-copies (one story told twice) and count as one item when a phrase is measured; 0 turns it off
+    nearCopyWords: 3, // how many of a pair's strongest shared words (its topic) are removed before asking whether it is still alike
     weight: 0.35,
     taggedToo: false, // also pick hubs FROM tagged items (default: hubs come from the untagged)
     bridgeTagged: true, // but attach selected hubs to tagged items that contain them, so the wire bridges into your vocabulary

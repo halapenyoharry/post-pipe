@@ -5,6 +5,7 @@ import { buildStone, indexStone, resolveLabel } from '../lib/stone.js';
 import { buildUniverse } from '../lib/universe.js';
 import { DISCOVERED_SCHEME, SITE_SCHEME, schemeOfSource } from '../lib/corpus.js';
 import { scoreVariants, rankingPool } from '../lib/canon.js';
+import { emerge } from '../lib/emerge.js';
 
 const stone = syntheticStone();
 const name = (id) => stone.concepts.find((c) => c.id === id).canonical;
@@ -658,4 +659,106 @@ test('the same essay under two vocabularies counts once: no identical-text flood
   const s = buildStone([...mk('Tags', ['alpha', 'beta']), ...mk('Topology', ['gamma', 'delta'])], {});
   assert.equal(s.relations.filter((r) => r.type === 'adjacent').length, 0, 'they share one essay: that is co-tagging, not adjacency');
   assert.ok(s.relations.filter((r) => r.type === 'related').length === 0, 'one shared essay is not enough support for related either');
+});
+
+// ---- below-bar evidence (rtz-discover's floor) is layered on, never mixed in ---------------------
+// A discovered record whose sourceRatio is under the sourceCoherenceRatio it was generated with is
+// below its bar. `mixed` hands a stone the same tags with the bar lowered to 1, so nothing is below
+// it: that is what a single-layer stone would make of them, and why it must not.
+const BAR = 1.6;
+const rated = (source, items, label, sourceRatio, bar = BAR) =>
+  earned(source, items, label, { sourceRatio, wasGeneratedBy: { activity: 'discover', parameters: { sourceCoherenceRatio: bar, sourceRatio } } });
+const mixed = (records) => records.map((r) => (r.sourceRatio < BAR ? { ...r, wasGeneratedBy: { ...r.wasGeneratedBy, parameters: { ...r.wasGeneratedBy.parameters, sourceCoherenceRatio: 1 } } } : r));
+const shownAt = (bar) => (x) => !(x.sourceRatio < bar);
+// what a viewer set at the bar keeps of a concept: its spellings and links at the bar
+const atBarView = (c, norms) => {
+  const x = structuredClone(c);
+  x.variants = x.variants.filter(shownAt(BAR));
+  x.links = x.links.filter((l) => norms.has(l.a) && norms.has(l.b));
+  return x;
+};
+const sameAtBar = (atBar, below, label) => {
+  const norms = new Set(atBar.concepts.flatMap((c) => c.variants.map((v) => v.norm)));
+  const byId = new Map(below.concepts.map((c) => [c.id, c]));
+  for (const c of atBar.concepts) assert.deepEqual(atBarView(byId.get(c.id), norms), c, `${label}: "${c.canonical}" (${c.id}) is the bar's concept`);
+  const lateIds = new Set(below.concepts.filter((c) => !atBar.concepts.some((x) => x.id === c.id)).map((c) => c.id));
+  assert.deepEqual(below.relations.filter((r) => !lateIds.has(r.a) && !lateIds.has(r.b)), atBar.relations, `${label}: relations between the bar's concepts are the bar's`);
+  for (const id of lateIds) assert.ok(below.concepts.find((c) => c.id === id).sourceRatio < BAR, `${label}: a concept only below-bar evidence made carries a ratio under the bar`);
+};
+
+const volcanoMeta = Object.fromEntries(['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7'].map((k, i) => [k, { title: `Volcano report ${i}`, text: `the volcano near town ${i} erupted again; ash fell on the fields` }]));
+const quietMeta = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`f${i}`, { title: `zorbl${i} flarn${i}`, text: `grindle${i} plonk${i} vexor${i}` }])); // so the volcano is not on every item
+const volcanoAtBar = [
+  ...rec('Wire', Object.fromEntries(Object.keys(volcanoMeta).map((k) => [k, []])), volcanoMeta),
+  ...rec('Filler', Object.fromEntries(Object.keys(quietMeta).map((k) => [k, []])), quietMeta),
+  ...rated('Wire', ['w1', 'w2'], 'volcanoes', 3),
+];
+const volcanoBelow = [...volcanoAtBar, ...rated('Wire', ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'], 'volcano', 1.2)];
+
+test('a below-bar spelling joins a concept at the bar without moving its canonical, items, scheme labels or id', () => {
+  const atBar = buildStone(volcanoAtBar, {});
+  const below = buildStone(volcanoBelow, {});
+  const single = conceptOf(buildStone(mixed(volcanoBelow), {}), 'volcanoes');
+  assert.ok(single.canonical === 'volcano' && single.id === 'c_volcano', 'mixed in, the more frequent spelling would rename the concept and its id');
+  const c = conceptOf(below, 'volcanoes');
+  const was = conceptOf(atBar, 'volcanoes');
+  assert.equal(c.id, 'c_volcanoes');
+  assert.equal(c.canonical, 'volcanoes');
+  assert.deepEqual(c.variants.map((v) => [v.norm, v.sourceRatio]), [['volcano', 1.2], ['volcanoes', 3]], 'the below-bar spelling is a variant, with its ratio');
+  assert.equal(c.sourceRatio, 3, 'the concept shows when any of its spellings would');
+  assert.deepEqual(c.rank, was.rank, 'only the bar\'s spellings rank');
+  assert.equal(c.items, was.items, 'described at the bar');
+  sameAtBar(atBar, below, 'volcano');
+  const fresh = buildStone(volcanoBelow, { ledger: { prior: null } });
+  assert.equal(conceptOf(fresh, 'volcanoes').id, 'c_volcanoes', 'a first ledgered build mints from the bar\'s spellings too');
+});
+
+test('two concepts at the bar never merge through a below-bar spelling', () => {
+  const meta = Object.fromEntries(['i1', 'i2', 'i3', 'i4', 'i5', 'i6'].map((k) => [k, { title: `zorbl${k}`, text: `grindle${k} plonk${k}` }])); // texts share nothing, so only the given evidence links the spellings
+  const base = [...rec('Wire', Object.fromEntries(Object.keys(meta).map((k) => [k, []])), meta), ...rated('Wire', ['i1', 'i2'], 'alpha', 3), ...rated('Wire', ['i3', 'i4'], 'beta', 3)];
+  const withGamma = [...base, ...rated('Wire', ['i5', 'i6'], 'gamma', 1.1)];
+  const extraSignals = [
+    { a: 'alpha', b: 'gamma', signal: 'seed', score: 0.95, why: 'test' },
+    { a: 'beta', b: 'gamma', signal: 'seed', score: 0.95, why: 'test' },
+    { a: 'alpha', b: 'beta', signal: 'fuzzy', score: 0.6, why: 'test' },
+  ];
+  const single = buildStone(mixed(withGamma), { extraSignals });
+  assert.equal(conceptOf(single, 'alpha').id, conceptOf(single, 'beta').id, 'mixed in, gamma would bridge alpha and beta into one concept');
+  const atBar = buildStone(base, { extraSignals });
+  const below = buildStone(withGamma, { extraSignals });
+  assert.notEqual(conceptOf(below, 'alpha').id, conceptOf(below, 'beta').id);
+  assert.equal(conceptOf(below, 'gamma').id, conceptOf(below, 'alpha').id, 'gamma joins the first concept it reaches');
+  sameAtBar(atBar, below, 'alpha/beta');
+});
+
+test('a below-bar tag on a spelling a human wrote does not move the choice between human spellings', () => {
+  const meta = Object.fromEntries(['d1', 'd2', 'd3', 'd4', 'd5', 'w1', 'w2', 'w3', 'w4', 'w5', 'w6'].map((k) => [k, { title: k, text: `climate note ${k}` }]));
+  const human = [
+    ...rec('Desk', { d1: ['Climate Change'], d2: ['Climate Change'], d3: ['Climate Change'], d4: ['Climate Crisis'], d5: ['Climate Crisis'] }, meta),
+    ...rec('Wire', { w1: [], w2: [], w3: [], w4: [], w5: [], w6: [] }, meta),
+  ];
+  const below = [...human, ...rated('Wire', ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'], 'climate crisis', 1.3)];
+  const overrides = { same: [['Climate Change', 'Climate Crisis']] };
+  assert.equal(conceptOf(buildStone(mixed(below), { overrides }), 'climate change').canonical, 'climate crisis', 'mixed in, the discovered occurrences would win it');
+  const atBar = buildStone(human, { overrides });
+  const s = buildStone(below, { overrides });
+  assert.equal(conceptOf(s, 'climate change').canonical, 'Climate Change');
+  sameAtBar(atBar, s, 'climate');
+});
+
+test('emergence and the universe hand a viewer set at the bar exactly what a build at the bar has', () => {
+  const atBarStone = buildStone(volcanoAtBar, {});
+  const belowStone = buildStone(volcanoBelow, {});
+  const earnedAtBar = emerge(atBarStone, volcanoAtBar);
+  const earnedBelow = emerge(belowStone, volcanoBelow);
+  assert.ok(earnedAtBar.length > 0 && earnedAtBar.every((t) => t.sourceRatio === 3), 'a tag earned through a discovered spelling carries its ratio');
+  assert.deepEqual(earnedBelow.filter(shownAt(BAR)), earnedAtBar);
+  const u16 = buildUniverse(atBarStone, [...volcanoAtBar, ...earnedAtBar]);
+  const u10 = buildUniverse(belowStone, [...volcanoBelow, ...earnedBelow]);
+  const tagsAt = (u, bar) => u.items.map((it) => [it.key, it.tags.filter(shownAt(bar))]);
+  assert.deepEqual(tagsAt(u10, BAR), tagsAt(u16, BAR), 'every tag a viewer shows at the bar is the bar\'s tag, origin, why and weight included');
+  const w7 = u10.items.find((it) => it.key === 'Wire::w7').tags;
+  assert.ok(w7.every((t) => t.sourceRatio === 3), 'an item only emergence reached shows with the concept');
+  const human = buildUniverse(buildStone(rec('Desk', { d1: ['Geology'] }), {}), [...rec('Desk', { d1: ['Geology'] }), ...rated('Desk', ['d1'], 'Geology', 2)]);
+  assert.ok(!('sourceRatio' in human.items[0].tags[0]), 'a tag a human wrote always shows, whatever discovery also said');
 });

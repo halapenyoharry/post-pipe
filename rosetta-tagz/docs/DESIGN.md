@@ -7,12 +7,12 @@ post-pipe draws tags from several places. Each place has its own tag-system (`ai
 layer the same idea shows up as unrelated nodes, and a source with no shared vocabulary produces no
 edges: in the real corpus 60 of 102 items were isolated dust.
 
-The Rosetta stone is the graph **between** tag-systems: it takes every source's tags, decides which are
-the same concept, chooses one display name by weight, and keeps the relations between concepts so any
-tag can be pulled up as a small neighbourhood.
+rosetta-tagz (rtagz) builds the graph **between** tag-systems: it takes every source's tags, decides
+which are the same concept, chooses one display name by weight, and keeps the relations between
+concepts so any tag can be pulled up as a small neighbourhood.
 
-This is the structure described in post-pipe's `vision/DECOMPOSITION.md` ("Rosetta stone of tags"):
-tag-systems are graphs, the stone is the graph between them, edges carry identity / adjacency /
+This is the structure described in post-pipe's `vision/DECOMPOSITION.md` (its section "rosetta-tagz"):
+tag-systems are graphs, rosetta-tagz is the graph between them, edges carry identity / adjacency /
 containment / opposition / synergy / near-equivalence. Mapping:
 
 | vision | here |
@@ -66,7 +66,7 @@ profiles, only for pairs that never share an item. Each concept keeps its strong
 
 ## Emergence and discovery
 
-`emerge` can only name what the stone already knows. Rules, each added after seeing a real failure:
+`emerge` can only name what `stone.json` already holds. Rules, each added after seeing a real failure:
 
 - a phrase on > 20% of items is too common to mean anything;
 - a lone generic word is accepted only if the item reads like the items carrying the tag (TF-IDF cosine
@@ -76,7 +76,7 @@ profiles, only for pairs that never share an item. Each concept keeps its strong
   before, they were skipped): discovery attached them where its candidate scan found the phrase, and
   emergence catches what that scan missed, under the same guards;
 - whatever an item already carries, from any tag-system or stage, is never doubled: a record naming a
-  concept the stone knows counts as is, any other record is resolved by its label.
+  concept `stone.json` holds counts as is, any other record is resolved by its label.
 
 `discover` exists for tag-systems with no shared vocabulary. Candidates are unigrams and bigrams that
 never span punctuation; a hub must recur in ≥ 2 items, stay under 12% of items, avoid
@@ -89,6 +89,19 @@ from the untagged items' point of view, `perItem` at a time, and then attached t
 containing them, with no cap: attachment follows justification, and a hub's `why` counts exactly the
 items that carry it (a hub left on fewer than `minDf` items is dropped). Before 2026-10-25 the cap was
 applied again at attachment, so a `why` could claim six items while two carried the tag.
+
+Since 2026-10-31 near-copies count once. Two items that stay alike (`nearCopy`, 0.35) even after the
+three words they share most are removed are one story told twice, and when a phrase is measured (its
+df, the item count, its coherence, its source likeness) each such group is one item; the hub still lands
+on every copy. On post-pipe's site corpus two ProPublica articles about one Ruidoso flood had carried 18
+incidental words into hubs (`memory`, `danger`, `onto`, …) and junk relations (`memory` broadMatch
+`Climate and Environment`); raw cosine could not be the test, because two short items on one topic are
+more alike by it than the two articles (FORMATS.md has the numbers). Also since then every discovered
+record carries its measured `sourceRatio`, and hubs down to `sourceRatioFloor` are chosen in a second
+pass that only fills the slots the first pass left, so a viewer can try another bar than
+`sourceCoherenceRatio` without a rebuild. rtz-stone, rtz-emerge and rtz-universe layer that below-bar
+evidence on top of everything a build at the bar holds instead of mixing it in, so a viewer set at the
+bar shows exactly the build at the bar (FORMATS.md, "Trying another bar").
 
 Every record either stage emits carries its provenance in PROV terms: `wasDerivedFrom`
 (`[{type: 'text', phrase, count, inTitle}]`, where `phrase` is the span of the item's own words that
@@ -105,7 +118,7 @@ assertions, not every edge it ends up with.
 
 ## What was verified, and how
 
-- 114 `node:test` tests: normalisation, each signal, clustering, overrides, canonical scoring,
+- 158 `node:test` tests (2026-10-31): normalisation, each signal, clustering, overrides, canonical scoring,
   emergence/discovery, all four graph projections, and the real programs run as separate processes
   (including the fully piped form and an external scorer).
 - Real corpus runs (your Posts + post-pipe's feed) found five defects the synthetic data hid; each now

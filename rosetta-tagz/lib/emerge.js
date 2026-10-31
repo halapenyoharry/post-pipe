@@ -15,10 +15,17 @@
 // system or stage, is never doubled. Every record carries wasDerivedFrom (the span of the item's own
 // words that matched, how often, whether in the title) and wasGeneratedBy (this stage, its
 // thresholds and, for a lone word, the context score that admitted it).
+//
+// A tag earned only through spellings a viewer can hide (discovered ones that carry a sourceRatio)
+// carries the ratio a viewer must be set at or below to show it: the highest of the matched
+// spellings'. A spelling that only below-bar evidence wrote (rtz-discover's floor) never earns a
+// concept at the bar anything, never shapes what that concept's items read like, and a below-bar tag
+// on an item never stops emergence from earning a concept at the bar there: so a viewer set at the bar
+// shows exactly what a build at the bar earned.
 import { normalizeLabel, looksLikeAcronym, stem, STOP } from './normalize.js';
 import { words, STOPWORDS, buildItemVectors, buildIdf, profileFor } from './text.js';
 import { cosine } from './similarity.js';
-import { loadCorpus, entitySet } from './corpus.js';
+import { loadCorpus, entitySet, belowBar } from './corpus.js';
 import { indexStone, resolveLabel } from './stone.js';
 import { makeConfig } from './config.js';
 
@@ -34,36 +41,43 @@ function stemSeq(text) {
   return { ws, seq };
 }
 
-export function buildPhraseTable(stone) {
-  const phrases = new Map(); // "stem stem" -> Map<cid, {norm, single}>
-  const acronyms = new Map(); // "AI" -> cid
-  const add = (key, cid, norm, single) => {
+// `skip(norm)` leaves a spelling out of the table. Each entry keeps the ratio a viewer must be set at
+// or below to show what it earns: null (always) when any spelling behind it has no sourceRatio.
+export function buildPhraseTable(stone, skip = () => false) {
+  const phrases = new Map(); // "stem stem" -> Map<cid, {norm, single, ratio}>
+  const acronyms = new Map(); // "AI" -> {cid, ratio}
+  const both = (x, y) => (x === undefined ? y : x === null || y === null ? null : Math.max(x, y));
+  const add = (key, cid, norm, single, ratio) => {
     if (!phrases.has(key)) phrases.set(key, new Map());
-    phrases.get(key).set(cid, { norm, single });
+    const was = phrases.get(key).get(cid);
+    phrases.get(key).set(cid, { norm, single, ratio: both(was?.ratio, ratio) });
   };
   for (const c of stone.concepts) {
-    const labels = new Set(c.variants.map((v) => v.norm));
+    const labels = new Set(c.variants.map((v) => v.norm).filter((n) => !skip(n)));
+    if (!labels.size) continue;
     labels.add(normalizeLabel(c.canonical).norm);
     for (const norm of labels) {
       const info = normalizeLabel(norm);
       const variant = c.variants.find((v) => v.norm === norm);
+      const ratio = typeof variant?.sourceRatio === 'number' ? variant.sourceRatio : null; // the canonical of a pin is a human's
       if (info.tokens.length === 1 && variant?.acronym) {
-        for (const raw of Object.keys(variant.forms)) if (looksLikeAcronym(raw)) acronyms.set(raw.replace(/[.\s]/g, ''), c.id);
+        for (const raw of Object.keys(variant.forms)) if (looksLikeAcronym(raw)) acronyms.set(raw.replace(/[.\s]/g, ''), { cid: c.id, ratio });
         continue;
       }
       if (!info.stems.length || info.stems.length > MAX_PHRASE) continue;
       if (info.stems.length === 1 && (info.norm.length < 4 || STOPWORDS.has(info.norm))) continue;
-      add(info.stems.join(' '), c.id, norm, info.stems.length === 1);
+      add(info.stems.join(' '), c.id, norm, info.stems.length === 1, ratio);
     }
   }
   return { phrases, acronyms };
 }
 
 function matchText(text, table) {
-  const found = new Map(); // cid -> {tf, phrase, single}; phrase is the first matching span of the item's own words
-  const bump = (cid, phrase, single) => {
-    const f = found.get(cid) ?? { tf: 0, phrase, single };
+  const found = new Map(); // cid -> {tf, phrase, single, ratio}; phrase is the first matching span of the item's own words
+  const bump = (cid, phrase, single, ratio) => {
+    const f = found.get(cid) ?? { tf: 0, phrase, single, ratio };
     f.tf += 1;
+    f.ratio = f.ratio === null || ratio === null ? null : Math.max(f.ratio, ratio);
     found.set(cid, f);
   };
   const { ws, seq } = stemSeq(text);
@@ -72,13 +86,13 @@ function matchText(text, table) {
       const hit = table.phrases.get(seq.slice(i, i + n).map((s) => s.stem).join(' '));
       if (!hit) continue;
       const span = ws.slice(seq[i].at, seq[i + n - 1].at + 1).join(' ');
-      for (const [cid, h] of hit) bump(cid, span, h.single);
+      for (const [cid, h] of hit) bump(cid, span, h.single, h.ratio);
     }
   }
-  for (const [acr, cid] of table.acronyms) {
+  for (const [acr, { cid, ratio }] of table.acronyms) {
     const re = new RegExp(`(?<![\\p{L}\\p{N}])${esc(acr)}(?![\\p{L}\\p{N}])`, 'gu');
     const m = text.match(re);
-    if (m) for (let i = 0; i < m.length; i++) bump(cid, acr, false); // an acronym in capitals is specific enough
+    if (m) for (let i = 0; i < m.length; i++) bump(cid, acr, false, ratio); // an acronym in capitals is specific enough
   }
   return found;
 }
@@ -86,16 +100,23 @@ function matchText(text, table) {
 export function emerge(stone, records, cfg = makeConfig()) {
   const E = cfg.emerge;
   const index = indexStone(stone);
-  const table = buildPhraseTable(stone);
   const canonical = new Map(stone.concepts.map((c) => [c.id, c.canonical]));
+  const corpus = loadCorpus(records);
+
+  // a spelling only below-bar records wrote, inside a concept that has spellings at the bar, is left
+  // out of everything that concept earns (a concept made only of below-bar spellings keeps them all)
+  const below = (norm) => corpus.terms.get(norm)?.atBar === 0;
+  const lateOnly = new Set(stone.concepts.filter((c) => c.variants.every((v) => below(v.norm))).map((c) => c.id));
+  const conceptOf = new Map(stone.concepts.flatMap((c) => c.variants.map((v) => [v.norm, c.id])));
+  const skip = (norm) => below(norm) && !lateOnly.has(conceptOf.get(norm));
+  const table = buildPhraseTable(stone, skip);
 
   // what each concept's tagged items read like, to vet single-word matches
-  const corpus = loadCorpus(records);
   const vecs = buildItemVectors(corpus.items);
   const idf = buildIdf(vecs);
   const profile = new Map();
   for (const c of stone.concepts) {
-    const keys = c.variants.flatMap((v) => [...(corpus.terms.get(v.norm)?.items ?? [])]);
+    const keys = c.variants.filter((v) => !skip(v.norm)).flatMap((v) => [...(corpus.terms.get(v.norm)?.items ?? [])]);
     if (keys.length) profile.set(c.id, profileFor(entitySet(corpus, keys), vecs, idf));
   }
 
@@ -105,7 +126,7 @@ export function emerge(stone, records, cfg = makeConfig()) {
   for (const r of records) {
     if (r.type !== 'tag' || (r.origin ?? 'explicit') === 'emergent') continue;
     const cid = r.concept && index.concepts.has(r.concept) ? r.concept : resolveLabel(index, r.label)?.concept;
-    if (!cid) continue;
+    if (!cid || (belowBar(r) && !lateOnly.has(cid))) continue;
     const k = `${r.source}::${r.item}`;
     if (!carried.has(k)) carried.set(k, new Set());
     carried.get(k).add(cid);
@@ -145,6 +166,7 @@ export function emerge(stone, records, cfg = makeConfig()) {
         weight: Number(weight.toFixed(3)),
         origin: 'emergent',
         concept: cid,
+        ...(typeof f.ratio === 'number' ? { sourceRatio: f.ratio } : {}),
         why: `text mentions "${f.phrase}" ×${f.tf}${inTitle.has(cid) ? ' (in title)' : ''}${context === null ? '' : `; reads like its other items (${context.toFixed(2)})`}`,
         wasDerivedFrom: [{ type: 'text', phrase: f.phrase, count: f.tf, inTitle: inTitle.has(cid) }],
         wasGeneratedBy: {
