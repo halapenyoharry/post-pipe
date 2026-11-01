@@ -37,6 +37,7 @@ import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from 
 import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
 import { tagEdgeLabel } from '../../lib/provenance';
 import { containerHas } from '../../lib/containers';
+import { tagReferences } from '../../lib/tagReferences';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
 
@@ -114,7 +115,10 @@ function feedToGraph(feed, config = {}) {
       image: item.image || '',
       date: item.date_published ? item.date_published.split('T')[0] : '',
       reading_time: item.reading_time || '',
-      tags: item.tags || [],
+      // The values of the item's tag references, item.tags standing in when
+      // it has none (lib/tagReferences.js). Read by containerHas
+      // (lib/containers.js) for the string path of containment.
+      tags: tagReferences(item).map((r) => r.value),
       _references: Array.isArray(item._references) ? item._references : [],
       series: item.series || '',
       series_part: item.series_part ?? null,
