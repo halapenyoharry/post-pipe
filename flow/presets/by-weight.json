@@ -1,0 +1,18 @@
+{
+  "name": "by-weight",
+  "description": "The first weight vector: the site scheme's strongest tag, degree and recency, each at 1; every source at 1; sorted by score.",
+  "weights": {
+    "tag.site": 1,
+    "degree": 1,
+    "recency": 1,
+    "source": {}
+  },
+  "switches": {
+    "degreePenalty": "sqrt",
+    "recencyClock": "calendar",
+    "recencyHalfLifeDays": 30,
+    "orderMode": "score",
+    "seam": 2,
+    "stability": 0.05
+  }
+}
