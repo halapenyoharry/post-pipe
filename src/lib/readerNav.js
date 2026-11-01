@@ -4,6 +4,8 @@
 // status line its container carries ("soon"), so the reader can say what is
 // coming instead of linking to nothing.
 
+const { containerHas } = require('./containers');
+
 function itemIndex(feed) {
   const byId = new Map();
   for (const item of (feed && feed.items) || []) byId.set(item.id, item);
@@ -22,7 +24,7 @@ function navStatus(feed, item, fallback = 'not yet published') {
   const byId = new Map(containers.map((c) => [c.id, c]));
   const depth = (c) => { let n = 0; let p = c.parent; while (p && byId.has(p) && n < 20) { n++; p = byId.get(p).parent; } return n; };
   const mine = containers
-    .filter((c) => c.tag && (item.tags || []).includes(c.tag))
+    .filter((c) => c.tag && containerHas(c, item))
     .sort((a, b) => depth(b) - depth(a));
   const withStatus = mine.find((c) => c.status);
   return withStatus ? String(withStatus.status) : fallback;

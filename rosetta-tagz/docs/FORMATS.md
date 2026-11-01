@@ -447,6 +447,119 @@ ingested it, so nothing is claimed). An earned tag (`discovered`, `emergent`) ca
 is a span of the item's own words (lower-cased, as `words()` reads them), never the label whose stems
 matched it. A PROV field is either present with a value or absent; it is never `null`.
 
+## `build.json` and untagged items
+
+`rtz-build` writes `build.json` last: `built`, `config`, `stages[]` (`name`, `program`, `ms`), `ledger`
+(above) and `untagged`, every item of the universe that ends with no tag a viewer shows at the build's
+bar, and why, as far as the build knows (`lib/untagged.js`). Nothing is forced onto such an item.
+
+```
+untagged: { bar, count, none, items[]: {
+  key, source, id, title,
+  reason, reasons[], why[],                        // reason is reasons[0]; why is one plain sentence per reason
+  under[]: {concept, label, origin, sourceRatio},  // its tags under the bar, highest ratio first
+  candidates?: {phrases, single, underBar?, underFloor?, nearCopy?, tooCommon?, incoherent?, dropped?, notChosen?}
+} }
+```
+
+- `bar` is `discover.sourceCoherenceRatio` when discovery ran, else `null` (then every tag shows).
+  `count` is the number of items listed; `none` the number whose `under` is empty, which have no tag
+  at any ratio. A viewer set at v shows a listed item again once any `under` ratio is at or above v.
+- One universe item is one real-world article, so an article two systems list is one entry, under the
+  key the universe kept.
+- `reasons`, in this order, each present only when it applies: `underBar` (tags under the bar, or
+  phrases under it no item chose), `underFloor` (phrases under `sourceRatioFloor`), `nearCopy` (phrases
+  that recur only in near-copies of one story, so on fewer than `minDf` items counted once), `tooCommon`
+  (on more than `maxDfRatio` of the items), `incoherent` (the items holding the phrase are not alike
+  without it), `dropped` (a hub chosen and then left on fewer than `minDf` items), `notChosen` (a hub at
+  the bar that no item chose); when none applies, `noRecurring` (no candidate phrase is on another item)
+  or `noCandidate` (the text has no candidate phrase); with discovery off, `noDiscovery`.
+- `candidates` lists every candidate phrase in each group with its numbers, spelled as the item writes
+  it: `{phrase, sourceRatio}` under and below the bar (`attached` says whether a below-bar hub was
+  attached), `{phrase, items, df}` for near-copies, `{phrase, df, of}` too common, `{phrase, df,
+  coherence, bar}` incoherent. `single` counts the phrases on this item alone. `why` names at most
+  eight phrases per sentence and says how many more there are.
+
+The reasons come from `rtz-discover --report FILE` (rtz-build writes it as `discover.report.json` when
+discovery runs, and reads it only then): `{schema: "rosetta-tagz/discover-report@1", bar, floor, minDf,
+maxDfRatio, items, untagged: {<item key>: {members[], candidates, single, nearCopy[], tooCommon[],
+incoherent[], underFloor[], underBar[], dropped[], notChosen[]}}}`, one entry for every item no tag-system
+tagged and no hub at or above the bar reached. `members` lists every record key of the same article. The
+report is a reading of what discovery measured; it changes no record (the records rtz-discover writes are
+the same with or without `--report`). The report's file name and the reason codes are provisional. A
+failure reading either file is one line on stderr and `build.json` without `untagged`; it never fails
+the build.
+
+## SKOS serialization (`rtz-skos`)
+
+`rtz-skos universe.json [-o DIR] [--base IRI] [--lang TAG | --no-lang]` writes `skos.jsonld` and
+`skos.ttl` beside `universe.json` (`lib/skos.js`): the same triples in two syntaxes, written both or
+neither (each to a `.tmp` first, then renamed). `rtz-build` runs it after `rtz-universe`; a failure is
+one stderr line, `rtz-build: skos files not written (<reason>)`, and never fails the build. JSON stays
+the working format; these files are for interchange.
+
+Switches, in rtz-build's config (`"skos": {...}`, or `false` for no files) or on the command line:
+
+| key | default | what it does |
+|---|---|---|
+| `skos.base` (`--base`) | `urn:rosetta-tagz:` (provisional) | the IRI concepts, schemes and items are named under. The default names nothing on the web; a site that publishes its vocabulary sets its own (an absolute IRI without the characters Turtle forbids, else the stage refuses it in one line) |
+| `skos.lang` (`--lang`, `--no-lang`) | `en` | the language tag on every label; `null` (`--no-lang`) writes plain literals |
+
+The graph, with `<base>` the base and ids percent-encoded:
+
+| resource | IRI | triples |
+|---|---|---|
+| scheme | `<base>scheme/<id>` | `a skos:ConceptScheme`, `skos:prefLabel` its id, `rtz:schemeKind` (`site`, `discovered` or `system`) |
+| concept | `<base>concept/<id>` | `a skos:Concept`, `skos:inScheme` the `site` scheme, `skos:notation` its id, `skos:prefLabel` its canonical, `skos:altLabel` every other spelling, `rtz:discovered true` when only discovery proposed it, `rtz:sourceRatio` when it has one |
+| a concept's form in a scheme | `<base>concept/<id>/<scheme>` | `a skos:Concept`, `skos:inScheme` that scheme alone, `skos:prefLabel` that scheme's prefLabel, its altLabels, `rtz:formOf` the concept |
+| item | `<base>item/<key>` | `dcterms:title`, `rdfs:seeAlso` its url (when an absolute http(s) url), `dcterms:subject` each concept it is tagged with |
+
+- **exactMatch.** The forms of one concept are the spellings rtz-stone merged at or above
+  `mergeThreshold`, so they are written `skos:exactMatch` every pair, the concept in `site` included.
+  This is where `exactMatch` lives; a human's `exactMatch` relation is written as the other mappings are.
+- **Relations.** `broader` and `related` with `skos: true` go between the concepts in `site`, `broader
+  {a, b}` written `b skos:broader a`. The mapping relations (`closeMatch`, `broadMatch`, `relatedMatch`,
+  `exactMatch`) map across schemes, so they go between the forms in their own schemes, every pair of a's
+  forms and b's (a concept filed only in `site` maps from its concept there); `broadMatch {a, b}` is
+  written `b skos:broadMatch a`, and toward a published vocabulary (`b` = `<scheme>:<id>`, IRI
+  `<base>external/<scheme>/<id>`) `a skos:broadMatch b`, as post-pipe reads it. Every relation SKOS has
+  no name for (`adjacent`, `near`, `synergy`, `opposes`, a cross-scheme `related` without text support,
+  all `skos: false`) is `rtz:<type>` between the concepts in `site`, and a relation an override
+  forbade (`forbidden[]`) is `rtz:notRelated`, its type in `rtz:relationType`.
+- **PROV: reified statements.** Every relation triple and every `dcterms:subject` triple is reified:
+  an `rdf:Statement` with `rdf:subject`, `rdf:predicate` and `rdf:object`, carrying `rtz:why`,
+  `rtz:weight`, `rtz:origin` and `rtz:sourceRatio` where the universe has them, `prov:wasDerivedFrom`
+  one blank `prov:Entity` per piece of evidence (its `type` as `rtz:evidenceType`, every other field
+  as `rtz:<field>`), and `prov:wasGeneratedBy` a blank `prov:Activity` of its own (`rtz:activity` the
+  stage, one `rtz:<parameter>` per parameter, an object parameter as its JSON). Reification, not one
+  named activity per stage, because the parameters differ per assertion (a hub's `df`, `coherence` and
+  `sourceRatio`). A mapping written between several pairs of forms is reified once per pair.
+- Literals: numbers typed `xsd:integer` or `xsd:decimal` (`xsd:double` for exponent forms), booleans
+  `xsd:boolean`, labels with the language tag, other strings plain, the same in both files.
+- **Names of rosetta-tagz's own, all provisional:** the namespace `rtz:` = `urn:rosetta-tagz:vocab#`;
+  the scheme ids `site` and `discovered`; `rtz:schemeKind`, `rtz:formOf`, `rtz:discovered`,
+  `rtz:sourceRatio`, `rtz:notRelated`, `rtz:relationType`, `rtz:why`, `rtz:weight`, `rtz:origin`,
+  `rtz:activity`, `rtz:evidenceType`, the evidence and parameter properties, and `rtz:<type>` for the
+  relations SKOS does not name. `broaderDepth` is a post-pipe viewer setting and is not written.
+
+**Checking it.** `python3 tools/skos-check.py DIR` (rdflib 7; it installs nothing) parses both files,
+counts their triples, checks they are the same graph (the triples without blank nodes identical, the
+blank-node structure identical by neighbourhood hashing: rdflib's full isomorphism test takes minutes
+here), and runs the SKOS integrity conditions SPARQL can express: at most one `prefLabel` per language
+per concept, and so per scheme (S14); `prefLabel` and `altLabel` disjoint (S13); no `broader` cycle;
+`related` or `closeMatch` not on a pair `broader` joins either way, read transitively and through
+`rtz:formOf` (S27); `exactMatch` not on a pair with `broadMatch` or `relatedMatch` (S46). It exits 1
+when any fails. The test (`test/skos.test.js`) runs it only when `python3` with rdflib is present.
+
+On the synthetic corpus the check finds one S27 violation, from the engine, not the serialization: a
+seed says `AI` broader `Machine Learning`, and co-occurrence also makes the pair `related`. The lexical
+rule replaces a `related` with the hierarchy (Relations, above); a seed's or a human's `broader` does
+not yet. haroldyounghumxn.site's build of 2026-10-31 has no such pair.
+
+Skosify (not installed; installing it is Harold's decision) would be run on the Turtle file as
+`skosify -f turtle -F turtle -o skos.skosify.ttl skos.ttl`, its log listing what it would change; the
+exact flags should be checked against `skosify --help` once it is installed.
+
 ## Trying another bar (`sourceRatio`)
 
 A viewer cannot rerun discovery, so rosetta-tagz hands over what it needs to filter at view time:

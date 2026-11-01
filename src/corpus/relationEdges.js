@@ -45,6 +45,11 @@ function tagLabelByConcept(items, options = {}) {
   const containerTags = new Set(
     (options.containment || []).map((c) => (c && c.tag !== undefined ? c.tag : null)).filter((t) => t !== null)
   );
+  // a container's tag resolved to its concept (src/lib/rtagz.js) is a
+  // container's whatever label it shows
+  const containerConcepts = new Set(
+    (options.containment || []).map((c) => (c && typeof c.concept === 'string' && c.concept ? c.concept : null)).filter((x) => x !== null)
+  );
   const labelOf = new Map();
   for (const item of items || []) {
     const refs = Array.isArray(item && item._references) ? item._references : null;
@@ -53,6 +58,7 @@ function tagLabelByConcept(items, options = {}) {
       if (containerTags.has(tag)) continue;
       const ref = refs.find((r) => r && r.type === 'tag' && r.value === tag);
       if (!ref || ref.concept === undefined || ref.concept === null) continue;
+      if (containerConcepts.has(ref.concept)) continue;
       if (!labelOf.has(ref.concept)) labelOf.set(ref.concept, tag);
     }
   }

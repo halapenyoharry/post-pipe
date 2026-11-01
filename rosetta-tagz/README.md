@@ -26,6 +26,7 @@ No AI inference by default. No dependencies. No network at runtime (the viewer i
       ▼
    rtz-universe                              stone.json + items joined               → universe.json
       │
+      ├─ rtz-skos                                      → skos.jsonld + skos.ttl (SKOS with PROV)
       ├─ rtz-graph   raw | hyper | dyadic | concepts   → {nodes, links} for any renderer
       └─ rtz-view                                      → one standalone 3D HTML file
 ```

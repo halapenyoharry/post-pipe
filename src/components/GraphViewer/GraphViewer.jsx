@@ -35,6 +35,8 @@ import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
 import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
+import { tagEdgeLabel } from '../../lib/provenance';
+import { containerHas } from '../../lib/containers';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 
 // The settings a link node's newTab rule is read from.
@@ -78,7 +80,7 @@ function feedToGraph(feed, config = {}) {
     let containerColor = null;
     const containersList = feed.containers || config.containment || [];
     for (const c of containersList) {
-      if (c.parent && c.tag && (item.tags || []).includes(c.tag)) {
+      if (c.parent && c.tag && containerHas(c, item)) {
         containerColor = c.badgeColor || c.color || c.stroke;
         break;
       }
@@ -197,8 +199,11 @@ function feedToGraph(feed, config = {}) {
     }
 
     // What the line says when hovered or tapped: its own label if it has one
-    // (a flashback, say), otherwise its role.
-    const label = edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
+    // (a flashback, say), otherwise its role; a card-to-tag edge adds its why
+    // and the PROV pair when rosetta-tagz wrote them (lib/provenance.js).
+    const label = edge.layer === 'tag'
+      ? tagEdgeLabel(edge)
+      : edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
     const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label };
     // A discovered tag's source coherence ratio, for the panel's slider of
     // that name (lib/sourceRatio.js): only a tag edge carries one.
@@ -3194,7 +3199,9 @@ export function GraphViewer({
       edgeLabelTimer = null;
       edgeLabelFor = l;
       edgeLabelEl = el;
-      if (l && l.layer === 'relation') { edgeLabel.raise(); edgeLabelLifted = true; }
+      // a label of several lines (a relation's, or a card-to-tag edge with
+      // its why and provenance) is lifted over the cards that would cover it
+      if (l && (l.layer === 'relation' || String(l.label).includes('\n'))) { edgeLabel.raise(); edgeLabelLifted = true; }
       else lowerEdgeLabel();
       placeEdgeLabel();
     }
@@ -3513,12 +3520,18 @@ export function GraphViewer({
     }
 
     // The small lines beside a tag bubble (lib/tagForms.js: what each system
-    // writes, who named it), shown while the tag is hovered or active. The
-    // concept is looked up by its id where rosetta-tagz named one, else by the
-    // label. Null when there is nothing to show.
+    // writes, who named it, its label in each scheme, its mappings, and the
+    // tags a bubble stands for at the depth chosen), shown while the tag is
+    // hovered or active. The concept is looked up by its id where rosetta-tagz
+    // named one, else by the label. Null when there is nothing to show.
+    const groupMembersOf = (d) => {
+      if (!d._groupKey) return null;
+      const folded = data.nodes.filter((n) => n._groupedInto === d.id);
+      return folded.length ? [d, ...folded].map((n) => n.label) : null;
+    };
     function buildTagForms(el, d, fontSize) {
       const formLines = d.type === 'tag'
-        ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items))
+        ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items), { rtagz: feedData._rtagz, members: groupMembersOf(d) })
         : [];
       if (!formLines.length) return null;
       const formFontSize = Math.round(fontSize * 0.65);
@@ -4598,7 +4611,11 @@ export function GraphViewer({
     function relabelBubble(entry, label, fallback) {
       const { d, el, textEl, fontSize } = entry;
       const shown = label || d.label;
-      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback)) return;
+      // the members a bubble stands for are in its forms, so a change of them
+      // redraws it too
+      const membersKey = (groupMembersOf(d) || []).join('\u0000');
+      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback) && entry.membersKey === membersKey) return;
+      entry.membersKey = membersKey;
       d._shownLabel = shown;
       entry.fallback = Boolean(fallback);
       const p = tagProbe();

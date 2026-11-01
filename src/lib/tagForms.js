@@ -196,7 +196,12 @@ function tagForms(rtagz, key, fallback) {
       if (spellings.length) forms.push({ system, spellings });
     }
 
-    if (!hasExtraBeyondCanonical(forms, label)) return null;
+    // Nothing to show: one system writing the canonical, no scheme naming
+    // the concept otherwise, and no mapping.
+    const prefLabels = concept.prefLabel && typeof concept.prefLabel === 'object' ? Object.values(concept.prefLabel) : [];
+    const otherLabel = prefLabels.some((l) => typeof l === 'string' && l && l !== label);
+    const anyMapping = Array.isArray(concept.mappings) && concept.mappings.length > 0;
+    if (!hasExtraBeyondCanonical(forms, label) && !otherLabel && !anyMapping) return null;
 
     const rank = Array.isArray(concept.rank)
       ? concept.rank.map((r) => ({
@@ -257,15 +262,81 @@ function winningPart(rank) {
   return bestWord;
 }
 
-// The lines shown beside a tag bubble: one "<system> writes <spelling>" line
-// per system, and "named by <winning part>" when a rank entry is present.
-function tagFormsLines(info) {
-  if (!info || !Array.isArray(info.forms) || info.forms.length === 0) return [];
-  const lines = info.forms.map(
-    (f) => `${f.system} writes ${(f.spellings || []).map((s) => s.label).join(', ')}`
-  );
-  const winner = winningPart(info.rank);
+// feed._rtagz from a feed or the summary itself, or null.
+function summaryOf(rtagz) {
+  if (!rtagz || typeof rtagz !== 'object' || Array.isArray(rtagz)) return null;
+  if (rtagz._rtagz && typeof rtagz._rtagz === 'object') return rtagz._rtagz;
+  return rtagz;
+}
+
+// A scheme's name as the panel shows it: its label in _rtagz.schemes (the
+// site's own scheme carries the site's title there), else its id.
+function schemeName(summary, id) {
+  const list = summary && Array.isArray(summary.schemes) ? summary.schemes : [];
+  const s = list.find((x) => x && x.id === id);
+  return s && typeof s.label === 'string' && s.label ? s.label : id;
+}
+
+// What a mapping's target is called: one of rosetta-tagz's own concepts by its
+// canonical, a published vocabulary's concept by its label there with the
+// vocabulary named, else the target as written.
+function targetName(summary, target) {
+  const concepts = summary && Array.isArray(summary.concepts) ? summary.concepts : [];
+  const own = concepts.find((c) => c && c.id === target);
+  if (own && typeof own.canonical === 'string' && own.canonical) return own.canonical;
+  const ext = summary && summary.external && typeof summary.external === 'object' ? summary.external[target] : null;
+  if (ext) {
+    const scheme = typeof ext.scheme === 'string' && ext.scheme ? ext.scheme
+      : (typeof target === 'string' && target.includes(':') ? target.slice(0, target.indexOf(':')) : '');
+    let label = '';
+    if (typeof ext.prefLabel === 'string') label = ext.prefLabel;
+    else if (ext.prefLabel && typeof ext.prefLabel === 'object') {
+      label = typeof ext.prefLabel[scheme] === 'string' ? ext.prefLabel[scheme] : (Object.values(ext.prefLabel).find((v) => typeof v === 'string' && v) || '');
+    }
+    if (label) return scheme ? `${label} (${schemeName(summary, scheme)})` : label;
+  }
+  return String(target);
+}
+
+// The lines shown beside a tag bubble:
+//   one "<system> writes <spellings>" line per system, and "named by
+//   <winning part>" when a rank entry is present;
+//   the concept's label in each scheme, "in <scheme>: <label>", the site's
+//   own scheme first and named by the site's title as the panel names it
+//   (options.rtagz, feed._rtagz, gives the scheme names), then the others in
+//   the concept's inScheme order;
+//   each mapping, "<type> <target> · weight <w>", the target named by
+//   targetName;
+//   for a bubble standing for several tags at the depth chosen,
+//   "stands for <member>, <member>, …" (options.members, their labels).
+// info may be null when only the members have something to say.
+function tagFormsLines(info, { rtagz, members } = {}) {
+  const lines = [];
+  if (info && Array.isArray(info.forms)) {
+    for (const f of info.forms) lines.push(`${f.system} writes ${(f.spellings || []).map((s) => s.label).join(', ')}`);
+  }
+  const winner = info && lines.length ? winningPart(info.rank) : null;
   if (winner) lines.push(`named by ${winner}`);
+  const summary = summaryOf(rtagz);
+  if (info && info.prefLabel && typeof info.prefLabel === 'object') {
+    const order = ['site', ...(Array.isArray(info.inScheme) ? info.inScheme : []), ...Object.keys(info.prefLabel)];
+    const seen = new Set();
+    for (const scheme of order) {
+      if (seen.has(scheme)) continue;
+      seen.add(scheme);
+      const label = info.prefLabel[scheme];
+      if (typeof label === 'string' && label) lines.push(`in ${schemeName(summary, scheme)}: ${label}`);
+    }
+  }
+  if (info && Array.isArray(info.mappings)) {
+    for (const m of info.mappings) {
+      if (!m || typeof m.type !== 'string' || typeof m.target !== 'string') continue;
+      const w = typeof m.weight === 'number' && Number.isFinite(m.weight) ? ` · weight ${m.weight}` : '';
+      lines.push(`${m.type} ${targetName(summary, m.target)}${w}`);
+    }
+  }
+  const names = Array.isArray(members) ? members.filter((x) => typeof x === 'string' && x) : [];
+  if (names.length > 1) lines.push(`stands for ${names.join(', ')}`);
   return lines;
 }
 

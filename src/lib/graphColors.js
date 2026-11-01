@@ -8,10 +8,12 @@
 // such edges or nodes. feed is what the graph draws (an item kept out of the
 // graph by the top bar is not counted: graphFeed in src/lib/topBar.js).
 // Offering a picker that changes nothing on screen is the thing this avoids.
+const { containerHas } = require('./containers');
+
 function colorKeysInUse(feed) {
   if (!feed || !Array.isArray(feed.items)) return null;
   const containers = feed.containers || [];
-  const inContainer = (item) => containers.some((c) => c.parent && c.tag && (item.tags || []).includes(c.tag));
+  const inContainer = (item) => containers.some((c) => c.parent && c.tag && containerHas(c, item));
   const used = new Set();
   const ids = new Set(feed.items.map((i) => i.id));
   for (const item of feed.items) {

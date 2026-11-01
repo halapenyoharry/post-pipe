@@ -15,6 +15,7 @@
     "rtz-emerge": "bin/rtz-emerge",
     "rtz-translate": "bin/rtz-translate",
     "rtz-universe": "bin/rtz-universe",
+    "rtz-skos": "bin/rtz-skos",
     "rtz-graph": "bin/rtz-graph",
     "rtz-lookup": "bin/rtz-lookup",
     "rtz-override": "bin/rtz-override",
