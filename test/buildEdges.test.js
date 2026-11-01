@@ -226,3 +226,68 @@ test('non-tag _references emit reference edges with types and weights while keep
     weight: 0.9,
   });
 });
+
+// The tag references are the source of the tag edges (src/lib/tagReferences.js);
+// item.tags stands in only when the item has none.
+test('tag references with an empty tags list still make the tag edges, in the references\' order, with their attrs', () => {
+  const containment = [{ id: 'container:act-1', tag: 'act-1', concept: 'c_act_1' }];
+  const items = [item('a', {
+    tags: [],
+    _references: [
+      { type: 'tag', value: 'Beta', concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2' },
+      { type: 'untagged', why: ['under the bar'], reason: 'underBar' },
+      { type: 'tag', value: 'Act One', concept: 'c_act_1', weight: 1, origin: 'explicit', why: null },
+      { type: 'tag', value: 'Alpha', concept: 'c_alpha', weight: 1, origin: 'explicit', why: null },
+    ],
+  })];
+  const edges = buildEdges(items, { containment });
+  assert.deepStrictEqual(edges.filter((e) => e.layer === 'tag').map((e) => [e.target, e.attrs]), [
+    ['tag:Beta', { concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2' }],
+    ['tag:Alpha', { concept: 'c_alpha', weight: 1, origin: 'explicit' }],
+  ]);
+  // The reference naming the container's concept is containment, as it is from item.tags.
+  assert.deepStrictEqual(
+    edges.filter((e) => e.layer === 'containment').map((e) => [e.source, e.target]),
+    [['container:act-1', items[0].id]]
+  );
+  // The same with no tags list at all, and an adapter's reference without rosetta-tagz's fields.
+  const noList = buildEdges([item('b', { _references: [{ type: 'tag', value: 'Alpha' }] })]);
+  assert.deepStrictEqual(noList.map((e) => e.target), ['tag:Alpha']);
+  assert.ok(!('attrs' in noList[0]));
+});
+
+test('tags with no references still make the tag edges (the fallback), as before', () => {
+  const containment = [{ id: 'container:act-1', tag: 'act-1' }];
+  const edges = buildEdges([item('a', { tags: ['Gamma', 'act-1', 'Alpha'] })], { containment });
+  assert.deepStrictEqual(edges.map((e) => [e.layer, e.target]), [
+    ['tag', 'tag:Gamma'],
+    ['tag', 'tag:Alpha'],
+    ['containment', 'https://example.test/a.html'],
+  ]);
+  assert.ok(edges.filter((e) => e.layer === 'tag').every((e) => !('attrs' in e)));
+  // References of other types do not stop the fallback.
+  const withImage = buildEdges([item('b', { tags: ['Alpha'], _references: [{ type: 'image', value: 'covers/b.png' }] })]);
+  assert.deepStrictEqual(withImage.map((e) => [e.layer, e.target]), [['tag', 'tag:Alpha'], ['reference', 'image:covers/b.png']]);
+});
+
+test('an item with both gets the same edges, in the same order, as its tags gave before', () => {
+  const refs = [
+    { type: 'tag', value: 'Alpha', concept: 'c_alpha', weight: 1, origin: 'explicit', why: null },
+    { type: 'tag', value: 'Beta', concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2', sourceRatio: 2.1 },
+    { type: 'tag', value: 'Gamma', concept: 'c_gamma', weight: 0.5, origin: 'discovered', why: 'recurs in 2 of 4 items' },
+  ];
+  const both = item('a', { tags: ['Alpha', 'Beta', 'Gamma'], _references: refs, topology: ['loop'] });
+  const edges = buildEdges([both]);
+  assert.deepStrictEqual(edges.map((e) => [e.layer, e.target]), [
+    ['tag', 'tag:Alpha'], ['tag', 'tag:Beta'], ['tag', 'tag:Gamma'], ['topology', 'topology:loop'],
+  ]);
+  assert.deepStrictEqual(edges.slice(0, 3).map((e) => e.attrs), [
+    { concept: 'c_alpha', weight: 1, origin: 'explicit' },
+    { concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2', sourceRatio: 2.1 },
+    { concept: 'c_gamma', weight: 0.5, origin: 'discovered', why: 'recurs in 2 of 4 items' },
+  ]);
+  // The same item with its tags list emptied, or without one, gives the same edges.
+  assert.deepStrictEqual(buildEdges([{ ...both, tags: [] }]), edges);
+  const { tags, ...noList } = both;
+  assert.deepStrictEqual(buildEdges([noList]), edges);
+});

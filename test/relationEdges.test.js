@@ -263,3 +263,42 @@ test('relationEdges: from the canned universe, each relation edge joins two tags
   assert.deepStrictEqual(Object.keys(explicit.attrs), ['concept', 'weight', 'origin', 'wasDerivedFrom', 'wasGeneratedBy']);
   assert.deepStrictEqual(explicit.attrs.wasGeneratedBy, { activity: 'ingest' });
 });
+
+// The tag references are the source of the labels (src/lib/tagReferences.js);
+// item.tags stands in only when an item has none, and names no concept.
+test('relationEdges: tag references with an empty tags list still label the concepts, so the relations are drawn as before', () => {
+  const relations = [
+    { a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6 },
+    { a: 'c_beta', b: 'c_gamma', type: 'broader', weight: 1 },
+    { a: 'c_act', b: 'c_alpha', type: 'related' },
+  ];
+  const before = relationEdges(rtagzWith(relations), ITEMS, { containment: CONTAINMENT });
+  assert.deepStrictEqual(before.map((e) => [e.source, e.target]), [['tag:Alpha', 'tag:Beta'], ['tag:Gamma', 'tag:Beta']]);
+  const emptied = ITEMS.map((it) => ({ ...it, tags: [] }));
+  assert.deepStrictEqual(relationEdges(rtagzWith(relations), emptied, { containment: CONTAINMENT }), before);
+  const noList = ITEMS.map(({ tags, ...rest }) => rest);
+  assert.deepStrictEqual(relationEdges(rtagzWith(relations), noList, { containment: CONTAINMENT }), before);
+});
+
+test('relationEdges: tags with no references name no concept, so there is nothing to draw, as before', () => {
+  const tagsOnly = ITEMS.map(({ _references, ...rest }) => rest);
+  assert.deepStrictEqual(relationEdges(rtagzWith([{ a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6 }]), tagsOnly), []);
+  // A mixed corpus: the piece with references labels its concepts, the one without adds nothing.
+  const mixed = [ITEMS[0], { ...ITEMS[1], _references: undefined }];
+  const edges = relationEdges(rtagzWith([
+    { a: 'c_alpha', b: 'c_beta', type: 'related', weight: 0.6 },
+    { a: 'c_beta', b: 'c_gamma', type: 'related', weight: 0.6 },
+  ]), mixed);
+  assert.deepStrictEqual(edges.map((e) => [e.source, e.target]), [['tag:Alpha', 'tag:Beta']]);
+});
+
+test('relationEdges: the endpoint is the reference\'s value, the string buildEdges uses, whatever item.tags spells', () => {
+  const items = [{ ...ITEMS[0], tags: ['alpha', 'beta', 'act'] }, { ...ITEMS[1], tags: ['beta', 'gamma'] }];
+  const edges = relationEdges(rtagzWith([{ a: 'c_alpha', b: 'c_beta', type: 'related' }]), items, { containment: CONTAINMENT });
+  assert.deepStrictEqual(edges.map((e) => [e.source, e.target]), [['tag:Alpha', 'tag:Beta']]);
+  const tagTargets = new Set(buildEdges(items, { containment: CONTAINMENT }).filter((e) => e.layer === 'tag').map((e) => e.target));
+  for (const e of edges) {
+    assert.ok(tagTargets.has(e.source), `${e.source} has a tag edge`);
+    assert.ok(tagTargets.has(e.target), `${e.target} has a tag edge`);
+  }
+});
