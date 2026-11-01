@@ -291,3 +291,18 @@ test('an item with both gets the same edges, in the same order, as its tags gave
   const { tags, ...noList } = both;
   assert.deepStrictEqual(buildEdges([noList]), edges);
 });
+
+test('a tag written as a number still makes its edge, as it did before the helper', () => {
+  // gray-matter reads `tags: [2024, ai]` as a number and a string, and the
+  // adapter writes a reference for each; the number's edge is tag:2024.
+  const edges = buildEdges([item('a', {
+    tags: [2024, 'ai'],
+    _references: [{ type: 'tag', value: 2024 }, { type: 'tag', value: 'ai' }],
+  })]);
+  assert.deepStrictEqual(edges.map((e) => [e.layer, e.target]), [['tag', 'tag:2024'], ['tag', 'tag:ai']]);
+  // With no references at all (an older feed), from item.tags.
+  const [edge] = buildEdges([item('b', { tags: [2024] })]);
+  assert.strictEqual(edge.layer, 'tag');
+  assert.strictEqual(edge.target, 'tag:2024');
+  assert.strictEqual(edge.role, 'tagged');
+});
