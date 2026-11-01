@@ -15,6 +15,7 @@ export const RELATION_TYPES = ['broader', 'related', 'adjacent', 'near', 'synerg
 
 const defaults = {
   labels: null, // Map<conceptId, label> to override canonical labels (live re-ranking)
+  broaderDepth: 0, // (provisional) steps up broader relations when choosing a concept's label (0 = the concept itself)
   focus: null,
   hops: 2,
   relations: true,
@@ -29,7 +30,26 @@ const defaults = {
 export function projectGraph(U, mode = 'hyper', options = {}) {
   const o = { ...defaults, ...options };
   const concept = new Map(U.concepts.map((c) => [c.id, c]));
-  const label = (cid) => o.labels?.get(cid) ?? concept.get(cid)?.canonical ?? cid;
+  const broaderOf = new Map();
+  for (const r of U.relations ?? []) {
+    if (r.type === 'broader' && !broaderOf.has(r.b)) broaderOf.set(r.b, r.a);
+  }
+  const walkBroader = (cid, depth = o.broaderDepth) => {
+    let cur = cid;
+    const seen = new Set([cur]);
+    const steps = Number.isFinite(Number(depth)) ? Math.max(0, Math.round(Number(depth))) : 0;
+    for (let i = 0; i < steps; i++) {
+      const up = broaderOf.get(cur);
+      if (!up || seen.has(up) || !concept.has(up)) break;
+      seen.add(up);
+      cur = up;
+    }
+    return cur;
+  };
+  const label = (cid) => {
+    const target = o.broaderDepth > 0 ? walkBroader(cid, o.broaderDepth) : cid;
+    return o.labels?.get(target) ?? concept.get(target)?.canonical ?? target;
+  };
   const srcOk = (s) => !o.hiddenSources || !o.hiddenSources.has(s);
   const items = U.items.filter((it) => srcOk(it.source) || (it.alsoIn ?? []).some(srcOk));
   const tagsOf = (it) => it.tags.filter((t) => (o.emergent || t.origin === 'explicit') && t.w >= o.minWeight && (!t.sys || t.sys.some(srcOk)));

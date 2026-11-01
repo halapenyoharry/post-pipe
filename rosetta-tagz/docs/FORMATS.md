@@ -205,7 +205,7 @@ member of a seed alias group (`artificial general intelligence` finds the corpus
 ## `stone.json`
 
 ```
-schema, generated, config{mergeThreshold, link, canon, sourceWeights, signals}, stats{…}
+schema, generated, config{mergeThreshold, link, canon, sourceWeights, signals, lexicalBroader, broaderDepth}, stats{…}
 systems{ <source>: {items, tagged, untagged, occurrences, distinctTags, weight, color} }
 concepts[]: {
   id, canonical, pinned, locked, discovered, sourceRatio?, items, sources{src:nItems},
@@ -300,7 +300,10 @@ where each comes from:
 **Direction.** `broader {a, b}` means b `skos:broader` a (a is the wider one), and so `broadMatch {a, b}`
 means b `skos:broadMatch` a. `narrower` and `narrowMatch` are never emitted: the inverse is implied. An
 override written with `narrower`, `contains` or `narrowMatch` is stored flipped onto `broader` /
-`broadMatch`.
+`broadMatch`. Both `relate.lexicalBroader` (`{ minP: 0.5, minN: 2 }`; `false` or `null` disables lexical
+containment) and `relate.broaderDepth` / `broaderDepth` (default `0`: steps up `skos:broader` a projection
+or viewer walks when reading or grouping concept labels) are exposed in `lib/config.js` (`DEFAULTS`) and
+`stone.json.config` as provisional parameters.
 
 **SKOS typing.** After the concepts know their schemes, two concepts *share a scheme* when
 `inScheme(a) ∩ inScheme(b)` minus `site` is non-empty (every concept is in `site`, so it says nothing).
@@ -364,7 +367,7 @@ before 2026-10-31); rosetta-tagz's own `local/real.config.json` names `ledger.js
 ```
 { schema: "rosetta-tagz/ledger@1", created, updated, builds,
   concepts: { <id>: {members[], label, pin?, since, lastSeen, parent?} },   // live ids, members are norms
-  retired:  { <id>: {members[], label, since, lastSeen, into?} },           // ids no cluster continues; `into` when absorbed
+  retired:  { <id>: {members[], label, since, lastSeen, retiredAt, retiredBuilds?, into?} }, // ids no cluster continues; `into` when absorbed
   events:   [ {type:"split", at, parent, children[]} | {type:"merge", at, parents[], child} | {type:"retire", at, ids[]} ] }
 ```
 
@@ -372,8 +375,11 @@ before 2026-10-31); rosetta-tagz's own `local/real.config.json` names `ledger.js
 somebody wrote, or a human's pin), `pin` the first member norm (in member order) a human pinned a
 canonical on; when several members are pinned the others stay members, which already carries their
 continuity. The ledger never holds a label that is not a member norm, the canonical, or a pin.
-`retired` is kept indefinitely, so a term that comes back after any gap gets its id back and no
-later mint can take a retired id; nothing prunes it yet (a retention rule would be a shape revision).
+A retired entry records `retiredAt` (the build timestamp when it left `concepts`) and is kept for up
+to `ledger.retiredMaxBuilds` builds (default `50`, provisional; `0` or `null` keeps forever) and
+`ledger.retiredMaxDays` days since `retiredAt` (default `90`, provisional; `0` or `null` keeps
+forever), so a term that comes back within the retention window gets its id back and no later mint
+takes a retained retired id.
 
 How each cluster finds its id, in cluster order (`lib/ledger.js`, `assignIds`):
 

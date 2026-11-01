@@ -5,7 +5,7 @@
 // Format `rosetta-tagz/ledger@1`:
 //   { schema, created, updated, builds,
 //     concepts: { id: { members[], label, pin?, since, lastSeen, parent? } },   // live ids
-//     retired:  { id: { members[], label, since, lastSeen, into? } },           // ids no cluster continues
+//     retired:  { id: { members[], label, since, lastSeen, retiredAt, retiredBuilds?, into? } }, // ids no cluster continues
 //     events:   [ { type: split|merge|retire, at, … } ] }                        // the 200 most recent
 //
 // Nothing in here is invented: `members` are norms the corpus wrote, `label` is the canonical the
@@ -17,9 +17,21 @@ import { normalizeLabel, slugify } from './normalize.js';
 
 export const LEDGER_SCHEMA = 'rosetta-tagz/ledger@1';
 export const MAX_EVENTS = 200;
+export const DEFAULT_RETENTION = { retiredMaxBuilds: 50, retiredMaxDays: 90 };
 
 const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const normOf = (label) => normalizeLabel(label).norm;
+
+function isRetiredExpired(entry, { now = null, builds = 1, maxBuilds = DEFAULT_RETENTION.retiredMaxBuilds, maxDays = DEFAULT_RETENTION.retiredMaxDays } = {}) {
+  if (typeof maxBuilds === 'number' && maxBuilds > 0 && builds > maxBuilds) return true;
+  const stamp = entry?.retiredAt ?? entry?.lastSeen;
+  if (typeof maxDays === 'number' && maxDays > 0 && now && stamp) {
+    const t0 = Date.parse(stamp);
+    const t1 = Date.parse(now);
+    if (Number.isFinite(t0) && Number.isFinite(t1) && (t1 - t0) / 86_400_000 > maxDays) return true;
+  }
+  return false;
+}
 
 export function emptyLedger(now = null) {
   return { schema: LEDGER_SCHEMA, created: now, updated: now, builds: 0, concepts: {}, retired: {}, events: [] };
@@ -77,10 +89,16 @@ export function writeLedger(file, ledger) {
 //      the id is live, retired or taken this build; live priors that overlap C without continuing
 //      anywhere are absorbed (a merge);
 //  (e) live priors no cluster touched are retired.
-export function assignIds(clusters, prior, { pins = [], now = null } = {}) {
+export function assignIds(clusters, prior, { pins = [], now = null, retention = {} } = {}) {
   const base = isLedger(prior) ? prior : emptyLedger(now);
   const live = base.concepts;
-  const gone = base.retired;
+  const maxBuilds = retention?.retiredMaxBuilds !== undefined ? retention.retiredMaxBuilds : DEFAULT_RETENTION.retiredMaxBuilds;
+  const maxDays = retention?.retiredMaxDays !== undefined ? retention.retiredMaxDays : DEFAULT_RETENTION.retiredMaxDays;
+  const gone = {};
+  for (const [id, r] of Object.entries(base.retired)) {
+    const builds = typeof r.retiredBuilds === 'number' ? r.retiredBuilds : 1;
+    if (!isRetiredExpired(r, { now, builds, maxBuilds, maxDays })) gone[id] = r;
+  }
   const pinSet = new Set(pins instanceof Map ? pins.keys() : pins);
 
   // indexes: norm -> live id (disjoint), norm -> retired ids, norm -> every prior carrying it
@@ -239,12 +257,18 @@ export function assignIds(clusters, prior, { pins = [], now = null } = {}) {
   let retiredNow = 0;
   for (const [id, c] of Object.entries(live)) {
     if (keeperOf.has(id)) continue;
-    const r = { members: c.members, label: c.label, since: c.since, lastSeen: c.lastSeen };
+    const r = { members: c.members, label: c.label, since: c.since, lastSeen: c.lastSeen, retiredAt: now };
     if (absorbedInto.has(id)) r.into = ids[absorbedInto.get(id)];
     next.retired[id] = r;
     retiredNow += 1;
   }
-  for (const [id, r] of Object.entries(gone)) if (!keeperOf.has(id)) next.retired[id] = r;
+  for (const [id, r] of Object.entries(gone)) {
+    if (keeperOf.has(id)) continue;
+    const nextBuilds = (typeof r.retiredBuilds === 'number' ? r.retiredBuilds : 1) + 1;
+    if (!isRetiredExpired(r, { now, builds: nextBuilds, maxBuilds, maxDays })) {
+      next.retired[id] = { ...r, retiredAt: r.retiredAt ?? r.lastSeen ?? now, retiredBuilds: nextBuilds };
+    }
+  }
 
   const events = [];
   for (const [id, children] of splitChildren) events.push({ type: 'split', at: now, parent: id, children: children.map((i) => ids[i]) });

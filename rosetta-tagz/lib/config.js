@@ -37,7 +37,9 @@ export const DEFAULTS = {
     minAdjacent: 0.3, // text cosine between concept profiles; also the text support a cross-scheme `related` needs to be a relatedMatch
     perConcept: 12,
     lexicalBroader: { minP: 0.5, minN: 2 }, // (provisional) "brain" ⊃ "brain scans" when P(brain | brain scans) >= minP on >= minN shared items
+    broaderDepth: 0, // (provisional) steps up skos:broader when projecting or grouping concept labels (0 = concept itself)
   },
+  broaderDepth: 0, // (provisional) top-level alias for relate.broaderDepth
 
   discover: {
     minDf: 2, // a phrase must recur in at least two items to connect anything
@@ -60,6 +62,11 @@ export const DEFAULTS = {
     maxDfRatio: 0.2, // a phrase present in >20% of items is too common to be a signal
     minWeight: 0.25,
     minContext: 0.12, // single-word labels: TF-IDF cosine the item must have with the tag's existing items
+  },
+
+  ledger: {
+    retiredMaxBuilds: 50, // (provisional) builds a retired concept id is kept before pruning; 0 or null keeps forever
+    retiredMaxDays: 90, // (provisional) days since retiredAt a retired concept id is kept before pruning; 0 or null keeps forever
   },
 };
 

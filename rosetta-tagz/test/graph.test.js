@@ -68,6 +68,8 @@ test('relation type filter and labels override', () => {
   assert.ok(only.links.length > 0 && only.links.every((l) => l.type === 'closeMatch'));
   const labels = new Map([[cid('ai'), 'Renamed']]);
   assert.equal(projectGraph(U, 'concepts', { labels }).nodes.find((n) => n.concept === cid('ai')).label, 'Renamed');
+  const step1 = projectGraph(U, 'concepts', { broaderDepth: 1 });
+  assert.equal(step1.nodes.find((n) => n.concept === cid('ml')).label, 'AI', 'broaderDepth: 1 walks one step up skos:broader');
 });
 
 test('hiding a tag-system removes its items and the concepts only it used', () => {

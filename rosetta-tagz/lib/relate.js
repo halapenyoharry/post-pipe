@@ -22,7 +22,7 @@ const quote = (s) => `"${s}"`;
 
 export function deriveRelations(corpus, concepts, cfg) {
   const R = cfg.relate;
-  const LB = R.lexicalBroader ?? { minP: 0.5, minN: 2 };
+  const LB = R.lexicalBroader === false || R.lexicalBroader === null ? null : { minP: 0.5, minN: 2, ...R.lexicalBroader };
   const labelOf = new Map(concepts.map((c) => [c.id, c.label ?? c.id]));
   const name = (id) => quote(labelOf.get(id) ?? id);
   const itemsOf = new Map();
@@ -139,7 +139,7 @@ export function deriveRelations(corpus, concepts, cfg) {
     stemSets.set(c.id, sets);
   }
   const visited = new Set(); // a pair is judged once, whichever of A's spellings the words came from
-  for (const c of concepts) {
+  for (const c of LB ? concepts : []) {
     for (const va of stemSets.get(c.id)) {
       if (!va.first) continue;
       for (const other of byStem.get(va.first) ?? []) {

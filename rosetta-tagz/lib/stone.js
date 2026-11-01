@@ -128,7 +128,7 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
       return { terms: cl.terms, label: named[i].canonical.label, ...(own.length && own.length < cl.terms.length ? { mint: own } : {}) };
     }),
     ledger?.prior ?? null,
-    { pins: pinByNorm.keys(), now },
+    { pins: pinByNorm.keys(), now, retention: cfg.ledger },
   );
   if (ledger) ledger.next = assigned.next;
 
@@ -225,7 +225,15 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   return {
     schema: STONE_SCHEMA,
     generated: now,
-    config: { mergeThreshold: cfg.mergeThreshold, link: cfg.link, canon: cfg.canon, sourceWeights: cfg.sourceWeights, signals: cfg.signals },
+    config: {
+      mergeThreshold: cfg.mergeThreshold,
+      link: cfg.link,
+      canon: cfg.canon,
+      sourceWeights: cfg.sourceWeights,
+      signals: cfg.signals,
+      lexicalBroader: cfg.relate.lexicalBroader,
+      broaderDepth: cfg.relate.broaderDepth ?? cfg.broaderDepth ?? 0,
+    },
     stats: {
       tags: corpus.terms.size,
       concepts: concepts.length,

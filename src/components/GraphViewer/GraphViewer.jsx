@@ -38,6 +38,7 @@ import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_P
 import { tagEdgeLabel } from '../../lib/provenance';
 import { containerHas } from '../../lib/containers';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
+import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -72,6 +73,11 @@ function feedToGraph(feed, config = {}) {
     }
   }
 
+  const sourceScaleById = new Map();
+  for (const s of (feed._sources || [])) {
+    if (s && s.id && Number(s.cardScale) > 0) sourceScaleById.set(s.id, Number(s.cardScale));
+  }
+
   for (const item of feed.items) {
     const slug = item.url.split('/').pop().replace('.html', '');
     idToSlug.set(item.id, slug);
@@ -85,6 +91,11 @@ function feedToGraph(feed, config = {}) {
         break;
       }
     }
+
+    const rawSourceScale = Number(item._source && item._source.cardScale)
+      || (item._source && sourceScaleById.get(item._source.id))
+      || 1;
+    const sourceCardScale = Number.isFinite(rawSourceScale) && rawSourceScale > 0 ? rawSourceScale : 1;
 
     nodes.push({
       id: slug,
@@ -104,6 +115,7 @@ function feedToGraph(feed, config = {}) {
       date: item.date_published ? item.date_published.split('T')[0] : '',
       reading_time: item.reading_time || '',
       tags: item.tags || [],
+      _references: Array.isArray(item._references) ? item._references : [],
       series: item.series || '',
       series_part: item.series_part ?? null,
       timeline: item.timeline || null,
@@ -134,6 +146,8 @@ function feedToGraph(feed, config = {}) {
       link: isLinkItem(item) ? linkOf(item) : '',
       subtitle: item.subtitle || '',
       _source: item._source || null,
+      _sourceCardScale: sourceCardScale,
+      _cardScale: sourceCardScale,
       originalItem: item
     });
   }
@@ -154,7 +168,34 @@ function feedToGraph(feed, config = {}) {
   // without them. They are drawn only from a selected tag to its relatives.
   const relations = [];
 
-  for (const edge of (feed.edges || [])) {
+  const allEdges = [...(feed.edges || [])];
+  const seenRefEdge = new Set(
+    allEdges
+      .filter((e) => e && e.layer === 'reference' && e.attrs && e.attrs.type && e.attrs.value)
+      .map((e) => `${e.source}\u0000${e.attrs.type}\u0000${e.attrs.value}`)
+  );
+  for (const item of feed.items) {
+    for (const ref of nonTagReferences(item)) {
+      const key = `${item.id}\u0000${ref.type}\u0000${ref.value}`;
+      if (seenRefEdge.has(key)) continue;
+      seenRefEdge.add(key);
+      const target = articleSlugs.has(ref.value)
+        ? ref.value
+        : (idToSlug.has(ref.value)
+          ? idToSlug.get(ref.value)
+          : (ref.value.startsWith(`${ref.type}:`) ? ref.value : `${ref.type}:${ref.value}`));
+      allEdges.push({
+        source: item.id,
+        target,
+        directed: Boolean(ref.directed),
+        role: ref.role || ref.type,
+        layer: ref.layer || 'reference',
+        attrs: { ...ref },
+      });
+    }
+  }
+
+  for (const edge of allEdges) {
     if (edge.layer === 'containment' || edge.role === 'contains') {
       containmentEdges.push({
         source: edge.source,
@@ -175,7 +216,11 @@ function feedToGraph(feed, config = {}) {
       continue;
     }
 
-    if (!visibleLayers.has(edge.layer)) continue;
+    const refType = edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type !== 'tag' ? edge.attrs.type : null;
+    const isRefEdge = edge.layer === 'reference' || Boolean(refType);
+    const layerVisible = visibleLayers.has(edge.layer)
+      || (isRefEdge && (visibleLayers.has('reference') || (refType && visibleLayers.has(refType)) || visibleLayers.has('tag')));
+    if (!layerVisible) continue;
     const source = resolveEndpoint(edge.source);
     const target = resolveEndpoint(edge.target);
 
@@ -192,6 +237,19 @@ function feedToGraph(feed, config = {}) {
       auxNodes.set(target, node);
     } else if (edge.layer === 'topology' && !auxNodes.has(target)) {
       auxNodes.set(target, { id: target, label: target.slice(9), type: 'topology', size: 30, color: topologyColor });
+    } else if (isRefEdge && !articleSlugs.has(target) && !auxNodes.has(target)) {
+      const prefix = refType ? `${refType}:` : 'reference:';
+      const refLabel = (edge.attrs && edge.attrs.label)
+        || (edge.attrs && edge.attrs.value)
+        || (target.startsWith(prefix) ? target.slice(prefix.length) : target);
+      auxNodes.set(target, {
+        id: target,
+        label: refLabel,
+        type: 'reference',
+        refType: refType || edge.role || 'reference',
+        size: 30,
+        color: topologyColor,
+      });
     } else if (edge.layer === 'authored' && !articleSlugs.has(target) && !auxNodes.has(target)) {
       // A connected_to edge pointing at a piece that hasn't been written yet.
       // Not an error — a placeholder with gravity, per buildEdges.js.
@@ -200,11 +258,19 @@ function feedToGraph(feed, config = {}) {
 
     // What the line says when hovered or tapped: its own label if it has one
     // (a flashback, say), otherwise its role; a card-to-tag edge adds its why
-    // and the PROV pair when rosetta-tagz wrote them (lib/provenance.js).
+    // and the PROV pair when rosetta-tagz wrote them (lib/provenance.js), and
+    // a non-tag reference edge shows its type and weight.
+    const weight = edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight)
+      ? edge.attrs.weight
+      : 1;
     const label = edge.layer === 'tag'
       ? tagEdgeLabel(edge)
-      : edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
-    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label };
+      : isRefEdge
+        ? referenceEdgeLabel(edge)
+        : (edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer);
+    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label, weight };
+    if (refType) link.refType = refType;
+    if (edge.attrs) link.attrs = edge.attrs;
     // A discovered tag's source coherence ratio, for the panel's slider of
     // that name (lib/sourceRatio.js): only a tag edge carries one.
     if (edge.layer === 'tag' && edge.attrs) {
@@ -655,13 +721,19 @@ export function GraphViewer({
 
   // Apply visibility from outside the main simulation effect.
   useEffect(() => {
-    hiddenSourcesRef.current = hiddenSources instanceof Set
-      ? hiddenSources
-      : new Set(hiddenSources || []);
+    if (hiddenSources instanceof Set) {
+      hiddenSourcesRef.current = hiddenSources;
+    } else if (Array.isArray(hiddenSources)) {
+      hiddenSourcesRef.current = new Set(hiddenSources);
+    } else {
+      hiddenSourcesRef.current = new Set(
+        ((feedData && feedData._sources) || []).filter((s) => s && s.defaultHidden).map((s) => s.id),
+      );
+    }
     if (!svgRef.current || !cardsLayerRef.current) return;
     applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
     if (relationsUpdateRef.current) relationsUpdateRef.current();
-  }, [hiddenSources]);
+  }, [hiddenSources, feedData]);
 
   // Settings writes a color profile to viewState; this repaints instantly by
   // setting the CSS custom properties every bubble and card already reads
@@ -841,7 +913,9 @@ export function GraphViewer({
     // two fingers turn, the drawn translate is corrected so the point under
     // them stays put; when they lift, that translate becomes d3's own. Labels
     // and cards turn back by the same angle, so they stay upright.
-    let rotation = 0; // degrees
+    let rotation = (viewStateRef.current && typeof viewStateRef.current.rotation === 'function')
+      ? viewStateRef.current.rotation()
+      : 0; // degrees
     let rotGesture = null; // { theta0, a0, mx, my, started }
     let paintedRotation = 0;
     let positionsReady = false;
@@ -974,14 +1048,24 @@ export function GraphViewer({
         if (Math.abs(twist) < ROTATE_DEADZONE) return;
         rotGesture.started = true;
         rotGesture.a0 = touchAngle(e);
+        userMovedView = true;
+        focusActive = false;
         return;
       }
       rotation = normalizeAngle(rotGesture.theta0 + twist);
+      if (viewStateRef.current && typeof viewStateRef.current.setRotation === 'function') {
+        viewStateRef.current.setRotation(rotation, { transient: true });
+      }
     };
     const onRotateEnd = (e) => {
       if (!rotGesture || e.touches.length >= 2) return;
+      const started = rotGesture.started;
       const v = viewFor(d3.zoomTransform(svg.node()));
       rotGesture = null;
+      if (started && viewStateRef.current && typeof viewStateRef.current.setRotation === 'function') {
+        viewStateRef.current.setRotation(rotation, { transient: true });
+        viewStateRef.current.commit();
+      }
       svg.call(zoom.transform, d3.zoomIdentity.translate(v.x, v.y).scale(v.k));
     };
     container.addEventListener('touchstart', onRotateStart, { capture: true, passive: true });
@@ -989,13 +1073,16 @@ export function GraphViewer({
     container.addEventListener('touchend', onRotateEnd, { capture: true, passive: true });
     container.addEventListener('touchcancel', onRotateEnd, { capture: true, passive: true });
     // Back to upright, keeping the point at the centre of the screen where it is.
-    function resetRotation({ repaint = true } = {}) {
+    function resetRotation({ repaint = true, record = false } = {}) {
       if (!rotation && !rotGesture) return;
       rotGesture = null;
       const t = d3.zoomTransform(svg.node());
       const cx = width / 2, cy = height / 2;
       const p = screenToView(view, rotation, cx, cy);
       rotation = 0;
+      if (record && viewStateRef.current && typeof viewStateRef.current.setRotation === 'function') {
+        viewStateRef.current.setRotation(0);
+      }
       if (repaint) svg.call(zoom.transform, d3.zoomIdentity.translate(cx - p[0] * t.k, cy - p[1] * t.k).scale(t.k));
     }
 
@@ -1409,9 +1496,18 @@ export function GraphViewer({
     let sketchOn = typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-theme') === 'sketchbook';
 
     // Containers closed from the start (graph.containersStart, or else
-    // graph.initialCollapsed; closedState.js); a reset returns to the same set.
+    // graph.initialCollapsed; closedState.js), overridden by any containers
+    // the reader has opened or closed in viewState; a reset returns to the
+    // site's initial set.
     const initiallyClosed = () => initiallyClosedIds(feedData.containers || [], GS);
+    const knownContainerIds = new Set((feedData.containers || []).map((c) => c.id));
     const closedContainers = new Set(initiallyClosed());
+    if (viewStateRef.current && typeof viewStateRef.current.containerState === 'function') {
+      for (const [id, st] of Object.entries(viewStateRef.current.containerState())) {
+        if (st === 'closed' && knownContainerIds.has(id)) closedContainers.add(id);
+        else if (st === 'open') closedContainers.delete(id);
+      }
+    }
     const containerCentroids = new Map();
     // Where each container's title (or, closed, its blob) is drawn: the
     // roots start there.
@@ -1948,10 +2044,12 @@ export function GraphViewer({
       }
       res = run();
       CL = res;
-      // Each laid-out card is drawn at its container's cardScale.
+      // Each laid-out card is drawn at its container's cardScale and its feed's cardScale.
       for (const n of data.nodes) {
         const p = CL.nodes.get(n.id);
-        n._cardScale = p && p.scale > 0 ? p.scale : 1;
+        const containerScale = p && p.scale > 0 ? p.scale : 1;
+        const feedScale = n._sourceCardScale > 0 ? n._sourceCardScale : 1;
+        n._cardScale = containerScale * feedScale;
       }
     }
 
@@ -2824,14 +2922,24 @@ export function GraphViewer({
     }
     // { open: [ids], close: [ids] }, drawn once.
     function setContainers({ open = [], close = [] }) {
-      let changed = false;
+      const opened = [];
+      const closed = [];
       for (const id of open) {
-        if (containerById.has(id) && closedContainers.has(id)) { closedContainers.delete(id); changed = true; }
+        if (containerById.has(id) && closedContainers.has(id)) {
+          closedContainers.delete(id);
+          opened.push(id);
+        }
       }
       for (const id of close) {
-        if (containerById.has(id) && !closedContainers.has(id)) { closedContainers.add(id); changed = true; }
+        if (containerById.has(id) && !closedContainers.has(id)) {
+          closedContainers.add(id);
+          closed.push(id);
+        }
       }
-      if (!changed) return false;
+      if (!opened.length && !closed.length) return false;
+      if (viewStateRef.current && typeof viewStateRef.current.setContainers === 'function') {
+        viewStateRef.current.setContainers({ open: opened, close: closed });
+      }
       applyContainerVisibility();
       // Opened past where the containers can grow in place: back out to it.
       keepGrowCap(relaidCentres);
@@ -4877,11 +4985,11 @@ export function GraphViewer({
     // home view (initialFocusMinScale from the frame's corner, so each
     // anchored container sits on its anchor), else the first framing
     // (homeK, declared with the view above).
-    function applyHomeView(animate) {
+    function applyHomeView(animate, { resetRot = false, recordRot = false } = {}) {
       const v = homeView(HOME_K);
       const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
       homeK = v.k;
-      resetRotation({ repaint: false });
+      if (resetRot) resetRotation({ repaint: false, record: recordRot });
       // Back about the art's pivot, when there is one: straight there, the
       // pivot's world point still under it all the way when the reader only
       // zoomed.
@@ -4892,14 +5000,14 @@ export function GraphViewer({
       return true;
     }
 
-    function fitToViewport({ animate = false, initialZoomOut = false, focus = true } = {}) {
-      if (focus && anchorsOn()) return applyHomeView(animate);
-      const fitted = fitTo({ animate, initialZoomOut, focus });
+    function fitToViewport({ animate = false, initialZoomOut = false, focus = true, resetRot = false, recordRot = false } = {}) {
+      if (focus && anchorsOn()) return applyHomeView(animate, { resetRot, recordRot });
+      const fitted = fitTo({ animate, initialZoomOut, focus, resetRot, recordRot });
       if (fitted && focus) { homeK = fitted; publishWorld(); }
       return Boolean(fitted);
     }
 
-    function fitTo({ animate = false, initialZoomOut = false, focus = true } = {}) {
+    function fitTo({ animate = false, initialZoomOut = false, focus = true, resetRot = false, recordRot = false } = {}) {
       const ext = containerExtent();
       if (ext) {
         let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
@@ -4941,8 +5049,8 @@ export function GraphViewer({
         const transform = d3.zoomIdentity
           .translate(w / 2 - cx * k, ty)
           .scale(k);
-        // A frame is computed upright, so framing brings the view upright.
-        resetRotation({ repaint: false });
+        // A frame is computed upright, so explicit framing brings the view upright.
+        if (resetRot) resetRotation({ repaint: false, record: recordRot });
         if (animate) svg.transition().duration(750).call(zoom.transform, transform);
         else svg.call(zoom.transform, transform);
         return transform.k;
@@ -5024,7 +5132,7 @@ export function GraphViewer({
       const tx = w / 2 - centerX * k;
       const ty = inset.top + room / 2 - centerY * k;
       const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
-      resetRotation({ repaint: false });
+      if (resetRot) resetRotation({ repaint: false, record: recordRot });
       if (animate) {
         svg.transition().duration(750).call(zoom.transform, transform);
       } else {
@@ -5158,7 +5266,7 @@ export function GraphViewer({
         }
         const r = growFitRatio(items, area);
         if (r && r > 0.02) { zoomAboutCentre(r); return; }
-        applyHomeView(true);
+        applyHomeView(true, { resetRot: true, recordRot: true });
         return;
       }
       if (ext) {
@@ -5171,7 +5279,7 @@ export function GraphViewer({
         const r = fitRatioAbout(box, px, py, area);
         if (r && r > 0.02) { zoomAboutCentre(r); return; }
       }
-      fitToViewport({ animate: true, focus: false });
+      fitToViewport({ animate: true, focus: false, resetRot: true, recordRot: true });
     };
     function nodeExtent() {
       const pts = data.nodes.filter((d) => !d._closedHidden && Number.isFinite(d.x));

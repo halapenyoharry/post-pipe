@@ -12,3 +12,12 @@ From the engine root:
 ## Using your own site
 
 A real site lives in its own folder outside the engine (or in its own repository) and keeps its own `settings.json`, `feeds.opml`, and content folders there. Point `POSTPIPE_SITE` at that folder when building.
+
+## Per-feed display parameters (`feeds.opml` and `settings.json`)
+
+Each `<outline>` in `feeds.opml` (or matching entry under `"feeds"` in `settings.json`, keyed by feed `xmlUrl`, `id`, or `title`) accepts optional per-feed display parameters:
+
+- `cardScale` — positive number scaling cards from that feed in `GraphViewer` (for example `cardScale="0.85"`).
+- `itemCap` (or `maxItems`) — positive integer capping how many of the feed's newest items enter the corpus (for example `itemCap="20"`).
+- `defaultHidden` (or `hidden`) — `"true"` to start that feed hidden on a reader's first visit while keeping its source pill in `FeedZ` so they can toggle it on (`defaultHidden="true"`).
+

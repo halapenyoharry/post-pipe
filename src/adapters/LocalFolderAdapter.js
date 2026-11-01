@@ -147,7 +147,10 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, d
     // case; future case includes images-as-edges (type: 'image'),
     // people, places, dates. Code that still wants just tags keeps
     // reading `tags` (above) for compatibility.
-    _references: tags.map(value => ({ type: 'tag', value })),
+    _references: [
+      ...(Array.isArray(c.references) ? c.references.filter(r => r && typeof r === 'object' && r.type && r.type !== 'tag' && r.value) : []),
+      ...tags.map(value => ({ type: 'tag', value })),
+    ],
     // Project schema fields the graph and TextView consume. Underscore-
     // prefixing them to match JSON Feed conventions is a breaking
     // refactor for another day.

@@ -1,6 +1,6 @@
 # post-pipe Architecture & Design Decisions
 
-**Last updated:** 2026-04-18
+**Last updated:** 2026-10-31
 
 ---
 
@@ -120,7 +120,7 @@ Rich, topologically-native. Encodes the structure Harold actually thinks in.
   },
 
   "meta": {
-    "author": "harold young [humxn]",
+    "author": "Example Author",
     "written": "2025",
     "updated": null,
     "reading_time": "6 min",
@@ -248,7 +248,7 @@ Non-essay substrates (image/audio/video) will get their own push paths as render
 
 The D3 graph fetches `feed.json` at load and derives its shape client-side. `feed.json` is the single source of truth; the graph is a view.
 
-External feeds (Aeon, ProPublica, etc.) can be toggled in [`settings.json`](./settings.json) `feeds[]`. When enabled, RSS items are ingested via `platforms/feed-ingester.js` and appear as peer nodes in the graph — curated external reading alongside your own corpus. (Currently all external feeds are `enabled: false`.)
+External feeds and the site's own local folder are declared in `feeds.opml` (or the path in `settings.json` `feeds_opml_path`), parsed by `src/lib/opml.js`. Each outline entry is routed by `generate-index.js` and `src/aggregator.js` to its source adapter (`src/adapters/LocalFolderAdapter.js`, `src/adapters/RssAdapter.js`, `src/adapters/AtomAdapter.js`, or `src/adapters/JsonFeedAdapter.js`), with feed colors cached in `.feed-cache/colors.json` and the last good copy of each fetched feed kept in `.feed-cache/last-good/` so external items appear as peer nodes in the graph alongside the local corpus.
 
 ---
 

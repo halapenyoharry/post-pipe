@@ -67,6 +67,9 @@ function walk(outlines, folderStack, out) {
         // the distinction was falling out of the status field by accident.
         // Defaults keep the current behaviour, deliberately this time.
         prominence: normalizeProminence(o['@_prominence'], detectType(o['@_type'], xmlUrl)),
+        cardScale: parseCardScale(o['@_cardScale']),
+        itemCap: parseItemCap(o['@_itemCap'] !== undefined ? o['@_itemCap'] : o['@_maxItems']),
+        defaultHidden: parseDefaultHidden(o['@_defaultHidden'] !== undefined ? o['@_defaultHidden'] : o['@_hidden']),
         raw: stripAtPrefix(o),
       });
       if (Array.isArray(children)) walk(children, folderStack, out);
@@ -83,6 +86,28 @@ function normalizeProminence(attr, type) {
   const v = (attr || '').toLowerCase();
   if (v === 'primary' || v === 'secondary') return v;
   return type === 'local' ? 'primary' : 'secondary';
+}
+
+function parseCardScale(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function parseItemCap(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.floor(n);
+}
+
+function parseDefaultHidden(v) {
+  if (v === true) return true;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    return s === 'true' || s === '1' || s === 'yes';
+  }
+  return false;
 }
 
 function detectType(typeAttr, xmlUrl) {
@@ -102,4 +127,4 @@ function stripAtPrefix(obj) {
   return out;
 }
 
-module.exports = { parseOpml };
+module.exports = { parseOpml, parseCardScale, parseItemCap, parseDefaultHidden };

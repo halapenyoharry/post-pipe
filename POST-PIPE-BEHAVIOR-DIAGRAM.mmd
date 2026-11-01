@@ -23,28 +23,32 @@ subgraph BUILD["Build phase: node generate-index.js"]
         buildunstr["builder: unstructured"]
     end
 
-    subgraph FEED_SOURCES["platforms/feed-ingester.js ⊕<br/>(RSS/JSON feed fetcher + cache,<br/>.feed-cache/)"]
-        feedfetch["fetch external feeds"]
-        feedparse["parse XML/JSON"]
-        feedcache["cache results"]
+    subgraph FEED_SOURCES["src/lib/opml.js + src/aggregator.js + src/adapters/<br/>(LocalFolderAdapter, RssAdapter, AtomAdapter, JsonFeedAdapter,<br/>.feed-cache/colors.json + .feed-cache/last-good/)"]
+        opmlparse["parseOpml(feeds.opml)"]
+        feedfetch["fetch external feeds (fetchText)"]
+        feedparse["parse RSS / Atom / JSON Feed"]
+        feedcache["cache last good copy + feed colors"]
     end
 
-    subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + renderer + data transformer)"]
+    subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + HTML emitter)"]
         direction TB
-        loadlocal["loadLocalContent()<br/>local Content → JSON Feed items"]
+        loadlocal["LocalFolderAdapter.load()<br/>local Content → JSON Feed items + per-item HTML"]
         covercopy["cover image copy<br/>into _site/covers/"]
         toiso["toIsoDate() date normalizer"]
         statusbucket["statusBucket()<br/>(status → draft/published for graph color)"]
-        buildfeed["buildFeed() JSON Feed 1.1"]
+        buildfeed["buildFeed() JSON Feed 1.1 + buildEdges()"]
         icons["inline SVG icon library<br/>(play, pause, stop, medium,<br/>substack, youtube, etc.)"]
-        buildhtml["buildIndexHTML() ⊕<br/>(reads D3 + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
-        mergesort["merge local + feed, sort by date"]
+        buildhtml["buildIndexHTML() ⊕<br/>(reads dist/ bundles + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
+        mergesort["aggregator.loadCorpus()<br/>(merge adapters, resolve colors, run rtagz, sort by date)"]
         writefiles["write feed.json + index.html<br/>to _site/"]
     end
 
+    settings --> opmlparse
     settings --> loadlocal
     settings --> buildhtml
     envfile --> buildhtml
+    opmlparse --> loadlocal
+    opmlparse --> feedfetch
     walk --> detect
     walk --> readfm
     walk --> readqmd

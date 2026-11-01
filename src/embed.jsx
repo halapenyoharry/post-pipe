@@ -43,6 +43,8 @@ import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
 import { toolbarConfig } from './lib/toolbar';
 import { topBarConfig } from './lib/topBar';
+import { autodiscoverEnabled } from './lib/feedAutodiscovery';
+import { groupByFolderEnabled } from './lib/sourceFolders';
 import './themes/sketchbook.css';
 
 // ── Default settings (mirrors settings.json structure) ───────────────────────
@@ -224,6 +226,9 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
     viewStateRef.current = vs;
     vs.ready().then(() => {
       vs.prune((feedData.items || []).map((i) => i.id));
+      if (vs.seedHiddenSources) {
+        vs.seedHiddenSources((feedData._sources || []).filter((s) => s && s.defaultHidden).map((s) => s.id));
+      }
       if (vs.state.layout === 'timeline') vs.setLayout('force');
       setViewState(vs);
       setHydrated(true);
@@ -418,6 +423,8 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           onToggleSource={toggleSource}
           viewState={viewState}
           showAddButton={features.addFeed}
+          autodiscover={autodiscoverEnabled(settings)}
+          groupByFolder={groupByFolderEnabled(settings)}
           showCount={showContainerCount(settings.graph)}
           links={topBarConfig(settings).links}
           subscribe={topBarConfig(settings).subscribe}
