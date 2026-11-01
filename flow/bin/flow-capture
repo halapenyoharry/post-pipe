@@ -1,0 +1,171 @@
+#!/usr/bin/env node
+// flow-capture: load a built site in headless Chrome, wait for the tag
+// bubbles and for the cards to stop moving, then write positions.json (every
+// card and tag node: id, label, centre and box in CSS pixels, read from the
+// DOM) and graph.png of the same frame. A fresh context: no saved view state,
+// so the layout is the site's default. One capture serves every preset.
+import fs from 'node:fs';
+import path from 'node:path';
+import { chromium } from 'playwright';
+import { parseArgs, fail, toJson } from '../lib/io.js';
+
+const usage = `usage: flow-capture --url <http://127.0.0.1:PORT/> [--out <dir>] [--width 1600] [--height 1000] [--min-wait 10000] [--settle 2000] [--timeout 120000]
+  --url <url>        the built site, served locally (required)
+  --out <dir>        where positions.json and graph.png go (default: the current folder)
+  --width, --height  the viewport in CSS pixels (default 1600 x 1000), device scale factor 1
+  --min-wait <ms>    the least time after the first card appears before sampling (default 10000): the
+                     viewer's force layout cools, then fits the graph to the viewport on its own end
+  --settle <ms>      the gap between two samples that must agree before the frame is taken (default 2000)
+  --timeout <ms>     how long to wait for the cards to settle (default 120000)`;
+
+const args = parseArgs(process.argv.slice(2), {
+  url: { type: 'string', default: null, required: true },
+  out: { type: 'string', default: '.' },
+  width: { type: 'number', default: 1600 },
+  height: { type: 'number', default: 1000 },
+  'min-wait': { type: 'number', default: 10000 },
+  settle: { type: 'number', default: 2000 },
+  timeout: { type: 'number', default: 120000 },
+}, usage);
+
+if (!/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?\//.test(args.url)) fail('--url must be a local address (127.0.0.1 or localhost); nothing is fetched beyond this machine');
+
+// Read every card and tag node from the DOM: the datum d3 bound to the
+// element (id, label, type, url, concept) and its box on screen.
+function sampleDom() {
+  const box = (r) => ({ x: r.left, y: r.top, w: r.width, h: r.height });
+  const centre = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  const hiddenOf = (el, r) => {
+    const cs = getComputedStyle(el);
+    return cs.display === 'none' || cs.visibility === 'hidden' || r.width === 0 || r.height === 0;
+  };
+  const cards = [];
+  for (const el of document.querySelectorAll('.cards-transform .node-card')) {
+    const d = el.__data__ || {};
+    const r = el.getBoundingClientRect();
+    cards.push({
+      id: d.id ?? null,
+      url: d.url ?? null,
+      label: d.label ?? null,
+      title: d.title ?? d.labelFull ?? null,
+      source: d._source && d._source.title ? d._source.title : null,
+      centre: centre(r),
+      box: box(r),
+      hidden: hiddenOf(el, r),
+    });
+  }
+  const tagz = [];
+  const others = [];
+  for (const el of document.querySelectorAll('svg g.node')) {
+    const d = el.__data__;
+    if (!d || typeof d.id !== 'string') continue;
+    const shape = el.querySelector('rect, circle') || el;
+    const r = shape.getBoundingClientRect();
+    const node = {
+      id: d.id,
+      type: d.type ?? null,
+      label: d.label ?? null,
+      concept: d.concept ?? null,
+      centre: centre(r),
+      box: box(r),
+      hidden: hiddenOf(el, r),
+    };
+    (d.type === 'tag' ? tagz : others).push(node);
+  }
+  const g = document.querySelector('svg > g');
+  const transform = g ? g.getAttribute('transform') : null;
+  return {
+    cards,
+    tagz,
+    others,
+    transform,
+    inner: { width: window.innerWidth, height: window.innerHeight },
+    devicePixelRatio: window.devicePixelRatio,
+    tags: window.PostPipeGraphTags ? { counts: window.PostPipeGraphTags.counts.length } : null,
+  };
+}
+
+function same(a, b, tolerance = 0.5) {
+  if (!a || !b || a.cards.length !== b.cards.length || a.tagz.length !== b.tagz.length) return false;
+  const key = (list) => new Map(list.map((n) => [n.id, n]));
+  const bc = key(b.cards);
+  for (const c of a.cards) {
+    const o = bc.get(c.id);
+    if (!o || Math.abs(o.centre.x - c.centre.x) > tolerance || Math.abs(o.centre.y - c.centre.y) > tolerance || o.hidden !== c.hidden) return false;
+  }
+  const bt = key(b.tagz);
+  for (const t of a.tagz) {
+    const o = bt.get(t.id);
+    if (!o || Math.abs(o.centre.x - t.centre.x) > tolerance || Math.abs(o.centre.y - t.centre.y) > tolerance || o.hidden !== t.hidden) return false;
+  }
+  return a.transform === b.transform;
+}
+
+function parseTransform(t) {
+  const out = { k: 1, x: 0, y: 0, rotation: 0 };
+  if (typeof t !== 'string') return out;
+  const tr = /translate\(\s*([-\d.e+]+)[ ,]+([-\d.e+]+)\s*\)/.exec(t);
+  const sc = /scale\(\s*([-\d.e+]+)/.exec(t);
+  const ro = /rotate\(\s*([-\d.e+]+)/.exec(t);
+  if (tr) { out.x = Number(tr[1]); out.y = Number(tr[2]); }
+  if (sc) out.k = Number(sc[1]);
+  if (ro) out.rotation = Number(ro[1]);
+  return out;
+}
+
+const outDir = path.resolve(args.out);
+fs.mkdirSync(outDir, { recursive: true });
+const positionsFile = path.join(outDir, 'positions.json');
+const screenshotFile = path.join(outDir, 'graph.png');
+
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+try {
+  const context = await browser.newContext({ viewport: { width: args.width, height: args.height }, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e && e.message ? e.message : e)));
+  await page.goto(args.url, { waitUntil: 'load', timeout: args.timeout });
+  await page.waitForFunction(() => Boolean(window.PostPipeGraphTags), null, { timeout: args.timeout });
+  await page.waitForSelector('.cards-transform .node-card', { timeout: args.timeout });
+  // The viewer's force layout keeps cooling after the cards stop visibly
+  // moving, and on its end it fits the graph to the viewport. Two samples
+  // two seconds apart can agree inside that tail, so a least wait comes first.
+  if (args['min-wait'] > 0) await page.waitForTimeout(args['min-wait']);
+
+  const started = Date.now();
+  let sample = null;
+  let settled = false;
+  while (Date.now() - started < args.timeout) {
+    const a = await page.evaluate(sampleDom);
+    await page.waitForTimeout(args.settle);
+    const b = await page.evaluate(sampleDom);
+    if (!same(a, b)) continue;
+    await page.screenshot({ path: screenshotFile, type: 'png', fullPage: false });
+    const c = await page.evaluate(sampleDom);
+    if (!same(b, c)) continue;
+    sample = b;
+    settled = true;
+    break;
+  }
+  if (!settled) fail(`the cards did not stop moving within ${args.timeout} ms`);
+
+  const zoom = parseTransform(sample.transform);
+  const positions = {
+    url: args.url,
+    viewport: { width: args.width, height: args.height },
+    deviceScaleFactor: 1,
+    zoom,
+    counts: { cards: sample.cards.length, tagz: sample.tagz.length, others: sample.others.length, tagBubbles: sample.tags ? sample.tags.counts : null },
+    minWaitMs: args['min-wait'],
+    settleMs: args.settle,
+    pageErrors: errors,
+    cards: sample.cards,
+    tagz: sample.tagz,
+    others: sample.others,
+  };
+  fs.writeFileSync(positionsFile, toJson(positions));
+  process.stderr.write(`captured ${sample.cards.length} cards and ${sample.tagz.length} tag nodes at zoom ${zoom.k.toFixed(3)} after ${Date.now() - started} ms; ${positionsFile}, ${screenshotFile}\n`);
+  await context.close();
+} finally {
+  await browser.close();
+}
