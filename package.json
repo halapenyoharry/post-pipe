@@ -1,6 +1,6 @@
 {
   "name": "post-pipe",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "markdown in → platform post out",
   "license": "SEE LICENSE IN LICENSE",
   "main": "index.js",
