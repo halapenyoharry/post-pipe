@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+// flow-score: a subfield on stdin, the same subfield with a score, terms and
+// top on every card on stdout. The preset gives the weights and the default
+// switches; a flag overrides a switch.
+import { parseArgs, readJsonStdin, readJsonFile, toJson, writeStdout, fail } from '../lib/io.js';
+import { normalisePreset, checkSwitches, DEGREE_PENALTIES, RECENCY_CLOCKS } from '../lib/preset.js';
+import { scoreSubfield } from '../lib/score.js';
+
+const usage = `usage: flow-score --preset <file> [--state <viewState.json>] [--degree-penalty none|sqrt|log] [--recency-clock calendar|session] [--half-life <days>] < subfield.json > scored.json
+  --preset <file>          the weight vector and its switches (required)
+  --state <file>           the viewer's saved state, for read and pin (0 without it)
+  --degree-penalty <how>   overrides the preset's degreePenalty
+  --recency-clock <clock>  overrides the preset's recencyClock
+  --half-life <days>       overrides the preset's recencyHalfLifeDays`;
+
+const args = parseArgs(process.argv.slice(2), {
+  preset: { type: 'string', default: null, required: true },
+  state: { type: 'string', default: null },
+  'degree-penalty': { type: 'string', default: null, oneOf: DEGREE_PENALTIES },
+  'recency-clock': { type: 'string', default: null, oneOf: RECENCY_CLOCKS },
+  'half-life': { type: 'number', default: null },
+}, usage);
+
+let preset;
+try {
+  preset = normalisePreset(readJsonFile(args.preset, 'preset'), 'preset');
+} catch (e) {
+  fail(e.message);
+}
+const state = args.state ? readJsonFile(args.state, 'state') : null;
+const sub = readJsonStdin('subfield');
+if (!sub || !Array.isArray(sub.cards) || !Array.isArray(sub.tagz)) fail('stdin is not a subfield: no cards and tagz arrays; run flow-select first');
+
+const switches = { ...preset.switches };
+if (args['degree-penalty']) switches.degreePenalty = args['degree-penalty'];
+if (args['recency-clock']) switches.recencyClock = args['recency-clock'];
+if (args['half-life'] !== null) switches.recencyHalfLifeDays = args['half-life'];
+try {
+  checkSwitches(switches, 'switches');
+  writeStdout(toJson(scoreSubfield(sub, preset, { state, switches })));
+} catch (e) {
+  fail(e.message);
+}
