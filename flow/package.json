@@ -1,0 +1,19 @@
+{
+  "name": "flow",
+  "version": "0.1.0",
+  "description": "Flow: a projector from a field (post-pipe's graph of cards and tagz) to a sequence, as small programs over JSON on stdin and stdout.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "bin": {
+    "flow-select": "bin/flow-select",
+    "flow-score": "bin/flow-score",
+    "flow-order": "bin/flow-order",
+    "flow-render": "bin/flow-render",
+    "flow-capture": "bin/flow-capture"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
