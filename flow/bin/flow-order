@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+// flow-order: scored cards on stdin, the ordered flow on stdout.
+import { parseArgs, readJsonStdin, readJsonFile, toJson, writeStdout, fail } from '../lib/io.js';
+import { ORDER_MODES } from '../lib/preset.js';
+import { orderFlow } from '../lib/order.js';
+
+const usage = `usage: flow-order [--mode score|walk] [--seam <hops>] [--stability <t>] [--previous <flow.json>] < scored.json > flow.json
+  --mode <mode>       score: by score, ties by id (the design's rule); walk: the position moves along the flow
+  --seam <hops>       a step longer than this is a seam (preset default 2)
+  --stability <t>     with --previous, a card passes a neighbour only when their scores differ by more than t of the score range (preset default 0.05)
+  --previous <file>   the flow to hold to; without it stability does nothing`;
+
+const args = parseArgs(process.argv.slice(2), {
+  mode: { type: 'string', default: null, oneOf: ORDER_MODES },
+  seam: { type: 'number', default: null },
+  stability: { type: 'number', default: null },
+  previous: { type: 'string', default: null },
+}, usage);
+
+if (args.seam !== null && args.seam < 0) fail('--seam must be 0 or more');
+if (args.stability !== null && args.stability < 0) fail('--stability must be 0 or more');
+const previous = args.previous ? readJsonFile(args.previous, 'previous flow') : null;
+if (previous && !Array.isArray(previous.items)) fail('--previous is not a flow: no items array');
+
+const scored = readJsonStdin('scored subfield');
+try {
+  writeStdout(toJson(orderFlow(scored, {
+    mode: args.mode || undefined,
+    seam: args.seam === null ? undefined : args.seam,
+    stability: args.stability === null ? undefined : args.stability,
+    previous,
+  })));
+} catch (e) {
+  fail(e.message);
+}

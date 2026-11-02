@@ -1,0 +1,71 @@
+#!/usr/bin/env node
+// flow-render: a flow on stdin; text or an SVG on stdout.
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseArgs, readJsonStdin, readJsonFile, writeStdout, fail, toJson } from '../lib/io.js';
+import { renderText } from '../lib/renderText.js';
+import { renderPathSvg } from '../lib/renderPath.js';
+
+const usage = `usage: flow-render --target text|path [options] < flow.json
+  --target text        adjacency text for a model's window (default)
+    --full <n>         how many cards from the top are written in full (default 20)
+  --target path        the flow as a polyline over the captured field, as SVG on stdout
+    --positions <f>    positions.json from flow-capture (required for path)
+    --screenshot <f>   graph.png from the same capture; with it the overlay is also composited
+    --over <f>         where the composited PNG goes (required with --screenshot)
+    --stats <f>        also write the path's measures as JSON to this file
+The scroll and here targets are not built yet.`;
+
+const args = parseArgs(process.argv.slice(2), {
+  target: { type: 'string', default: 'text', oneOf: ['text', 'path'] },
+  full: { type: 'number', default: 20 },
+  positions: { type: 'string', default: null },
+  screenshot: { type: 'string', default: null },
+  over: { type: 'string', default: null },
+  stats: { type: 'string', default: null },
+}, usage);
+
+const flow = readJsonStdin('flow');
+if (!flow || !Array.isArray(flow.items)) fail('stdin is not a flow: no items array; run flow-order first');
+
+if (args.target === 'text') {
+  if (!Number.isInteger(args.full) || args.full < 0) fail('--full must be a whole number, 0 or more');
+  try {
+    writeStdout(renderText(flow, { full: args.full }));
+  } catch (e) {
+    fail(e.message);
+  }
+} else {
+  if (!args.positions) fail('--target path needs --positions <positions.json>');
+  if (args.screenshot && !args.over) fail('--screenshot needs --over <file.png> for the composited picture');
+  const positions = readJsonFile(args.positions, 'positions');
+  let rendered;
+  try {
+    rendered = renderPathSvg(flow, positions);
+  } catch (e) {
+    fail(e.message);
+  }
+  writeStdout(rendered.svg);
+  if (args.stats) {
+    try {
+      fs.mkdirSync(path.dirname(path.resolve(args.stats)), { recursive: true });
+      fs.writeFileSync(args.stats, toJson(rendered.stats));
+    } catch (e) {
+      fail(`could not write --stats: ${e.message}`);
+    }
+  }
+  if (args.screenshot) {
+    try {
+      const { compositeOver } = await import('../lib/composite.js');
+      await compositeOver({
+        svg: rendered.svg,
+        screenshot: args.screenshot,
+        width: positions.viewport.width,
+        height: positions.viewport.height,
+        out: args.over,
+      });
+    } catch (e) {
+      fail(e.message);
+    }
+  }
+}

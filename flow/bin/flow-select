@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+// flow-select: feed.json on stdin, a subfield on stdout.
+import { parseArgs, readJsonStdin, toJson, writeStdout, fail } from '../lib/io.js';
+import { select } from '../lib/subfield.js';
+
+const usage = `usage: flow-select [--all | --around <id> [--hops <n>] | --set <id,id,...>] < feed.json > subfield.json
+  --all            the whole field (default)
+  --around <id>    a neighbourhood: the card, its tagz, the cards within --hops card steps
+  --hops <n>       card steps for --around (default 1): a shared tag or a direct link is one step
+  --set <ids>      an explicit selection, comma-separated card ids
+The path selector in the design is not built yet.`;
+
+const args = parseArgs(process.argv.slice(2), {
+  all: { type: 'boolean', default: false },
+  around: { type: 'string', default: null },
+  hops: { type: 'number', default: 1 },
+  set: { type: 'string', default: null },
+}, usage);
+
+const chosen = [args.all, args.around !== null, args.set !== null].filter(Boolean).length;
+if (chosen > 1) fail('choose one of --all, --around, --set');
+if (!Number.isInteger(args.hops) || args.hops < 0) fail('--hops must be a whole number, 0 or more');
+
+const feed = readJsonStdin('feed');
+if (!feed || !Array.isArray(feed.items)) fail('stdin is not a post-pipe feed: no items array');
+
+let selector = { mode: 'all' };
+if (args.around !== null) selector = { mode: 'around', id: args.around, hops: args.hops };
+else if (args.set !== null) selector = { mode: 'set', ids: args.set.split(',').map((s) => s.trim()).filter(Boolean) };
+
+try {
+  writeStdout(toJson(select(feed, selector)));
+} catch (e) {
+  fail(e.message);
+}
