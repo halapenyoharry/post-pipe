@@ -35,6 +35,18 @@ test('text: beyond --full a card is one line with rank, score, title and tag lab
   assert.equal(renderText(flow, { full: 0 }).split('\n').filter((l) => l.startsWith('    tag ')).length, 0);
 });
 
+test('text: header line names the start card when walk rule is not heaviest', () => {
+  const scored = scoreSubfield(select(syntheticFeed(), { mode: 'all' }), normalisePreset(byNeighbourhoodPreset()));
+  const heaviest = orderFlow(scored, { mode: 'walk', walkStart: 'heaviest' });
+  assert.match(renderText(heaviest, { full: 1 }), /^flow test-by-neighbourhood: 6 cards, mode walk, \d+ seams/);
+
+  const newest = orderFlow(scored, { mode: 'walk', walkStart: 'newest' });
+  assert.match(renderText(newest, { full: 1 }), /^flow test-by-neighbourhood: 6 cards, mode walk, start Card one \(newest\), \d+ seams/);
+
+  const explicit = orderFlow(scored, { mode: 'walk', start: 'https://example.test/c5' });
+  assert.match(renderText(explicit, { full: 1 }), /^flow test-by-neighbourhood: 6 cards, mode walk, start Card five \(explicit\), \d+ seams/);
+});
+
 test('path: an SVG the size of the viewport with one segment per step, seams dashed, a mark per card, a legend naming the preset', () => {
   const flow = flowOf(byWeightPreset());
   const positions = syntheticPositions();

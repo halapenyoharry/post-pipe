@@ -100,8 +100,13 @@ export function scoreSubfield(sub, preset, { state = null, switches } = {}) {
         for (const ref of card.references || []) {
           if (ref.type !== 'tag') continue;
           if (!ref.prefLabel || typeof ref.prefLabel !== 'object' || !(scheme in ref.prefLabel)) continue;
-          const w = Number.isFinite(Number(ref.weight)) ? Number(ref.weight) : 1;
-          if (w > best) best = w;
+          if (sw.tagMeasure === 'weight') {
+            const w = Number.isFinite(Number(ref.weight)) ? Number(ref.weight) : 1;
+            if (w > best) best = w;
+          } else {
+            best = 1;
+            break;
+          }
         }
         x[name] = Math.min(1, Math.max(0, best));
       }

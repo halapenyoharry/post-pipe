@@ -22,14 +22,38 @@ test('score: every feature is bounded to 0..1 and named', () => {
   }
 });
 
-test('score: tag.<scheme> is the strongest reference with a prefLabel in that scheme', () => {
-  const scored = scoreSubfield(all(), normalisePreset(byWeightPreset()));
-  assert.equal(card(scored, 1).terms['tag.site'].x, 1);
-  assert.equal(card(scored, 1).terms['tag.Journal'].x, 1);
-  assert.equal(card(scored, 1).terms['tag.discovered'].x, 0.5);
-  assert.equal(card(scored, 1).terms['tag.Wire'].x, 0);
-  assert.equal(card(scored, 5).terms['tag.site'].x, 0.4);
-  assert.equal(card(scored, 6).terms['tag.site'].x, 0);
+test('score: tag.<scheme> reads presence by default and strongest reference weight under weight', () => {
+  const weighted = scoreSubfield(all(), normalisePreset(byWeightPreset()));
+  assert.equal(weighted.preset.switches.tagMeasure, 'weight');
+  assert.equal(card(weighted, 1).terms['tag.site'].x, 1);
+  assert.equal(card(weighted, 1).terms['tag.Journal'].x, 1);
+  assert.equal(card(weighted, 1).terms['tag.discovered'].x, 0.5);
+  assert.equal(card(weighted, 1).terms['tag.Wire'].x, 0);
+  assert.equal(card(weighted, 5).terms['tag.site'].x, 0.4);
+  assert.equal(card(weighted, 6).terms['tag.site'].x, 0);
+
+  const presence = scoreSubfield(all(), normalisePreset(byWeightPreset()), { switches: { tagMeasure: 'presence' } });
+  assert.equal(presence.preset.switches.tagMeasure, 'presence');
+  // c5 has a 0.4 reference in site and discovered: presence gives 1, missing scheme gives 0.
+  assert.equal(card(presence, 5).terms['tag.site'].x, 1);
+  assert.equal(card(presence, 5).terms['tag.discovered'].x, 1);
+  assert.equal(card(presence, 5).terms['tag.Wire'].x, 0);
+  assert.equal(card(presence, 5).terms['tag.Journal'].x, 0);
+  assert.equal(card(presence, 1).terms['tag.discovered'].x, 1);
+  // c6 has no tag reference: 0 under both measures.
+  assert.equal(card(presence, 6).terms['tag.site'].x, 0);
+  assert.equal(card(presence, 6).terms['tag.Wire'].x, 0);
+});
+
+test('score: defaults (365 half-life, presence tagMeasure) appear in scored output switches', () => {
+  const p = normalisePreset({ name: 'defaults', weights: { 'tag.site': 1, recency: 1 } });
+  const scored = scoreSubfield(all(), p);
+  assert.equal(scored.preset.switches.recencyHalfLifeDays, 365);
+  assert.equal(scored.preset.switches.tagMeasure, 'presence');
+  assert.equal(scored.preset.switches.walkStart, 'heaviest');
+  assert.equal(scored.preset.switches.walkStartSource, null);
+  assert.equal(card(scored, 5).terms['tag.site'].x, 1);
+  assert.ok(Math.abs(card(scored, 4).terms.recency.x - Math.pow(0.5, 30 / 365)) < 1e-12);
 });
 
 test('score: degree counts tag incidences and links, penalised by sqrt, over the largest', () => {
@@ -105,8 +129,15 @@ test('preset: shape is checked', () => {
   assert.throws(() => normalisePreset({ name: 'x' }), /no weights/);
   assert.throws(() => normalisePreset({ name: 'x', weights: { degree: 'heavy' } }), /not a number/);
   assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { degreePenalty: 'cube' } }), /degreePenalty/);
+  assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { tagMeasure: 'count' } }), /tagMeasure/);
+  assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { walkStart: 'oldest' } }), /walkStart/);
+  assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { walkStartSource: 42 } }), /walkStartSource/);
   assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { other: 1 } }), /unknown switch/);
   const p = normalisePreset({ name: 'x', weights: { degree: 1 } });
   assert.deepEqual(p.weights, { degree: 1, source: {} });
   assert.equal(p.switches.seam, 2);
+  assert.equal(p.switches.recencyHalfLifeDays, 365);
+  assert.equal(p.switches.tagMeasure, 'presence');
+  assert.equal(p.switches.walkStart, 'heaviest');
+  assert.equal(p.switches.walkStartSource, null);
 });

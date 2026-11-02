@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 // flow-order: scored cards on stdin, the ordered flow on stdout.
 import { parseArgs, readJsonStdin, readJsonFile, toJson, writeStdout, fail } from '../lib/io.js';
-import { ORDER_MODES } from '../lib/preset.js';
+import { ORDER_MODES, WALK_STARTS } from '../lib/preset.js';
 import { orderFlow } from '../lib/order.js';
 
-const usage = `usage: flow-order [--mode score|walk] [--seam <hops>] [--stability <t>] [--previous <flow.json>] < scored.json > flow.json
-  --mode <mode>       score: by score, ties by id (the design's rule); walk: the position moves along the flow
-  --seam <hops>       a step longer than this is a seam (preset default 2)
-  --stability <t>     with --previous, a card passes a neighbour only when their scores differ by more than t of the score range (preset default 0.05)
-  --previous <file>   the flow to hold to; without it stability does nothing`;
+const usage = `usage: flow-order [--mode score|walk] [--walk-start heaviest|newest] [--start-source <title>] [--start <id>] [--seam <hops>] [--stability <t>] [--previous <flow.json>] < scored.json > flow.json
+  --mode <mode>            score: by score, ties by id (the design's rule); walk: the position moves along the flow
+  --walk-start <how>       in walk mode, start at the heaviest or newest card (overrides walkStart)
+  --start-source <title>   in walk mode, restrict the start candidates to this source (overrides walkStartSource)
+  --start <id>             in walk mode, start at this card id (wins over --walk-start)
+  --seam <hops>            a step longer than this is a seam (preset default 2)
+  --stability <t>          with --previous, a card passes a neighbour only when their scores differ by more than t of the score range (preset default 0.05)
+  --previous <file>        the flow to hold to; without it stability does nothing`;
 
 const args = parseArgs(process.argv.slice(2), {
   mode: { type: 'string', default: null, oneOf: ORDER_MODES },
+  'walk-start': { type: 'string', default: null, oneOf: WALK_STARTS },
+  'start-source': { type: 'string', default: null },
+  start: { type: 'string', default: null },
   seam: { type: 'number', default: null },
   stability: { type: 'number', default: null },
   previous: { type: 'string', default: null },
@@ -26,6 +32,9 @@ const scored = readJsonStdin('scored subfield');
 try {
   writeStdout(toJson(orderFlow(scored, {
     mode: args.mode || undefined,
+    walkStart: args['walk-start'] || undefined,
+    walkStartSource: args['start-source'] === null ? undefined : args['start-source'],
+    start: args.start || undefined,
     seam: args.seam === null ? undefined : args.seam,
     stability: args.stability === null ? undefined : args.stability,
     previous,

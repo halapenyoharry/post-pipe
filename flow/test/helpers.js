@@ -91,11 +91,11 @@ export function syntheticPositions() {
 export const byWeightPreset = () => ({
   name: 'test-by-weight',
   weights: { 'tag.site': 1, degree: 1, recency: 1, source: {} },
-  switches: { degreePenalty: 'sqrt', recencyClock: 'calendar', recencyHalfLifeDays: 30, orderMode: 'score', seam: 2, stability: 0.05 },
+  switches: { degreePenalty: 'sqrt', recencyClock: 'calendar', recencyHalfLifeDays: 30, tagMeasure: 'weight', orderMode: 'score', walkStart: 'heaviest', walkStartSource: null, seam: 2, stability: 0.05 },
 });
 
 export const byNeighbourhoodPreset = () => ({
   name: 'test-by-neighbourhood',
   weights: { 'tag.site': 1, degree: 1, recency: 1, 'tag.shared': 1, distance: -1, source: {} },
-  switches: { degreePenalty: 'sqrt', recencyClock: 'calendar', recencyHalfLifeDays: 30, orderMode: 'walk', seam: 2, stability: 0.05 },
+  switches: { degreePenalty: 'sqrt', recencyClock: 'calendar', recencyHalfLifeDays: 30, tagMeasure: 'weight', orderMode: 'walk', walkStart: 'heaviest', walkStartSource: null, seam: 2, stability: 0.05 },
 });

@@ -4,15 +4,20 @@
 export const SWITCH_DEFAULTS = Object.freeze({
   degreePenalty: 'sqrt',       // none | sqrt | log
   recencyClock: 'calendar',    // calendar | session
-  recencyHalfLifeDays: 30,
+  recencyHalfLifeDays: 365,
+  tagMeasure: 'presence',      // presence | weight
   orderMode: 'score',          // score | walk
+  walkStart: 'heaviest',       // heaviest | newest
+  walkStartSource: null,       // source title string, or null for any source
   seam: 2,                     // a step longer than this many hops is a jump
   stability: 0.05,             // fraction of the score range, used only with --previous
 });
 
 export const DEGREE_PENALTIES = ['none', 'sqrt', 'log'];
 export const RECENCY_CLOCKS = ['calendar', 'session'];
+export const TAG_MEASURES = ['presence', 'weight'];
 export const ORDER_MODES = ['score', 'walk'];
+export const WALK_STARTS = ['heaviest', 'newest'];
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -65,7 +70,13 @@ export function checkSwitches(s, what = 'switches') {
   if (!DEGREE_PENALTIES.includes(s.degreePenalty)) throw new Error(`${what}: degreePenalty must be one of ${DEGREE_PENALTIES.join(', ')}`);
   if (!RECENCY_CLOCKS.includes(s.recencyClock)) throw new Error(`${what}: recencyClock must be one of ${RECENCY_CLOCKS.join(', ')}`);
   if (!(Number(s.recencyHalfLifeDays) > 0)) throw new Error(`${what}: recencyHalfLifeDays must be a positive number`);
+  if (!TAG_MEASURES.includes(s.tagMeasure)) throw new Error(`${what}: tagMeasure must be one of ${TAG_MEASURES.join(', ')}`);
   if (!ORDER_MODES.includes(s.orderMode)) throw new Error(`${what}: orderMode must be one of ${ORDER_MODES.join(', ')}`);
+  if (!WALK_STARTS.includes(s.walkStart)) throw new Error(`${what}: walkStart must be one of ${WALK_STARTS.join(', ')}`);
+  if (s.walkStartSource === undefined || s.walkStartSource === '') s.walkStartSource = null;
+  if (s.walkStartSource !== null && typeof s.walkStartSource !== 'string') {
+    throw new Error(`${what}: walkStartSource must be a source title string or null`);
+  }
   if (!(Number(s.seam) >= 0)) throw new Error(`${what}: seam must be a number of hops, 0 or more`);
   if (!(Number(s.stability) >= 0)) throw new Error(`${what}: stability must be 0 or more`);
   s.recencyHalfLifeDays = Number(s.recencyHalfLifeDays);

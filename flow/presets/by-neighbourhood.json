@@ -1,6 +1,6 @@
 {
   "name": "by-neighbourhood",
-  "description": "The same weights as by-weight, plus shared tagz at 1 and distance at -1, walked: each next card is the heaviest among the nearest to the one before. Offered beside by-weight, not instead of it.",
+  "description": "The same weights as by-weight, plus shared tagz at 1 and distance at -1, walked from the newest card: each next card is the heaviest among the nearest to the one before. Offered beside by-weight, not instead of it.",
   "weights": {
     "tag.site": 1,
     "degree": 1,
@@ -12,8 +12,10 @@
   "switches": {
     "degreePenalty": "sqrt",
     "recencyClock": "calendar",
-    "recencyHalfLifeDays": 30,
+    "recencyHalfLifeDays": 365,
+    "tagMeasure": "presence",
     "orderMode": "walk",
+    "walkStart": "newest",
     "seam": 2,
     "stability": 0.05
   }

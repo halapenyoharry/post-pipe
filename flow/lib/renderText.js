@@ -41,7 +41,10 @@ export function renderText(flow, { full = 20 } = {}) {
 
   const lines = [];
   const mean = Number.isFinite(s.meanHops) ? `${fmt(s.meanHops, 2)} hops per step on average` : 'no reachable steps';
-  lines.push(`flow ${s.preset || ''}: ${s.cards} cards, mode ${s.mode}, ${s.seams} seams, ${mean}`);
+  const start = s.start && s.start.rule && s.start.rule !== 'heaviest'
+    ? `, start ${s.start.title || s.start.id} (${s.start.rule})`
+    : '';
+  lines.push(`flow ${s.preset || ''}: ${s.cards} cards, mode ${s.mode}${start}, ${s.seams} seams, ${mean}`);
   const weights = Object.entries(s.weights || {})
     .filter(([k, v]) => k !== 'source' && Number.isFinite(v) && v !== 0)
     .map(([k, v]) => `${k} ${v}`);

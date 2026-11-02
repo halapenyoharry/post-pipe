@@ -1,6 +1,6 @@
 {
   "name": "by-weight",
-  "description": "The first weight vector: the site scheme's strongest tag, degree and recency, each at 1; every source at 1; sorted by score.",
+  "description": "The first weight vector: presence of a tag in the site scheme, degree and recency (365-day half-life), each at 1; every source at 1; sorted by score.",
   "weights": {
     "tag.site": 1,
     "degree": 1,
@@ -10,7 +10,8 @@
   "switches": {
     "degreePenalty": "sqrt",
     "recencyClock": "calendar",
-    "recencyHalfLifeDays": 30,
+    "recencyHalfLifeDays": 365,
+    "tagMeasure": "presence",
     "orderMode": "score",
     "seam": 2,
     "stability": 0.05

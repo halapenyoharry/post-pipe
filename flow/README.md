@@ -47,13 +47,13 @@ Without references (a feed built without rosetta-tagz) a tag string is read as a
 
 ### flow-score
 
-Reads a subfield. `--preset <file>` is required; `--state <viewState.json>` is optional (the viewer's saved state, the object under its `post-pipe:` key, read for `reading` and `nodes`). `--degree-penalty`, `--recency-clock`, `--half-life` override the preset's switches.
+Reads a subfield. `--preset <file>` is required; `--state <viewState.json>` is optional (the viewer's saved state, the object under its `post-pipe:` key, read for `reading` and `nodes`). `--degree-penalty`, `--recency-clock`, `--half-life`, `--tag-measure` override the preset's switches.
 
 Writes the subfield through, with `preset` (name, description, weights, the switches as used) and, on each card, `score`, `terms` (feature → `{x, w, term}`) and `top` (the feature names by absolute term, largest first, ties by name). `score` is the sum of the terms.
 
 The features, each bounded to 0..1 before weighting, and what each reads:
 
-- `tag.<scheme>`, one per scheme in `subfield.schemes` plus any the preset names: the weight of the card's strongest tag reference that has a `prefLabel` in that scheme. Reads `_references[].weight` and `_references[].prefLabel`.
+- `tag.<scheme>`, one per scheme in `subfield.schemes` plus any the preset names: with `tagMeasure` `presence` (default), 1 when the card has at least one tag reference that has a `prefLabel` in that scheme, else 0; with `tagMeasure` `weight`, the weight of the card's strongest such reference. Reads `_references[].prefLabel` (and `_references[].weight` under `weight`).
 - `tag.shared`: with a position, for every tag the card and the position both carry, the smaller of the two reference weights, summed, over the position's total reference weight; 0 without a position. Reads `_references[].concept` and `weight`. The bounding is the worker's.
 - `rel.<type>`, one per SKOS type present in `subfield.relations` plus any the preset names: the weights of relations of that type between one of the position's tagz and one of the card's tagz, summed and capped at 1; 0 without a position. Reads the relation edges' `attrs.weight`. A tag both carry is `tag.shared`, not a relation.
 - `degree`: the card's tag incidences plus the links it is an end of, in the subfield; penalised by `degreePenalty` (`none`: n, `sqrt`: √n, `log`: ln(1+n)); over the subfield's largest. Reads the tag references and `feed.edges`.
@@ -64,19 +64,19 @@ The features, each bounded to 0..1 before weighting, and what each reads:
 
 ### flow-order
 
-Reads scored cards. `--mode score|walk`, `--seam <hops>`, `--stability <t>`, `--previous <flow.json>`; each defaults to the preset's switch.
+Reads scored cards. `--mode score|walk`, `--walk-start heaviest|newest`, `--start-source <title>`, `--start <id>`, `--seam <hops>`, `--stability <t>`, `--previous <flow.json>`; each defaults to the preset's switch (`--start` names an explicit start card and wins over `--walk-start`).
 
-- `score`: by score descending, ties by id ascending. The design's rule.
-- `walk`: start at the heaviest card; at each step take, among the unvisited, the card with the highest `score + w(tag.shared) · shared(current, candidate) + w(distance) · distance(current, candidate)`, the two position features recomputed with the current card as the position (distance over the largest finite hops from the current card; unreachable counts as 1); ties by id. Every card is visited once. Offered beside `score`, not instead of it.
+- `score`: by score descending, ties by id ascending. The design's rule. In `score` mode `walkStart` and `walkStartSource` are ignored (a sort has no start); `--start` still checks that the card is in the subfield.
+- `walk`: start at the card chosen by `--start <id>` (an id not in the subfield is an error), else by `walkStart` (`heaviest`: highest score, ties by id; `newest`: by the preset's `recencyClock` — `calendar` takes the latest `date`, ties by the feed's item `index` then id, with undated cards never newest unless every candidate is undated; `session` takes the lowest `index`). `walkStartSource` restricts the start candidates for `newest` and `heaviest` to that source's cards, falling back to the whole subfield when no card of that source is present. At each step take, among the unvisited, the card with the highest `score + w(tag.shared) · shared(current, candidate) + w(distance) · distance(current, candidate)`, the two position features recomputed with the current card as the position (distance over the largest finite hops from the current card; unreachable counts as 1); ties by id. Every card is visited once. Offered beside `score`, not instead of it.
 - Stability: with `--previous`, the previous flow's order is the start (cards no longer present dropped, new cards placed by score), then a card passes its neighbour only when their scores differ by more than `t` of the score range. Repeated adjacent passes; deterministic. Without `--previous` it does nothing. Applies to `score` mode.
 
-Writes `{summary, items}`. `summary`: preset, mode, cards, steps, seams, meanHops (over reachable steps), unreachableSteps, position, selector, the switches used, the weights. Each item: `rank`, `id`, `title`, `url`, `source`, `date`, `score`, `terms`, `top`, `tagz[]` (`id`, `label`, `weight`, `origin`, `why`), `untagged` (the reference, when the card has one), and `step`: `from` (the card before), `hops` (in the subfield; null when unreachable), `shared` (tag ids shared with the card before), `seam` (true when hops exceed the seam switch or the card is unreachable).
+Writes `{summary, items}`. `summary`: preset, mode, start (`{id, title, rule, source}` in `walk` mode, where `rule` is `heaviest`, `newest`, `explicit`, or `<walkStart> (no card of <source>; whole subfield)`; `null` in `score` mode), cards, steps, seams, meanHops (over reachable steps), unreachableSteps, position, selector, the switches used, the weights. Each item: `rank`, `id`, `title`, `url`, `source`, `date`, `score`, `terms`, `top`, `tagz[]` (`id`, `label`, `weight`, `origin`, `why`), `untagged` (the reference, when the card has one), and `step`: `from` (the card before), `hops` (in the subfield; null when unreachable), `shared` (tag ids shared with the card before), `seam` (true when hops exceed the seam switch or the card is unreachable).
 
 ### flow-render
 
 Reads a flow.
 
-- `--target text` (default), `--full <n>` (default 20): adjacency text for a model's window. A header line with the preset, cards, mode, seams and mean hops, and one with the weights. Then, in flow order, for each of the first `n` cards: a line with rank, score, title, id, source and date; its top three terms in words (`degree 0.41 · recency 0.30 · tag.site 0.20`); its tagz one line each (label, concept id, weight, origin, the why where there is one, and the other cards in the flow carrying it, by rank and title); an `untagged:` line with the feed's reasons when the card has that reference. The rest are one line each: rank, score, title, tag labels. A seam is one line before the card, saying the hops and what is shared. Every line is from the feed or from the flow's own numbers.
+- `--target text` (default), `--full <n>` (default 20): adjacency text for a model's window. A header line with the preset, cards, mode (and the start card when the walk rule is not `heaviest`), seams and mean hops, and one with the weights. Then, in flow order, for each of the first `n` cards: a line with rank, score, title, id, source and date; its top three terms in words (`degree 0.41 · recency 0.30 · tag.site 0.20`); its tagz one line each (label, concept id, weight, origin, the why where there is one, and the other cards in the flow carrying it, by rank and title); an `untagged:` line with the feed's reasons when the card has that reference. The rest are one line each: rank, score, title, tag labels. A seam is one line before the card, saying the hops and what is shared. Every line is from the feed or from the flow's own numbers.
 - `--target path --positions <positions.json> [--screenshot <graph.png> --over <out.png>] [--stats <out.json>]`: an SVG the size of the captured viewport: every card as a faint box with its short label at its captured place, every drawn tag bubble as a faint circle, the flow as one line segment per step through the card centres, a step number at each card, seams dashed, and a legend naming the preset, the mode, the counts and the path's measures. Cards are matched to positions by url, then by the viewer's slug. With `--screenshot`, the same overlay is composited over the PNG in headless Chrome (`channel: 'chrome'`, `headless: true`) at 1:1 and written to `--over`; the PNG must be the size the positions say. `--stats` writes the measures (total length, mean and median step, steps longer than half the diagonal, cards not drawn).
 - The `scroll` and `here` targets are not built.
 
@@ -95,14 +95,14 @@ Card node ids are the viewer's slugs (the url's last segment without `.html`); `
   "name": "by-weight",
   "description": "…",
   "weights": { "tag.site": 1, "degree": 1, "recency": 1, "source": {} },
-  "switches": { "degreePenalty": "sqrt", "recencyClock": "calendar", "recencyHalfLifeDays": 30, "orderMode": "score", "seam": 2, "stability": 0.05 }
+  "switches": { "degreePenalty": "sqrt", "recencyClock": "calendar", "recencyHalfLifeDays": 365, "tagMeasure": "presence", "orderMode": "score", "seam": 2, "stability": 0.05 }
 }
 ```
 
 `weights` maps a feature name to a number; `source` is a map of source title to number (a title not named is 1; an empty map is every source at 1). A program reads a preset's switches as defaults and a flag overrides them. The engine ships no site-specific preset: neither shipped preset names a source.
 
-- `by-weight`: `tag.site` 1, `degree` 1, `recency` 1, mode `score`. The first weight vector.
-- `by-neighbourhood`: the same plus `tag.shared` 1 and `distance` -1, mode `walk`. Beside the first, not instead of it.
+- `by-weight`: `tag.site` 1 (`tagMeasure` `presence`), `degree` 1, `recency` 1 (half-life 365 days), mode `score`. The first weight vector.
+- `by-neighbourhood`: the same plus `tag.shared` 1 and `distance` -1, mode `walk`, `walkStart` `newest` (`walkStartSource` unset). Beside the first, not instead of it.
 
 ## Switches
 
@@ -110,8 +110,11 @@ Card node ids are the viewer's slugs (the url's last segment without `.html`); `
 |---|---|---|---|---|
 | `degreePenalty` | preset, `flow-score --degree-penalty` | none, sqrt, log | sqrt | how much a many-edged card outweighs a few-edged one |
 | `recencyClock` | preset, `flow-score --recency-clock` | calendar, session | calendar | whether new means recent by date or late in the feed's order |
-| `recencyHalfLifeDays` | preset, `flow-score --half-life` | days > 0 | 30 | how fast calendar recency fades |
+| `recencyHalfLifeDays` | preset, `flow-score --half-life` | days > 0 | 365 | how fast calendar recency fades |
+| `tagMeasure` | preset, `flow-score --tag-measure` | presence, weight | presence | whether `tag.<scheme>` reads presence (0 or 1) or the strongest reference's weight |
 | `orderMode` | preset, `flow-order --mode` | score, walk | score | sort by weight, or walk the neighbourhood |
+| `walkStart` | preset, `flow-order --walk-start` (or `--start <id>`) | heaviest, newest | heaviest | where a walk begins (`--start <id>` names an explicit card and wins) |
+| `walkStartSource` | preset, `flow-order --start-source` | source title or null | null | restricts the walk's start candidates to one source (falls back to the whole subfield if absent) |
 | `seam` | preset, `flow-order --seam` | hops ≥ 0 | 2 | how far a step may reach before it is a jump |
 | `stability` | preset, `flow-order --stability` with `--previous` | fraction ≥ 0 | 0.05 | how much a score must move before the order does |
 | `--full` | `flow-render --target text` | cards ≥ 0 | 20 | how many cards the window gets in full |
@@ -130,8 +133,8 @@ Card node ids are the viewer's slugs (the url's last segment without `.html`); `
 
 ## Tests
 
-`node --test flow/test/*.test.js`: 26 tests on a synthetic feed (six cards, four tagz, one relation, one untagged card, one authored link): the subfield carries every card and tag; distances from a position; each feature's range and what it reads; terms sum to the score; `score` order is deterministic with ties by id; `walk` visits each card once; a seam is flagged; stability holds and yields; the text render names every card; the path SVG has one segment per step and marks seams; the programs chain on stdin and stdout and refuse bad input with one line.
+`node --test flow/test/*.test.js`: 31 tests on a synthetic feed (six cards, four tagz, one relation, one untagged card, one authored link): the subfield carries every card and tag; distances from a position; each feature's range and what it reads (`tagMeasure` `presence` vs `weight`, 365-day default half-life); terms sum to the score; `score` order is deterministic with ties by id and unaffected by `walkStart`; `walk` visits each card once and starts by `heaviest`, `newest` (calendar with index tie-break, or session), `walkStartSource` with fallback, or explicit `--start`; a seam is flagged; stability holds and yields; the text render names every card and names a non-heaviest walk start in its header; the path SVG has one segment per step and marks seams; the programs chain on stdin and stdout and refuse bad input with one line.
 
 ## Provisional names
 
-Named by the worker, for Harold to keep or replace: the subfield's fields (`cards`, `tagz`, `relations`, `links`, `members`, `references`, `index`, `distance`, `position`, `selector`, `schemes`), the scored fields (`terms`, `top`, `x`, `w`, `term`), the flow's fields (`summary`, `items`, `rank`, `step`, `from`, `hops`, `shared`, `seam`, `meanHops`, `unreachableSteps`), the feature names (`tag.<scheme>`, `tag.shared`, `rel.<type>`, `degree`, `recency`, `source`, `read`, `pin`, `distance`), the switch names and the flags (`--min-wait`, `--settle`, `--over`, `--stats`, `--full`, `--hops`, `--half-life`, `--degree-penalty`, `--recency-clock`), the preset names `by-weight` and `by-neighbourhood`, and the capture's file names `positions.json` and `graph.png`. The folder name and the program names come from the design note.
+Named by the worker, for Harold to keep or replace: the subfield's fields (`cards`, `tagz`, `relations`, `links`, `members`, `references`, `index`, `distance`, `position`, `selector`, `schemes`), the scored fields (`terms`, `top`, `x`, `w`, `term`), the flow's fields (`summary`, `start`, `rule`, `items`, `rank`, `step`, `from`, `hops`, `shared`, `seam`, `meanHops`, `unreachableSteps`), the feature names (`tag.<scheme>`, `tag.shared`, `rel.<type>`, `degree`, `recency`, `source`, `read`, `pin`, `distance`), the switch names (`degreePenalty`, `recencyClock`, `recencyHalfLifeDays`, `tagMeasure`, `orderMode`, `walkStart`, `walkStartSource`, `seam`, `stability`) and the flags (`--min-wait`, `--settle`, `--over`, `--stats`, `--full`, `--hops`, `--half-life`, `--degree-penalty`, `--recency-clock`, `--tag-measure`, `--walk-start`, `--start-source`, `--start`), the preset names `by-weight` and `by-neighbourhood`, and the capture's file names `positions.json` and `graph.png`. The folder name and the program names come from the design note.
