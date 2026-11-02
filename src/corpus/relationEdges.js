@@ -26,8 +26,9 @@
 // the PROV fields where rosetta-tagz gave them.
 //
 // An endpoint is `tag:<label>`, the string the items' tag edges use (the
-// concept's site prefLabel, which is item.tags as rosetta-tagz rewrote it). A
-// concept that is a tag on no joined item has no tag node and gets no edge.
+// tag reference's value: the concept's site prefLabel, which is also item.tags
+// as rosetta-tagz rewrote it). A concept that is a tag on no joined item has
+// no tag node and gets no edge.
 // A container tag (settings.containment[].tag) is intercepted by containment
 // in buildEdges and has no tag node either, so it gets none. A relation to an
 // external vocabulary's concept is a mapping on its concept
@@ -35,12 +36,16 @@
 //
 // No rosetta-tagz summary, or one with no relations → [].
 
+const { tagReferences } = require('../lib/tagReferences');
+
 const DIRECTED = new Set(['broader', 'broadMatch']);
 const UNDIRECTED = new Set(['related', 'closeMatch', 'relatedMatch', 'exactMatch']);
 
-// The tag label each concept is drawn under: the first item tag whose tag
-// reference names the concept, skipping container tags, the same walk
-// buildEdges makes when it emits a tag edge.
+// The tag label each concept is drawn under: the value of the first tag
+// reference naming the concept, over the items' tag references in their
+// order (src/lib/tagReferences.js), skipping container tags, the same walk
+// buildEdges makes when it emits a tag edge. A reference with no concept (an
+// adapter's, or one stood in for an entry of item.tags) labels nothing.
 function tagLabelByConcept(items, options = {}) {
   const containerTags = new Set(
     (options.containment || []).map((c) => (c && c.tag !== undefined ? c.tag : null)).filter((t) => t !== null)
@@ -52,12 +57,10 @@ function tagLabelByConcept(items, options = {}) {
   );
   const labelOf = new Map();
   for (const item of items || []) {
-    const refs = Array.isArray(item && item._references) ? item._references : null;
-    if (!refs) continue;
-    for (const tag of item.tags || []) {
+    for (const ref of tagReferences(item)) {
+      const tag = ref.value;
       if (containerTags.has(tag)) continue;
-      const ref = refs.find((r) => r && r.type === 'tag' && r.value === tag);
-      if (!ref || ref.concept === undefined || ref.concept === null) continue;
+      if (ref.concept === undefined || ref.concept === null) continue;
       if (containerConcepts.has(ref.concept)) continue;
       if (!labelOf.has(ref.concept)) labelOf.set(ref.concept, tag);
     }

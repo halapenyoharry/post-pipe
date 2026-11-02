@@ -15,6 +15,8 @@ import { rightsLine } from '../../lib/rights';
 import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
 import { Contributions } from './Contributions';
 import { nonTagReferences } from '../../corpus/buildEdges';
+import { tagReferences } from '../../lib/tagReferences';
+import { wrapText, provenanceLines } from '../../lib/provenance';
 
 
 // contributions: what readers brought (settings.contributions), already
@@ -894,11 +896,28 @@ function FrontmatterPanel({ article, settings }) {
       case 'reading_time':
         value = article.reading_time || '';
         break;
-      case 'tags':
-        if (article.tags && article.tags.length) {
-          value = <>{article.tags.map(t => <span key={t} className={styles.fmTag}>{t}</span>)}</>;
+      case 'tags': {
+        // The chips come from the item's tag references
+        // (src/lib/tagReferences.js), item.tags standing in when it has none.
+        // A chip rosetta-tagz wrote carries its concept, origin and weight as
+        // data attributes and, where rosetta-tagz wrote a why, a hover with
+        // the why and the PROV lines the graph's tag-edge hover shows
+        // (src/lib/provenance.js: the same lines, after the role).
+        const tagRefs = tagReferences(article);
+        if (tagRefs.length) {
+          value = <>{tagRefs.map((r) => (
+            <span
+              key={r.value}
+              className={styles.fmTag}
+              data-concept={typeof r.concept === 'string' && r.concept ? r.concept : undefined}
+              data-origin={typeof r.origin === 'string' && r.origin ? r.origin : undefined}
+              data-weight={typeof r.weight === 'number' && Number.isFinite(r.weight) ? r.weight : undefined}
+              title={typeof r.why === 'string' && r.why ? [...wrapText(r.why), ...provenanceLines(r)].join('\n') : undefined}
+            >{r.value}</span>
+          ))}</>;
         }
         break;
+      }
       case 'references':
         if (nonTagRefs.length) {
           value = <>{nonTagRefs.map((r, i) => (

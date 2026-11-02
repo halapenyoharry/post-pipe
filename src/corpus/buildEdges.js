@@ -17,6 +17,7 @@ function slugOf(item) {
 }
 
 const { containerOfTag } = require('../lib/containers');
+const { tagReferences } = require('../lib/tagReferences');
 
 function nonTagReferences(item) {
   const raw = Array.isArray(item && item._references)
@@ -101,9 +102,12 @@ function buildEdges(items, options = {}) {
       });
     }
 
-    // Subject keywords. Check if any tags belong to containment hierarchy.
+    // Subject keywords: the item's tag references, in their order
+    // (src/lib/tagReferences.js; item.tags stands in only when the item has
+    // none). Check if any tags belong to containment hierarchy.
     const itemContainers = [];
-    for (const tag of item.tags || []) {
+    for (const ref of tagReferences(item)) {
+      const tag = ref.value;
       const container = containerOfTag(item, tag, containerByTag, containerByConcept);
       if (container) {
         if (!itemContainers.includes(container)) itemContainers.push(container);
@@ -116,10 +120,7 @@ function buildEdges(items, options = {}) {
           role: 'tagged',
           layer: 'tag',
         };
-        const ref = Array.isArray(item._references)
-          ? item._references.find((r) => r && r.type === 'tag' && r.value === tag)
-          : null;
-        if (ref && ref.concept !== undefined && ref.weight !== undefined && ref.origin !== undefined) {
+        if (ref.concept !== undefined && ref.weight !== undefined && ref.origin !== undefined) {
           edge.attrs = { concept: ref.concept, weight: ref.weight, origin: ref.origin };
           // rosetta-tagz's word on this attachment, only where it wrote one: why
           // (an explicit tag's is null and stays out) and the PROV fields.
