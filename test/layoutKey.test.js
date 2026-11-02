@@ -62,3 +62,15 @@ test('the spiral on its tip: a set anchorEnd, openTowards, keepBelow or cardScal
   const own = { layouts: { 'container:a': { spiral: { openTowards: 'down-right' } } } };
   assert.notStrictEqual(key('force', base, own), key('force', base));
 });
+
+test('edgeWeights: defaults leave the key unchanged; a non-default mode, degreePenalty or weight changes it', () => {
+  const { EDGE_WEIGHT_DEFAULTS } = require('../src/lib/edgeWeight');
+  const k = layoutKey('force', SITE);
+  assert.strictEqual(layoutKey('force', { ...SITE, edgeWeights: { ...EDGE_WEIGHT_DEFAULTS } }), k);
+  assert.strictEqual(layoutKey('force', SITE, { edgeWeights: { mode: 'weighted', degreePenalty: 'sqrt' } }), k);
+  assert.notStrictEqual(layoutKey('force', { ...SITE, edgeWeights: { mode: 'uniform' } }), k);
+  assert.notStrictEqual(layoutKey('force', SITE, { edgeWeights: { mode: 'uniform' } }), k);
+  assert.notStrictEqual(layoutKey('force', SITE, { edgeWeights: { degreePenalty: 'log' } }), k);
+  assert.notStrictEqual(layoutKey('force', SITE, { edgeWeights: { degreePenalty: 'none' } }), k);
+  assert.notStrictEqual(layoutKey('force', { ...SITE, edgeWeights: { weights: { tag: 2 } } }), k);
+});

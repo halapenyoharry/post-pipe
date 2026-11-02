@@ -13,6 +13,10 @@ import { colorKeysInUse } from '../../lib/graphColors';
 import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
 import { clampTightness } from '../../lib/tightness';
+import {
+  MODE_PREF as EDGE_WEIGHT_MODE_PREF, PENALTY_PREF as DEGREE_PENALTY_PREF,
+  EDGE_WEIGHT_MODES, DEGREE_PENALTIES, normaliseEdgeWeights,
+} from '../../lib/edgeWeight';
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { PREF as MIN_PIECES_PREF, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
@@ -331,6 +335,14 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const ratioNow = sourceRatios.has ? clampRatio(viewState.preference(SOURCE_RATIO_PREF), sourceRatios) : null;
   const setRatio = (v) => viewState.setPreference(SOURCE_RATIO_PREF, Math.abs(v - sourceRatios.bar) < 1e-9 ? null : v);
   const RATIO_KEYS = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
+  // Edge weights (preferences edgeWeights and degreePenalty, null for the
+  // site's own; lib/edgeWeight.js): how each link's strength and distance are
+  // computed in the cluster layout.
+  const siteEw = normaliseEdgeWeights(S && S.graph && S.graph.edgeWeights);
+  const ewModePref = viewState.preference(EDGE_WEIGHT_MODE_PREF);
+  const ewMode = EDGE_WEIGHT_MODES.includes(ewModePref) ? ewModePref : siteEw.mode;
+  const ewPenaltyPref = viewState.preference(DEGREE_PENALTY_PREF);
+  const ewPenalty = DEGREE_PENALTIES.includes(ewPenaltyPref) ? ewPenaltyPref : siteEw.degreePenalty;
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -474,6 +486,31 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
             <span className={styles.rangeEnd} aria-hidden="true">tight</span>
           </span>
         </label>
+      )}
+      {TB.show.layout && (
+        <Choice
+          label="Edge weights"
+          name={EDGE_WEIGHT_MODE_PREF}
+          options={[
+            { id: 'uniform', label: 'uniform', title: "One link distance and D3's default strength for every link." },
+            { id: 'weighted', label: 'weighted', title: "Each link's strength and distance follow its weight, endpoint degrees and card recency." },
+          ]}
+          value={ewMode}
+          onChange={(v) => viewState.setPreference(EDGE_WEIGHT_MODE_PREF, v === siteEw.mode ? null : v)}
+        />
+      )}
+      {TB.show.layout && ewMode === 'weighted' && (
+        <Choice
+          label="Degree penalty"
+          name={DEGREE_PENALTY_PREF}
+          options={[
+            { id: 'none', label: 'none', title: 'Divide by each endpoint degree as it is (n).' },
+            { id: 'sqrt', label: '√', title: 'Divide by the square root of each endpoint degree (√n).' },
+            { id: 'log', label: 'log', title: 'Divide by log(1 + n) of each endpoint degree.' },
+          ]}
+          value={ewPenalty}
+          onChange={(v) => viewState.setPreference(DEGREE_PENALTY_PREF, v === siteEw.degreePenalty ? null : v)}
+        />
       )}
       {minPieces.max > 1 && (
         // The label carries the value, so it has a line of its own, and the
