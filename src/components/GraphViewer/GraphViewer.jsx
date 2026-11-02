@@ -694,8 +694,8 @@ export function GraphViewer({
   const edgeWeightsUpdateRef = useRef(null);
   const edgeWeightsChosen = () => {
     const vs = viewStateRef.current;
-    const mode = vs && vs.preference ? vs.preference(MODE_PREF) : null;
-    const degreePenalty = vs && vs.preference ? vs.preference(PENALTY_PREF) : null;
+    const mode = vs && vs.preference ? vs.preference(EDGE_WEIGHT_MODE_PREF) : null;
+    const degreePenalty = vs && vs.preference ? vs.preference(DEGREE_PENALTY_PREF) : null;
     return normaliseEdgeWeights({
       ...(GS.edgeWeights || {}),
       ...(mode ? { mode } : {}),
