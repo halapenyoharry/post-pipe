@@ -1,11 +1,18 @@
 // Aggregator — runs N adapters, resolves each feed's color, merges items.
 
+const path = require('path');
+
 const { detectExplicitFeedColor, hashFeedColor } = require('./adapters/detectFeedColor');
 const { fetchText }       = require('./adapters/fetchText');
 const { readLastGood, writeLastGood, readSavedCopy, writeSavedCopy, copiesNewestFirst, DEFAULT_DIR: LAST_GOOD_DIR } = require('./adapters/lastGoodCopy');
 const { ColorCache }      = require('./lib/colorCache');
 const { runRtagzPhase }   = require('./lib/rtagz');
 const { parseCardScale, parseItemCap, parseDefaultHidden } = require('./lib/opml');
+
+// The feed colours resolved so far, in post-pipe's own .feed-cache wherever
+// the build is run from (until 2026-11-05 the working directory's, so a
+// build run from another folder looked each home page up again).
+const DEFAULT_COLOR_CACHE = path.join(path.resolve(__dirname, '..'), '.feed-cache', 'colors.json');
 
 function resolveFeedDisplay(config = {}, feedMeta = {}, feedsMap = null) {
   const map = feedsMap && typeof feedsMap === 'object' ? feedsMap : (config.settings && config.settings.feeds) || {};
@@ -130,7 +137,7 @@ async function loadEntry({ adapter, config }, options) {
 /**
  * @param {Array<{ adapter, config }>} entries
  * @param {Object} [options]
- * @param {string} [options.colorCachePath]  defaults to './.feed-cache/colors.json'
+ * @param {string} [options.colorCachePath]  defaults to the engine's .feed-cache/colors.json
  * @param {Object} [options.rtagz]           site rosetta-tagz settings (settings.rtagz)
  * @param {string} [options.siteRoot]        site root path
  * @param {Array}  [options.containment]     site containment entries (settings.containment)
@@ -145,7 +152,7 @@ async function loadEntry({ adapter, config }, options) {
  * @returns {Promise<{ items: JsonFeedItem[], sources: Source[], rtagz?: Object }>}
  */
 async function loadCorpus(entries, options = {}) {
-  const cache = new ColorCache(options.colorCachePath || './.feed-cache/colors.json');
+  const cache = new ColorCache(options.colorCachePath || DEFAULT_COLOR_CACHE);
 
   // Phase 1: fetch items from every adapter concurrently. Adapter failures
   // are caught so one broken feed doesn't take the whole build down, and a
@@ -265,4 +272,4 @@ async function loadCorpus(entries, options = {}) {
   return out;
 }
 
-module.exports = { loadCorpus, describeError, resolveFeedDisplay };
+module.exports = { loadCorpus, describeError, resolveFeedDisplay, DEFAULT_COLOR_CACHE };

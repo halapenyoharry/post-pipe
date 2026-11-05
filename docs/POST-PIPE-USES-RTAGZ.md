@@ -63,7 +63,7 @@ These exist in rosetta-tagz, but nothing a site writes reaches them today. Nothi
 
 | file | where | written by |
 |---|---|---|
-| the cache folder | `.feed-cache/rtagz/<site>-<hash>/` under post-pipe's working folder: `<site>` is the site folder's name, `<hash>` the first eight hex digits of the sha1 of its absolute path, so two sites of one name never share a cache. `.feed-cache/` is git-ignored | post-pipe (`cacheDirForSite` in `src/lib/rtagz.js`) |
+| the cache folder | `.feed-cache/rtagz/<site>-<hash>/` under post-pipe's own folder, wherever the build is run from (before 2026-11-05, under the folder it was run from): `<site>` is the site folder's name, `<hash>` the first eight hex digits of the sha1 of its absolute path, so two sites of one name never share a cache. `.feed-cache/` is git-ignored | post-pipe (`cacheDirForSite` in `src/lib/rtagz.js`) |
 | `records.jsonl`, `overrides.json`, `rtz.config.json` | the cache folder | post-pipe, before the run |
 | `stone.json`, `records.discovered.jsonl`, `discover.report.json` *(provisional)*, `records.all.jsonl`, `universe.json`, `skos.jsonld`, `skos.ttl`, `build.json` | the cache folder | rosetta-tagz's stages |
 | `rtagz-ids.json` | the site folder (setting `ledger`) | `rtz-stone`, every build |
@@ -122,7 +122,7 @@ Never run a cache folder's `rtz.config.json` by hand: it writes the ids file int
 ## How a build runs it
 
 ```
-node <engine>/bin/rtz-build --config .feed-cache/rtagz/<site>-<hash>/rtz.config.json --no-view
+node <engine>/bin/rtz-build --config <post-pipe>/.feed-cache/rtagz/<site>-<hash>/rtz.config.json --no-view
 ```
 
 Run from `src/lib/rtagz.js` with `child_process.spawn` on post-pipe's own `process.execPath` (rosetta-tagz needs Node 22 or later), the cache folder as working folder, `detached: true` so the whole process group can be killed at the timeout. `rtz-build` runs each stage as a program of its own, in this order:

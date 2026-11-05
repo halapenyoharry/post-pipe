@@ -67,6 +67,11 @@ test('the copies live in the engine\'s own .feed-cache, never beside a site', ()
   assert.notStrictEqual(copyFile(URL_A), copyFile('https://feeds.example/b.xml'), 'one file per address');
 });
 
+test("the colour cache lives in the engine's own .feed-cache too, wherever the build is run from", () => {
+  const { DEFAULT_COLOR_CACHE } = require('../src/aggregator');
+  assert.strictEqual(DEFAULT_COLOR_CACHE, path.join(path.resolve(__dirname, '..'), '.feed-cache', 'colors.json'));
+});
+
 test('a fetch that parses keeps its text as the feed\'s last good copy; its source entry keeps its fields and adds when it was fetched', async () => {
   const s = scratch();
   try {

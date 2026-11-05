@@ -272,10 +272,18 @@ test('rtagz: a site holding only stone.ledger.json or stone.overrides.json has t
   }
 });
 
-test('rtagz: the cache folder for a site is under .feed-cache/rtagz', () => {
+test("rtagz: the cache folder for a site is under post-pipe's own .feed-cache/rtagz, wherever the build is run from", () => {
+  const engine = path.resolve(__dirname, '..');
   const dir = cacheDirForSite('/sites/example');
-  assert.strictEqual(path.dirname(dir), path.join('.feed-cache', 'rtagz'));
+  assert.strictEqual(path.dirname(dir), path.join(engine, '.feed-cache', 'rtagz'));
   assert.match(path.basename(dir), /^example-[0-9a-f]{8}$/);
+  const here = process.cwd();
+  try {
+    process.chdir(os.tmpdir());
+    assert.strictEqual(cacheDirForSite('/sites/example'), dir, 'the working folder does not move it');
+  } finally {
+    process.chdir(here);
+  }
 });
 
 test('rtagz: write-back from canned universe orders tags, resolves folded items, preserves unjoined, emits edge attrs, and builds feed._rtagz', () => {
