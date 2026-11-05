@@ -25,7 +25,7 @@ cd ~/Projects/post-pipe
 POSTPIPE_SITE=~/Projects/<site> node generate-index.js
 ```
 
-Every script (`generate-index.js`, `add-feed.js`, `update-index.js`, the publishers in `platforms/`) finds the site the same way, through `src/lib/siteRoot.js`: `POSTPIPE_SITE` if set, else the example site at `examples/site/`. So a fresh clone builds the example and never someone else's site. The example site is also the engine's test corpus of five made-up pieces about ordinary things; it carries no person's name.
+Every script (`generate-index.js`, `add-feed.js`, `update-index.js`, the publishers in `platforms/`) finds the site the same way, through `src/lib/siteRoot.js`: `POSTPIPE_SITE` if set, else the example site at `examples/site/`. So a fresh clone builds the example and never someone else's site. The example site is post-pipe's test page, what anyone (a person or an agent) builds to see the engine work without bringing data of their own: it reads two public feeds, ScienceDaily and ProPublica, fetched at build, with rosetta-tagz on so their items carry tagz. It carries no person's name and no one's own writing. Its slug ledger and rosetta-tagz files follow the live feeds and stay out of git.
 
 A site may convert its own content shape into post-pipe's before building, the way the novel's `scripts/build.js` assembles chapter folders from a manuscript repository and then calls `generate-index.js` with `POSTPIPE_SITE` set. That converter belongs to the site, not the engine. Formats many people share (a folder of pieces, feeds) are read by the engine directly.
 

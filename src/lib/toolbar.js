@@ -2,13 +2,14 @@
 // show, and the rows of the dimensions menu they use when they sit in the
 // top bar.
 //
-//   "toolbar": { "position": "bottom" | "top", "show": { "history": true, "layout": true, "dimensions": true } }
+//   "toolbar": { "position": "top" | "bottom", "show": { "history": true, "layout": true, "dimensions": true } }
 //
-// position bottom (default): the bar along the bottom (src/components/Toolbar).
-// position top: no bottom bar; undo, redo, Reset and the dimensions menu join
-// the top bar as icon buttons, then the sliders that open the main view's
-// panel, where the view actions and the layout (when shown) are. show: each
-// group on unless set false.
+// position top (default since 2026-11-05): no bottom bar; undo, redo, Reset
+// and the dimensions menu join the top bar as icon buttons, then the sliders
+// that open the main view's panel, where the view actions and the layout
+// (when shown) are. position bottom: the bar along the bottom
+// (src/components/Toolbar), the default before 2026-11-05. show: each group
+// on unless set false.
 
 const { resizeOn } = require('./actions');
 
@@ -37,7 +38,7 @@ function toolbarConfig(settings, features) {
   const s = (t.show && typeof t.show === 'object') ? t.show : {};
   const f = features || {};
   return {
-    position: t.position === 'top' ? 'top' : 'bottom',
+    position: t.position === 'bottom' ? 'bottom' : 'top',
     show: {
       history: s.history !== false && f.undoRedo !== false,
       layout: s.layout !== false && f.layoutControls !== false,

@@ -6,12 +6,13 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const { toolbarConfig, menuModel, menuMove, toggleDimension, nextGranularity, VIEW_ACTIONS } = require('../src/lib/toolbar');
 
-test('position: bottom by default, top only when set so', () => {
-  assert.strictEqual(toolbarConfig(null).position, 'bottom');
-  assert.strictEqual(toolbarConfig({}).position, 'bottom');
+test('position: top by default, bottom only when set so', () => {
+  assert.strictEqual(toolbarConfig(null).position, 'top');
+  assert.strictEqual(toolbarConfig({}).position, 'top');
   assert.strictEqual(toolbarConfig({ toolbar: { position: 'top' } }).position, 'top');
-  assert.strictEqual(toolbarConfig({ toolbar: { position: 'left' } }).position, 'bottom');
-  assert.strictEqual(toolbarConfig({ toolbar: 'top' }).position, 'bottom');
+  assert.strictEqual(toolbarConfig({ toolbar: { position: 'bottom' } }).position, 'bottom');
+  assert.strictEqual(toolbarConfig({ toolbar: { position: 'left' } }).position, 'top');
+  assert.strictEqual(toolbarConfig({ toolbar: 'bottom' }).position, 'top');
 });
 
 test('show: every group on by default; false turns one off, at the top as at the bottom', () => {
