@@ -180,7 +180,7 @@ Each Gen 0 folder gets a `_TODO-METADATA.md` with a research checklist. Full pro
 The generated `_site/index.html` is a self-contained page with:
 
 1. **D3 force-directed graph** — nodes are content items; edges are tag co-occurrence (and in future: explicit `connected_to` edges, substrate clusters)
-2. **Reader panel** — slides in on node click; dispatches rendering based on `content.kind`
+2. **Reader panel** — slides in on node click; dispatches rendering based on `content.kind`. Its tag row draws the item's tag references as chips (`src/lib/tagReferences.js`); a card with no tagz shows instead the one line the build wrote on it, `untaggedBecause` (`src/lib/untaggedBecause.js`, provisional, 2026-11-04), saying why, from what rosetta-tagz reported
 3. **TTS toolbar** — engine-agnostic registry (browser / gemini)
 4. **Syndication toolbar** — platform icons linking to cross-posted versions
 

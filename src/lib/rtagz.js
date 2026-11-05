@@ -11,6 +11,8 @@ const path   = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
+const { untaggedBecause } = require('./untaggedBecause');
+
 const POSTPIPE_ROOT = path.resolve(__dirname, '../..');
 
 // rosetta-tagz's SKOS serialization, written beside universe.json when its
@@ -122,6 +124,11 @@ function sitePath(p, siteRoot) {
 // until the file is renamed.
 const IDS_FILE = 'rtagz-ids.json';
 const OVERRIDES_FILE = 'rtagz-overrides.json';
+// The queue rosetta-tagz writes when a site's rtagz.discover is "queue":
+// the candidates discovery would have attached, for the site's owner to
+// move into the overrides file by hand. Beside that file, in the site, so
+// the two sit together (provisional name, 2026-11-04).
+const QUEUE_FILE = 'rtagz-queue.json';
 const FORMER_NAMES = {
   [IDS_FILE]: 'stone.ledger.json',
   [OVERRIDES_FILE]: 'stone.overrides.json',
@@ -166,15 +173,21 @@ function rtagzSettings(settings) {
 // language tag on labels), passed through as rtz-build's skos block; false
 // writes no SKOS files; absent, rosetta-tagz's defaults (base urn:rosetta-tagz:,
 // lang en). Only base and lang are passed.
-function buildConfig({ emerge = true, discover = false, conceptSchemes, ledger, siteRoot, skos } = {}) {
+// discover (settings.rtagz.discover) is true, "queue" or false, passed as it
+// is; anything else truthy is true. With "queue", queue (an absolute path,
+// the site's rtagz-queue.json) names the file rtz-build writes the queue to;
+// without one rtz-build puts it beside the overrides it was given, which for
+// post-pipe is the cache folder's copy.
+function buildConfig({ emerge = true, discover = false, queue, conceptSchemes, ledger, siteRoot, skos } = {}) {
   const root = path.resolve(siteRoot || POSTPIPE_ROOT);
   const config = {
     out: '.',
     sources: [{ adapter: 'jsonl', path: 'records.jsonl' }],
     overrides: 'overrides.json',
     emerge: Boolean(emerge),
-    discover: Boolean(discover),
+    discover: discover === 'queue' ? 'queue' : Boolean(discover),
   };
+  if (discover === 'queue' && typeof queue === 'string' && queue) config.queue = queue;
   const schemes = [];
   const list = Array.isArray(conceptSchemes) ? conceptSchemes : [];
   for (let i = 0; i < list.length; i += 1) {
@@ -707,6 +720,9 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
 
       item.tags = newTags;
       item._references = [...nonTagRefs, ...newTagRefs];
+      // The line saying why a card has no tagz is this build's to write
+      // (below, from the untagged report); one an earlier build left goes.
+      delete item.untaggedBecause;
     }
   }
 
@@ -813,6 +829,10 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
   // rebuild) and its candidates. Each joined item also gets a reference of
   // type untagged with the same why, reasons and under (the candidates stay
   // in the summary), so its own reference list says why it shows no tag. Nothing is forced onto it. An empty list writes nothing.
+  // A joined item that ends with no tagz at all also carries untaggedBecause,
+  // one line from the entry's reason codes, its queued candidates and the
+  // site's discover and emerge switches (src/lib/untaggedBecause.js), for the
+  // reader panel to show where the tag chips would be.
   const report = buildManifest && buildManifest.untagged && typeof buildManifest.untagged === 'object'
     && !Array.isArray(buildManifest.untagged) && Array.isArray(buildManifest.untagged.items)
     ? buildManifest.untagged
@@ -840,6 +860,9 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
             const ref = { type: 'untagged', why: [...why], ...JSON.parse(JSON.stringify(extra)) };
             delete ref.candidates; // the full candidate lists stay in feed._rtagz.untagged
             j.item._references = [...refs, ref];
+            if (!Array.isArray(j.item.tags) || j.item.tags.length === 0) {
+              j.item.untaggedBecause = untaggedBecause(u, { discover: options.discover, emerge: options.emerge !== false });
+            }
           }
         }
       } else {
@@ -975,9 +998,17 @@ async function runRtagzPhase(results, options = {}) {
     fs.writeFileSync(recordsPath, recordsText, 'utf8');
     fs.writeFileSync(overridesOutPath, JSON.stringify(mergedOverrides, null, 2) + '\n', 'utf8');
 
+    // discover: true | "queue" | false (settings.json's rtagz.discover). With
+    // "queue" the queue file goes beside the site's overrides file, named
+    // rtagz-queue.json, when a site root is known.
+    const discoverMode = rtagzCfg.discover === 'queue' ? 'queue' : Boolean(rtagzCfg.discover);
+    const queuePath = discoverMode === 'queue' && options.siteRoot
+      ? path.join(path.dirname(overridesPath), QUEUE_FILE)
+      : undefined;
     const rtzConfig = buildConfig({
       emerge: rtagzCfg.emerge !== false,
-      discover: Boolean(rtagzCfg.discover),
+      discover: discoverMode,
+      queue: queuePath,
       conceptSchemes: rtagzCfg.conceptSchemes,
       ledger: rtagzCfg.ledger,
       skos: rtagzCfg.skos,
@@ -1011,7 +1042,19 @@ async function runRtagzPhase(results, options = {}) {
     // is labelled with its id.
     const siteTitle = typeof options.siteTitle === 'string' ? options.siteTitle : '';
 
-    const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, { siteTitle });
+    const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, {
+      siteTitle,
+      discover: discoverMode,
+      emerge: rtagzCfg.emerge !== false,
+    });
+    // The queue, as rtz-build reports it: its path and how many candidates
+    // wait in it; written only when the build queued.
+    if (buildManifest && buildManifest.queue && typeof buildManifest.queue === 'object') {
+      const q = {};
+      if (typeof buildManifest.queue.path === 'string' && buildManifest.queue.path) q.path = buildManifest.queue.path;
+      if (typeof buildManifest.queue.candidates === 'number' && Number.isFinite(buildManifest.queue.candidates)) q.candidates = buildManifest.queue.candidates;
+      if (Object.keys(q).length) summary.queue = q;
+    }
     // The container tags as concept ids, for containment by concept
     // (generate-index stamps each container with its concept).
     const containerConcepts = resolveContainerConcepts(universe, options.containment || []);
@@ -1029,6 +1072,7 @@ module.exports = {
   SKOS_FILES,
   IDS_FILE,
   OVERRIDES_FILE,
+  QUEUE_FILE,
   rtagzSettings,
   htmlToText,
   itemText,
