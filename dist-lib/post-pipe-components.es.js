@@ -8302,7 +8302,7 @@ var ps = /* @__PURE__ */ _(((e, t) => {
 	}
 	function u(e) {
 		let t = o(e);
-		return !!(t && t.labels === !0);
+		return !(t && t.labels === !1);
 	}
 	function d(e, t) {
 		return e === !0 || e === !1 ? e : u(t);
