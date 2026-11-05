@@ -46,7 +46,9 @@ import { tagReferences } from '../../lib/tagReferences';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
 import { listenInCard, toggleListen, stopListening } from '../../lib/listenInCard';
-import { PREF as TAG_SHOW_PREF, showTagsChosen } from '../../lib/tagPills';
+import {
+  PREF as TAG_SHOW_PREF, LABELS_PREF as TAG_LABELS_PREF, tagDrawing, tagMarkRadius, tagMarkHitRadius,
+} from '../../lib/tagPills';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -419,7 +421,9 @@ function piecesByTag(entries, view = null) {
 // (src/lib/blendColors.js), each feed weighing as many pieces as it brings
 // and a hidden piece weighing nothing; a piece without a feed colour weighs
 // in as the theme's tag colour. With nothing to blend, the theme's tag
-// colour, as a variable, so the reader's palette still reaches it.
+// colour, as a variable, so the reader's palette still reaches it. The dot
+// a tag is drawn as while the labels are hidden (.tag-mark) takes the same
+// fill as its pill, so a tag keeps its colour drawn either way.
 function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
   const tags = svg.selectAll('.node').filter((d) => Boolean(d && d.type === 'tag' && !d._groupedInto));
   if (tags.empty()) return;
@@ -427,12 +431,15 @@ function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
   if (typeof getComputedStyle === 'function') {
     themeTag = getComputedStyle(svg.node()).getPropertyValue('--gv-tag-color').trim() || null;
   }
-  tags.select('rect').attr('fill', (d) => {
+  const fills = new Map();
+  tags.each((d) => {
     const parts = (pieces.get(d.id) || [])
       .filter((p) => !isHiddenArticle(p))
       .map((p) => ({ color: feedColorOf(p, sourceColorOf), weight: 1 }));
-    return blendColors(parts, themeTag || d.color) || 'var(--gv-tag-color)';
+    fills.set(d.id, blendColors(parts, themeTag || d.color) || 'var(--gv-tag-color)');
   });
+  tags.select('rect').attr('fill', (d) => fills.get(d.id));
+  tags.select('.tag-mark').attr('fill', (d) => fills.get(d.id));
 }
 
 // The number of pieces on each tag bubble drawn, for the panel's pieces per
@@ -708,15 +715,24 @@ export function GraphViewer({
       ...(degreePenalty ? { degreePenalty } : {}),
     });
   };
-  // Whether the tag pills are drawn (settings.graph.tag.show, default false,
-  // and the preference showTags, null for the site's own; lib/tagPills.js).
-  // Hidden pills only stop being drawn: the tag nodes stay in the simulation.
-  const showTagsNow = () => {
+  // How the tags are drawn (lib/tagPills.js): 'hidden' (settings.graph.tag.show
+  // false, or the preference showTags off: no tag, no edge to one), 'pills'
+  // (settings.graph.tag.labels, or the preference showTagLabels, on: each tag
+  // its pill) or 'marks', the default (each tag a dot, every edge to it
+  // drawn). The svg carries it as tags-hidden or tag-labels-hidden
+  // (GraphViewer.module.css). Only the drawing changes: the tag nodes stay
+  // in the simulation with their pills' footprint.
+  const tagDrawingNow = () => {
     const vs = viewStateRef.current;
-    return showTagsChosen(vs && vs.preference ? vs.preference(TAG_SHOW_PREF) : null, { graph: GS });
+    const pref = (k) => (vs && vs.preference ? vs.preference(k) : null);
+    return tagDrawing(pref(TAG_SHOW_PREF), pref(TAG_LABELS_PREF), { graph: GS });
   };
   const applyTagPills = () => {
-    if (svgRef.current) svgRef.current.classed('tags-hidden', !showTagsNow());
+    if (!svgRef.current) return;
+    const drawn = tagDrawingNow();
+    svgRef.current
+      .classed('tags-hidden', drawn === 'hidden')
+      .classed('tag-labels-hidden', drawn === 'marks');
   };
   // Readers' contributions (settings.contributions): counted on the cards,
   // and their connections drawn as their own edge layer, the readers
@@ -3815,6 +3831,13 @@ export function GraphViewer({
       return formsEl;
     }
 
+    // A tag's mark (lib/tagPills.js): the dot it is drawn as while the labels
+    // are hidden, settings.graph.tag.markRadius in graph units (7 by default),
+    // and round it a transparent circle a finger can hit (22, or the dot's
+    // own radius when larger).
+    const MARK_R = tagMarkRadius({ graph: GS });
+    const MARK_HIT_R = tagMarkHitRadius(MARK_R);
+
     nodes.each(function(d) {
       const el = d3.select(this);
       if (d.type !== 'article') {
@@ -3841,6 +3864,24 @@ export function GraphViewer({
           .attr('rx', TAG.cornerRadius).attr('ry', TAG.cornerRadius)
           .attr('fill', 'var(--gv-' + (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') + ')')
           .attr('opacity', TAG.opacity);
+
+        // A tag's dot and its hit circle, under the pill. Drawn only while
+        // the labels are hidden (.tag-labels-hidden), when the pill is not;
+        // the pill is still built and measured, so its footprint (_r) holds
+        // the layout whichever is drawn. The dot takes the pill's fill
+        // (paintTagColors) and opacity. A tap or a drag on either is one on
+        // the tag node, as on its pill.
+        if (d.type === 'tag') {
+          el.insert('circle', 'rect')
+            .attr('class', 'tag-mark-hit')
+            .attr('r', MARK_HIT_R)
+            .style('fill', 'transparent');
+          el.insert('circle', 'rect')
+            .attr('class', 'tag-mark')
+            .attr('r', MARK_R)
+            .attr('fill', 'var(--gv-tag-color)')
+            .attr('opacity', TAG.opacity);
+        }
 
         const formsEl = buildTagForms(el, d, fontSize);
 
@@ -4283,16 +4324,26 @@ export function GraphViewer({
     // depth changes.
     let chosenTag = null;
     let hoveredTag = null;
+    // The forms beside the tag selected or hovered. While the labels are
+    // hidden (.tag-labels-hidden), the tag hovered also draws its pill, with
+    // its forms, instead of its dot (tag-hover), for as long as the pointer
+    // is on it; its hit circle stays under the pointer meanwhile, so the
+    // pill does not flicker off at the dot's edge.
     function updateTagForms() {
       nodes.select('.tag-forms')
         .style('display', (d) => (d && (d.id === activeTag || d.id === hoveredTag) ? null : 'none'));
+      nodes.classed('tag-hover', (d) => Boolean(d && d.type === 'tag' && d.id === hoveredTag));
     }
+    // Hover is a mouse's or a pen's: a finger does not hover, so a tap shows
+    // a tag's pill by picking it (tag-shown, paintHighlight) and leaves no
+    // hover behind when it lifts.
     nodes.filter(d => d.type === 'tag')
-      .on('mouseenter', (event, d) => {
+      .on('pointerenter', (event, d) => {
+        if (event.pointerType === 'touch') return;
         hoveredTag = d.id;
         updateTagForms();
       })
-      .on('mouseleave', (event, d) => {
+      .on('pointerleave', (event, d) => {
         if (hoveredTag === d.id) {
           hoveredTag = null;
           updateTagForms();
@@ -4357,7 +4408,9 @@ export function GraphViewer({
     // While the pills are hidden (.tags-hidden), the tag highlighted and the
     // relatives its lines are drawn to still show (tag-shown), and so do the
     // edges between a showing pill and a card (link-tag-shown). An edge from
-    // a showing pill to a hidden one stays hidden. shown: tag ids, or null.
+    // a showing pill to a hidden one stays hidden. While only their labels
+    // are hidden (.tag-labels-hidden), the same tags draw their pills instead
+    // of their dots. shown: tag ids, or null.
     function paintShownPills(shown) {
       const on = (nid) => Boolean(shown && shown.has(nid));
       nodes.classed('tag-shown', (nd) => nd.type === 'tag' && on(nd.id));
@@ -5569,8 +5622,8 @@ export function GraphViewer({
     // The positions go through viewState, so Undo can bring them back.
     const handleResetAll = () => {
       const vs = viewStateRef.current;
-      // Showing the tag pills goes back to the site's own too.
-      if (vs && vs.resetLayout) vs.resetLayout({ prefs: [TAG_SHOW_PREF] });
+      // Showing the tagz, and their labels, goes back to the site's own too.
+      if (vs && vs.resetLayout) vs.resetLayout({ prefs: [TAG_SHOW_PREF, TAG_LABELS_PREF] });
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
       focusNode(null);
       hideEdgeLabel();
