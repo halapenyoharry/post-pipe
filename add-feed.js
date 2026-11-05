@@ -2,12 +2,16 @@
 // add-feed.js — append a feed to feeds.opml and rebuild the corpus.
 //
 // Usage:
-//   node add-feed.js <feedUrl> [--title=<title>] [--color=<#rrggbb>]
+//   node add-feed.js <feedUrl> [--title=<title>] [--color=<#rrggbb>] [--type=<type>]
 //
 // What it does:
 //   1. Validates the URL.
 //   2. Appends an <outline> entry to feeds.opml before </body>.
 //   3. Runs `node generate-index.js` so feed.json includes the new items.
+//
+// --type=page lists the address as one article's page (one item) instead
+// of a feed; any other --type is written as given (rss, atom, json). With
+// no --type the attribute is left off and the OPML parser infers it.
 //
 // What it intentionally does NOT do:
 //   - Fetch the feed to verify it's reachable (build will surface that)
@@ -20,10 +24,11 @@ const { execSync } = require('child_process');
 const { siteRoot } = require('./src/lib/siteRoot');
 
 function parseArgs(argv) {
-  const out = { url: '', title: '', color: '' };
+  const out = { url: '', title: '', color: '', type: '' };
   for (const arg of argv.slice(2)) {
     if (arg.startsWith('--title='))  out.title = arg.slice(8);
     else if (arg.startsWith('--color=')) out.color = arg.slice(8);
+    else if (arg.startsWith('--type='))  out.type = arg.slice(7).trim().toLowerCase();
     else if (!arg.startsWith('--'))   out.url = arg;
   }
   return out;
@@ -42,10 +47,10 @@ function resolveOpmlPath(site) {
 }
 
 function main() {
-  const { url, title, color } = parseArgs(process.argv);
+  const { url, title, color, type } = parseArgs(process.argv);
 
   if (!url) {
-    console.error('Usage: node add-feed.js <feedUrl> [--title=<title>] [--color=<#rrggbb>]');
+    console.error('Usage: node add-feed.js <feedUrl> [--title=<title>] [--color=<#rrggbb>] [--type=page|rss|atom|json]');
     process.exit(1);
   }
   try { new URL(url); }
@@ -67,7 +72,8 @@ function main() {
 
   const label = title || urlToLabel(url);
   const colorAttr = color ? ` customColor="${color}"` : '';
-  const outline = `    <outline text="${escape(label)}" title="${escape(label)}" xmlUrl="${escape(url)}"${colorAttr}/>`;
+  const typeAttr = type ? ` type="${escape(type)}"` : '';
+  const outline = `    <outline text="${escape(label)}" title="${escape(label)}"${typeAttr} xmlUrl="${escape(url)}"${colorAttr}/>`;
 
   const updated = existing.replace('</body>', `${outline}\n  </body>`);
   fs.writeFileSync(opmlPath, updated);
