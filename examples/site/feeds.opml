@@ -5,5 +5,10 @@
   </head>
   <body>
     <outline text="Example pieces" title="Example pieces" type="local" xmlUrl="local://pieces"/>
+    <!-- One outline per source. type says what xmlUrl is: rss, atom or json
+         (a feed; left off, a feed is inferred), local (a folder of pieces),
+         page (one article's address, read at build as one item), or pages
+         (a local text file of such addresses, one per line). The example
+         lists no page so that it builds without the network. -->
   </body>
 </opml>
