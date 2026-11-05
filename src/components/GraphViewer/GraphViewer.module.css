@@ -126,6 +126,18 @@
   filter: drop-shadow(0 0 6px var(--gv-accent));
 }
 
+/* The tag pills hidden (settings.graph.tag.show false, or the reader's
+   "Show tagz on the graph" off; src/lib/tagPills.js): a tag node and its
+   edges are not drawn and take no pointer, but stay in the simulation, so
+   nothing moves. The tag highlighted from the tag list, and the relatives
+   its lines go to, still show (tag-shown), with their edges to cards
+   (link-tag-shown). !important beats the hit paths' inline pointer-events. */
+.graphContainer :global(.tags-hidden .node-tag:not(.tag-shown)),
+.graphContainer :global(.tags-hidden .link-to-tag:not(.link-tag-shown)) {
+  visibility: hidden;
+  pointer-events: none !important;
+}
+
 /* A tag whose label is not in the scheme the reader chose (the site's, or
    another scheme's, stands in): the bubble's outline is dashed. */
 .graphContainer :global(.tag-fallback rect) {
