@@ -16,7 +16,7 @@ The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the read
 | `container` | a closed container (its node), or an open container's title |
 | `node` | a card |
 | `node.readable` | a card whose title already renders at `graph.readablePx` CSS px or more (default 16). With no row of its own it does what `node` does. |
-| `space` | the canvas: empty space and an open container's hull. A double tap on an edge or a tag bubble also does what a double tap on `space` does. |
+| `space` | the canvas: empty space and an open container's hull. A double tap on an edge or a tag bubble (or the dot a tag is drawn as) also does what a double tap on `space` does. |
 
 ## Gestures
 
@@ -47,7 +47,7 @@ The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the read
 
 A row that binds an action to a gesture it cannot answer, or to a target it means nothing on, does nothing there, and the page says why in the console. So does a row that names an action the engine does not have.
 
-Not in the table, and fixed: a link card follows its link on a tap; the button inside an open card opens the reader; the listening strip under an open card's title (`cards.listen`, default true: play or pause, stop, the voice and the speed, the same ones the reader and the panel have) acts on the one reading, and taps on it never open, close or drag the card; a tap on a tag bubble highlights its pieces and a tap on an edge names it; a double tap with two fingers zooms out; the wheel and a pinch zoom; two fingers turned rotate the view.
+Not in the table, and fixed: a link card follows its link on a tap; the button inside an open card opens the reader; the listening strip under an open card's title (`cards.listen`, default true: play or pause, stop, the voice and the speed, the same ones the reader and the panel have) acts on the one reading, and taps on it never open, close or drag the card; a tap on a tag bubble highlights its pieces and a tap on an edge names it; while the tagz' labels are hidden (`graph.tag.labels`, the default), each tag is a dot with a hit circle round it a finger can reach, a tap there does what a tap on its bubble does, and a mouse or a pen resting on a dot shows its bubble while it rests there; a double tap with two fingers zooms out; the wheel and a pinch zoom; two fingers turned rotate the view.
 
 ## The engine's table (the defaults)
 
