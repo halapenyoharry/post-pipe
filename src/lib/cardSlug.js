@@ -4,7 +4,7 @@
 //
 // Discovery order (discoverSlug): a canonical the feed gives (canonical_url
 // when it differs from url, else a <link rel="canonical"> in the item's
-// HTML); a DOI (a doi field, or a DOI inside the canonical, url or id); the
+// HTML), counted only when it is a web address; a DOI (a doi field, or a DOI inside the canonical, url or id); the
 // slug part of the url's path (a numeric segment is fine: the path is the
 // identity); and only then the title. Each result says which it came from.
 //
@@ -60,20 +60,28 @@ function lastPathPart(u) {
   return s.replace(/\.html?$/i, '');
 }
 
-// A canonical the item carries that is not just its own url.
+// A web address: http or https, a host, no spaces. A canonical that is not
+// one is no canonical: a note in a piece's front matter, or a relative href.
+// (2026-11-05: a piece whose canonical field held a note about its source got
+// that note, slugified, as its slug.)
+const isWebAddress = (s) => /^https?:\/\/[^\s/?#]+[^\s]*$/i.test(s);
+
+// A canonical the item carries that is not just its own url, and is a web
+// address.
 function canonicalOf(item) {
   const url = str(item.url);
   const c = str(item.canonical_url);
-  if (c && c !== url) return c;
+  if (c && c !== url && isWebAddress(c)) return c;
   const html = typeof item.content_html === 'string' ? item.content_html : '';
   const m = html.match(/<link\b[^>]*\brel=["']?canonical["']?[^>]*\bhref=["']([^"']+)["']/i)
     || html.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\brel=["']?canonical["']?/i);
-  if (m && str(m[1]) && str(m[1]) !== url) return str(m[1]);
+  const h = m ? str(m[1]) : '';
+  if (h && h !== url && isWebAddress(h)) return h;
   return '';
 }
 
 function doiOf(item, canonical) {
-  for (const f of [item.doi, item._doi, canonical, item.url, item.external_url, item.id]) {
+  for (const f of [item.doi, item._doi, canonical, item.canonical_url, item.url, item.external_url, item.id]) {
     const d = doiIn(f);
     if (d) return d;
   }
