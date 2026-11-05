@@ -204,6 +204,7 @@ function readerFontFaces() {
   }).join('');
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
+const { cardsLedgerPath, readLedger, writeLedger, assignSlugs } = require('./src/lib/cardSlug');
 const { contributionsConfig } = require('./src/lib/contributions');
 const { timeOverlayConfig } = require('./src/lib/timeOverlay');
 const { lookFromSettings } = require('./src/components/GraphViewer/containerLook');
@@ -943,6 +944,21 @@ async function main() {
   for (const item of items) {
     item.labels = labelLadder(item);
   }
+
+  // Every card gets one slug (item.slug, item.slugSource), discovered from
+  // what it carries and frozen in the site's cards ledger
+  // (settings.cards.ledger, cards.json by default; src/lib/cardSlug.js).
+  // The ledger is written only when it changed; one that cannot be read is
+  // left as it is, with one logged line, and the slugs come from discovery.
+  // Item ids are untouched.
+  const ledgerFile = cardsLedgerPath(SETTINGS, SITE_ROOT);
+  const prior = ledgerFile ? readLedger(ledgerFile) : { ledger: null, status: 'off' };
+  if (prior.status === 'unreadable') {
+    console.warn(`  cards: ${path.relative(SITE_ROOT, ledgerFile)} is not a cards ledger; left as it is, slugs discovered afresh this build`);
+  }
+  const slugs = assignSlugs(items, prior.ledger, { now: new Date() });
+  if (ledgerFile && prior.status !== 'unreadable' && slugs.changed) writeLedger(ledgerFile, slugs.ledger);
+  console.log(`  cards: ${slugs.summary.known} known, ${slugs.summary.added} new${slugs.summary.suffixed ? ` (${slugs.summary.suffixed} suffixed)` : ''}${ledgerFile ? `; ledger ${path.relative(SITE_ROOT, ledgerFile)}${slugs.changed && prior.status !== 'unreadable' ? ' written' : ' unchanged'}` : '; no ledger (cards.ledger false)'}`);
 
   const feed = buildFeed(items);
   // A container whose tag rosetta-tagz resolved to a concept carries it as
