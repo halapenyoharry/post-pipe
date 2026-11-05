@@ -63,17 +63,31 @@ test('cli: the neighbourhood preset walks; --around and --set select; switches o
   const set = run('flow-select', ['--set', 'https://example.test/c4,https://example.test/c5'], feed);
   assert.equal(JSON.parse(set.out).cards.length, 2);
 
-  const scored = run('flow-score', ['--preset', preset('by-neighbourhood'), '--degree-penalty', 'none', '--half-life', '10'], around.out);
+  const scored = run('flow-score', ['--preset', preset('by-neighbourhood'), '--degree-penalty', 'none', '--half-life', '10', '--tag-measure', 'weight'], around.out);
   assert.equal(scored.code, 0, scored.err);
   const p = JSON.parse(scored.out).preset;
   assert.equal(p.switches.degreePenalty, 'none');
   assert.equal(p.switches.recencyHalfLifeDays, 10);
+  assert.equal(p.switches.tagMeasure, 'weight');
   assert.equal(p.switches.orderMode, 'walk');
+  assert.equal(p.switches.walkStart, 'newest');
   const flow = run('flow-order', [], scored.out);
   assert.equal(JSON.parse(flow.out).summary.mode, 'walk');
+  assert.equal(JSON.parse(flow.out).summary.start.rule, 'newest');
+
+  const explicit = run('flow-order', ['--start', 'https://example.test/c3'], scored.out);
+  assert.equal(explicit.code, 0, explicit.err);
+  assert.equal(JSON.parse(explicit.out).items[0].id, 'https://example.test/c3');
+  assert.equal(JSON.parse(explicit.out).summary.start.rule, 'explicit');
+
+  const sourceFallback = run('flow-order', ['--walk-start', 'newest', '--start-source', 'Absent'], scored.out);
+  assert.equal(sourceFallback.code, 0, sourceFallback.err);
+  assert.equal(JSON.parse(sourceFallback.out).summary.start.rule, 'newest (no card of Absent; whole subfield)');
 });
 
 test('cli: bad input exits 1 with one line on stderr', () => {
+  const sub = run('flow-select', ['--all'], JSON.stringify(syntheticFeed())).out;
+  const scored = run('flow-score', ['--preset', preset('by-neighbourhood')], sub).out;
   const cases = [
     run('flow-select', [], '{}'),
     run('flow-select', ['--all', '--set', 'a'], JSON.stringify(syntheticFeed())),
@@ -82,8 +96,11 @@ test('cli: bad input exits 1 with one line on stderr', () => {
     run('flow-score', [], '{}'),
     run('flow-score', ['--preset', '/nonexistent/preset.json'], '{}'),
     run('flow-score', ['--preset', preset('by-weight')], 'not json'),
+    run('flow-score', ['--preset', preset('by-weight'), '--tag-measure', 'bogus'], sub),
     run('flow-order', [], '{"cards":[]}'),
     run('flow-order', ['--mode', 'spiral'], '{}'),
+    run('flow-order', ['--walk-start', 'oldest'], scored),
+    run('flow-order', ['--start', 'https://example.test/nope'], scored),
     run('flow-render', ['--target', 'path'], '{"items":[]}'),
     run('flow-render', ['--target', 'here'], '{"items":[]}'),
     run('flow-capture', [], ''),

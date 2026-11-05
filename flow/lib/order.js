@@ -3,12 +3,56 @@
 // it. Each step records its hops, the tagz shared with the card before, and
 // whether it is a seam.
 import { sharedTagz, hopsTable } from './graph.js';
-import { weightOf } from './preset.js';
+import { weightOf, WALK_STARTS } from './preset.js';
 import { hyperedgeId } from './subfield.js';
 
 function byScoreThenId(a, b) {
   if (b.score !== a.score) return b.score - a.score;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function byIndexThenId(a, b) {
+  const ia = Number.isFinite(a.index) ? a.index : Infinity;
+  const ib = Number.isFinite(b.index) ? b.index : Infinity;
+  if (ia !== ib) return ia - ib;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function byNewest(a, b, clock) {
+  if (clock === 'session') return byIndexThenId(a, b);
+  const ta = a.date ? Date.parse(a.date) : NaN;
+  const tb = b.date ? Date.parse(b.date) : NaN;
+  const da = Number.isFinite(ta);
+  const db = Number.isFinite(tb);
+  if (da !== db) return da ? -1 : 1;
+  if (da && db && tb !== ta) return tb - ta;
+  return byIndexThenId(a, b);
+}
+
+function pickStart(cards, clock, { walkStart, walkStartSource, explicitCard }) {
+  if (!cards.length) return { card: null, info: null };
+  if (explicitCard) {
+    return {
+      card: explicitCard,
+      info: { id: explicitCard.id, title: explicitCard.title, rule: 'explicit', source: explicitCard.source ?? null },
+    };
+  }
+  let pool = cards;
+  let rule = walkStart;
+  if (walkStartSource !== null) {
+    const fromSource = cards.filter((c) => c.source === walkStartSource);
+    if (fromSource.length) {
+      pool = fromSource;
+    } else {
+      rule = `${walkStart} (no card of ${walkStartSource}; whole subfield)`;
+    }
+  }
+  const compare = walkStart === 'newest' ? (a, b) => byNewest(a, b, clock) : byScoreThenId;
+  const card = [...pool].sort(compare)[0];
+  return {
+    card,
+    info: { id: card.id, title: card.title, rule, source: card.source ?? null },
+  };
 }
 
 function tagzOf(card) {
@@ -57,13 +101,13 @@ function stabilise(sorted, previous, threshold) {
   return seq;
 }
 
-function walk(cards, scored, hops) {
+function walk(cards, scored, hops, startCard) {
   const preset = scored.preset;
   const wShared = weightOf(preset, 'tag.shared');
   const wDist = weightOf(preset, 'distance');
   const left = new Map(cards.map((c) => [c.id, c]));
   const out = [];
-  let current = [...cards].sort(byScoreThenId)[0];
+  let current = startCard;
   if (!current) return out;
   out.push(current);
   left.delete(current.id);
@@ -90,22 +134,37 @@ function walk(cards, scored, hops) {
 }
 
 /**
- * Order the scored subfield. Options: mode (score | walk), seam (hops),
- * stability (fraction of the score range), previous (a flow to hold to).
+ * Order the scored subfield. Options: mode (score | walk), walkStart
+ * (heaviest | newest), walkStartSource (source title or null), start
+ * (explicit card id), seam (hops), stability (fraction of the score range),
+ * previous (a flow to hold to).
  */
 export function orderFlow(scored, options = {}) {
   if (!scored || !Array.isArray(scored.cards)) throw new Error('scored input has no cards array');
   if (!scored.preset || !scored.preset.switches) throw new Error('scored input carries no preset; run flow-score first');
   const sw = scored.preset.switches;
   const mode = options.mode || sw.orderMode || 'score';
+  const walkStart = options.walkStart || sw.walkStart || 'heaviest';
+  if (!WALK_STARTS.includes(walkStart)) throw new Error(`unknown walkStart ${walkStart}; use heaviest or newest`);
+  const walkStartSource = options.walkStartSource !== undefined
+    ? (options.walkStartSource || null)
+    : (options.startSource !== undefined ? (options.startSource || null) : (sw.walkStartSource ?? null));
   const seam = Number.isFinite(options.seam) ? options.seam : Number(sw.seam);
   const stability = Number.isFinite(options.stability) ? options.stability : Number(sw.stability);
   const cards = scored.cards.filter((c) => Number.isFinite(c.score));
+  let explicitCard = null;
+  if (options.start !== undefined && options.start !== null && options.start !== '') {
+    explicitCard = cards.find((c) => c.id === options.start) || null;
+    if (!explicitCard) throw new Error(`--start names a card the subfield does not have: ${options.start}`);
+  }
   const hops = hopsTable(scored);
 
   let seq;
+  let startInfo = null;
   if (mode === 'walk') {
-    seq = walk(cards, scored, hops);
+    const picked = pickStart(cards, sw.recencyClock || 'calendar', { walkStart, walkStartSource, explicitCard });
+    startInfo = picked.info;
+    seq = walk(cards, scored, hops, picked.card);
   } else if (mode === 'score') {
     seq = [...cards].sort(byScoreThenId);
     if (options.previous && Array.isArray(options.previous.items)) {
@@ -163,6 +222,7 @@ export function orderFlow(scored, options = {}) {
     summary: {
       preset: scored.preset.name,
       mode,
+      start: startInfo,
       cards: items.length,
       steps: Math.max(0, items.length - 1),
       seams,
@@ -177,6 +237,9 @@ export function orderFlow(scored, options = {}) {
         degreePenalty: sw.degreePenalty,
         recencyClock: sw.recencyClock,
         recencyHalfLifeDays: sw.recencyHalfLifeDays,
+        tagMeasure: sw.tagMeasure,
+        walkStart,
+        walkStartSource,
       },
       weights: scored.preset.weights,
     },
