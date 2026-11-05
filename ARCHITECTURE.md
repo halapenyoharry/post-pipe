@@ -1,6 +1,6 @@
 # post-pipe Architecture & Design Decisions
 
-**Last updated:** 2026-10-31
+**Last updated:** 2026-11-04
 
 ---
 
@@ -183,6 +183,14 @@ The generated `_site/index.html` is a self-contained page with:
 2. **Reader panel** — slides in on node click; dispatches rendering based on `content.kind`
 3. **TTS toolbar** — engine-agnostic registry (browser / gemini)
 4. **Syndication toolbar** — platform icons linking to cross-posted versions
+
+### Views: the registry (2026-11-04)
+
+A view is one way of drawing the feed (`vision/VIEWS.md`). The registry is `src/views/index.js`: `VIEWS`, a list of entries `{ id, label, component, props }`. Two ship, both GraphViewer: `cluster` (`props.layout: 'force'`) and `ring` (`props.layout: 'radial'`). A later entry may be another component (JSON Trees); every view's component takes GraphViewer's props (`feedData`, `graphSettings`, `viewState`, `onNodeSelect`), plus `view`, the entry itself.
+
+- `src/lib/views.js` holds the pure helpers, with no component, so the tests run in node: `siteViews(settings, registry)` reads `settings.views` (default `["cluster"]`, unknown ids skipped with one logged line), `viewById`, `viewLayout`, `viewFromSearch(location.search, listed)` for `?view=<id>`, and `currentView(listed, viewState.state)`, the view in force.
+- The page (`generate-index.js`) and the embed (`src/embed.jsx`) mount the current entry's component with the entry's props under the page's own, and pass the site's views to the top bar (`FeedZ`: `views`, `currentView`, `onSelectView`), which shows the switch only when there is more than one.
+- The reader's choice lives in `viewState.state.view`, set with `setView(id, layout, { silent })`: the view and the layout it draws with in one step. `resetLayout` clears it. The bottom bar's layout picker still sets `state.layout` alone; `currentView` resolves a layout that contradicts the chosen view to the listed view drawn with that layout, and the page syncs the state silently, so the two controls always agree.
 
 ### Substrate dispatch in the reader
 

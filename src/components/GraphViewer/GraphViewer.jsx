@@ -577,9 +577,13 @@ function labelPositionOf(c) {
 // (makeCardSizeFor) are in levelOfDetail.js.
 
 export function GraphViewer({
-  feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout = 'force', timeAxis, graphSettings,
+  feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout: layoutProp, view, timeAxis, graphSettings,
   colorOverrides, apiRef, onNodeFocus, contributions,
 }) {
+  // The layout: the one the view entry names (src/views/index.js, when the
+  // page mounts this as one of a site's views), else the layout prop, else
+  // cluster (force).
+  const layout = (view && view.props && typeof view.props.layout === 'string' && view.props.layout) || layoutProp || 'force';
   // Visual parameters come from settings.json so they can be tuned without a
   // rebuild. The defaults here are the values they replaced, so a missing or
   // partial settings file still renders exactly as before rather than oddly.

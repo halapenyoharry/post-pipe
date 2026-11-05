@@ -74,6 +74,7 @@ function emptyState(corpusId, layoutVersion) {
     corpusId: corpusId || null,
     layoutVersion: layoutVersion || null,
     layout: 'force',
+    view: null,     // the view the reader chose (settings.views, src/lib/views.js); null means the site's first
     hiddenSources: [],
     sourceColors: {},  // sourceId -> hex override, chosen from the pill's ring picker
     graphColors: {},   // e.g. draft/published/tag/topology/placeholder -> hex override
@@ -472,6 +473,17 @@ function createViewState(opts = {}) {
 
     setLayout(layout) { update((s) => { s.layout = layout; }); },
 
+    // The view the reader chose (an id from settings.views), and the layout
+    // it draws with when it names one, in one step, so one undo takes both
+    // back. silent: not the reader's act (the address picked it, or the page
+    // put the view and the layout back in agreement), so not undoable.
+    setView(id, layout, { silent = false } = {}) {
+      (silent ? updateSilent : update)((s) => {
+        s.view = typeof id === 'string' && id ? id : null;
+        if (typeof layout === 'string' && layout) s.layout = layout;
+      });
+    },
+
     // Which containers the reader has opened or closed (id -> 'open' | 'closed').
     // Anything not listed keeps the site's initial state; opening or closing
     // enters history, and resetLayout clears it so Undo brings it back.
@@ -522,6 +534,7 @@ function createViewState(opts = {}) {
         s.containers = {};
         s.rotation = 0;
         s.layout = 'force';
+        s.view = null;
       });
       gestureBase = null;
     },

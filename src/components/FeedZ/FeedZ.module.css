@@ -132,6 +132,15 @@
   border-color: var(--pp-accent, rgba(255, 255, 255, 0.4));
 }
 
+/* The view switch (settings.views): the views' buttons kept together in the
+   row, in the pill style; the one in force takes .pillOn. */
+.views {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 .subscribeSheet {
   pointer-events: auto;
   position: fixed;
