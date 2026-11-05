@@ -56,6 +56,13 @@ import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolde
  *                    source pills after the first shrink to their dot, then
  *                    the first pill's text gives way (an ellipsis; its whole
  *                    text stays its name)
+ *   views          — optional; the site's views (settings.views,
+ *                    src/lib/views.js siteViews), entries { id, label }:
+ *                    a button each, in the pill style, after the pages and
+ *                    links, shown only when there is more than one
+ *   currentView    — the id of the view in force (src/lib/views.js
+ *                    currentView); its button is marked
+ *   onSelectView   — (id) => void, for a view's button
  *   staleAge       — optional, default false; true shows the age of a stale
  *                    feed's copy beside its mark ("! 2d"), not only in the
  *                    pill's title (settings.topBar.staleAge), for a screen
@@ -67,10 +74,12 @@ import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolde
  * the copy's day and age; with no copy, the pill is struck through, its title
  * saying why.
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true, groupByFolder = false }) {
+export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true, groupByFolder = false, views = [], currentView = null, onSelectView }) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
+  const viewList = Array.isArray(views) ? views.filter((v) => v && v.id) : [];
+  const hasViews = viewList.length > 1;
   const fit = !!controls;
   useLayoutEffect(() => { if (fit && barRef.current) fitRow(barRef.current); });
   useEffect(() => {
@@ -81,7 +90,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     return () => window.removeEventListener('resize', run);
   }, [fit]);
   if (showSources === false) sources = [];
-  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !resume && !intro && !controls) return null;
+  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !resume && !intro && !controls && !hasViews) return null;
 
   const hidden = hiddenSources || new Set();
 
@@ -142,6 +151,29 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
     </button>
   ) : null);
 
+  // The view switch (settings.views): one plain button per view in the pill
+  // style, the one in force marked; only when the site lists more than one.
+  const renderViews = () => (hasViews ? (
+    <span key="views" className={styles.views} data-top-views role="group" aria-label="View">
+      {viewList.map((v) => {
+        const on = v.id === currentView;
+        return (
+          <button
+            key={v.id}
+            type="button"
+            className={`${styles.pill} ${styles.pagePill} ${on ? styles.pillOn : ''}`}
+            data-top-view={v.id}
+            aria-pressed={on}
+            title={v.label || v.id}
+            onClick={() => { if (!on && onSelectView) onSelectView(v.id); }}
+          >
+            <span className={`${styles.title} ${styles.pageLabel}`}>{v.label || v.id}</span>
+          </button>
+        );
+      })}
+    </span>
+  ) : null);
+
   const renderSourcePill = (src) => (
     <FeedPill
       key={src.id}
@@ -182,6 +214,7 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
         if (k.startsWith('link:')) { const l = links.find((x) => `link:${x.id}` === k); return l ? renderLink(l) : null; }
         return null;
       })}
+      {renderViews()}
       {showAddButton !== false && <AddPill autodiscover={autodiscover} />}
       {controls}
       {intro && <div className={styles.intro} data-graph-intro dangerouslySetInnerHTML={{ __html: intro }} />}

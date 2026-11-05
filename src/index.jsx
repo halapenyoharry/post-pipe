@@ -15,6 +15,7 @@ export { Theme } from './components/Theme/Theme';
 export { Opening } from './components/Opening/Opening';
 export { useContributions } from './components/Contributions/useContributions';
 export { topBarConfig, resolvePages, graphFeed, topBarOrder, resumeTarget } from './lib/topBar';
+export { VIEWS, siteViews, viewById, viewLayout, viewFromSearch, currentView } from './views/index';
 export { toolbarConfig } from './lib/toolbar';
 export { React, ReactDOM };
 export { isLinkItem, followLink, linkOf } from './lib/linkNode';

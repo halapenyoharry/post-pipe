@@ -489,6 +489,8 @@
   "_fonts_note": "A site's own faces: [{ family, file, license }], file and license relative to the site root (ttf, otf, woff or woff2). Copied next to the page, declared with @font-face and preloaded; nothing is fetched from elsewhere. A face whose file is missing is left out with a warning, and text set in it falls back.",
   "accent": "",
   "_accent_note": "Optional: one accent colour for the site in every theme (links, the reader's and the panel's accent, the bottom bar's active pill, the selected state). Kept as given wherever it reaches WCAG AA (4.5:1) for text, else moved toward black on paper or white on graphite just far enough; the tint behind an active control is the colour at 12%. Empty: each theme keeps its own.",
+  "views": ["cluster"],
+  "_views_note": "The views the site offers, by id from the engine's registry (src/views/index.js): cluster (the graph drawn with the cluster layout) and ring (the graph drawn with the ring layout); more may come (vision/VIEWS.md). The first is the default. With more than one, the top bar shows a switch, one plain button per view in the pill style after the pages and links, and ?view=<id> in the address picks one; the reader's choice is remembered on the device, and Reset puts the first back. The layout picker in the bar keeps working beside it: picking ring there is the ring view. An unknown id is skipped, said in one line in the page's console. Absent or empty: [\"cluster\"], no switch, the page as it was.",
   "topBar": {
     "pages": [],
     "links": [],

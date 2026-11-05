@@ -525,6 +525,15 @@ ${reactJs}
     const feed = await res.json();
 
     const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, topBarOrder, resumeTarget, toolbarConfig, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
+    // The registry of views (src/views/index.js) and the site's list of them
+    // (settings.views, src/lib/views.js). Read guardedly so a page built
+    // against an older bundle, without the registry, still mounts the graph.
+    const PPC = window.PostPipeComponents;
+    const VIEWS = Array.isArray(PPC.VIEWS) ? PPC.VIEWS : [{ id: 'cluster', label: 'cluster', component: GraphViewer, props: { layout: 'force' } }];
+    const siteViews = PPC.siteViews || function () { return VIEWS.slice(0, 1); };
+    const viewById = PPC.viewById || function (list, id) { return list.find(function (v) { return v.id === id; }) || null; };
+    const viewFromSearch = PPC.viewFromSearch || function () { return null; };
+    const currentView = PPC.currentView || function (list) { return list[0] || null; };
 
     // The top bar's pages (settings.topBar.pages): buttons beside the source
     // pills that open an item in the reader. An item kept out of the graph
@@ -536,6 +545,11 @@ ${reactJs}
     // The graph's controls (settings.toolbar): along the bottom, or in the
     // top bar beside the pills (position top).
     const TOOLBAR = toolbarConfig(window.SETTINGS);
+    // The site's views (settings.views): the first is its default. With more
+    // than one the top bar shows the switch and the page mounts the current
+    // entry's component with its props; with one, the page is as it was.
+    const SITE_VIEWS = siteViews(window.SETTINGS, VIEWS);
+    const HAS_VIEWS = SITE_VIEWS.length > 1;
 
     // Where the reader's arrangement lives. Namespaced by corpus so pointing
     // this page at a different feed does not inherit somebody else's layout.
@@ -593,6 +607,10 @@ ${reactJs}
           // stranded on it from before would otherwise have no button left
           // that could get them off it.
           if (viewState.state.layout === 'timeline') viewState.setLayout('force');
+          // ?view=<id> in the address picks one of the site's views for this
+          // visit, and it is remembered on the device like a chosen one.
+          var fromAddress = HAS_VIEWS ? viewFromSearch(window.location.search, SITE_VIEWS) : null;
+          if (fromAddress) viewState.setView(fromAddress.id, fromAddress.props && fromAddress.props.layout, { silent: true });
           off = viewState.subscribe(bump);
           setHydrated(true);
         });
@@ -711,6 +729,20 @@ ${reactJs}
       // their own marks, never part of the feed or the text.
       const readers = useContributions(window.SETTINGS, feed);
 
+      // The view in force (src/lib/views.js currentView): the one the reader
+      // chose, or the one drawn with the layout they picked in the bar, or
+      // the site's first. With more than one view the page keeps the
+      // reader's view and layout in agreement (silently, nothing to undo),
+      // so the switch in the top bar and the layout picker say the same.
+      const VIEW = currentView(SITE_VIEWS, viewState.state);
+      React.useEffect(function () {
+        if (!hydrated || !HAS_VIEWS || !VIEW) return;
+        var layout = VIEW.props && VIEW.props.layout;
+        if (viewState.state.view !== VIEW.id || (layout && viewState.state.layout !== layout)) {
+          viewState.setView(VIEW.id, layout, { silent: true });
+        }
+      });
+
       if (!hydrated) return null;
 
       // History, layout, dimensions, and the view actions (the timeline
@@ -738,9 +770,12 @@ ${reactJs}
         // the graph with its controls over it. Without it, these render as
         // they are.
         React.createElement(Opening, { settings: window.SETTINGS, viewState: viewState },
-          React.createElement(GraphViewer, {
+          // The current view's component (GraphViewer for cluster and ring),
+          // with the entry's props under the page's own.
+          React.createElement((HAS_VIEWS && VIEW && VIEW.component) || GraphViewer, Object.assign({}, HAS_VIEWS && VIEW ? VIEW.props : null, {
             feedData: GRAPH_FEED,
             layout: viewState.state.layout,
+            view: HAS_VIEWS ? VIEW : null,
             timeAxis: viewState.state.timeAxis,
             graphSettings: (window.SETTINGS && window.SETTINGS.graph) || {},
             onNodeSelect: function (article) {
@@ -753,7 +788,7 @@ ${reactJs}
             apiRef: graphApi,
             onNodeFocus: setFocusedItem,
             contributions: readers.list
-          }),
+          })),
           React.createElement(FeedZ, {
             sources: feed._sources || [],
             hiddenSources: hiddenSources,
@@ -779,7 +814,14 @@ ${reactJs}
             staleAge: !!(window.SETTINGS && window.SETTINGS.topBar && window.SETTINGS.topBar.staleAge === true),
             intro: window.PP_INTRO_HTML || '',
             controls: TOOLBAR.position === 'top' ? graphControls : null,
-            onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); }
+            onOpenPage: function (item) { if (item && (!selectedRef.current || selectedRef.current.id !== item.id)) selectArticle(item); },
+            // The view switch (settings.views), shown with more than one view.
+            views: SITE_VIEWS,
+            currentView: VIEW ? VIEW.id : null,
+            onSelectView: function (id) {
+              var v = viewById(SITE_VIEWS, id);
+              if (v) viewState.setView(v.id, v.props && v.props.layout);
+            }
           }),
 ${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (settings.timeOverlay.show, default true);
           // a site that sets it false has no stack on the page at all.

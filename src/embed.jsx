@@ -43,6 +43,7 @@ import { ConfigPanel, DEFAULT_FEATURES } from './components/ConfigPanel';
 import { createViewState } from './lib/viewState';
 import { toolbarConfig } from './lib/toolbar';
 import { topBarConfig } from './lib/topBar';
+import { VIEWS, siteViews, viewById, viewFromSearch, currentView } from './views/index';
 import { autodiscoverEnabled } from './lib/feedAutodiscovery';
 import { groupByFolderEnabled } from './lib/sourceFolders';
 import './themes/sketchbook.css';
@@ -186,6 +187,11 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
     window.SETTINGS = settings;
   }, [settings]);
 
+  // The site's views (settings.views, src/lib/views.js): the first is the
+  // default; with more than one the top bar shows the switch.
+  const siteViewList = React.useMemo(() => siteViews(settings, VIEWS), [config.settings]);
+  const hasViews = siteViewList.length > 1;
+
   // Set CSS custom properties from theme
   React.useEffect(() => {
     const root = document.documentElement;
@@ -230,6 +236,9 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         vs.seedHiddenSources((feedData._sources || []).filter((s) => s && s.defaultHidden).map((s) => s.id));
       }
       if (vs.state.layout === 'timeline') vs.setLayout('force');
+      // ?view=<id> in the address picks one of the site's views.
+      const fromAddress = hasViews && typeof window !== 'undefined' ? viewFromSearch(window.location.search, siteViewList) : null;
+      if (fromAddress) vs.setView(fromAddress.id, fromAddress.props && fromAddress.props.layout, { silent: true });
       setViewState(vs);
       setHydrated(true);
     });
@@ -356,7 +365,19 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
   // Readers' contributions, when settings.contributions names a file.
   const readers = useContributions(settings, feedData);
 
+  // The view in force (src/lib/views.js currentView); with more than one the
+  // reader's view and layout are kept in agreement, silently.
+  const view = viewState ? currentView(siteViewList, viewState.state) : null;
+  React.useEffect(() => {
+    if (!viewState || !hasViews || !view) return;
+    const layout = view.props && view.props.layout;
+    if (viewState.state.view !== view.id || (layout && viewState.state.layout !== layout)) {
+      viewState.setView(view.id, layout, { silent: true });
+    }
+  });
+
   if (!hydrated) return null;
+  const ViewComponent = (hasViews && view && view.component) || GraphViewer;
 
   // The graph's controls (settings.toolbar, and the embed's switches): along
   // the bottom, or in the top bar beside the pills (position top).
@@ -383,10 +404,12 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
       {/* The background follows the time of day (settings.theme.timeOfDay) */}
       <TimeOfDay item={selectedArticle || focusedItem} settings={settings} viewState={viewState} />
 
-      {/* The graph — always on */}
-      <GraphViewer
+      {/* The graph — always on: the current view's component */}
+      <ViewComponent
+        {...(hasViews && view ? view.props : {})}
         feedData={feedData}
         layout={viewState ? viewState.state.layout : 'force'}
+        view={hasViews ? view : null}
         timeAxis={viewState ? viewState.state.timeAxis : { on: false }}
         graphSettings={settings.graph || {}}
         onNodeSelect={(article) => {
@@ -430,6 +453,12 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           subscribe={topBarConfig(settings).subscribe}
           showSources={topBarConfig(settings).showSourcePills}
           controls={atTop ? graphControls : null}
+          views={siteViewList}
+          currentView={view ? view.id : null}
+          onSelectView={(id) => {
+            const v = viewById(siteViewList, id);
+            if (v && viewState) viewState.setView(v.id, v.props && v.props.layout);
+          }}
         />
       )}
 
