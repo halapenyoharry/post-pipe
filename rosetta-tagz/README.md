@@ -125,7 +125,13 @@ carries both vocabularies. That is also the strongest alignment evidence there i
   `sourceRatio`, so a viewer can try a stricter or looser bar without a rebuild (`docs/FORMATS.md`).
   A discovered label is always a spelling the text has (`energy-efficient`, `Jupiter`), never invented.
   Quality is decent, not perfect: leftovers like `think` appear dashed, low-weight, with a visible reason.
-  Edit `seed/generic-words.txt` (plain data) to teach it more words that are never topics.
+  A phrase holding a function word (`onto`, `roughly`, `allowing`; `lib/stopwords.js`) is refused whatever
+  its score, and the untagged report says so. Edit `seed/generic-words.txt` (plain data) to teach it more
+  words that are never topics, or name them in your overrides' `ignore` list.
+- **The queue** (`discover: "queue"` in the build config, since 2026-11-04): discovery runs and attaches
+  nothing; what it would have attached goes to `rtagz-queue.json` beside your overrides file, with each
+  candidate's score, the items it would tag and why it passed. `rtz-override accept <label>` takes one,
+  and the next build attaches it wherever the text says it. `docs/FORMATS.md`, "The queue".
 
 ## The viewer
 

@@ -51,11 +51,25 @@
 // first. A phrase none of whose occurrences reads, on its own, as what it was counted as (normalization
 // that depends on the neighbours, a Greek final sigma before an apostrophe; English text has none) is
 // not a candidate, so every label has a spelling.
-import { stem, STOP } from './normalize.js';
+//
+// Function words (since 2026-11-04, issue #20). A phrase that holds a closed-class word ("onto",
+// "roughly", "allowing", "staying": lib/stopwords.js) is refused before any score is read, and recorded
+// as turned away with the reason `functionWord`, so the report can name it. The scoring (Luhn's middle
+// band: recurring, not everywhere, coherent) is unchanged; this is a gate in front of it. A phrase the
+// overrides file's `ignore` list names is refused the same way, with the reason `ignored`.
+//
+// The queue (since 2026-11-04, issue #32). With `queue: true` nothing discovery finds becomes a tag:
+// every hub that would have been attached is listed instead, with its score, the items it would tag and
+// why it passed (`info.queue`), and the untagged report says of each item which candidates are queued
+// for it (`queued`). A human moves a candidate into the overrides file's `accept` list, and from then on
+// (in queue mode or not) discovery attaches that phrase, spelled as the human wrote it, to every item
+// whose text holds it, with no bar to clear: the human chose it.
+import { stem, STOP, normalizeLabel } from './normalize.js';
 import { words, STOPWORDS, buildItemVectors, buildIdf } from './text.js';
 import { normalize, dot } from './similarity.js';
 import { loadCorpus, entitySet } from './corpus.js';
 import { makeConfig } from './config.js';
+import { hasFunctionWord } from './stopwords.js';
 
 const ok = (w) => w.length >= 4 && !STOPWORDS.has(w) && !STOP.has(w) && !/^\d+$/.test(w);
 const BASELINE_PAIRS = 400; // item pairs sampled per baseline: the corpus-wide one, and each pair of sources
@@ -270,13 +284,31 @@ function withoutPhrase(tf, idf, drop) {
   return normalize(v);
 }
 
+// The key a human's label has among the candidates: the stem key of its words (lib/normalize.js), so
+// "Climate Change" in an overrides file meets the candidate "climate change". null for a label with no
+// words.
+const keyOf = (label) => {
+  const info = normalizeLabel(label);
+  return info.stems.length ? info.stems.join(' ') : null;
+};
+
 // `info`, when given, is filled with what the run measured beside the records: { nearCopies: [[item
 // keys] per group of two or more], nearCopiesApart: [[key, key, likeness] per near-copy pair whose items
-// ended in different groups, which only "all-pairs" leaves] }.
-export function discover(records, cfg = makeConfig(), info = null) {
+// ended in different groups, which only "all-pairs" leaves], untagged (untaggedFates below), and in queue
+// mode `queue`: { bar, floor, candidates[]: { label, score, sourceRatio?, df, items[]: { key, title },
+// why } }, highest score first }.
+// `overrides`, when given, is the site's overrides file: `ignore` refuses phrases, `accept` attaches
+// them. `queue` lists what would be attached instead of attaching it (accepted phrases excepted).
+export function discover(records, cfg = makeConfig(), info = null, { queue = false, overrides = null } = {}) {
   const D = cfg.discover;
   if (!NEAR_COPY_GROUPINGS.includes(D.nearCopyGrouping)) {
     throw new Error(`unknown discover.nearCopyGrouping ${JSON.stringify(D.nearCopyGrouping)} (${NEAR_COPY_GROUPINGS.join(', ')})`);
+  }
+  const ignored = new Set((overrides?.ignore ?? []).map(keyOf).filter(Boolean));
+  const accepted = new Map(); // candidate key -> the label as the human wrote it (the first spelling wins)
+  for (const label of overrides?.accept ?? []) {
+    const k = keyOf(label);
+    if (k && !accepted.has(k)) accepted.set(k, String(label).trim());
   }
   const corpus = loadCorpus(records);
   const reps = [...corpus.items.values()].filter((it) => (corpus.canonItem.get(it.key) ?? it.key) === it.key).sort((a, b) => (a.key < b.key ? -1 : 1));
@@ -437,8 +469,21 @@ export function discover(records, cfg = makeConfig(), info = null) {
   const usable = new Map(); // stemKey -> coherence, at or above sourceCoherenceRatio
   const under = new Map(); // stemKey -> coherence, below it but at or above the floor
   const measure = new Map(); // stemKey -> { baseline, ratio }
-  const turnedAway = new Map(); // stemKey -> why it is no hub: { tooCommon } | { incoherent, coherence } | { underFloor, sourceRatio }
+  const turnedAway = new Map(); // stemKey -> why it is no hub: { functionWord } | { ignored } | { tooCommon } | { incoherent, coherence } | { underFloor, sourceRatio }
+  // a phrase holds a function word when any form the text writes it in does ("staying" and "stays" share
+  // a key; one listed form refuses the key)
+  const functionWord = (key) => [...surface.get(key).keys()].some(hasFunctionWord);
   for (const [key, d] of df) {
+    // the gates that read no score come first, whatever the count: a function word on one item or on
+    // every item is a function word
+    if (functionWord(key)) {
+      turnedAway.set(key, { reason: 'functionWord' });
+      continue;
+    }
+    if (ignored.has(key)) {
+      turnedAway.set(key, { reason: 'ignored' });
+      continue;
+    }
     if (d < D.minDf) continue;
     if (d / N > D.maxDfRatio) {
       turnedAway.set(key, { reason: 'tooCommon' });
@@ -522,6 +567,10 @@ export function discover(records, cfg = makeConfig(), info = null) {
     for (const key of lower) hubs.add(key);
   }
 
+  // ...then the phrases a human accepted from the queue are hubs by choice, whatever the gates and the
+  // bars said of them (an accepted phrase no item writes is nothing; the human sees that from the queue)
+  for (const key of accepted.keys()) if (containing.has(key)) hubs.add(key);
+
   // ...then every hub is attached to every item that contains it: untagged items always, tagged ones
   // when the site bridges. No cap here; the cap governed selection. A hub that lands on fewer than
   // minDf items (near-copies counted once) would connect nothing and is dropped.
@@ -548,15 +597,36 @@ export function discover(records, cfg = makeConfig(), info = null) {
   const out = [];
   const landed = new Set(); // item keys an at-bar hub lands on
   const dropped = new Set(); // hubs chosen and then dropped, on fewer than minDf items
+  const queued = []; // in queue mode, what would have been attached: { key, label, score, sourceRatio, df, items, why }
+  const queuedOn = new Map(); // item key -> the queued hubs that would land on it
   for (const key of [...attached.keys()].sort(byForm)) {
     const carriers = attached.get(key);
     const n = carriers.length;
     const k = distinctItems(carriers.map(({ it }) => it.key));
+    const chosen = accepted.has(key);
+    if (chosen) {
+      // a human's choice: no bar, no drop, the label as written, and it always shows (no sourceRatio)
+      for (const { it } of carriers) landed.add(it.key);
+      const name = accepted.get(key);
+      for (const { it, f } of carriers) {
+        out.push({
+          type: 'tag',
+          source: it.source,
+          item: it.id,
+          label: name,
+          weight: Number(Math.min(0.6, D.weight + 0.05 * Math.min(4, f.tf)).toFixed(3)),
+          origin: 'discovered',
+          why: `accepted from the queue by the site's overrides; recurs in ${n} of ${reps.length} items${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
+          wasDerivedFrom: [{ type: 'text', phrase: phrase(f), count: f.tf, inTitle: f.inTitle }, { type: 'overrides', key: 'accept', label: name }],
+          wasGeneratedBy: { activity: 'discover', parameters: { accepted: true, df: df.get(key), items: n } },
+        });
+      }
+      continue;
+    }
     if (k < D.minDf) {
       dropped.add(key);
       continue;
     }
-    if (!under.has(key)) for (const { it } of carriers) landed.add(it.key);
     const coherence = coherenceOf(key);
     const { baseline, ratio } = measure.get(key);
     const below = under.has(key);
@@ -564,6 +634,26 @@ export function discover(records, cfg = makeConfig(), info = null) {
     const bar = below ? `; under the ${D.sourceCoherenceRatio}× bar, admitted by the ${floor}× floor` : '';
     const copies = k < n ? ` (${k} of ${N} counting near-copies once)` : '';
     const name = label(key);
+    const passed = `recurs in ${n} of ${reps.length} items${copies}, which stay alike without it (${coherence.toFixed(2)}${lift}${bar})`;
+    if (queue) {
+      // listed, not attached: the score is the highest any item gave it, the one that would have chosen it
+      const entry = {
+        key,
+        label: name,
+        score: Number(Math.max(...carriers.map(({ f }) => score(key, f))).toFixed(3)),
+        ...(ratio === null ? {} : { sourceRatio: ratio }),
+        df: df.get(key),
+        items: carriers.map(({ it }) => ({ key: it.key, title: it.title ?? '' })),
+        why: passed,
+      };
+      queued.push(entry);
+      for (const { it } of carriers) {
+        if (!queuedOn.has(it.key)) queuedOn.set(it.key, []);
+        queuedOn.get(it.key).push(entry);
+      }
+      continue;
+    }
+    if (!below) for (const { it } of carriers) landed.add(it.key);
     for (const { it, f } of carriers) {
       out.push({
         type: 'tag',
@@ -573,7 +663,7 @@ export function discover(records, cfg = makeConfig(), info = null) {
         weight: Number(Math.min(0.6, D.weight + 0.05 * Math.min(4, f.tf)).toFixed(3)),
         origin: 'discovered',
         ...(ratio === null ? {} : { sourceRatio: ratio }),
-        why: `recurs in ${n} of ${reps.length} items${copies}, which stay alike without it (${coherence.toFixed(2)}${lift}${bar})${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
+        why: `${passed}${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
         wasDerivedFrom: [{ type: 'text', phrase: phrase(f), count: f.tf, inTitle: f.inTitle }],
         wasGeneratedBy: {
           activity: 'discover',
@@ -596,7 +686,14 @@ export function discover(records, cfg = makeConfig(), info = null) {
       });
     }
   }
-  if (info) info.untagged = untaggedFates();
+  if (info) {
+    info.untagged = untaggedFates();
+    if (queue) {
+      // highest score first, then by form, so a reader starts at the top
+      const byScore = (a, b) => b.score - a.score || byForm(a.key, b.key);
+      info.queue = { bar: D.sourceCoherenceRatio, floor, candidates: [...queued].sort(byScore).map(({ key: _key, ...rest }) => rest) };
+    }
+  }
   return out;
 
   // What became of each candidate phrase of every untagged item no hub at or above the bar lands on,
@@ -613,13 +710,21 @@ export function discover(records, cfg = makeConfig(), info = null) {
     const fates = {};
     for (const it of reps) {
       if (tagged.has(it.key) || landed.has(it.key)) continue;
-      const fate = { members: (members.get(it.key) ?? [it.key]).sort(), candidates: 0, single: 0, nearCopy: [], tooCommon: [], incoherent: [], underFloor: [], underBar: [], dropped: [], notChosen: [] };
+      const fate = { members: (members.get(it.key) ?? [it.key]).sort(), candidates: 0, single: 0, queued: [], functionWord: [], ignored: [], nearCopy: [], tooCommon: [], incoherent: [], underFloor: [], underBar: [], dropped: [], notChosen: [] };
+      const inQueue = new Set((queuedOn.get(it.key) ?? []).map((q) => q.key));
       for (const [key, f] of perItem.get(it.key)) {
         fate.candidates += 1;
         const name = phrase(f);
         const raw = containing.get(key).length;
         const d = df.get(key);
-        if (raw < D.minDf) fate.single += 1;
+        const gate = turnedAway.get(key)?.reason;
+        // the gates that read no score are reported first, whatever the count
+        if (gate === 'functionWord') fate.functionWord.push({ phrase: name, df: d });
+        else if (gate === 'ignored') fate.ignored.push({ phrase: name, df: d });
+        else if (inQueue.has(key)) {
+          const q = queuedOn.get(it.key).find((x) => x.key === key);
+          fate.queued.push({ phrase: name, score: q.score, ...(q.sourceRatio === undefined ? {} : { sourceRatio: q.sourceRatio }) });
+        } else if (raw < D.minDf) fate.single += 1;
         else if (d < D.minDf) fate.nearCopy.push({ phrase: name, items: raw, df: d });
         else if (dropped.has(key)) fate.dropped.push({ phrase: name, df: d });
         else if (usable.has(key)) fate.notChosen.push({ phrase: name, sourceRatio: measure.get(key).ratio });
@@ -634,9 +739,10 @@ export function discover(records, cfg = makeConfig(), info = null) {
       const byRatio = (a, b) => b.sourceRatio - a.sourceRatio || (a.phrase < b.phrase ? -1 : 1);
       fate.underBar.sort(byRatio);
       fate.underFloor.sort(byRatio);
-      for (const k of ['nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen']) fate[k].sort((a, b) => (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
+      fate.queued.sort((a, b) => b.score - a.score || (a.phrase < b.phrase ? -1 : 1));
+      for (const k of ['functionWord', 'ignored', 'nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen']) fate[k].sort((a, b) => (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
       fates[it.key] = fate;
     }
-    return { bar: D.sourceCoherenceRatio, floor, minDf: D.minDf, maxDfRatio: D.maxDfRatio, items: N, untagged: fates };
+    return { bar: D.sourceCoherenceRatio, floor, minDf: D.minDf, maxDfRatio: D.maxDfRatio, items: N, queue, untagged: fates };
   }
 }

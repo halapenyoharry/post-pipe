@@ -9,7 +9,8 @@ usage: rtz-override same     <label> <label>…       these are the same concept
        rtz-override notsame  <label> <label>        these must never merge
        rtz-override pin      <label> <canonical>    the concept containing <label> is displayed as <canonical>
        rtz-override relate   <label> <type> <label> [note]   type: broader|related|synergy|opposes|adjacent
-       rtz-override ignore   <label>…               drop this tag entirely
+       rtz-override ignore   <label>…               drop this tag entirely (discovery refuses the phrase too)
+       rtz-override accept   <label>…               take this phrase from the queue: discovery attaches it to every item whose text holds it
        rtz-override trust    <tag-system> <0..2>    how much to trust a tag-system when picking canonical labels
        rtz-override prefer   expanded|short|neutral
        rtz-override show
@@ -52,6 +53,10 @@ switch (verb) {
     break;
   case 'ignore':
     for (const a of args) push('ignore', a);
+    break;
+  case 'accept':
+    if (!args.length) die('accept <label>…');
+    for (const a of args) push('accept', a);
     break;
   case 'trust':
     if (args.length !== 2 || Number.isNaN(Number(args[1]))) die('trust <tag-system> <number>');
