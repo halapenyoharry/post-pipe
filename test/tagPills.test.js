@@ -1,6 +1,7 @@
 // How the graph draws its tag nodes (src/lib/tagPills.js): the site's
-// settings.graph.tag.show (on by default) and graph.tag.labels (off by
-// default, each tag a dot), the reader's choices kept in viewState
+// settings.graph.tag.show (on by default) and graph.tag.labels (on by
+// default, each tag its pill; off, each tag a dot), the reader's choices kept
+// in viewState
 // (preferences showTags and showTagLabels), and Reset the view returning both
 // to the site's own. Neither setting moves anything, so neither is part of
 // the layout key.
@@ -57,40 +58,43 @@ test("a choice equal to the site's is stored as null", () => {
   assert.strictEqual(showTagsPrefFor(false, SHOWN), false);
 });
 
-test('labels, site default: off unless graph.tag.labels is true', () => {
-  assert.strictEqual(siteShowsTagLabels(undefined), false);
-  assert.strictEqual(siteShowsTagLabels({}), false);
-  assert.strictEqual(siteShowsTagLabels(UNSET), false);
-  assert.strictEqual(siteShowsTagLabels(UNLABELLED), false);
+test('labels, site default: on unless graph.tag.labels is false', () => {
+  assert.strictEqual(siteShowsTagLabels(undefined), true);
+  assert.strictEqual(siteShowsTagLabels({}), true);
+  assert.strictEqual(siteShowsTagLabels(UNSET), true);
   assert.strictEqual(siteShowsTagLabels(LABELLED), true);
-  assert.strictEqual(siteShowsTagLabels({ graph: { tag: { labels: 'yes' } } }), false, 'only true shows');
-  assert.strictEqual(siteShowsTagLabels({ tag: { labels: true } }), true, 'the graph block alone');
+  assert.strictEqual(siteShowsTagLabels(UNLABELLED), false);
+  assert.strictEqual(siteShowsTagLabels({ graph: { tag: { labels: 'no' } } }), true, 'only false hides');
+  assert.strictEqual(siteShowsTagLabels({ graph: { tag: { labels: 0 } } }), true, 'only false hides');
+  assert.strictEqual(siteShowsTagLabels({ tag: { labels: false } }), false, 'the graph block alone');
 });
 
 test("labels: the reader's choice wins over the site's, null means the site's", () => {
-  assert.strictEqual(showTagLabelsChosen(null, UNSET), false);
-  assert.strictEqual(showTagLabelsChosen(null, LABELLED), true);
-  assert.strictEqual(showTagLabelsChosen(true, UNSET), true);
+  assert.strictEqual(showTagLabelsChosen(null, UNSET), true);
+  assert.strictEqual(showTagLabelsChosen(null, UNLABELLED), false);
+  assert.strictEqual(showTagLabelsChosen(true, UNLABELLED), true);
+  assert.strictEqual(showTagLabelsChosen(false, UNSET), false);
   assert.strictEqual(showTagLabelsChosen(false, LABELLED), false);
-  assert.strictEqual(showTagLabelsChosen('true', UNSET), false, 'anything but a boolean is no choice');
+  assert.strictEqual(showTagLabelsChosen('false', UNSET), true, 'anything but a boolean is no choice');
 });
 
 test("labels: a choice equal to the site's is stored as null", () => {
-  assert.strictEqual(showTagLabelsPrefFor(false, UNSET), null);
-  assert.strictEqual(showTagLabelsPrefFor(true, UNSET), true);
-  assert.strictEqual(showTagLabelsPrefFor(true, LABELLED), null);
-  assert.strictEqual(showTagLabelsPrefFor(false, LABELLED), false);
+  assert.strictEqual(showTagLabelsPrefFor(true, UNSET), null);
+  assert.strictEqual(showTagLabelsPrefFor(false, UNSET), false);
+  assert.strictEqual(showTagLabelsPrefFor(false, UNLABELLED), null);
+  assert.strictEqual(showTagLabelsPrefFor(true, UNLABELLED), true);
 });
 
-test('how the tags are drawn: dots by default, pills with labels, nothing with show off', () => {
-  assert.strictEqual(tagDrawing(null, null, UNSET), 'marks');
-  assert.strictEqual(tagDrawing(null, null, undefined), 'marks');
+test('how the tags are drawn: pills by default, dots with labels off, nothing with show off', () => {
+  assert.strictEqual(tagDrawing(null, null, UNSET), 'pills');
+  assert.strictEqual(tagDrawing(null, null, undefined), 'pills');
   assert.strictEqual(tagDrawing(null, null, LABELLED), 'pills');
-  assert.strictEqual(tagDrawing(null, true, UNSET), 'pills');
-  assert.strictEqual(tagDrawing(null, false, LABELLED), 'marks');
+  assert.strictEqual(tagDrawing(null, null, UNLABELLED), 'marks');
+  assert.strictEqual(tagDrawing(null, false, UNSET), 'marks');
+  assert.strictEqual(tagDrawing(null, true, UNLABELLED), 'pills');
   assert.strictEqual(tagDrawing(null, null, HIDDEN), 'hidden');
   assert.strictEqual(tagDrawing(false, null, UNSET), 'hidden');
-  assert.strictEqual(tagDrawing(true, null, HIDDEN), 'marks');
+  assert.strictEqual(tagDrawing(true, null, HIDDEN), 'pills');
   // The labels count only while the tagz are shown.
   assert.strictEqual(tagDrawing(false, true, LABELLED), 'hidden');
   assert.strictEqual(tagDrawing(null, true, HIDDEN), 'hidden');
@@ -115,14 +119,14 @@ test('both choices are kept on the device, and Reset the view returns both to th
   const backend = memoryBackend();
   const a = mk({ backend, corpusId: 'c' });
   await a.ready();
-  assert.strictEqual(tagDrawing(a.preference(PREF), a.preference(LABELS_PREF), UNSET), 'marks');
-  a.setPreference(LABELS_PREF, showTagLabelsPrefFor(true, UNSET));
+  assert.strictEqual(tagDrawing(a.preference(PREF), a.preference(LABELS_PREF), UNSET), 'pills');
+  a.setPreference(LABELS_PREF, showTagLabelsPrefFor(false, UNSET));
   await a.flush();
 
   const b = mk({ backend, corpusId: 'c' });
   await b.ready();
-  assert.strictEqual(b.preference(LABELS_PREF), true);
-  assert.strictEqual(tagDrawing(b.preference(PREF), b.preference(LABELS_PREF), UNSET), 'pills');
+  assert.strictEqual(b.preference(LABELS_PREF), false);
+  assert.strictEqual(tagDrawing(b.preference(PREF), b.preference(LABELS_PREF), UNSET), 'marks');
   b.setPreference(PREF, showTagsPrefFor(false, UNSET));
   assert.strictEqual(b.preference(PREF), false);
   assert.strictEqual(tagDrawing(b.preference(PREF), b.preference(LABELS_PREF), UNSET), 'hidden');
@@ -131,13 +135,13 @@ test('both choices are kept on the device, and Reset the view returns both to th
   b.resetLayout({ prefs: [PREF, LABELS_PREF] });
   assert.strictEqual(b.preference(PREF), null);
   assert.strictEqual(b.preference(LABELS_PREF), null);
-  assert.strictEqual(tagDrawing(b.preference(PREF), b.preference(LABELS_PREF), UNSET), 'marks');
+  assert.strictEqual(tagDrawing(b.preference(PREF), b.preference(LABELS_PREF), UNSET), 'pills');
   assert.strictEqual(b.preference('theme'), 'paper', 'other preferences stay');
 
   // One undo step brings both choices back with the rest of the reset.
   b.undo();
   assert.strictEqual(b.preference(PREF), false);
-  assert.strictEqual(b.preference(LABELS_PREF), true);
+  assert.strictEqual(b.preference(LABELS_PREF), false);
 });
 
 test('resetLayout with no prefs leaves the choices alone', async () => {

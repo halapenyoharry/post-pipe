@@ -716,10 +716,10 @@ export function GraphViewer({
     });
   };
   // How the tags are drawn (lib/tagPills.js): 'hidden' (settings.graph.tag.show
-  // false, or the preference showTags off: no tag, no edge to one), 'pills'
-  // (settings.graph.tag.labels, or the preference showTagLabels, on: each tag
-  // its pill) or 'marks', the default (each tag a dot, every edge to it
-  // drawn). The svg carries it as tags-hidden or tag-labels-hidden
+  // false, or the preference showTags off: no tag, no edge to one), 'pills',
+  // the default (each tag its pill), or 'marks' (settings.graph.tag.labels
+  // false, or the preference showTagLabels off: each tag a dot, every edge
+  // to it drawn). The svg carries it as tags-hidden or tag-labels-hidden
   // (GraphViewer.module.css). Only the drawing changes: the tag nodes stay
   // in the simulation with their pills' footprint.
   const tagDrawingNow = () => {

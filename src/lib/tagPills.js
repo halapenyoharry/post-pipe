@@ -5,12 +5,13 @@
 //           preference showTags: whether the tags are drawn at all. Off, no
 //           tag and no edge to one is drawn, and none takes a tap; a tag
 //           picked in the tag list still shows its pill while it is picked.
-//   labels  settings.graph.tag.labels, off unless it is true, and the
-//           preference showTagLabels (provisional): whether each tag shows
-//           its text, the pill. Off, each tag is a dot (its mark, of radius
-//           settings.graph.tag.markRadius, provisional, 7 graph units by
-//           default) with every edge to it; a tag hovered, or picked with its
-//           relatives, shows its pill. It counts only while show is on.
+//   labels  settings.graph.tag.labels, on unless it is false (Harold,
+//           2026-11-05), and the preference showTagLabels (provisional):
+//           whether each tag shows its text, the pill. Off, each tag is a dot
+//           (its mark, of radius settings.graph.tag.markRadius, provisional,
+//           7 graph units by default) with every edge to it; a tag hovered,
+//           or picked with its relatives, shows its pill. It counts only
+//           while show is on.
 //
 // The reader's choice wins; null means the site's own.
 //
@@ -61,10 +62,12 @@ function showTagsPrefFor(v, settings) {
   return on === siteShowsTags(settings) ? null : on;
 }
 
-// settings.graph.tag.labels: off unless it is true.
+// settings.graph.tag.labels: on unless it is false. The dots were the
+// default for part of 2026-11-05; Harold made the labels the default the
+// same day.
 function siteShowsTagLabels(settings) {
   const tag = tagBlockOf(settings);
-  return Boolean(tag && tag.labels === true);
+  return !(tag && tag.labels === false);
 }
 
 // The labels in force: the reader's choice (a boolean) when there is one,
@@ -83,8 +86,8 @@ function showTagLabelsPrefFor(v, settings) {
 
 // How the tags are drawn, from the two preferences (null for the site's own)
 // and the settings: 'hidden' (show off: no tag, no edge to one), 'pills'
-// (show and labels on: each tag its pill) or 'marks' (show on, labels off,
-// the default: each tag a dot, every edge to it drawn).
+// (show and labels on, the default: each tag its pill) or 'marks' (show on,
+// labels off: each tag a dot, every edge to it drawn).
 function tagDrawing(showPref, labelsPref, settings) {
   if (!showTagsChosen(showPref, settings)) return 'hidden';
   return showTagLabelsChosen(labelsPref, settings) ? 'pills' : 'marks';
