@@ -293,6 +293,10 @@
     ],
     "_fonts_note": "The faces offered for the text in the panel. default is the page's own face (Atkinson Hyperlegible) and is always offered. opendyslexic ships as fonts/OpenDyslexic-Regular.woff2 next to the page, with its SIL Open Font License in fonts/OpenDyslexic-OFL.txt; it loads only when chosen."
   },
+  "cards": {
+    "listen": true,
+    "_listen_note": "Whether an open card (a tap on it, node.select) holds the listening controls under its title: play or pause, stop, and the voice and the speed, the same ones the reader's toolbar and the panel's Listening group have. There is one reading on the page: started in a card it goes on when the reader opens, and the reader's pause and stop act on it; a play elsewhere ends it. The sentence being read is marked in the card's text as it is in the reader. Default true; false leaves the controls out of the cards, and the reader's own stay. The graph's table (graph.bindings, docs/ACTIONS.md) can also put node.listen on a gesture."
+  },
   "graph": {
     "_growCap_note": "graph.growCap (default true): with zoomMode grow-in-place, a zoom in stops where two anchored containers would come within 16 px. false lets the reader zoom as far as they like (to the zoom's own limits); the containers then may grow into each other.",
     "_note": "Visual parameters for the graph. Here rather than in the code so they can be tuned without a rebuild, and so a fork can look different without editing components. Not all of these are exposed in the interface, and they do not need to be — being reachable is the point.",

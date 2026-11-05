@@ -38,6 +38,8 @@ The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the read
 | `node.zoomToReadable` | Zooms in until the card's title renders at `graph.readablePx` CSS px or more (default 16), in the site's zoom mode (with grow-in-place the card's act grows about its anchor). When that would take the card off the screen, the view also pans so the card stays under the finger. | tap, double tap, long press on a card |
 | `node.openReader` | Opens the reader on the card's piece. | tap, double tap, long press on a card |
 | `node.select` | Opens or closes the card in place (its text inside it) and makes it the card the panel acts on. The reader stays as it is. | tap, double tap, long press on a card |
+| `node.listen` | Reads the card's text aloud, in the voice and at the speed the panel has (one reading on the page: the reader's or a card's). On the card being read it pauses; on the card paused in it reads on; a closed card opens first and is read once its text has arrived. The same as the play button in an open card's listening strip. | tap, double tap, long press on a card |
+| `node.stopListening` | Ends the reading when it is this card's; does nothing otherwise. The same as the stop button in the strip. | tap, double tap, long press on a card |
 | `node.move` | Moves the card, or the container with all it holds, with the pointer or the finger. | drag on a card or a container |
 | `node.resize` | A drag that starts on a card's edge or corner changes its size. Only while it is bound do the cards have edges to drag (their resize handles), and only then does the panel offer "Reset sizes" and the graph bring back sizes saved on an earlier visit. | drag on a card |
 | `view.pan` | Moves the whole view with the pointer or the finger. | drag on `space` |
@@ -45,7 +47,7 @@ The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the read
 
 A row that binds an action to a gesture it cannot answer, or to a target it means nothing on, does nothing there, and the page says why in the console. So does a row that names an action the engine does not have.
 
-Not in the table, and fixed: a link card follows its link on a tap; the button inside an open card opens the reader; a tap on a tag bubble highlights its pieces and a tap on an edge names it; a double tap with two fingers zooms out; the wheel and a pinch zoom; two fingers turned rotate the view.
+Not in the table, and fixed: a link card follows its link on a tap; the button inside an open card opens the reader; the listening strip under an open card's title (`cards.listen`, default true: play or pause, stop, the voice and the speed, the same ones the reader and the panel have) acts on the one reading, and taps on it never open, close or drag the card; a tap on a tag bubble highlights its pieces and a tap on an edge names it; a double tap with two fingers zooms out; the wheel and a pinch zoom; two fingers turned rotate the view.
 
 ## The engine's table (the defaults)
 
@@ -114,3 +116,4 @@ What that table gives, with the engine's rows it leaves in place:
 | `graph.doubleTapMs` | 250 | how long a single tap waits for a second one |
 | `graph.longPressMs` | 500 | how long a press is held to be a long press |
 | `graph.readablePx` | 16 | the title size, in CSS px, at which a card is `node.readable` and to which `node.zoomToReadable` zooms |
+| `cards.listen` | `true` | whether an open card holds the listening strip; `false` leaves it out, and `node.listen` still reads a card when a row binds it |

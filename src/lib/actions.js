@@ -38,6 +38,8 @@ const ACTIONS = {
   'node.zoomToReadable': { kind: 'press', targets: CARD, does: 'Zooms in until the card\'s title renders at graph.readablePx CSS px or more (default 16), in the site\'s zoom mode; when that would take the card off the screen, the view also pans so the card stays under the finger.' },
   'node.openReader': { kind: 'press', targets: CARD, does: 'Opens the reader on the card\'s piece.' },
   'node.select': { kind: 'press', targets: CARD, does: 'Opens or closes the card in place (its text inside it) and makes it the card the panel acts on; the reader stays as it is.' },
+  'node.listen': { kind: 'press', targets: CARD, does: 'Reads the card\'s text aloud in the voice and at the speed the panel has, from its start; on the card being read, pauses; on the card paused in, reads on. A closed card opens first. What the play button in an open card does (settings.cards.listen).' },
+  'node.stopListening': { kind: 'press', targets: CARD, does: 'Ends the reading when it is this card\'s; nothing otherwise. What the stop button in an open card does.' },
   'node.move': { kind: 'drag', targets: ['container', 'node', 'node.readable'], does: 'Moves the card, or the container with all it holds, with the pointer or the finger.' },
   'node.resize': { kind: 'drag', targets: CARD, does: 'A drag that starts on a card\'s edge or corner changes its size. Only while it is bound do the cards have edges to drag, and the panel "Reset sizes".' },
   'view.pan': { kind: 'drag', targets: ['space'], does: 'Moves the whole view with the pointer or the finger.' },

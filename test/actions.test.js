@@ -144,3 +144,26 @@ test('docs/ACTIONS.md names every action and every target', () => {
   for (const id of Object.keys(ACTIONS)) assert.ok(doc.includes('`' + id + '`'), `${id} in docs/ACTIONS.md`);
   for (const t of ['container', 'node', 'node.readable', 'space']) assert.ok(doc.includes('`' + t + '`'), `${t} in docs/ACTIONS.md`);
 });
+
+test('node.listen and node.stopListening answer a press on a card and are bound nowhere by default', () => {
+  const t = bindingsOf({});
+  assert.ok(!isBound(t, 'node.listen'));
+  assert.ok(!isBound(t, 'node.stopListening'));
+  const site = bindingsOf({ bindings: [
+    { target: 'node', gesture: 'longpress', action: 'node.listen' },
+    { target: 'node.readable', gesture: 'doubletap', action: 'node.stopListening' },
+  ] }, { warn: quiet });
+  assert.equal(resolve(site, 'node', 'longpress'), 'node.listen');
+  assert.equal(resolve(site, 'node.readable', 'longpress'), 'node.listen');
+  assert.equal(resolve(site, 'node.readable', 'doubletap'), 'node.stopListening');
+  assert.equal(resolve(site, 'node', 'tap'), 'node.select');
+  // Not on the canvas, and not a drag.
+  const warned = [];
+  const bad = bindingsOf({ bindings: [
+    { target: 'space', gesture: 'tap', action: 'node.listen' },
+    { target: 'node', gesture: 'drag', action: 'node.listen' },
+  ] }, { warn: (m) => warned.push(m) });
+  assert.equal(resolve(bad, 'space', 'tap'), 'none');
+  assert.equal(resolve(bad, 'node', 'drag'), 'none');
+  assert.equal(warned.length, 2);
+});

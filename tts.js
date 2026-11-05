@@ -6,13 +6,20 @@
 //   register(engine),         — add an engine to the registry
 //   engines(),                — list registered engines with capabilities
 //   select(id),               — choose engine (does NOT load it)
-//   play(container, opts),    — lazy-loads if needed, then speaks
+//   play(container, opts),    — lazy-loads if needed, then speaks. One reading at a
+//                               time: play on another container stops the one going;
+//                               play on the paused one resumes it
 //   pause(), resume(), stop(),
-//   set(param, value),        — set any engine parameter (speed, pitch, voice, quality, etc.)
+//   set(param, value),        — set any engine parameter (speed, pitch, voice, quality, etc.);
+//                               says so with a 'paramChanged' event, so every view of
+//                               the voice (the reader's, a card's, the panel's) agrees
 //   get(param),               — read current value
 //   capabilities(),           — returns current engine's declared capabilities
 //   selected(),               — returns current engine id
+//   state(),                  — 'playing', 'paused', 'loading' or 'stopped'
+//   target(),                 — the container being read (or paused in), else null
 //   on(event, fn),            — event: 'state', 'progress', 'ready', 'error', 'capabilitiesChanged',
+//                               'paramChanged' ({ key, value }),
 //                               'fallback' (another voice took over; see below)
 //   lastFallback(),           — the last fallback since the reader chose a voice, or null
 //   clearFallback(),          — forget it (the reader chose a voice)
@@ -49,6 +56,13 @@
   let sentences = [];
   let sentenceIndex = 0;
   let scrollContainer = null;
+  // The container being read, or paused in: the reader's body, or an open
+  // card's text. There is one reading; a second play elsewhere replaces it.
+  let readingContainer = null;
+  // Which reading the loop belongs to. A play or a stop starts a new one, so
+  // a sentence that ends after that (its promise resolves late) does not read
+  // on into the new reading's sentences beside it.
+  let run = 0;
   let params = {};  // current parameter values (speed, pitch, voice, quality, etc.)
 
   // ── Events ─────────────────────────────────────────────────────────────────
@@ -271,6 +285,7 @@
       stopAll();
       return;
     }
+    const myRun = run;
     highlightSentence(sentenceIndex);
     emit('progress', { index: sentenceIndex, total: sentences.length });
 
@@ -292,9 +307,11 @@
       } else {
         await activeEngine.speak(text, params);
       }
+      if (myRun !== run) return;
       sentenceIndex++;
       if (playing) speakNext();
     } catch (e) {
+      if (myRun !== run) return;
       // Stopped or paused while a voice was being tried: nothing failed.
       if (e && e.interrupted && !playing) {
         if (paused) restartOnResume = true;
@@ -336,9 +353,11 @@
   }
 
   function stopAll() {
+    run++;
     playing = false;
     paused = false;
     sentenceIndex = 0;
+    readingContainer = null;
     if (activeEngine && activeEngine.stop) activeEngine.stop();
     clearHighlight();
     emit('progress', { index: 0, total: sentences.length });
@@ -440,7 +459,9 @@
     },
 
     play: async function (container, opts) {
-      if (paused) {
+      // Paused here (or nowhere named): read on. Paused or reading somewhere
+      // else: that reading ends and this one begins.
+      if (paused && (!container || container === readingContainer)) {
         playing = true;
         paused = false;
         emit('state', 'playing');
@@ -452,6 +473,7 @@
         }
         return;
       }
+      if (playing || paused) stopAll();
 
       scrollContainer = (opts && opts.scrollContainer) || container;
       if (opts && opts.onProgress) this.on('progress', opts.onProgress);
@@ -461,15 +483,18 @@
 
       sentences = extractSentences(container);
       if (!sentences.length) return;
+      readingContainer = container;
       sentenceIndex = 0;
       playing = true;
       paused = false;
       restartOnResume = false;
       failedVoices = [];
+      const myRun = ++run;
 
       try {
         emit('state', 'loading');
         await ensureReady();
+        if (myRun !== run) return;
         // After init, voices may now be available — notify UI
         emit('capabilitiesChanged', activeEngine.capabilities);
         emit('state', 'playing');
@@ -522,6 +547,7 @@
       if (activeEngine && activeEngine.onParamChange) {
         activeEngine.onParamChange(key, value, params);
       }
+      emit('paramChanged', { key: key, value: value });
     },
 
     get: function (key) { return params[key]; },
@@ -543,6 +569,14 @@
 
     isPlaying: function () { return playing; },
     isPaused: function () { return paused; },
+    // What the reading is doing, as the 'state' event says it.
+    state: function () {
+      if (paused) return 'paused';
+      if (playing) return engineLoading ? 'loading' : 'playing';
+      return 'stopped';
+    },
+    // Where it is reading (or paused): the container given to play(), else null.
+    target: function () { return readingContainer; },
 
     // The last time another voice took over since the reader chose one:
     // { from, to, error, note, at } ({ engine, voice } each), or null.
