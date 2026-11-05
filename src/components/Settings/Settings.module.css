@@ -320,6 +320,13 @@
   color: var(--pp-panel-muted);
 }
 
+/* A switch that counts only while the one above it is on (Show their labels
+   under Show tagz on the graph): greyed, and inert, while that one is off. */
+.aidBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* Your place */
 .subjectBlock {
   display: flex;

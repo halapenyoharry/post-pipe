@@ -138,6 +138,28 @@
   pointer-events: none !important;
 }
 
+/* A tag's mark, the dot it is drawn as, and the transparent circle round it
+   that takes a tap: drawn only while the labels are hidden. */
+.graphContainer :global(.tag-mark),
+.graphContainer :global(.tag-mark-hit) {
+  display: none;
+}
+/* The labels hidden, the tagz shown (settings.graph.tag.labels false, or the
+   reader's "Show their labels" off; src/lib/tagPills.js): each tag is its
+   dot, and every edge to it is drawn. Its pill (rect, text and forms) is not
+   drawn and takes no pointer, but keeps its size, so nothing moves. A tag
+   hovered (tag-hover), or highlighted with the relatives its lines go to
+   (tag-shown), draws its pill instead of its dot; its hit circle stays, so
+   the pointer stays on the tag while the pill is up. */
+.graphContainer :global(.tag-labels-hidden .node-tag .tag-mark-hit),
+.graphContainer :global(.tag-labels-hidden .node-tag:not(.tag-shown):not(.tag-hover) .tag-mark) {
+  display: inline;
+}
+.graphContainer :global(.tag-labels-hidden .node-tag:not(.tag-shown):not(.tag-hover) > rect),
+.graphContainer :global(.tag-labels-hidden .node-tag:not(.tag-shown):not(.tag-hover) > text) {
+  visibility: hidden;
+}
+
 /* A tag whose label is not in the scheme the reader chose (the site's, or
    another scheme's, stands in): the bubble's outline is dashed. */
 .graphContainer :global(.tag-fallback rect) {

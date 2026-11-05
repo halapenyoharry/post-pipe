@@ -328,8 +328,12 @@
       "maxLines": 3,
       "cornerRadius": 9,
       "opacity": 0.7,
-      "show": false,
-      "_show_note": "Whether the tagz are drawn on the graph as pills (src/lib/tagPills.js). false (default): no pill and no edge to one is drawn, and none takes a tap; the tag nodes stay in the layout and keep pulling, so every card sits where it would with them shown. true draws them. The reader can turn them on or off in the panel (Show tagz on the graph), kept on this device; Reset the view goes back to this. With them hidden, a tag picked in the top bar's tag list still shows its pill, its edges to its cards, and the related tagz its lines go to, while it is picked."
+      "show": true,
+      "_show_note": "Whether the tagz are drawn on the graph at all (src/lib/tagPills.js). true (default): every tag is drawn, as a dot or as its pill (labels), with every edge to it. false: no tag and no edge to one is drawn, and none takes a tap; the tag nodes stay in the layout and keep pulling, so every card sits where it would with them shown. The reader can turn them on or off in the panel (Show tagz on the graph), kept on this device; Reset the view goes back to this. With them hidden, a tag picked in the top bar's tag list still shows its pill, its edges to its cards, and the related tagz its lines go to, while it is picked.",
+      "labels": false,
+      "_labels_note": "Whether each tag shows its label, the pill, while show is true. false (default): each tag is a dot (markRadius) in its pill's colour and opacity, with every edge to it; hovering a dot shows its pill, with its forms, for as long as it is hovered, and a tag picked (a tap on it, or the top bar's tag list) shows its pill, and so do the related tagz its lines go to, while it is picked. true draws every pill. Either way nothing moves: a dot keeps its pill's room in the layout. The reader can turn the labels on or off in the panel (Show their labels, under Show tagz on the graph, greyed while that is off), kept on this device; Reset the view goes back to this.",
+      "markRadius": 7,
+      "_markRadius_note": "The radius of a tag's dot while the labels are hidden, in graph units, so it grows and shrinks with the zoom like everything else. Default 7. Round each dot a transparent circle of radius 22 (or the dot's own, when larger) takes a tap, so a finger can hit it."
     },
     "timeAxis": {
       "dock": "left",

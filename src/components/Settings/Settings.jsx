@@ -20,7 +20,10 @@ import {
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { PREF as MIN_PIECES_PREF, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
-import { PREF as TAG_SHOW_PREF, showTagsChosen, showTagsPrefFor } from '../../lib/tagPills';
+import {
+  PREF as TAG_SHOW_PREF, LABELS_PREF as TAG_LABELS_PREF,
+  showTagsChosen, showTagsPrefFor, showTagLabelsChosen, showTagLabelsPrefFor,
+} from '../../lib/tagPills';
 import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
 import {
   PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText, travelLength, ratioAt, positionOf,
@@ -344,6 +347,9 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const ewMode = EDGE_WEIGHT_MODES.includes(ewModePref) ? ewModePref : siteEw.mode;
   const ewPenaltyPref = viewState.preference(DEGREE_PENALTY_PREF);
   const ewPenalty = DEGREE_PENALTIES.includes(ewPenaltyPref) ? ewPenaltyPref : siteEw.degreePenalty;
+  // Whether the tagz are drawn (lib/tagPills.js): their switch, and the
+  // labels switch under it, inert while they are not.
+  const tagsShown = showTagsChosen(viewState.preference(TAG_SHOW_PREF), S);
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -513,18 +519,30 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           onChange={(v) => viewState.setPreference(DEGREE_PENALTY_PREF, v === siteEw.degreePenalty ? null : v)}
         />
       )}
-      {W === 'graph' && hasTagNodes(feedData, S && S.graph) && (
-        // Whether the tag pills are drawn (settings.graph.tag.show, the
-        // preference showTags, null for the site's own; lib/tagPills.js).
-        // Hidden, they still hold their cards where they are.
+      {W === 'graph' && hasTagNodes(feedData, S && S.graph) && (<>
+        {/* Whether the tagz are drawn (settings.graph.tag.show, the
+            preference showTags, null for the site's own; lib/tagPills.js).
+            Hidden, they still hold their cards where they are. */}
         <Switch
-          on={showTagsChosen(viewState.preference(TAG_SHOW_PREF), S)}
+          on={tagsShown}
           onChange={(v) => viewState.setPreference(TAG_SHOW_PREF, showTagsPrefFor(v, S))}
           label="Show tagz on the graph"
           hint="Off, the cards still sit by the tagz they share."
           data-pref={TAG_SHOW_PREF}
         />
-      )}
+        {/* Whether each tag shows its label, its pill, or is a dot
+            (settings.graph.tag.labels, the preference showTagLabels, null
+            for the site's own; lib/tagPills.js). Greyed and inert while the
+            tagz are not shown. Either way nothing moves. */}
+        <Switch
+          on={showTagLabelsChosen(viewState.preference(TAG_LABELS_PREF), S)}
+          onChange={(v) => viewState.setPreference(TAG_LABELS_PREF, showTagLabelsPrefFor(v, S))}
+          label="Show their labels"
+          hint="Off, each tag is a dot; point at one, or tap it, to read it."
+          data-pref={TAG_LABELS_PREF}
+          disabled={!tagsShown}
+        />
+      </>)}
       {minPieces.max > 1 && (
         // The label carries the value, so it has a line of its own, and the
         // count beside the slider keeps one width: dragging moves the thumb
@@ -637,7 +655,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
       <button
         className={styles.resetBtn}
         data-settings-reset
-        title="Layout, zoom, rotation, open and closed containers, selection, showing tagz and colors, back to how the site starts"
+        title="Layout, zoom, rotation, open and closed containers, selection, showing tagz and their labels, and colors, back to how the site starts"
         onClick={() => {
           setOpen(false);
           if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);
