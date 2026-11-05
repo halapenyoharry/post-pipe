@@ -43,8 +43,20 @@ async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
       // <image><url/></image> per RSS 2.0
       favicon: channel.image?.url || null,
       icon: channel.image?.url || null,
+      // The feed's own date for itself: <lastBuildDate>, else the channel's
+      // <pubDate> (RSS 2.0), else its <dc:date> (RSS 1.0); null when it
+      // gives none that reads as a date.
+      feedUpdated: feedUpdated(channel),
     },
   };
+}
+
+function feedUpdated(channel) {
+  for (const v of [channel.lastBuildDate, channel.pubDate, channel['dc:date']]) {
+    const d = parseDate(typeof v === 'string' ? v : (v && typeof v === 'object' ? v['#text'] : v));
+    if (d) return d;
+  }
+  return null;
 }
 
 function normalizeItem(it) {

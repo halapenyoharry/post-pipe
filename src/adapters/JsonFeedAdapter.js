@@ -30,6 +30,8 @@ async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
       home_page_url: feed.home_page_url || null,
       favicon: feed.favicon || null,
       icon: feed.icon || null,
+      // JSON Feed has no date for the feed itself.
+      feedUpdated: null,
     },
   };
 }

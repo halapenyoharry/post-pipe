@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './FeedZ.module.css';
 import { Icon } from '../Icon/Icon';
 import { Subscribe } from './Subscribe';
-import { sourceStatus } from '../../lib/sourceStatus';
+import { sourceStatus, sourceLines } from '../../lib/sourceStatus';
 import { discoverSource } from '../../lib/feedAutodiscovery';
 import { buildOutline, buildPageOutline, buildCommand } from '../../lib/addFeedLine';
 import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolders';
@@ -68,14 +69,26 @@ import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolde
  *   onSelectView   — (id) => void, for a view's button
  *   staleAge       — optional, default false; true shows the age of a stale
  *                    feed's copy beside its mark ("! 2d"), not only in the
- *                    pill's title (settings.topBar.staleAge), for a screen
- *                    with no hover to show a title
+ *                    pill's popover (settings.topBar.staleAge), to be read
+ *                    at a glance
+ *
+ * Each source pill has a small popover just below it, shown while a mouse
+ * rests on the pill, while the keyboard's focus is on it, and after a
+ * finger's dwell (a press held about 500 ms without moving), until a few
+ * seconds after the finger lifts. It says when the source's items were taken
+ * in and, for a feed that gives one, the feed's own date for itself
+ * (sourceLines in src/lib/sourceStatus.js, from the source's fetchedAt,
+ * readAt and feedUpdated in feed.json). A tap still hides or shows the
+ * source, a dwell does not; the dot keeps its own hover dwell and tap, which
+ * open its colour ring. The pill's aria-describedby names the popover, so a
+ * screen reader reads it with the pill; Escape puts it away.
  *
  * A feed whose fetch failed when the site was built (src/lib/sourceStatus.js):
- * when its cards come from its last good copy (source.stale), its pill shows
- * a small mark after the count, and its title says the fetch failed, why, and
- * the copy's day and age; with no copy, the pill is struck through, its title
- * saying why.
+ * when its cards come from a copy (source.stale: the site's saved copy or
+ * this machine's last good copy), its pill shows a small mark after the
+ * count, and its popover says the fetch failed, why, which copy and the
+ * copy's date and age; with no copy, the pill is struck through, its popover
+ * saying why. The pill's title says only what a tap does.
  */
 export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true, groupByFolder = false, views = [], currentView = null, onSelectView }) {
   const barRef = useRef(null);
@@ -270,9 +283,9 @@ function fitRow(bar) {
 // inconsistently (the outer control can silently stop receiving events).
 // role="button" + a key handler keep it keyboard-operable regardless.
 // The build's word on the feed (sourceStatus): a stale feed (its fetch
-// failed, its cards from its last good copy) gets a small mark after the
-// count, the copy's age beside it when staleAge is on; a failed feed with no
-// copy is struck through. Either way the pill's title says why.
+// failed, its cards from a copy) gets a small mark after the count, the
+// copy's age beside it when staleAge is on; a failed feed with no copy is
+// struck through. Either way the pill's popover says why.
 function FolderPill({ group, allHidden, onToggle, showCount }) {
   const action = allHidden ? `Show ${group.folder}` : `Hide ${group.folder}`;
   return (
@@ -297,30 +310,211 @@ function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge }) 
   const stale = Boolean(status && status.kind === 'stale');
   const color = (viewState && viewState.sourceColor(source.id)) || source.color;
   const action = hidden ? `Show ${title}` : `Hide ${title}`;
+  const lines = sourceLines(source);
+  const pillRef = useRef(null);
+  const popoverRef = useRef(null);
+  const popoverId = useId();
+  const popover = usePillPopover(lines.length > 0, pillRef, popoverRef);
   return (
-    <div
-      className={`${styles.pill} ${hidden ? styles.hidden : ''} ${failed ? styles.failed : ''}`}
-      data-source-pill
-      data-source-stale={stale ? '' : undefined}
-      data-source-failed={failed ? '' : undefined}
-      onClick={onToggle}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
-      role="button"
-      tabIndex={0}
-      title={status ? `${action} · ${status.note}` : action}
-      style={{ '--pill-color': color }}
-    >
-      <FeedDot color={color} sourceId={source.id} viewState={viewState} />
-      <span className={styles.title}>{title}</span>
-      {showCount && <span className={styles.count}>{source.itemCount}</span>}
-      {stale && (
-        <span className={styles.staleMark} data-stale-mark title={status.note}
-          role="img" aria-label={status.age ? `not fetched, the copy is ${status.age.long}` : 'not fetched, an earlier copy'}>
-          <span aria-hidden="true">!</span>
-          {staleAge && status.age && <span className={styles.staleAge} aria-hidden="true" data-stale-age>{status.age.short}</span>}
-        </span>
+    <>
+      <div
+        ref={pillRef}
+        className={`${styles.pill} ${hidden ? styles.hidden : ''} ${failed ? styles.failed : ''}`}
+        data-source-pill
+        data-source-stale={stale ? '' : undefined}
+        data-source-failed={failed ? '' : undefined}
+        onClick={() => { if (!popover.swallowClick()) onToggle(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        role="button"
+        tabIndex={0}
+        title={action}
+        aria-describedby={lines.length ? popoverId : undefined}
+        style={{ '--pill-color': color }}
+        {...popover.pillHandlers}
+      >
+        <FeedDot color={color} sourceId={source.id} viewState={viewState} />
+        <span className={styles.title}>{title}</span>
+        {showCount && <span className={styles.count}>{source.itemCount}</span>}
+        {stale && (
+          <span className={styles.staleMark} data-stale-mark
+            role="img" aria-label={status.age ? `not fetched, the copy is ${status.age.long}` : 'not fetched, an earlier copy'}>
+            <span aria-hidden="true">!</span>
+            {staleAge && status.age && <span className={styles.staleAge} aria-hidden="true" data-stale-age>{status.age.short}</span>}
+          </span>
+        )}
+      </div>
+      {lines.length > 0 && (
+        <SourcePopover
+          id={popoverId}
+          popoverRef={popoverRef}
+          anchorRef={pillRef}
+          open={popover.open}
+          action={action}
+          lines={lines}
+          handlers={popover.popoverHandlers}
+        />
       )}
-    </div>
+    </>
+  );
+}
+
+// The source pill's popover (sourceLines): its timings.
+const POPOVER_HOVER_MS = 350;   // a mouse resting on the pill this long shows it
+const POPOVER_LEAVE_MS = 150;   // time to move the mouse from the pill onto it
+const POPOVER_HOLD_MS = 500;    // a finger held this long is a dwell...
+const POPOVER_HOLD_SLOP_PX = 8; // ...moving less than this
+const POPOVER_LINGER_MS = 4000; // after a dwell, it stays this long once the finger lifts
+
+// When the popover shows: while a mouse rests on the pill (not its dot) or
+// on the popover itself, while the pill has the keyboard's focus, and from a
+// finger's dwell on the pill (not its dot) until POPOVER_LINGER_MS after the
+// finger lifts. Escape, a tap elsewhere, the mouse leaving and blur put it
+// away. A dwell is not a tap: the click a browser may send when the finger
+// lifts is swallowed (swallowClick), so the source is not toggled; a short
+// tap toggles it as ever and puts away a dwell's popover. A press held on
+// the pill opens no context menu.
+function usePillPopover(enabled, pillRef, popoverRef) {
+  const [why, setWhy] = useState({ hover: false, focus: false, hold: false, dismissed: false });
+  const timers = useRef({});
+  const press = useRef(null);   // a finger's press in progress: { id, x, y }
+  const held = useRef(false);   // that press became a dwell
+  const lastPress = useRef(0);
+
+  const update = (patch) => setWhy((w) => {
+    const next = { ...w, ...patch };
+    // Once nothing holds it open, an Escape is forgotten.
+    if (!next.hover && !next.focus && !next.hold) next.dismissed = false;
+    return next;
+  });
+  const clear = (name) => { if (timers.current[name]) { clearTimeout(timers.current[name]); timers.current[name] = null; } };
+  const after = (name, ms, fn) => { clear(name); timers.current[name] = setTimeout(() => { timers.current[name] = null; fn(); }, ms); };
+  useEffect(() => () => { for (const k of Object.keys(timers.current)) clear(k); }, []);
+
+  const open = enabled && !why.dismissed && (why.hover || why.focus || why.hold);
+
+  // While it shows: Escape puts it away, and so does a press anywhere but
+  // the pill and the popover.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') update({ dismissed: true }); };
+    const onDown = (e) => {
+      const t = e.target;
+      if ((pillRef.current && pillRef.current.contains(t)) || (popoverRef.current && popoverRef.current.contains(t))) return;
+      clear('hover'); clear('leave'); clear('linger');
+      update({ hover: false, hold: false });
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown, true);
+    };
+  }, [open]);
+
+  const onDot = (t) => !!(t && t.closest && t.closest('[data-feed-dot]'));
+  const leaveSoon = () => { clear('hover'); after('leave', POPOVER_LEAVE_MS, () => update({ hover: false })); };
+  const endPress = () => {
+    press.current = null;
+    clear('hold');
+    // A dwell's popover lingers a few seconds; a short tap puts one away.
+    if (held.current) after('linger', POPOVER_LINGER_MS, () => update({ hold: false }));
+    else update({ hold: false });
+  };
+
+  if (!enabled) return { open: false, pillHandlers: {}, popoverHandlers: {}, swallowClick: () => false };
+
+  const pillHandlers = {
+    onPointerOver: (e) => {
+      if (e.pointerType !== 'mouse') return;
+      clear('leave');
+      // The dot keeps its own hover (its colour ring); the popover is the
+      // rest of the pill's.
+      if (onDot(e.target)) { clear('hover'); update({ hover: false }); return; }
+      if (!why.hover && !timers.current.hover) after('hover', POPOVER_HOVER_MS, () => update({ hover: true }));
+    },
+    onPointerLeave: (e) => { if (e.pointerType === 'mouse') leaveSoon(); },
+    onPointerDown: (e) => {
+      held.current = false;
+      if (e.pointerType === 'mouse') return;
+      lastPress.current = Date.now();
+      clear('linger');
+      if (onDot(e.target)) { press.current = null; update({ hold: false }); return; }
+      press.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      after('hold', POPOVER_HOLD_MS, () => { held.current = true; update({ hold: true, dismissed: false }); });
+    },
+    onPointerMove: (e) => {
+      const p = press.current;
+      if (!p || e.pointerId !== p.id || held.current) return;
+      if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > POPOVER_HOLD_SLOP_PX) { press.current = null; clear('hold'); }
+    },
+    onPointerUp: (e) => { if (press.current && e.pointerId === press.current.id) endPress(); },
+    onPointerCancel: (e) => { if (press.current && e.pointerId === press.current.id) endPress(); },
+    // A long press opens no menu (Chrome on Android sends contextmenu).
+    onContextMenu: (e) => { if (press.current || held.current) e.preventDefault(); },
+    // The keyboard's focus shows it; a tap or click that focuses the pill
+    // does not (it is not :focus-visible).
+    onFocus: (e) => {
+      if (e.target !== e.currentTarget) return;
+      let keyboard;
+      try { keyboard = e.currentTarget.matches(':focus-visible'); } catch (_) { keyboard = Date.now() - lastPress.current > 1000; }
+      if (keyboard) update({ focus: true });
+    },
+    onBlur: (e) => { if (e.target === e.currentTarget) update({ focus: false }); },
+  };
+  const popoverHandlers = {
+    onPointerEnter: (e) => { if (e.pointerType === 'mouse') clear('leave'); },
+    onPointerLeave: (e) => { if (e.pointerType === 'mouse') leaveSoon(); },
+  };
+  // The click a browser sends when a dwell's finger lifts is not a tap.
+  const swallowClick = () => {
+    if (!held.current) return false;
+    held.current = false;
+    return true;
+  };
+  return { open, pillHandlers, popoverHandlers, swallowClick };
+}
+
+// The popover itself: in the page's body, so the bar's layout, the pill's
+// dimming and its accessible name are untouched, placed just below its pill
+// and kept on the screen. Always in the page (hidden when not shown), so the
+// pill's aria-describedby always finds it. What a screen reader is given is
+// its aria-label, one string of whole sentences: what a tap does (as the
+// pill's title says), then each line, each ending in a full stop, so they
+// are read as sentences whether or not the popover is drawn.
+function SourcePopover({ id, popoverRef, anchorRef, open, action, lines, handlers }) {
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const pill = anchorRef.current;
+      const pop = popoverRef.current;
+      if (!pill || !pop) return;
+      const r = pill.getBoundingClientRect();
+      const vw = document.documentElement.clientWidth || window.innerWidth;
+      const left = Math.max(8, Math.min(r.left, vw - pop.offsetWidth - 8));
+      pop.style.top = `${Math.round(r.bottom + 6)}px`;
+      pop.style.left = `${Math.round(left)}px`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open]);
+  if (typeof document === 'undefined' || !document.body) return null;
+  return createPortal(
+    <div
+      ref={popoverRef}
+      id={id}
+      role="tooltip"
+      aria-label={[action, ...lines].map((t) => `${t}.`).join(' ')}
+      className={styles.popover}
+      hidden={!open}
+      data-source-popover
+      {...handlers}
+    >
+      {lines.map((line, i) => (
+        <span key={i} className={styles.popoverLine} data-source-popover-line>{line}</span>
+      ))}
+    </div>,
+    document.body,
   );
 }
 
@@ -375,6 +569,7 @@ function FeedDot({ color, sourceId, viewState }) {
   return (
     <span
       className={styles.dotWrap}
+      data-feed-dot
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={openRing}

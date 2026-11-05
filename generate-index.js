@@ -2,6 +2,9 @@
 // Orchestrates the build: ask the aggregator for the merged corpus, write
 // _site/feed.json + _site/index.html.
 // Run: node generate-index.js
+//      node generate-index.js --save-copies   also writes each fetched feed's
+//        saved copy in the site (the file its outline's savedCopy names) from
+//        this build's good fetch; an ordinary build never writes them
 
 const fs   = require('fs');
 const path = require('path');
@@ -27,6 +30,9 @@ const COVERS_DIR   = path.join(SITE_DIR, 'covers');
 const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
 const OPML_PATH    = path.resolve(SITE_ROOT, SETTINGS.feeds_opml_path || 'feeds.opml');
+// Refreshing the site's saved copies is a deliberate act, never a side effect
+// of a build: they are the site's files, in its git.
+const SAVE_COPIES  = process.argv.slice(2).includes('--save-copies');
 const PAGES_BASE   = SETTINGS.site.base_url;
 
 // Registry of adapter modules keyed by OPML type attribute.
@@ -67,6 +73,9 @@ function configFor(entry) {
     htmlUrl: entry.htmlUrl,
     customColor: entry.customColor,
     folder: entry.folder,
+    // The site's own copy of a fetched feed, for a build whose fetch fails
+    // (resolved against the site, like a local folder's path).
+    savedCopy: entry.savedCopy ? resolveSitePath(entry.savedCopy) : null,
     prominence: entry.prominence,
     cardScale: entry.cardScale,
     itemCap: entry.itemCap,
@@ -826,9 +835,10 @@ ${reactJs}
             autodiscover: !(window.SETTINGS && ((window.SETTINGS.topBar && window.SETTINGS.topBar.autodiscover === false) || window.SETTINGS.autodiscover === false)),
             groupByFolder: !!(window.SETTINGS && ((window.SETTINGS.topBar && window.SETTINGS.topBar.groupByFolder === true) || window.SETTINGS.groupByFolder === true)),
             showSources: TOP_BAR.showSourcePills,
-            // A stale feed's pill (its fetch failed, its cards from its last
-            // good copy) shows a small mark; topBar.staleAge true adds the
-            // copy's age beside it, for a screen with no hover.
+            // A stale feed's pill (its fetch failed, its cards from a copy:
+            // the site's saved copy or this machine's last good copy) shows a
+            // small mark, its popover saying more; topBar.staleAge true adds
+            // the copy's age beside the mark, to be read at a glance.
             staleAge: !!(window.SETTINGS && window.SETTINGS.topBar && window.SETTINGS.topBar.staleAge === true),
             intro: window.PP_INTRO_HTML || '',
             controls: TOOLBAR.position === 'top' ? graphControls : null,
@@ -934,7 +944,9 @@ async function main() {
   // rosetta-tagz's cache folder for this site, named here once: the phase
   // writes into it and the SKOS copy below reads from it.
   const rtagzCacheDir = path.resolve(cacheDirForSite(SITE_ROOT));
+  if (SAVE_COPIES) console.log('Saving copies: each fetched feed whose outline names a savedCopy gets it written from this build\'s fetch');
   const { items, sources, rtagz } = await loadCorpus(entries, {
+    saveCopies: SAVE_COPIES,
     rtagz: rtagzSettings(SETTINGS),
     siteRoot: SITE_ROOT,
     containment: SETTINGS.containment,
