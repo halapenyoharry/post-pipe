@@ -14,6 +14,7 @@ A site is a folder holding at least:
 - optionally `auth/.env` — credentials for publishing (GitHub token, API keys). Read from the site first; the engine's own `auth/.env` is the fallback, announced with one logged line.
 - optionally `rtagz-overrides.json` — human decisions for rosetta-tagz (see `docs/POST-PIPE-USES-RTAGZ.md`).
 - optionally `rtagz-ids.json` — written by rosetta-tagz when the site turns it on: the concept ids it keeps from one build to the next. Worth tracking in the site's git.
+- `cards.json` (the name is provisional; `settings.cards.ledger` names another, `false` keeps none) — written by the first build: every card's slug, discovered from what the piece carries and never rewritten after (`src/lib/cardSlug.js`, 2026-11-04). Worth tracking in the site's git.
 - `_site/` — build output, git-ignored.
 - `archive/` — by convention, git-ignored and Syncthing-synced, for material the site's owner keeps but the engine never reads.
 

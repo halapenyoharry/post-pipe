@@ -47,6 +47,11 @@ function normalizeEntry(e) {
   const authors = (e.author || []).map(a => ({ name: decodeHtmlEntities(extractText(a.name) || '') })).filter(a => a.name);
   const image = extractImage(e);
   const tags  = (e.category || []).map(c => c['@_term']).filter(Boolean);
+  // What the entry carries of its own identity, kept for the card's slug
+  // (src/lib/cardSlug.js): a <link rel="canonical">, and a DOI in
+  // <prism:doi> or <dc:identifier>.
+  const canonical = canonicalLink(e.link);
+  const doi = doiOf(e['prism:doi']) || doiOf(e['dc:identifier']);
 
   return {
     id: e.id || url,
@@ -60,7 +65,8 @@ function normalizeEntry(e) {
     date_published: parseDate(e.published || e.updated),
     tags,
     authors,
-    canonical_url: url,
+    canonical_url: canonical || url,
+    ...(doi ? { doi } : {}),
     kind: 'text',
     attachments: image ? [{ url: image, mime_type: 'image/*', _role: 'cover' }] : [],
     _references: tags.map(value => ({ type: 'tag', value })),
@@ -74,6 +80,21 @@ function alternateLink(links) {
   const arr = Array.isArray(links) ? links : [links];
   const alt = arr.find(l => l['@_rel'] === 'alternate' || !l['@_rel']);
   return alt?.['@_href'] || arr[0]?.['@_href'] || '';
+}
+
+// A <link rel="canonical" href="…"> on the entry, when it has one.
+function canonicalLink(links) {
+  if (!links) return '';
+  const arr = Array.isArray(links) ? links : [links];
+  const c = arr.find(l => l && l['@_rel'] === 'canonical' && l['@_href']);
+  return c ? String(c['@_href']).trim() : '';
+}
+
+// A DOI in a field (bare, "doi:…" or a doi.org address); '' when none.
+function doiOf(v) {
+  const s = typeof v === 'string' ? v : extractText(v);
+  const m = String(s || '').match(/(?:doi\.org\/|doi:\s*|^|[\s(])(10\.\d{4,9}\/[^\s"'<>]+)/i);
+  return m ? m[1].replace(/[.,;:)\]]+$/, '') : '';
 }
 
 function extractText(node) {

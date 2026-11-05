@@ -68,6 +68,8 @@ function normalizeItem(it) {
     authors: it.authors || (it.author ? [it.author] : []),
     canonical_url: it.url || it.external_url || '',
     external_url: it.external_url || undefined,
+    // A DOI the item names (doi or _doi), kept for the card's slug.
+    ...(typeof (it.doi || it._doi) === 'string' && (it.doi || it._doi) ? { doi: it.doi || it._doi } : {}),
     // An item that is only a link (external_url, no content) is a link node.
     kind: isLinkFeedItem(it) ? 'link' : (it._kind || it.kind || 'text'),
     attachments,

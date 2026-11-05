@@ -59,6 +59,11 @@ function normalizeItem(it) {
                 : typeof it.author === 'string' ? it.author : '') || '');
   const image = extractImage(it);
   const tags  = extractCategories(it.category);
+  // What the item carries of its own identity, kept for the card's slug
+  // (src/lib/cardSlug.js): an <atom:link rel="canonical">, and a DOI in
+  // <prism:doi> or <dc:identifier>.
+  const canonical = canonicalLink(it['atom:link']);
+  const doi = doiOf(it['prism:doi']) || doiOf(it['dc:identifier']);
 
   return {
     id,
@@ -72,11 +77,27 @@ function normalizeItem(it) {
     date_published: parseDate(it.pubDate || it['dc:date']),
     tags,
     authors: author ? [{ name: author }] : [],
-    canonical_url: url,
+    canonical_url: canonical || url,
+    ...(doi ? { doi } : {}),
     kind: 'text',
     attachments: image ? [{ url: image, mime_type: 'image/*', _role: 'cover' }] : [],
     _references: tags.map(value => ({ type: 'tag', value })),
   };
+}
+
+// An <atom:link rel="canonical" href="…"> on the item, when it has one.
+function canonicalLink(links) {
+  if (!links) return '';
+  const arr = Array.isArray(links) ? links : [links];
+  const c = arr.find(l => l && typeof l === 'object' && l['@_rel'] === 'canonical' && l['@_href']);
+  return c ? String(c['@_href']).trim() : '';
+}
+
+// A DOI in a field (bare, "doi:…" or a doi.org address); '' when none.
+function doiOf(v) {
+  const s = typeof v === 'string' ? v : (v && typeof v === 'object' && typeof v['#text'] === 'string' ? v['#text'] : '');
+  const m = s.match(/(?:doi\.org\/|doi:\s*|^|[\s(])(10\.\d{4,9}\/[^\s"'<>]+)/i);
+  return m ? m[1].replace(/[.,;:)\]]+$/, '') : '';
 }
 
 function stripCdata(s) {
