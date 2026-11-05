@@ -231,6 +231,7 @@ function readerFontFaces() {
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
 const { cardsLedgerPath, readLedger, writeLedger, assignSlugs } = require('./src/lib/cardSlug');
+const { topicSlugs, topicSlugOn } = require('./src/lib/topicSlug');
 const { contributionsConfig } = require('./src/lib/contributions');
 const { timeOverlayConfig } = require('./src/lib/timeOverlay');
 const { lookFromSettings } = require('./src/components/GraphViewer/containerLook');
@@ -988,6 +989,20 @@ async function main() {
   const slugs = assignSlugs(items, prior.ledger, { now: new Date() });
   if (ledgerFile && prior.status !== 'unreadable' && slugs.changed) writeLedger(ledgerFile, slugs.ledger);
   console.log(`  cards: ${slugs.summary.known} known, ${slugs.summary.added} new${slugs.summary.suffixed ? ` (${slugs.summary.suffixed} suffixed)` : ''}${ledgerFile ? `; ledger ${path.relative(SITE_ROOT, ledgerFile)}${slugs.changed && prior.status !== 'unreadable' ? ' written' : ' unchanged'}` : '; no ledger (cards.ledger false)'}`);
+
+  // Beside its slug, every card gets a topic slug (item.topicSlug,
+  // provisional; issue #39, src/lib/topicSlug.js): the literal best two
+  // words for what it is about, computed over all of this build's items as
+  // the corpus. It is not frozen: a card's topic slug may change from one
+  // build to the next as the corpus changes. slug, slugSource and the cards
+  // ledger are untouched. A site turns it off with cards.topicSlug false.
+  if (topicSlugOn(SETTINGS)) {
+    const topics = topicSlugs(items);
+    items.forEach((item, i) => { item.topicSlug = topics[i].slug; });
+    console.log(`  topic slugs: ${items.length} (tools/topic-slugs.js shows each with its candidates)`);
+  } else {
+    console.log('  topic slugs: off (cards.topicSlug false)');
+  }
 
   const feed = buildFeed(items);
   // A container whose tag rosetta-tagz resolved to a concept carries it as
