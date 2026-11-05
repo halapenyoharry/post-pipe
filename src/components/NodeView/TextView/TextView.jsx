@@ -16,6 +16,7 @@ function sketchFor(id, w, h, r) {
 import styles from './TextView.module.css';
 import { ResizeHandles } from '../ResizeHandles';
 import { numberToLowercaseWords } from '../../../lib/readerHeader';
+import { CardListen } from '../../TTS/TTS';
 
 /**
  * TextView — the lens that renders a text-substrate node (essay, fragment,
@@ -36,13 +37,18 @@ import { numberToLowercaseWords } from '../../../lib/readerHeader';
  *     replaces the summary as the scrollable body
  *   onResize: optional callback ({ width, height }) => void; without it the
  *     card has no resize handles (the graph's table binds no node.resize)
+ *   listen: whether an open (pinned) card holds the listening strip under
+ *     its title (settings.cards.listen, default true): play or pause, stop,
+ *     the voice and the speed, acting on the one reading (window.TTS)
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
-export function TextView({ article, width, height, viewState, fullContent, onResize, cardSettings, sourceColor: feedColor }) {
+export function TextView({ article, width, height, viewState, fullContent, onResize, cardSettings, sourceColor: feedColor, listen = true }) {
   const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
+  // The listening strip, in an open card only.
+  const listening = pinned && listen !== false;
 
   // The "draft vs published" distinction maps to the bucket the graph
   // ingester chose. Used to tint backgrounds. Per-source color (when
@@ -129,6 +135,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     isDraft ? styles.draft : styles.published,
     expanded && styles.expanded,
     pinned && styles.pinned,
+    listening && styles.listening,
   ].filter(Boolean).join(' ');
 
   // The sketchbook theme's pencil outline: generated per card and size, so it
@@ -212,6 +219,7 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         useFullArticle={useFullArticle}
         fullContent={fullContent}
         cardSettings={cardSettings}
+        listening={listening}
       />
       {(readMax > 0 || readDone) && (
         <div
@@ -286,7 +294,7 @@ const COMPACT_HEIGHT = 260;
 
 // English number words from 0 to 99, shared with the reader's header line.
 
-function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent, cardSettings }) {
+function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent, cardSettings, listening = false }) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
@@ -296,12 +304,17 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
     // In a small card the title scrolls away with the text instead of holding
     // a fixed band at the top. You have already read it by the time you start
     // scrolling, and the card is too short to spend 36px on remembering it.
+    // The listening strip (settings.cards.listen) sits under the title, or
+    // above the text when the title scrolls with it; the text takes the rest.
     if (height && height < COMPACT_HEIGHT) {
       return (
-        <div className={`${styles.scroll} ${styles.scrollFull} ${useFullArticle ? styles.full : ''} rp-scroll`}>
-          <div className={styles.titleScrolling} data-card-title>{title}</div>
-          {body && <div dangerouslySetInnerHTML={{ __html: body }} />}
-        </div>
+        <>
+          {listening && <CardListen />}
+          <div className={`${styles.scroll} ${styles.scrollFull} ${useFullArticle ? styles.full : ''} rp-scroll`}>
+            <div className={styles.titleScrolling} data-card-title>{title}</div>
+            {body && <div dangerouslySetInnerHTML={{ __html: body }} />}
+          </div>
+        </>
       );
     }
 
@@ -310,6 +323,7 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
         <div className={styles.title} data-card-title>
           {title}
         </div>
+        {listening && <CardListen />}
         {body && (
           <div
             className={`${styles.scroll} ${useFullArticle ? styles.full : ''} rp-scroll`}

@@ -1,20 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import styles from './TTS.module.css';
 import { ICONS } from '../../utils/icons';
+import { listenState, toggleListen, stopListening } from '../../lib/listenInCard';
 
-// The voice, shared by two views of it: the transport in the reader (play,
-// pause, stop, and what it is doing) and the choices in the settings panel's
-// Listening group (engine, voice, speed). Both read and write window.TTS, so
-// a voice chosen in the panel is the one the reader plays.
+// The voice, shared by three views of it: the transport in the reader (play,
+// pause, stop, and what it is doing), the choices in the settings panel's
+// Listening group (engine, voice, speed), and the strip in an open card
+// (CardListen: the transport with the voice and speed beside it). All read
+// and write window.TTS, so a voice chosen in the panel is the one the reader
+// plays and the one a card plays, and there is one reading: started in a
+// card, it goes on when the reader opens, and the reader's pause and stop
+// act on it. A change made in one view reaches the others through tts.js's
+// events ('state', 'paramChanged', 'capabilitiesChanged').
 //
 // When the voice reading fails and another takes over (tts.js, the
 // 'fallback' event; the order is settings.tts.fallback), the picker shows
 // the voice now reading and one quiet line under it saying so; the
 // transport says nothing, so reading is not interrupted. The line goes when
 // the reader chooses a voice or an engine.
-function useTTS() {
+export function useTTS() {
   const [T, setT] = useState(null);
   const [state, setState] = useState('stopped'); // 'playing', 'paused', 'loading', 'stopped'
+  // The container being read or paused in (tts.js target()), so a card's
+  // strip can tell its own reading from the reader's or another card's.
+  const [target, setTarget] = useState(null);
   const [engines, setEngines] = useState([]);
   const [selectedEngine, setSelectedEngine] = useState('');
   const [voices, setVoices] = useState([]);
@@ -35,6 +44,7 @@ function useTTS() {
 
     const updateState = (s) => {
       setState(s);
+      setTarget(tts.target ? tts.target() : null);
       if (s !== 'loading') setEngineProgress(0); // Reset progress when leaving loading
       if (s === 'playing' || s === 'stopped') {
         if (!isError) setStatusMessage(null);
@@ -111,7 +121,16 @@ function useTTS() {
       setFallbackNote((fb && fb.note) || '');
     };
 
+    // A choice made in another view of the voice (the panel's speed slider
+    // while a card's strip is open, or the other way): this view follows.
+    const handleParamChanged = (p) => {
+      if (!p || !p.key) return;
+      if (p.key === 'voice') setSelectedVoice(p.value || '');
+      else setParams(prev => (prev[p.key] === p.value ? prev : { ...prev, [p.key]: p.value }));
+    };
+
     tts.on('state', updateState);
+    tts.on('paramChanged', handleParamChanged);
     tts.on('capabilitiesChanged', refreshCapabilities);
     tts.on('engineProgress', handleEngineProgress);
     tts.on('loadingProgress', handleLoadingProgress);
@@ -120,6 +139,8 @@ function useTTS() {
 
     refreshEngines();
     refreshCapabilities();
+    // Mounted while a reading is going (a card opened mid-chapter): show it.
+    if (tts.state) updateState(tts.state());
     const earlier = tts.lastFallback ? tts.lastFallback() : null;
     if (earlier && earlier.note) setFallbackNote(earlier.note);
 
@@ -131,6 +152,7 @@ function useTTS() {
     return () => {
       if (tts.off) {
         tts.off('state', updateState);
+        tts.off('paramChanged', handleParamChanged);
         tts.off('capabilitiesChanged', refreshCapabilities);
         tts.off('engineProgress', handleEngineProgress);
         tts.off('loadingProgress', handleLoadingProgress);
@@ -171,7 +193,7 @@ function useTTS() {
   };
 
   return {
-    T, state, engines, selectedEngine, voices, selectedVoice, capabilities, params, engineProgress,
+    T, state, target, engines, selectedEngine, voices, selectedVoice, capabilities, params, engineProgress,
     errorMsg, statusMessage, isError, setStatusMessage, setIsError, fallbackNote,
     handleEngineChange, handleVoiceChange, handleParamChange,
   };
@@ -185,6 +207,9 @@ export function TTS({ targetRef }) {
     if (!T || !targetRef.current) return;
     setStatusMessage(null);
     setIsError(false);
+    // Paused, wherever it was paused (the reader, or a card): read on.
+    // Otherwise the reader's text, from its start.
+    if (state === 'paused' && T.resume) { T.resume(); return; }
     T.play(targetRef.current, { scrollContainer: targetRef.current });
   };
 
@@ -339,6 +364,62 @@ export function TTSSettings() {
           return null;
         })}
       </div>
+    </div>
+  );
+}
+
+// The strip in an open card (settings.cards.listen, default true): play or
+// pause, stop, and the voice and speed as the panel has them. It reads the
+// card's text (the .rp-scroll under the card, found when a button is
+// pressed, so a body replaced when the full text arrives is still found)
+// with tts.js's play(), which highlights the sentence being read and keeps
+// it softly in view inside that text, as it does in the reader (rule 10).
+// Taps on it stay on it: they never open, close or drag the card.
+export function CardListen() {
+  const { T, state, target, voices, selectedVoice, capabilities, params, handleVoiceChange, handleParamChange } = useTTS();
+  const ref = React.useRef(null);
+  if (!T) return null;
+
+  const bodyOf = () => {
+    const card = ref.current && ref.current.closest('[data-pp-card]');
+    return card ? card.querySelector('.rp-scroll') : null;
+  };
+  // 'off' unless the reading is this card's (target is kept in state, so the
+  // strip re-renders as the reading moves between the reader and cards).
+  const body = ref.current ? bodyOf() : null;
+  const mine = body && target === body ? (state === 'stopped' ? 'off' : state) : 'off';
+
+  const stay = (e) => { e.stopPropagation(); };
+  const onPlay = (e) => { stay(e); toggleListen(T, bodyOf()); };
+  const onStop = (e) => { stay(e); stopListening(T, bodyOf()); };
+
+  const speed = capabilities && capabilities.speed;
+  const icon = (name, label) => ({ __html: `${ICONS[name]}<span class="${styles.tbTooltip}">${label}</span>` });
+
+  return (
+    <div ref={ref} className={styles.cardStrip} data-pp-listen data-pp-listen-state={mine}
+      onClick={stay} onDoubleClick={stay} onPointerDown={stay} onMouseDown={stay} onTouchStart={stay}>
+      {mine === 'playing' || mine === 'loading'
+        ? <button type="button" className={`${styles.tb} ${styles.tbSmall}`} onClick={onPlay} title="Pause" aria-label="Pause" data-pp-listen-play dangerouslySetInnerHTML={icon('pause', 'Pause')} />
+        : <button type="button" className={`${styles.tb} ${styles.tbSmall}`} onClick={onPlay} title={mine === 'paused' ? 'Play' : 'Listen'} aria-label={mine === 'paused' ? 'Play' : 'Listen'} data-pp-listen-play dangerouslySetInnerHTML={icon('play', mine === 'paused' ? 'Play' : 'Listen')} />}
+      {mine !== 'off' && (
+        <button type="button" className={`${styles.tb} ${styles.tbSmall}`} onClick={onStop} title="Stop" aria-label="Stop" data-pp-listen-stop dangerouslySetInnerHTML={icon('stop', 'Stop')} />
+      )}
+      {voices.length > 0 && (
+        <select className={`${styles.select} ${styles.cardSelect}`} value={selectedVoice} onChange={handleVoiceChange} title="Voice" aria-label="Voice" data-pp-listen-voice>
+          {!voices.some(v => v.id === selectedVoice) && <option value={selectedVoice}>{selectedVoice || "This device's own voice"}</option>}
+          {voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+        </select>
+      )}
+      {speed && speed.type === 'range' && (
+        <label className={styles.cardSpeed} title={`${speed.label}: ${Number(params.speed ?? speed.default).toFixed(1)}×`}>
+          <input type="range" min={speed.min} max={speed.max} step={speed.step || 0.1}
+            value={params.speed ?? speed.default}
+            onChange={(e) => handleParamChange('speed', parseFloat(e.target.value))}
+            aria-label={speed.label} data-pp-listen-speed />
+          <span className={styles.paramValue}>{Number(params.speed ?? speed.default).toFixed(1)}×</span>
+        </label>
+      )}
     </div>
   );
 }
