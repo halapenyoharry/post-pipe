@@ -46,3 +46,9 @@ _handoff/
 /.project-bible.json
 .vscode/
 test/_test_visibility_pages/
+
+# the example site reads two live feeds, so its slug ledger and rosetta-tagz
+# state change with every build; they stay on disk, out of git (2026-11-05)
+examples/site/cards.json
+examples/site/rtagz-ids.json
+examples/site/rtagz-queue.json
