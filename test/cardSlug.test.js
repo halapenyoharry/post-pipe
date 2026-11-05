@@ -205,3 +205,20 @@ test('the feed adapters keep a canonical link and a DOI when the feed gives one'
   assert.strictEqual(atom.items[1].doi, '10.2000/abc.9');
   assert.deepStrictEqual(atom.items.map((i) => S.discoverSlug(i).slug), ['first-entry', '10.2000-abc.9']);
 });
+
+test('a canonical that is not a web address is no canonical: the slug comes from what follows it', () => {
+  // A note in a piece's front matter where a canonical link would be
+  // (2026-11-05): the url path gives the slug, not the note.
+  const note = S.discoverSlug({ url: 'https://a.test/post-pipe/stone-cutters.html', canonical_url: 'fictional — unknown author, found in a novel', title: 'T' });
+  assert.deepStrictEqual(note, { slug: 'stone-cutters', source: 'url', identity: 'https://a.test/post-pipe/stone-cutters.html' });
+  // A relative canonical in the HTML is none either.
+  const relative = S.discoverSlug({ url: 'https://a.test/p/one.html', content_html: '<link rel="canonical" href="/elsewhere/two">', title: 'T' });
+  assert.strictEqual(relative.source, 'url');
+  assert.strictEqual(relative.slug, 'one');
+  // A DOI written as a canonical is still the DOI.
+  const doi = S.discoverSlug({ url: 'https://a.test/p/one.html', canonical_url: 'doi:10.5555/ABC.12', title: 'T' });
+  assert.deepStrictEqual([doi.slug, doi.source], ['10.5555-abc.12', 'doi']);
+  // An address with no path part still falls through to the url.
+  const bare = S.discoverSlug({ url: 'https://a.test/p/three', canonical_url: 'https://b.test/', title: 'T' });
+  assert.deepStrictEqual([bare.slug, bare.source], ['three', 'url']);
+});
