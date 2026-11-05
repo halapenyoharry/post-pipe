@@ -8,6 +8,7 @@
     { "a": "prison", "b": "oversight", "type": "related" }
   ],
   "ignore": [],
+  "accept": [],
   "sourceWeights": { "Science": 0.5 },
   "canon": { "prefer": "expanded" }
 }

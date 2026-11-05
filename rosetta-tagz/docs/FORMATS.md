@@ -56,6 +56,21 @@ anyone comparing it with another value makes exactly the build's comparison. Wit
 with (an expected likeness of exactly 0) nothing is measured: the record has no `sourceRatio`, and no
 bar rejects it.
 
+**Function words** (since 2026-11-04, issue #20). A phrase holding a closed-class word ("onto",
+"roughly", "allowing", "staying": prepositions, conjunctions, determiners, pronouns, auxiliaries, common
+adverbs and the participles of light verbs, `lib/stopwords.js`, English only) is refused before any
+bar is read, however it scores, and the untagged report names it (reason `functionWord`). The bars
+above are unchanged; this is a gate in front of them. The list is its own: a word on it is still
+scanned and counted, unlike `seed/generic-words.txt`, whose words never become candidates, so the
+report can say the word recurred and was refused. Participles that are also topic nouns ("thinking",
+"writing", "being", "building") are deliberately not on it. A site adds words through its overrides
+file's `ignore` list (reason `ignored`).
+
+**Accepted phrases.** A record for a phrase the overrides `accept` has `why` "accepted from the queue by
+the site's overrides; recurs in n of M items", no `sourceRatio` (a human's choice always shows), a
+second `wasDerivedFrom` entry `{type: "overrides", key: "accept", label}`, and `wasGeneratedBy`
+`{activity: "discover", parameters: {accepted: true, df, items}}`.
+
 **Spelling** (since 2026-10-31). No label is invented: `label`, and `phrase` in `wasDerivedFrom`, are
 spellings the text has, with hyphens, capitals and accents as written (`energy-efficient`, `Jupiter`, and
 `Diego` from "UC San Diego", where "San" is too short to be a candidate). Counting and matching still use
@@ -189,12 +204,14 @@ bar" below for what this is for.
 | `pin` | `{"ml":"Machine Learning"}` | canonical label for the concept containing `ml` |
 | `relations` | `[{"a","b","type","note"}]` | `broader`, `narrower`, `contains`, `related`, `adjacent`, `synergy`, `opposes`, or a SKOS mapping name `closeMatch`, `broadMatch`, `narrowMatch`, `relatedMatch`, `exactMatch`; any other `type` is dropped with one line on stderr. Stored `locked`, the narrow side flipped (below); it replaces a computed relation saying the same of the pair under either name (`near`/`closeMatch`, `related`/`relatedMatch`, `broader`/`broadMatch`). `b` may be `"<schemeId>:<externalId>"`, a concept of a published vocabulary, kept verbatim |
 | `notRelated` | `[{"a","b","type"?}]` | (provisional) forbid a relation: without `type` every relation between the pair, in both directions; with one, that type (old names flipped as in `relations`; a name and the mapping typing turns it into name the same row: `near` removes a `closeMatch`, `related` a `relatedMatch`, `broader` a `broadMatch`, and the other way round). Applied last, after seeds, computed relations and `relations`; what went is listed in `stone.json.forbidden` |
-| `ignore` | `["untagged"]` | drop these tags entirely |
+| `ignore` | `["untagged"]` | drop these tags entirely; since 2026-11-04 rtz-discover reads it too and refuses a candidate phrase it names (reason `ignored`), which is how a site extends the function-word gate (lib/stopwords.js) |
+| `accept` | `["quantum computing"]` | (provisional, 2026-11-04) phrases a human took from the queue: rtz-discover attaches each one to every item whose text holds it, spelled as written here, with no bar to clear, in any discover mode. Nothing is attached for a phrase no item writes |
 | `sourceWeights` | `{"ScienceDaily":0.4}` | trust per tag-system when picking canonical labels |
 | `canon` | `{"weights":{…},"prefer":"short"}` | override the scoring weights / length preference |
 | `config` | partial `lib/config.js` defaults | e.g. `{"mergeThreshold":0.75}`; read by rtz-stone only: rtz-discover and rtz-emerge take theirs from `--config` (rtz-build's `engine`) |
 
-Labels are matched by `norm`, so `AI`, `ai`, `A.I.` are the same argument.
+Labels are matched by `norm`, so `AI`, `ai`, `A.I.` are the same argument. rtz-discover (`--overrides`;
+rtz-build passes the file) reads only `ignore` and `accept`, matched by stem key against its candidates.
 
 ## Seeds (`seed/common.json`)
 
@@ -474,27 +491,62 @@ untagged: { bar, count, none, items[]: {
 - One universe item is one real-world article, so an article two systems list is one entry, under the
   key the universe kept.
 - `reasons`, in this order, each present only when it applies: `underBar` (tags under the bar, or
-  phrases under it no item chose), `underFloor` (phrases under `sourceRatioFloor`), `nearCopy` (phrases
+  phrases under it no item chose), `queued` (with discover `"queue"`: hubs that would have tagged it,
+  listed in the queue instead), `underFloor` (phrases under `sourceRatioFloor`), `nearCopy` (phrases
   that recur only in near-copies of one story, so on fewer than `minDf` items counted once), `tooCommon`
   (on more than `maxDfRatio` of the items), `incoherent` (the items holding the phrase are not alike
-  without it), `dropped` (a hub chosen and then left on fewer than `minDf` items), `notChosen` (a hub at
-  the bar that no item chose); when none applies, `noRecurring` (no candidate phrase is on another item)
-  or `noCandidate` (the text has no candidate phrase); with discovery off, `noDiscovery`.
+  without it), `functionWord` (phrases holding a function word, refused whatever their score),
+  `ignored` (phrases the overrides `ignore`), `dropped` (a hub chosen and then left on fewer than
+  `minDf` items), `notChosen` (a hub at the bar that no item chose); when none applies, `noRecurring`
+  (no candidate phrase is on another item) or `noCandidate` (the text has no candidate phrase); with
+  discovery off, `noDiscovery`. `queued`, `functionWord` and `ignored` are from 2026-11-04; a report
+  without them is read as before.
 - `candidates` lists every candidate phrase in each group with its numbers, spelled as the item writes
-  it: `{phrase, sourceRatio}` under and below the bar (`attached` says whether a below-bar hub was
-  attached), `{phrase, items, df}` for near-copies, `{phrase, df, of}` too common, `{phrase, df,
-  coherence, bar}` incoherent. `single` counts the phrases on this item alone. `why` names at most
-  eight phrases per sentence and says how many more there are.
+  it: `{phrase, score, sourceRatio?}` queued, `{phrase, sourceRatio}` under and below the bar
+  (`attached` says whether a below-bar hub was attached), `{phrase, items, df}` for near-copies,
+  `{phrase, df, of}` too common, `{phrase, df, coherence, bar}` incoherent, `{phrase, df}` function
+  words and ignored. `single` counts the phrases on this item alone. `why` names at most eight phrases
+  per sentence and says how many more there are.
 
 The reasons come from `rtz-discover --report FILE` (rtz-build writes it as `discover.report.json` when
 discovery runs, and reads it only then): `{schema: "rosetta-tagz/discover-report@1", bar, floor, minDf,
-maxDfRatio, items, untagged: {<item key>: {members[], candidates, single, nearCopy[], tooCommon[],
-incoherent[], underFloor[], underBar[], dropped[], notChosen[]}}}`, one entry for every item no tag-system
-tagged and no hub at or above the bar reached. `members` lists every record key of the same article. The
+maxDfRatio, items, queue, untagged: {<item key>: {members[], candidates, single, queued[], functionWord[],
+ignored[], nearCopy[], tooCommon[], incoherent[], underFloor[], underBar[], dropped[], notChosen[]}}}`, one
+entry for every item no tag-system tagged and no hub at or above the bar reached (`queue` says whether
+the run queued instead of attaching). `members` lists every record key of the same article. The
 report is a reading of what discovery measured; it changes no record (the records rtz-discover writes are
 the same with or without `--report`). The report's file name and the reason codes are provisional. A
 failure reading either file is one line on stderr and `build.json` without `untagged`; it never fails
 the build.
+
+## The queue (`rtagz-queue.json`, discover `"queue"`)
+
+Since 2026-11-04 (issue #32). rtz-build's `discover` has three states: `true` attaches what discovery
+finds, `false` runs no discovery, and `"queue"` runs it and attaches nothing: every hub that would have
+been attached is written to the queue file for a human to choose from. The file is `queue` in the
+config, else `rtagz-queue.json` beside the overrides file (the file a candidate is moved into), else in
+OUTDIR with no overrides. Names provisional.
+
+```
+{ schema: "rosetta-tagz/queue@1", built, bar, floor,
+  candidates[]: { label, score, sourceRatio?, df, items[]: {key, title}, why } }   // highest score first
+```
+
+`label` is the spelling the text has; `score` the highest any item gave it (the one that would have
+chosen it: tf, idf, the bigram boost and coherence); `sourceRatio` as on a record (absent with nothing
+to compare with); `df` the items counted (near-copies once); `items` every item it would have been
+attached to; `why` the sentence its records would have carried. A candidate under the bar but at or
+above the floor is listed with its ratio, and its `why` says so. The gate applies: no function word is
+queued. The queue is rewritten on every build; it is a reading of this corpus, never a decision.
+
+**Choosing a candidate.** Add its label to the overrides file's `accept` list, by hand or with
+`rtz-override accept <label>`, and rebuild: discovery then attaches that phrase to every item whose
+text holds it, spelled as you wrote it, with no bar to clear (above, "Accepted phrases"), in any
+discover mode, and it leaves the queue. To keep one out, `rtz-override ignore <label>`: it is refused
+(reason `ignored`) and leaves the queue too. `build.json` carries `discover` (the mode that ran) and,
+with `"queue"`, `queue: {path, candidates}`; the untagged report says of each item what is queued for
+it (reason `queued`). The record stream of a queue build holds only the accepted phrases' records, so
+rtz-stone, rtz-emerge and rtz-universe see no other discovered tag.
 
 ## SKOS serialization (`rtz-skos`)
 

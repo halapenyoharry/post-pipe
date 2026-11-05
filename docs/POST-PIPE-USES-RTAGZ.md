@@ -22,7 +22,7 @@ rosetta-tagz runs for a site only when that site's own `settings.json` has an `r
 ```json
 "rtagz": {
   "enabled": true,
-  "discover": true,
+  "discover": true,                   // true | "queue" | false
   "emerge": true,
   "overrides": "rtagz-overrides.json",
   "ledger": "rtagz-ids.json",
@@ -38,7 +38,7 @@ What a site can set, all in that block:
 | key | default | what it does |
 |---|---|---|
 | `enabled` | `false` | turns rosetta-tagz on for this site |
-| `discover` | `false` | proposes tagz for items no source tagged, from phrases that recur across items (`rtz-discover`); a site of untagged wire items needs it |
+| `discover` | `false` | proposes tagz for items no source tagged, from phrases that recur across items (`rtz-discover`); a site of untagged wire items needs it. Three states since 2026-11-04: `true` attaches what it finds; `"queue"` finds the same and attaches none, writing the candidates to the queue file (below) for the site's owner to choose from; `false` runs no discovery. A phrase holding a function word (`onto`, `roughly`, `allowing`; rosetta-tagz's `lib/stopwords.js`) is never proposed in either state; the overrides file's `ignore` list adds words, and its `accept` list takes candidates from the queue |
 | `emerge` | `true` | lets an item earn a tag from its text, against the concepts `rtz-stone` made (`rtz-emerge`) |
 | `overrides` | `rtagz-overrides.json` | the site's own decisions, in rosetta-tagz's overrides format, relative to the site; absent is fine. Its `config` key reaches `rtz-stone` only (below) |
 | `ledger` | `rtagz-ids.json` | the ids file, where `rtz-stone` keeps concept ids from one build to the next, relative to the site. Worth tracking in the site's git |
@@ -67,7 +67,8 @@ These exist in rosetta-tagz, but nothing a site writes reaches them today. Nothi
 | `records.jsonl`, `overrides.json`, `rtz.config.json` | the cache folder | post-pipe, before the run |
 | `stone.json`, `records.discovered.jsonl`, `discover.report.json` *(provisional)*, `records.all.jsonl`, `universe.json`, `skos.jsonld`, `skos.ttl`, `build.json` | the cache folder | rosetta-tagz's stages |
 | `rtagz-ids.json` | the site folder (setting `ledger`) | `rtz-stone`, every build |
-| `rtagz-overrides.json` | the site folder (setting `overrides`) | the site's owner; the engine only reads it |
+| `rtagz-overrides.json` | the site folder (setting `overrides`) | the site's owner; the engine only reads it. Its `accept` list *(provisional)* holds the candidates taken from the queue, its `ignore` list the phrases discovery must refuse |
+| `rtagz-queue.json` *(provisional)* | the site folder, beside the overrides file | `rtz-discover`, on every build whose `discover` is `"queue"`: `{schema, built, bar, floor, candidates[]: {label, score, sourceRatio?, df, items[]: {key, title}, why}}`, highest score first (rosetta-tagz FORMATS.md, "The queue"). A reading of this build, rewritten each time; the decision is the overrides file. Without a site root the queue lands beside the cache folder's copy of the overrides instead |
 | `skos.jsonld`, `skos.ttl` | the site's `_site/`, beside `feed.json` | `generate-index.js` copies them from the cache when this build wrote them, and removes ones an earlier build left |
 
 Before each run post-pipe removes the cache folder's SKOS files, since `rtz-build` never clears its output folder: a SKOS file found there afterwards is this build's.
@@ -107,13 +108,14 @@ then one tag record per entry of the item's `tags`, in order, as written:
   "overrides": "overrides.json",
   "emerge": true,
   "discover": true,
+  "queue": "/abs/path/to/site/rtagz-queue.json",
   "ledger": "/abs/path/to/site/rtagz-ids.json",
   "conceptSchemes": [{ "id": "…", "path": "/abs/path" }],
   "skos": { "base": "…", "lang": "en" }
 }
 ```
 
-`emerge` and `discover` copy the site's settings; `ledger` is the site's ids file made absolute; `conceptSchemes` and `skos` are written only when the site sets them.
+`emerge` and `discover` copy the site's settings (`discover` as `true`, `"queue"` or `false`); `ledger` is the site's ids file made absolute; `queue`, the site's queue file made absolute, is written only with `"queue"` and a site root; `conceptSchemes` and `skos` are written only when the site sets them.
 
 Never run a cache folder's `rtz.config.json` by hand: it writes the ids file into the site.
 
@@ -128,14 +130,14 @@ Run from `src/lib/rtagz.js` with `child_process.spawn` on post-pipe's own `proce
 | stage | program | reads | writes |
 |---|---|---|---|
 | ingest | `rtz-ingest jsonl` | `records.jsonl` | `records.jsonl` again (the same records re-serialized: compare parsed objects, never bytes) |
-| discover (when `discover`) | `rtz-discover --report` | `records.jsonl` | `records.discovered.jsonl`, and `discover.report.json` *(provisional)*: what became of each candidate phrase of every untagged item |
+| discover (when `discover`) | `rtz-discover --report --overrides`, and `--queue` with `"queue"` | `records.jsonl`, the overrides | `records.discovered.jsonl` (with `"queue"`: the records plus only the accepted phrases' tagz), `discover.report.json` *(provisional)*: what became of each candidate phrase of every untagged item, and with `"queue"` the site's queue file |
 | stone | `rtz-stone --ledger` | the records, the overrides | `stone.json`, and the site's ids file |
 | emerge (when `emerge`) | `rtz-emerge` | `stone.json`, the records | `records.all.jsonl` |
 | universe | `rtz-universe` | `stone.json`, the records | `universe.json` |
 | skos (unless `skos: false`) | `rtz-skos` | `universe.json` | `skos.jsonld`, `skos.ttl`; a failure is one line, `rtz-build: skos files not written (…)`, and the build goes on |
 | view | `rtz-view` | | skipped (`--no-view`); post-pipe has its own viewer |
 
-Last, `rtz-build` writes `build.json`: `built`, `config`, `stages[]` (name, program, ms), `ledger` (path, minted, reused, retired, splits, merges, this build's events) and `untagged` (below).
+Last, `rtz-build` writes `build.json`: `built`, `config`, `stages[]` (name, program, ms), `discover` (the state that ran), `queue` (`{path, candidates}`, with `"queue"`), `ledger` (path, minted, reused, retired, splits, merges, this build's events) and `untagged` (below).
 
 ## What post-pipe reads back
 
@@ -149,7 +151,7 @@ Two files, `universe.json` and `build.json`, from `runRtagzPhase` in `src/lib/rt
 untagged: { bar, count, none, items[]: { key, source, id, title, reason, reasons[], why[], under[], candidates } }
 ```
 
-every item that ends with no tag shown at the build's bar (`discover.sourceCoherenceRatio`), with its tagz under the bar (`under`, each `{concept, label, origin, sourceRatio}`), the reasons as codes (`underBar`, `underFloor`, `nearCopy`, `tooCommon`, `incoherent`, `dropped`, `notChosen`, `noRecurring`, `noCandidate`, `noDiscovery`; provisional) and as sentences (`why`), and every candidate phrase grouped by what became of it.
+every item that ends with no tag shown at the build's bar (`discover.sourceCoherenceRatio`), with its tagz under the bar (`under`, each `{concept, label, origin, sourceRatio}`), the reasons as codes (`underBar`, `queued`, `underFloor`, `nearCopy`, `tooCommon`, `incoherent`, `functionWord`, `ignored`, `dropped`, `notChosen`, `noRecurring`, `noCandidate`, `noDiscovery`; provisional; the three added 2026-11-04 are `queued`, what the queue holds for the item, `functionWord` and `ignored`) and as sentences (`why`), and every candidate phrase grouped by what became of it (`candidates.queued` lists each queued one with its score).
 
 **The join.** Each post-pipe item is looked up in `universe.items` by `<source>::<id>`. If absent, rosetta-tagz folded it into another system's copy of the same article, and post-pipe finds the copy by the canonical url (hostname lower-cased without `www.`, path without a trailing slash, no query, no fragment, lower-cased) or, with no url, by the folded title when it is 24 characters or longer. A folded item gets the union of both systems' tagz. An item still not found keeps its tagz and is counted as `unjoined`.
 
@@ -173,6 +175,7 @@ Nothing below is written when rosetta-tagz is off, skipped or failed.
 
   `prefLabel`, `wasDerivedFrom`, `wasGeneratedBy` and `sourceRatio` only where rosetta-tagz gave them; an explicit tag's `why` is `null`.
 - An item `build.json` lists as untagged also gets one reference `{"type":"untagged","why":[…],"reason":"…","reasons":[…],"under":[…]}` *(the type name is provisional)*, so its own reference list says why it shows no tag. An older note of that type is replaced on every build. Nothing is forced onto the item: it keeps exactly the tagz rosetta-tagz gave, under the bar or none.
+- An item that ends with no tagz at all (`tags` empty) also carries `untaggedBecause` *(provisional, 2026-11-04)*, one line from the entry's reason codes, its queued candidates and the site's `discover` and `emerge` switches (`src/lib/untaggedBecause.js`): `source gave none, discovery off`; `source gave none, candidates queued (N)`; `source gave none, nothing recurred` (no phrase of its text is on a second distinct item: `noRecurring`, `noCandidate`, `nearCopy`); `emerge found no concept` (phrases recurred and discovery refused every one, and emergence matched nothing); or, with `emerge` off in that last case, `source gave none, every phrase refused`. An older line is replaced on every build; a tagged item carries none. The reader panel shows the line in its tag row where the chips would be, as plain text; the card on the canvas does not change. A site without rosetta-tagz carries no such line.
 
 **Edges**
 
@@ -206,7 +209,8 @@ Each container whose tag rosetta-tagz resolved carries `concept` *(provisional)*
                "candidates": {}}], "none": 5},
   "containers": {"act-1": "c_act_1"},
   "external": {},
-  "ledger": {"minted": 0, "reused": 191, "retired": 0}
+  "ledger": {"minted": 0, "reused": 191, "retired": 0},
+  "queue": {"path": "/abs/path/to/site/rtagz-queue.json", "candidates": 23}
 }
 ```
 
@@ -215,7 +219,7 @@ Each container whose tag rosetta-tagz resolved carries `concept` *(provisional)*
 - `relationList`: the `skos: true` relations between two of rosetta-tagz's own concepts, each pair once.
 - `untagged`: `count` is the post-pipe items listed (a folded article names every item folded into it), `none` those with no tag at any ratio, `bar` the build's bar. A viewer set at a ratio v shows a listed card's tag again once one of its `under` ratios is at or above v, without a rebuild.
 - `containers` *(provisional)*: each container tag resolved to its concept id.
-- `relations`, `relationList`, `mappings`, `untagged`, `containers`, `external` and `ledger` are written only when there is something in them.
+- `relations`, `relationList`, `mappings`, `untagged`, `containers`, `external` and `ledger` are written only when there is something in them; `queue` *(provisional)* only when the build queued, as `rtz-build` reports it.
 
 ## What the viewer does with it
 
@@ -225,6 +229,7 @@ Each container whose tag rosetta-tagz resolved carries `concept` *(provisional)*
 - **Hide tagz on fewer than N cards** (preference `minTagPieces`).
 - **Relations**: choosing a tag draws thin lines to its five strongest relatives, with a control for the rest; lines to tagz folded into another bubble go to that bubble unless "Lines to folded tagz" says to leave them out (preference `foldedRelatives`).
 - **Hover**: a card-to-tag edge shows its role, its why and the PROV pair ("derived from …", "generated by …"); a relation line shows its type, weight, why and the PROV pair (`src/lib/provenance.js`).
+- **A card with no tagz** says why in the reader panel's tag row, where the chips would be: the `untaggedBecause` line above, plain text (`src/components/ReaderPanel/ReaderPanel.jsx`, `untaggedBecauseOf` in `src/lib/untaggedBecause.js`). Nothing on the canvas changes.
 - **A tag's detail**, shown beside the bubble while it is hovered or chosen (`tagFormsLines` in `src/lib/tagForms.js`): what each system writes, which part of the ranking named it, its label in each scheme (the site's own scheme named by the site's title), each mapping with its type and weight, and, for a bubble standing for several tagz at the chosen depth, the tagz it stands for.
 
 ## Checking a build
@@ -237,14 +242,14 @@ Each container whose tag rosetta-tagz resolved carries `concept` *(provisional)*
 
 ## Tests
 
-- `test/rtagz.test.js`: record writing, overrides merging with container pins, the write-back (tagz, references, edges' attrs, `feed._rtagz`), the untagged report and the untagged note on a card, the skip paths (disabled, missing engine, non-zero exit, timeout, container guard), the old names, the SKOS settings pass-through, and the real engine when `rosetta-tagz/bin/rtz-build` (or `POSTPIPE_RTAGZ_ENGINE`) exists, skipped otherwise.
+- `test/rtagz.test.js`: record writing, overrides merging with container pins, the write-back (tagz, references, edges' attrs, `feed._rtagz`), the untagged report, the untagged note and the `untaggedBecause` line on a card, the three `discover` states in the config and the queue file in the site (the real engine in queue mode, skipped without it), the skip paths (disabled, missing engine, non-zero exit, timeout, container guard), the old names, the SKOS settings pass-through, and the real engine when `rosetta-tagz/bin/rtz-build` (or `POSTPIPE_RTAGZ_ENGINE`) exists, skipped otherwise.
 - `test/containers.test.js`: containment by concept through the four places that decide it. `test/buildEdges.test.js`, `test/graphColors.test.js` and `test/readerNav.test.js` pin the tag-string path and do not know rosetta-tagz exists.
-- `test/relationEdges.test.js`, `test/schemeLabels.test.js`, `test/sourceRatio.test.js`, `test/tagForms.test.js`, `test/tagNetwork.test.js`, `test/provenance.test.js`, `test/rtagzReport.test.js`, `test/rtagzLabelsCheck.test.js`: the pieces above.
+- `test/relationEdges.test.js`, `test/schemeLabels.test.js`, `test/sourceRatio.test.js`, `test/tagForms.test.js`, `test/tagNetwork.test.js`, `test/provenance.test.js`, `test/rtagzReport.test.js`, `test/rtagzLabelsCheck.test.js`, `test/untaggedBecause.test.js`: the pieces above.
 - rosetta-tagz's own suite covers its stages, `rtz-skos` and the untagged report (`rosetta-tagz/test/`).
 
 ## Not in this seam yet
 
 - Published vocabularies: the format, `rtz-vocab`, `rtz-map` (on hold).
 - Discovery and emergence settings a site can set (above).
-- Feeding a reader's decisions in the viewer back into the site's overrides file.
+- Feeding a reader's decisions in the viewer back into the site's overrides file. The queue is the first half of that: the viewer shows nothing of `rtagz-queue.json` yet, and a candidate is accepted by editing the overrides file.
 - Relaxing the container guard now that containment can follow concept ids.

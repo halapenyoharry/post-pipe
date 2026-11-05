@@ -9,11 +9,13 @@
 // (`--report`), which says what became of each candidate phrase of the item's text; without one
 // (discovery off) the only reason given is that no tag-system tagged it.
 
-export const UNTAGGED_REASONS = ['underBar', 'underFloor', 'nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen', 'noRecurring', 'noCandidate', 'noDiscovery'];
+export const UNTAGGED_REASONS = ['underBar', 'queued', 'underFloor', 'nearCopy', 'tooCommon', 'incoherent', 'functionWord', 'ignored', 'dropped', 'notChosen', 'noRecurring', 'noCandidate', 'noDiscovery'];
 
 // at most eight named in a sentence; the full lists are in `candidates`
 const list = (xs, f) => xs.slice(0, 8).map(f).join(', ') + (xs.length > 8 ? `, and ${xs.length - 8} more` : '');
-const ratio = (x) => `${x.phrase ?? x.label} ${x.sourceRatio}`;
+const ratio = (x) => (typeof x.sourceRatio === 'number' ? `${x.phrase ?? x.label} ${x.sourceRatio}` : `${x.phrase ?? x.label}`);
+// a report written before a group existed (functionWord, ignored, queued since 2026-11-04) lacks the key
+const group = (fate, k) => (Array.isArray(fate[k]) ? fate[k] : []);
 
 // universe: universe.json; report: rtz-discover's report or null; bar: the source coherence ratio the
 // build was made at (null when discovery did not run: then every tag shows).
@@ -45,32 +47,45 @@ export function untaggedReport(universe, report, bar) {
     } else if (fate) {
       // below-bar candidates the build did not attach (no item chose them) are named here; the ones
       // it did attach are the `under` tags above
-      const unattached = fate.underBar.filter((x) => !x.attached);
+      const unattached = group(fate, 'underBar').filter((x) => !x.attached);
       if (unattached.length) {
         if (!reasons.includes('underBar')) reasons.push('underBar');
         why.push(`phrases under the ${bar}× bar that no item chose: ${list(unattached, ratio)}`);
       }
-      if (fate.underFloor.length) {
+      // the queue: what would have tagged it, listed for a human instead of attached
+      if (group(fate, 'queued').length) {
+        reasons.push('queued');
+        why.push(`candidates queued, none a tag until accepted in the overrides: ${list(fate.queued, ratio)}`);
+      }
+      if (group(fate, 'underFloor').length) {
         reasons.push('underFloor');
         why.push(`phrases under the ${report.floor ?? bar}× floor: ${list(fate.underFloor, ratio)}`);
       }
-      if (fate.nearCopy.length) {
+      if (group(fate, 'nearCopy').length) {
         reasons.push('nearCopy');
         why.push(`phrases that recur only in near-copies of one story, counted once: ${list(fate.nearCopy, (x) => `${x.phrase} (${x.items} items, ${x.df} counting near-copies once)`)}`);
       }
-      if (fate.tooCommon.length) {
+      if (group(fate, 'tooCommon').length) {
         reasons.push('tooCommon');
         why.push(`phrases on too many items (over ${report.maxDfRatio} of ${report.items}): ${list(fate.tooCommon, (x) => `${x.phrase} (${x.df})`)}`);
       }
-      if (fate.incoherent.length) {
+      if (group(fate, 'incoherent').length) {
         reasons.push('incoherent');
         why.push(`phrases whose items are not alike without them: ${list(fate.incoherent, (x) => `${x.phrase} (${x.coherence}, under ${x.bar})`)}`);
       }
-      if (fate.dropped.length) {
+      if (group(fate, 'functionWord').length) {
+        reasons.push('functionWord');
+        why.push(`function words, never a tag whatever their score: ${list(fate.functionWord, (x) => `${x.phrase} (${x.df})`)}`);
+      }
+      if (group(fate, 'ignored').length) {
+        reasons.push('ignored');
+        why.push(`phrases the site's overrides ignore: ${list(fate.ignored, (x) => `${x.phrase} (${x.df})`)}`);
+      }
+      if (group(fate, 'dropped').length) {
         reasons.push('dropped');
         why.push(`hubs chosen and then left on fewer than ${report.minDf} items: ${list(fate.dropped, (x) => x.phrase)}`);
       }
-      if (fate.notChosen.length) {
+      if (group(fate, 'notChosen').length) {
         reasons.push('notChosen');
         why.push(`hubs at the bar that no item chose: ${list(fate.notChosen, ratio)}`);
       }
@@ -94,7 +109,7 @@ export function untaggedReport(universe, report, bar) {
       entry.candidates = {
         phrases: fate.candidates,
         single: fate.single,
-        ...Object.fromEntries(['underBar', 'underFloor', 'nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen'].filter((k) => fate[k].length).map((k) => [k, fate[k]])),
+        ...Object.fromEntries(['queued', 'underBar', 'underFloor', 'nearCopy', 'tooCommon', 'incoherent', 'functionWord', 'ignored', 'dropped', 'notChosen'].filter((k) => group(fate, k).length).map((k) => [k, fate[k]])),
       };
     }
     items.push(entry);
