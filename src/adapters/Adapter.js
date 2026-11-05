@@ -10,9 +10,8 @@
 //
 // Implementations live alongside this file:
 //   - LocalFolderAdapter.js   (the user's content folder, e.g. items/)
-//   - RssAdapter.js           (future)
-//   - AtomAdapter.js          (future)
-//   - JsonFeedAdapter.js      (future)
+//   - RssAdapter.js, AtomAdapter.js, JsonFeedAdapter.js (fetched feeds)
+//   - PageAdapter.js, PageListAdapter.js (one page; a local list of pages)
 
 /**
  * @typedef {Object} AdapterConfig
@@ -40,6 +39,9 @@
  *   home_page_url — optional; for color detection in a later step
  *   favicon      — optional
  *   icon         — optional
+ *   feedUpdated  — optional, a fetched feed's own date for itself as ISO
+ *                  time (RSS lastBuildDate, else pubDate; Atom updated), or
+ *                  null; the aggregator puts it on the source in feed.json
  */
 
 /**

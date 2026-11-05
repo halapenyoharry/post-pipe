@@ -4,14 +4,17 @@
     <title>Example site</title>
   </head>
   <body>
-    <outline text="ScienceDaily" title="ScienceDaily" type="rss" xmlUrl="https://www.sciencedaily.com/rss/all.xml"/>
-    <outline text="ProPublica" title="ProPublica" type="rss" xmlUrl="https://www.propublica.org/feeds/propublica/main"/>
+    <outline text="ScienceDaily" title="ScienceDaily" type="rss" xmlUrl="https://www.sciencedaily.com/rss/all.xml" savedCopy="saved/sciencedaily.json"/>
+    <outline text="ProPublica" title="ProPublica" type="rss" xmlUrl="https://www.propublica.org/feeds/propublica/main" savedCopy="saved/propublica.json"/>
     <!-- One outline per source. type says what xmlUrl is: rss, atom or json
          (a feed; left off, a feed is inferred), local (a folder of pieces),
          page (one article's address, read at build as one item), or pages
          (a local text file of such addresses, one per line). The example
          reads two public feeds, so anyone who builds it sees a graph
          without bringing data of their own; the build fetches them, and
-         nothing else, over the network. -->
+         nothing else, over the network. savedCopy names a copy of the feed
+         kept in the site (relative to the site), shown only when a build
+         cannot fetch the feed; a build with the save-copies flag refreshes
+         it, and no other build writes it (see README.md). -->
   </body>
 </opml>

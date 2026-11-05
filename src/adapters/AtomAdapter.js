@@ -33,6 +33,9 @@ async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
       home_page_url: alternateLink(feed.link) || null,
       favicon: feed.icon || null,
       icon: feed.logo || feed.icon || null,
+      // The feed's own date for itself: the feed-level <updated>; null when
+      // it gives none that reads as a date.
+      feedUpdated: parseDate(extractText(feed.updated)) || null,
     },
   };
 }

@@ -1,6 +1,6 @@
 # post-pipe Architecture & Design Decisions
 
-**Last updated:** 2026-11-04
+**Last updated:** 2026-11-05
 
 ---
 
@@ -266,7 +266,9 @@ The slug is frozen in the site's cards ledger (`settings.cards.ledger`, `cards.j
 
 The D3 graph fetches `feed.json` at load and derives its shape client-side. `feed.json` is the single source of truth; the graph is a view.
 
-External feeds and the site's own local folder are declared in `feeds.opml` (or the path in `settings.json` `feeds_opml_path`), parsed by `src/lib/opml.js`. Each outline entry is routed by `generate-index.js` and `src/aggregator.js` to its source adapter (`src/adapters/LocalFolderAdapter.js`, `src/adapters/RssAdapter.js`, `src/adapters/AtomAdapter.js`, `src/adapters/JsonFeedAdapter.js`, or, for one article's page and a local list of pages, `src/adapters/PageAdapter.js` and `src/adapters/PageListAdapter.js`, which read a page through `src/lib/pageExtract.js`), with feed colors cached in `.feed-cache/colors.json` and the last good copy of each fetched feed or page kept in `.feed-cache/last-good/` so external items appear as peer nodes in the graph alongside the local corpus.
+External feeds and the site's own local folder are declared in `feeds.opml` (or the path in `settings.json` `feeds_opml_path`), parsed by `src/lib/opml.js`. Each outline entry is routed by `generate-index.js` and `src/aggregator.js` to its source adapter (`src/adapters/LocalFolderAdapter.js`, `src/adapters/RssAdapter.js`, `src/adapters/AtomAdapter.js`, `src/adapters/JsonFeedAdapter.js`, or, for one article's page and a local list of pages, `src/adapters/PageAdapter.js` and `src/adapters/PageListAdapter.js`, which read a page through `src/lib/pageExtract.js`), with feed colors cached in `.feed-cache/colors.json`, so external items appear as peer nodes in the graph alongside the local corpus.
+
+A fetched feed or page whose fetch fails shows its cards from a copy (`src/adapters/lastGoodCopy.js`, 2026-11-05): the engine's last good copy, which every good fetch leaves in the engine's `.feed-cache/last-good/` on the machine that builds, or the site's saved copy, a file in the site's folder that the outline names with `savedCopy` (provisional) and the site ships, as `examples/site/saved/` does. Both are `{ url, fetchedAt, body }`; the build takes the newer by `fetchedAt` (`copiesNewestFirst`), and the source is marked `stale` with `copyDate`, `copyFrom` (`site` or `engine`) and `error`. An ordinary build never writes the site's copy; `node generate-index.js --save-copies` writes it from that build's good fetch. Every source in `_sources` also says when its items were taken in: a fetched one `fetchedAt` (this build's fetch, or the copy's) and `feedUpdated` (the feed's own date: RSS `lastBuildDate`, else the channel's `pubDate`; Atom's `updated`; null for JSON Feed and for a page), a local folder or a list of pages `readAt`. The top bar's source pill shows these in a popover on a mouse's hover, the keyboard's focus or a finger's dwell (`FeedPill` in `src/components/FeedZ/FeedZ.jsx`, its lines from `sourceLines` in `src/lib/sourceStatus.js`).
 
 The top bar's `+` (`AddPill` in `src/components/FeedZ/FeedZ.jsx`) asks `src/lib/feedAutodiscovery.js` what a pasted address is (`discoverSource`: a feed, a page naming no feed, or nothing readable) and shows the line to add from `src/lib/addFeedLine.js`: the feed line as ever, or a `type="page"` line.
 
