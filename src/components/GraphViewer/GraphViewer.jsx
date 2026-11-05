@@ -46,6 +46,7 @@ import { tagReferences } from '../../lib/tagReferences';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
 import { listenInCard, toggleListen, stopListening } from '../../lib/listenInCard';
+import { PREF as TAG_SHOW_PREF, showTagsChosen } from '../../lib/tagPills';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -707,6 +708,16 @@ export function GraphViewer({
       ...(degreePenalty ? { degreePenalty } : {}),
     });
   };
+  // Whether the tag pills are drawn (settings.graph.tag.show, default false,
+  // and the preference showTags, null for the site's own; lib/tagPills.js).
+  // Hidden pills only stop being drawn: the tag nodes stay in the simulation.
+  const showTagsNow = () => {
+    const vs = viewStateRef.current;
+    return showTagsChosen(vs && vs.preference ? vs.preference(TAG_SHOW_PREF) : null, { graph: GS });
+  };
+  const applyTagPills = () => {
+    if (svgRef.current) svgRef.current.classed('tags-hidden', !showTagsNow());
+  };
   // Readers' contributions (settings.contributions): counted on the cards,
   // and their connections drawn as their own edge layer, the readers
   // dimension, off until the reader turns it on.
@@ -823,6 +834,7 @@ export function GraphViewer({
       if (paletteUpdateRef.current) paletteUpdateRef.current();
       if (tightnessUpdateRef.current) tightnessUpdateRef.current();
       if (edgeWeightsUpdateRef.current) edgeWeightsUpdateRef.current();
+      applyTagPills();
       // A colour the reader gives a feed reaches its tag nodes as well, and
       // the pieces per tag chosen in the panel hides or shows tags.
       if (svgRef.current && cardsLayerRef.current) {
@@ -894,6 +906,7 @@ export function GraphViewer({
       .style('pointer-events', 'all');
 
     svgRef.current = svg;
+    applyTagPills();
 
     const defs = svg.append('defs');
     defs.append('marker')
@@ -3307,6 +3320,14 @@ export function GraphViewer({
       return sn?.containerColor || 'var(--gv-accent, #d4af37)';
     };
 
+    // An edge with a tag node at either end: not drawn while the pills are
+    // hidden (.tags-hidden), unless that pill shows (paintHighlight).
+    const touchesTag = (l) => {
+      const s = nodeBySlug.get(endId(l.source));
+      const t = nodeBySlug.get(endId(l.target));
+      return Boolean((s && s.type === 'tag') || (t && t.type === 'tag'));
+    };
+
     // The hit area sits under the containers layer, so a container's title
     // always wins a tap over an edge passing near it; cards are above both.
     const linkHits = g.insert('g', '.containers-layer')
@@ -3314,7 +3335,7 @@ export function GraphViewer({
       .selectAll('.link-hit')
       .data(data.links)
       .enter().append('path')
-      .attr('class', 'link-hit')
+      .attr('class', (d) => (touchesTag(d) ? 'link-hit link-to-tag' : 'link-hit'))
       .attr('fill', 'none')
       .style('stroke', 'transparent')
       .style('stroke-width', '16px')
@@ -3329,6 +3350,7 @@ export function GraphViewer({
         'link',
         d.layer ? `link-${d.layer}` : '',
         d.role ? `link-role-${d.role}` : '',
+        touchesTag(d) ? 'link-to-tag' : '',
       ].filter(Boolean).join(' '))
       .attr('fill', 'none')
       .attr('data-label', (d) => d.label)
@@ -3349,7 +3371,7 @@ export function GraphViewer({
     const linkGhosts = g.selectAll('.link-ghost')
       .data(data.links)
       .enter().insert('path', '.link-sequence-pulse')
-      .attr('class', 'link-ghost')
+      .attr('class', (d) => (touchesTag(d) ? 'link-ghost link-to-tag' : 'link-ghost'))
       .style('stroke', (d) => linkColor(d));
     const ghostKey = (l) => `${endId(l.source)}>${endId(l.target)}`;
     function redrawGhosts() {
@@ -3473,7 +3495,7 @@ export function GraphViewer({
     const nodes = g.selectAll('.node')
       .data(data.nodes)
       .enter().append('g')
-      .attr('class', 'node');
+      .attr('class', (d) => (d.type === 'tag' ? 'node node-tag' : 'node'));
 
     // Under the selected tag, when it has more relatives than show: +N
     // brings in the rest, -N goes back to the strongest (see Relations
@@ -4305,6 +4327,7 @@ export function GraphViewer({
         nodes.classed('dimmed', false).classed('tag-active', false);
         articleNodes.classed('dimmed', false);
         links.classed('highlighted', false);
+        paintShownPills(null);
         return;
       }
       const id = activeTag;
@@ -4329,6 +4352,22 @@ export function GraphViewer({
         const tid = typeof l.target === 'object' ? l.target.id : l.target;
         return sid === id || tid === id;
       });
+      paintShownPills(new Set([id, ...relationShown.map((r) => r.id)]));
+    }
+    // While the pills are hidden (.tags-hidden), the tag highlighted and the
+    // relatives its lines are drawn to still show (tag-shown), and so do the
+    // edges between a showing pill and a card (link-tag-shown). An edge from
+    // a showing pill to a hidden one stays hidden. shown: tag ids, or null.
+    function paintShownPills(shown) {
+      const on = (nid) => Boolean(shown && shown.has(nid));
+      nodes.classed('tag-shown', (nd) => nd.type === 'tag' && on(nd.id));
+      const linkShown = (l) => {
+        const s = nodeBySlug.get(endId(l.source));
+        const t = nodeBySlug.get(endId(l.target));
+        const ok = (n) => !n || n.type !== 'tag' || on(n.id);
+        return ok(s) && ok(t);
+      };
+      g.selectAll('.link-to-tag').classed('link-tag-shown', linkShown);
     }
     // The tag highlighted, for the page ('graph:tag-changed', detail.id the
     // tag node's id, or null for none): the top bar's tag list marks its row.
@@ -5530,7 +5569,8 @@ export function GraphViewer({
     // The positions go through viewState, so Undo can bring them back.
     const handleResetAll = () => {
       const vs = viewStateRef.current;
-      if (vs && vs.resetLayout) vs.resetLayout();
+      // Showing the tag pills goes back to the site's own too.
+      if (vs && vs.resetLayout) vs.resetLayout({ prefs: [TAG_SHOW_PREF] });
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
       focusNode(null);
       hideEdgeLabel();

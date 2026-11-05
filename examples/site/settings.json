@@ -327,7 +327,9 @@
       "maxWidth": 150,
       "maxLines": 3,
       "cornerRadius": 9,
-      "opacity": 0.7
+      "opacity": 0.7,
+      "show": false,
+      "_show_note": "Whether the tagz are drawn on the graph as pills (src/lib/tagPills.js). false (default): no pill and no edge to one is drawn, and none takes a tap; the tag nodes stay in the layout and keep pulling, so every card sits where it would with them shown. true draws them. The reader can turn them on or off in the panel (Show tagz on the graph), kept on this device; Reset the view goes back to this. With them hidden, a tag picked in the top bar's tag list still shows its pill, its edges to its cards, and the related tagz its lines go to, while it is picked."
     },
     "timeAxis": {
       "dock": "left",

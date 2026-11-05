@@ -528,13 +528,18 @@ function createViewState(opts = {}) {
       apply((s) => { s.rotation = deg; });
     },
 
-    resetLayout() {
+    // prefs: preference keys the reset also returns to the site's own (one
+    // undo step with the rest), e.g. ['showTags'].
+    resetLayout({ prefs = [] } = {}) {
       update((s) => {
         s.nodes = {};
         s.containers = {};
         s.rotation = 0;
         s.layout = 'force';
         s.view = null;
+        if (s.prefs && typeof s.prefs === 'object') {
+          for (const k of prefs) delete s.prefs[k];
+        }
       });
       gestureBase = null;
     },

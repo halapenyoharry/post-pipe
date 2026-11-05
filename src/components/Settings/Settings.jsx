@@ -20,6 +20,7 @@ import {
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { PREF as MIN_PIECES_PREF, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
+import { PREF as TAG_SHOW_PREF, showTagsChosen, showTagsPrefFor } from '../../lib/tagPills';
 import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
 import {
   PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText, travelLength, ratioAt, positionOf,
@@ -512,6 +513,18 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           onChange={(v) => viewState.setPreference(DEGREE_PENALTY_PREF, v === siteEw.degreePenalty ? null : v)}
         />
       )}
+      {W === 'graph' && hasTagNodes(feedData, S && S.graph) && (
+        // Whether the tag pills are drawn (settings.graph.tag.show, the
+        // preference showTags, null for the site's own; lib/tagPills.js).
+        // Hidden, they still hold their cards where they are.
+        <Switch
+          on={showTagsChosen(viewState.preference(TAG_SHOW_PREF), S)}
+          onChange={(v) => viewState.setPreference(TAG_SHOW_PREF, showTagsPrefFor(v, S))}
+          label="Show tagz on the graph"
+          hint="Off, the cards still sit by the tagz they share."
+          data-pref={TAG_SHOW_PREF}
+        />
+      )}
       {minPieces.max > 1 && (
         // The label carries the value, so it has a line of its own, and the
         // count beside the slider keeps one width: dragging moves the thumb
@@ -624,7 +637,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
       <button
         className={styles.resetBtn}
         data-settings-reset
-        title="Layout, zoom, rotation, open and closed containers, selection and colors, back to how the site starts"
+        title="Layout, zoom, rotation, open and closed containers, selection, showing tagz and colors, back to how the site starts"
         onClick={() => {
           setOpen(false);
           if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);
