@@ -26,6 +26,9 @@ const parser = new XMLParser({
  *   htmlUrl      — optional, the human-readable site URL
  *   folder       — '/'-joined OPML folder path, '' for top level
  *   customColor  — optional, user-defined color override
+ *   savedCopy    — optional, a file the site keeps a copy of this feed in,
+ *                  relative to the site ({ url, fetchedAt, body }), used only
+ *                  when a build's fetch fails (src/adapters/lastGoodCopy.js)
  *   raw          — the original outline attributes (for forward compatibility)
  */
 
@@ -62,6 +65,9 @@ function walk(outlines, folderStack, out) {
         htmlUrl: o['@_htmlUrl'] || null,
         folder: folderStack.join('/'),
         customColor: o['@_customColor'] || null,
+        // A copy of the feed the site ships in its own folder, for a build
+        // whose fetch fails (provisional name).
+        savedCopy: typeof o['@_savedCopy'] === 'string' && o['@_savedCopy'].trim() ? o['@_savedCopy'].trim() : null,
         // How loudly this source renders. Your own corpus and a subscribed
         // firehose are not peers, and nothing in the model said so before —
         // the distinction was falling out of the status field by accident.

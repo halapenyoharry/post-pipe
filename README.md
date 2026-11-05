@@ -14,7 +14,7 @@ post-pipe is also the publishing route for the writing it holds: a piece can go 
 
 ## Sites
 
-post-pipe holds no one's site. A site is its own folder, usually its own repository, with a `settings.json`, a `feeds.opml` naming its sources (RSS, Atom, JSON, a local folder as `local://<path>`, or single pages), and optionally credentials, rtagz overrides and the `rtagz-ids.json` that keeps tag ids stable. `examples/site/` is a complete, annotated site that reads two public feeds, ScienceDaily and ProPublica, so a fresh clone builds it and shows a graph without data of its own; that build fetches those two feeds over the network. The full shape is in `docs/SITES.md`.
+post-pipe holds no one's site. A site is its own folder, usually its own repository, with a `settings.json`, a `feeds.opml` naming its sources (RSS, Atom, JSON, a local folder as `local://<path>`, or single pages), and optionally credentials, rtagz overrides and the `rtagz-ids.json` that keeps tag ids stable. `examples/site/` is a complete, annotated site that reads two public feeds, ScienceDaily and ProPublica, so a fresh clone builds it and shows a graph without data of its own; that build fetches those two feeds over the network, and when it cannot, shows the copy of each the example ships (an outline's `savedCopy` names a feed's saved copy in the site). The full shape is in `docs/SITES.md`.
 
 Each `<outline>` in `feeds.opml` is one source, and its `type` says what its `xmlUrl` is:
 

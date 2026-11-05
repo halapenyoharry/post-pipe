@@ -1,9 +1,11 @@
 // A fetched feed that fails: the build makes one fetch, as ever; when it
 // fails, the feed's cards come from its last good copy (the text of its last
 // fetch that parsed, kept in the engine's .feed-cache/last-good/), and its
-// source in feed.json says so (stale, copyDate, error). With no copy it has
-// no items and carries the error. A feed that loads leaves its source entry
-// exactly as it was. The fetch is stubbed: nothing here touches the network.
+// source in feed.json says so (stale, copyDate, copyFrom, error). With no
+// copy it has no items and carries the error. A feed that loads carries the
+// fields it always did, and since 2026-11-05 when it was fetched (fetchedAt)
+// and the feed's own date (feedUpdated). The site's saved copy is in
+// savedCopy.test.js. The fetch is stubbed: nothing here touches the network.
 
 const { test } = require('node:test');
 const assert = require('node:assert');
@@ -65,7 +67,7 @@ test('the copies live in the engine\'s own .feed-cache, never beside a site', ()
   assert.notStrictEqual(copyFile(URL_A), copyFile('https://feeds.example/b.xml'), 'one file per address');
 });
 
-test('a fetch that parses keeps its text as the feed\'s last good copy; its source entry is as it always was', async () => {
+test('a fetch that parses keeps its text as the feed\'s last good copy; its source entry keeps its fields and adds when it was fetched', async () => {
   const s = scratch();
   try {
     const fetch = stubFetch({ [URL_A]: rss(['one', 'two']) });
@@ -73,9 +75,11 @@ test('a fetch that parses keeps its text as the feed\'s last good copy; its sour
     assert.strictEqual(fetch.calls.length, 1, 'one fetch');
     assert.strictEqual(out.items.length, 2);
     assert.deepStrictEqual(Object.keys(out.sources[0]),
-      ['id', 'title', 'type', 'color', 'home_page_url', 'folder', 'prominence', 'itemCount', 'ok'],
-      'no new fields on a feed that loaded, so its feed.json stays byte for byte as it was');
+      ['id', 'title', 'type', 'color', 'home_page_url', 'folder', 'prominence', 'itemCount', 'ok', 'fetchedAt', 'feedUpdated'],
+      'the fields a loaded feed always had, in their order, then when it was fetched and the feed\'s own date');
     assert.strictEqual(out.sources[0].ok, true);
+    assert.strictEqual(out.sources[0].fetchedAt, '2026-10-29T08:00:00.000Z', 'the same time the copy is dated by');
+    assert.strictEqual(out.sources[0].feedUpdated, null, 'this feed gives no date of its own');
     const copy = readLastGood(URL_A, path.join(s.root, 'last-good'));
     assert.strictEqual(copy.fetchedAt, '2026-10-29T08:00:00.000Z');
     assert.strictEqual(copy.body, rss(['one', 'two']));
@@ -95,6 +99,8 @@ test('a failed fetch: one attempt, then the cards from the last good copy, marke
     assert.strictEqual(src.ok, true, 'its items are in the corpus');
     assert.strictEqual(src.stale, true);
     assert.strictEqual(src.copyDate, '2026-10-29T08:00:00.000Z', 'the date of the copy used');
+    assert.strictEqual(src.copyFrom, 'engine', 'this machine\'s last good copy');
+    assert.strictEqual(src.fetchedAt, '2026-10-29T08:00:00.000Z', 'its cards were fetched when the copy was');
     assert.strictEqual(src.error, 'fetch failed (ECONNREFUSED)');
     assert.strictEqual(src.itemCount, 2);
     // The failed build did not touch the copy.
@@ -125,7 +131,8 @@ test('a failed fetch with no earlier copy: no items, struck through as before, a
     assert.strictEqual(src.ok, false);
     assert.strictEqual(src.itemCount, 0);
     assert.strictEqual(src.error, 'HTTP 503 Service Unavailable');
-    assert.ok(!('stale' in src) && !('copyDate' in src));
+    assert.ok(!('stale' in src) && !('copyDate' in src) && !('copyFrom' in src));
+    assert.strictEqual(src.fetchedAt, null, 'nothing was fetched');
     assert.strictEqual(readLastGood(URL_A, path.join(s.root, 'last-good')), null, 'nothing kept');
   } finally { s.done(); }
 });
