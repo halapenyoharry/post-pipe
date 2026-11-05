@@ -7,26 +7,40 @@ import { loadJSONIfExists } from '../lib/seeds.js';
 
 const usage = `rtz-discover — propose NEW tags for untagged items from phrases that recur in the corpus
 
-usage: rtz-discover [records.jsonl] [--all] [--config FILE] [--report FILE] [-o FILE]
+usage: rtz-discover [records.jsonl] [--all] [--config FILE] [--overrides FILE] [--report FILE] [--queue FILE] [-o FILE]
 
 For tag-systems that share no vocabulary with the others (a news wire with no categories) nothing
 connects. This finds phrases that are distinctive (not on every item) and recurring (at least two
 items), so each one is a hub that actually connects things. Tags get origin "discovered", a low
 weight, and a "why". Run it BEFORE rtz-stone and the discovered phrases join stone.json as ordinary
 evidence, so they can fold into the vocabularies of other tag-systems. Near-copies (one story told
-twice) count as one item; every tag carries its measured sourceRatio; see docs/FORMATS.md.
+twice) count as one item; every tag carries its measured sourceRatio; see docs/FORMATS.md. A phrase
+holding a function word (lib/stopwords.js) is refused whatever its score.
 
-  --all     echo the input records first, so the output can be piped straight into rtz-stone
-  --report  write what became of each candidate phrase of every untagged item no hub at or above the
-            bar lands on (JSON, docs/FORMATS.md "Untagged items"); rtz-build reads it for build.json`;
+  --all        echo the input records first, so the output can be piped straight into rtz-stone
+  --overrides  the site's overrides file: its "ignore" list refuses phrases, its "accept" list attaches
+               them to every item whose text holds them, with no bar to clear (a human chose them)
+  --report     write what became of each candidate phrase of every untagged item no hub at or above the
+               bar lands on (JSON, docs/FORMATS.md "Untagged items"); rtz-build reads it for build.json
+  --queue      the queue: write every hub that would have been attached to FILE (label, score, the items
+               it would tag, why it passed; docs/FORMATS.md "The queue") and attach none of them. Only
+               phrases the overrides "accept" are tags. A human moves a candidate from the queue into
+               "accept" by hand`;
 
-const { values, positionals } = cli('rtz-discover', usage, { all: { type: 'boolean' }, config: { type: 'string' }, report: { type: 'string' }, o: { type: 'string', short: 'o' } });
+const { values, positionals } = cli('rtz-discover', usage, { all: { type: 'boolean' }, config: { type: 'string' }, overrides: { type: 'string' }, report: { type: 'string' }, queue: { type: 'string' }, o: { type: 'string', short: 'o' } });
 try {
   const records = parseJSONL(await readText(positionals[0]), positionals[0] ?? 'stdin');
   const info = {};
-  const found = discover(records, makeConfig(loadJSONIfExists(values.config)), info);
+  const overrides = values.overrides ? loadJSONIfExists(values.overrides) : null;
+  const found = discover(records, makeConfig(loadJSONIfExists(values.config)), info, { queue: Boolean(values.queue), overrides });
   writeOut(toJSONL(values.all ? [...records.filter((r) => r.origin !== 'discovered'), ...found] : found), values.o);
   if (values.report) fs.writeFileSync(values.report, JSON.stringify({ schema: 'rosetta-tagz/discover-report@1', ...info.untagged }) + '\n');
+  if (values.queue) {
+    fs.writeFileSync(values.queue, JSON.stringify({ schema: 'rosetta-tagz/queue@1', built: new Date().toISOString(), ...info.queue }, null, 1) + '\n');
+    log(`rtz-discover: ${info.queue.candidates.length} candidates queued to ${values.queue}, none a tag until accepted`);
+  }
+  const accepted = found.filter((r) => r.wasGeneratedBy?.parameters?.accepted);
+  if (accepted.length) log(`rtz-discover: ${new Set(accepted.map((r) => r.label)).size} phrases accepted from the queue by the overrides (${accepted.length} tags)`);
   log(`rtz-discover: ${found.length} tags on ${new Set(found.map((r) => `${r.source}::${r.item}`)).size} items, ${new Set(found.map((r) => r.label)).size} distinct phrases`);
   const under = found.filter((r) => r.wasGeneratedBy?.parameters?.sourceRatioFloor !== undefined);
   if (under.length) log(`rtz-discover: ${new Set(under.map((r) => r.label)).size} of those phrases (${under.length} tags) are under the ${under[0].wasGeneratedBy.parameters.sourceCoherenceRatio}× bar, admitted by the ${under[0].wasGeneratedBy.parameters.sourceRatioFloor}× floor for a viewer to try lower bars`);

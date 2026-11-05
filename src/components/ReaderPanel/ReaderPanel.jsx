@@ -16,6 +16,7 @@ import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
 import { Contributions } from './Contributions';
 import { nonTagReferences } from '../../corpus/buildEdges';
 import { tagReferences } from '../../lib/tagReferences';
+import { untaggedBecauseOf } from '../../lib/untaggedBecause';
 import { wrapText, provenanceLines } from '../../lib/provenance';
 
 
@@ -915,6 +916,12 @@ function FrontmatterPanel({ article, settings }) {
               title={typeof r.why === 'string' && r.why ? [...wrapText(r.why), ...provenanceLines(r)].join('\n') : undefined}
             >{r.value}</span>
           ))}</>;
+        } else {
+          // A card with no tagz says why, in the build's own words, where
+          // the chips would be (src/lib/untaggedBecause.js): plain text,
+          // not a chip, so it reads as a note and never as a tag.
+          const because = untaggedBecauseOf(article);
+          if (because) value = <span className={styles.fmUntagged} data-untagged-because>{because}</span>;
         }
         break;
       }

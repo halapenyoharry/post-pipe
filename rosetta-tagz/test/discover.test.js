@@ -172,18 +172,20 @@ test('a concept only ever proposed by discovery is flagged, visible to emerge, a
 });
 
 // A newsroom whose items are alike anyway (they share its vocabulary), one untagged newsroom item, a
-// wire with a topic the newsroom also covers, and filler so nothing is everywhere. "instead" sits on
-// five newsroom items and nowhere else; "wildfire" on three newsroom items and both wire items.
+// wire with a topic the newsroom also covers, and filler so nothing is everywhere. "quietly" sits on
+// five newsroom items and nowhere else; "wildfire" on three newsroom items and both wire items. (It was
+// "instead" until 2026-11-04, when the function-word gate began refusing "instead" before any of this
+// is measured; the mechanism this pins is unchanged.)
 const newsroom = 'county commissioners weighed the budget after an audit of agency records; lawmakers demanded testimony and a subpoena from the department';
 const deskMeta = {
   d1: { title: 'Wildfire response audit in Ashford County', text: `${newsroom}. the wildfire forced evacuation orders as smoke covered acres near ashford; firefighters held containment lines` },
   d2: { title: 'Brennan County wildfire costs', text: `${newsroom}. after the wildfire, smoke and evacuation costs grew as firefighters lost acres near brennan` },
   d3: { title: 'Calloway wildfire records', text: `${newsroom}. a wildfire near calloway sent smoke over acres; evacuation routes jammed and firefighters asked for relief` },
-  d4: { title: 'Dunmore audit', text: `${newsroom}; dunmore spent the reserve instead` },
-  d5: { title: 'Fairhaven audit', text: `${newsroom}; fairhaven hired a consultant instead` },
-  d6: { title: 'Glenrock audit', text: `${newsroom}; glenrock delayed the vote instead` },
-  d7: { title: 'Harlow audit', text: `${newsroom}; harlow borrowed the money instead` },
-  d8: { title: 'Elmwood audit', text: `${newsroom}; elmwood paid the vendor instead` },
+  d4: { title: 'Dunmore audit', text: `${newsroom}; dunmore spent the reserve quietly` },
+  d5: { title: 'Fairhaven audit', text: `${newsroom}; fairhaven hired a consultant quietly` },
+  d6: { title: 'Glenrock audit', text: `${newsroom}; glenrock delayed the vote quietly` },
+  d7: { title: 'Harlow audit', text: `${newsroom}; harlow borrowed the money quietly` },
+  d8: { title: 'Elmwood audit', text: `${newsroom}; elmwood paid the vendor quietly` },
 };
 const deskRecords = [
   ...rec('Desk', { d1: ['Politics'], d2: ['Politics'], d3: ['Politics'], d4: ['Politics'], d5: ['Politics'], d6: ['Politics'], d7: ['Politics'], d8: [] }, deskMeta),
@@ -200,12 +202,12 @@ const hubsOf = (found) => new Set(found.map((t) => t.label));
 const atBar = (found, bar = 1.6) => found.filter((t) => !(t.sourceRatio < bar));
 
 test('a word spread over one homogeneous source is not a topic: its items are only as alike as the source makes them', () => {
-  assert.ok(hubsOf(deskOff).has('instead'), 'measured against the whole corpus, the newsroom\'s likeness carries "instead" through');
-  assert.ok(!hubsOf(atBar(deskOn)).has('instead'), 'measured against items from the same source, it adds nothing');
-  assert.equal(atBar(deskOn).filter((t) => t.item === 'd8').length, 0, 'the untagged newsroom item had only "instead" to offer');
-  const instead = deskOn.filter((t) => t.label === 'instead');
-  assert.ok(instead.length > 0 && instead.every((t) => t.sourceRatio >= 1 && t.sourceRatio < 1.6 && t.wasGeneratedBy.parameters.sourceRatioFloor === 1), 'below the bar it is still handed over, with its ratio, for a viewer to try a lower bar');
-  assert.match(instead[0].why, /under the 1\.6× bar, admitted by the 1× floor\)$/);
+  assert.ok(hubsOf(deskOff).has('quietly'), 'measured against the whole corpus, the newsroom\'s likeness carries "quietly" through');
+  assert.ok(!hubsOf(atBar(deskOn)).has('quietly'), 'measured against items from the same source, it adds nothing');
+  assert.equal(atBar(deskOn).filter((t) => t.item === 'd8').length, 0, 'the untagged newsroom item had only "quietly" to offer');
+  const quietly = deskOn.filter((t) => t.label === 'quietly');
+  assert.ok(quietly.length > 0 && quietly.every((t) => t.sourceRatio >= 1 && t.sourceRatio < 1.6 && t.wasGeneratedBy.parameters.sourceRatioFloor === 1), 'below the bar it is still handed over, with its ratio, for a viewer to try a lower bar');
+  assert.match(quietly[0].why, /under the 1\.6× bar, admitted by the 1× floor\)$/);
 });
 
 test('a real topic whose items are alike beyond what their sources share is kept', () => {
@@ -226,11 +228,11 @@ test('a real topic whose items are alike beyond what their sources share is kept
 // twice, the copies' likeness carries the word's coherence. Three short items about glaciers share
 // only their topic. Filler keeps any phrase from being everywhere.
 const story = 'flood ruidoso trotter riverview crawford swiftwater lincoln mescalero sierra blanca peak tourist cabins campground bridge culvert gauge sirens shelter levee arroyo burn scar sediment debris river mayor chief volunteers rescue';
-const incidental = ['memory', 'staying', 'moderate', 'danger'];
+const incidental = ['memory', 'lingering', 'moderate', 'danger']; // "lingering" was "staying" until the function-word gate of 2026-11-04
 const copyRecords = [
   ...rec('Paper', { a: [], b: [], c: [] }, {
-    a: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met; residents said the memory of the fire was staying with them and a moderate rain could still bring danger` },
-    b: { title: 'The river cannot be trusted', text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response; families described staying near the water, the memory of the night, and the danger of moderate storms` },
+    a: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met; residents said the memory of the fire was lingering with them and a moderate rain could still bring danger` },
+    b: { title: 'The river cannot be trusted', text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response; families described lingering near the water, the memory of the night, and the danger of moderate storms` },
     c: { title: 'A flood in another valley', text: 'waters rose after rain on a burn scar near the river; sediment and debris closed the road' },
   }),
   ...rec('Wire', { g1: [], g2: [], g3: [], x0: [], x1: [], x2: [], x3: [] }, {

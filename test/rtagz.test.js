@@ -192,6 +192,14 @@ test('rtagz: build config carries the site\'s concept schemes and ledger as abso
   assert.strictEqual(buildConfig({ skos: false }).skos, false, 'false: no SKOS files');
   assert.ok(!('skos' in buildConfig({ skos: { other: 1 } })), 'nothing it knows: nothing passed');
   assert.ok(!('ledger' in buildConfig({ ledger: 'ids.json' })), 'a relative ledger path needs a site root');
+  // discover has three states; the queue file is named only with "queue"
+  assert.strictEqual(buildConfig({ discover: true }).discover, true);
+  assert.strictEqual(buildConfig({ discover: 'yes' }).discover, true, 'anything else truthy is true');
+  const queued = buildConfig({ discover: 'queue', queue: '/site/rtagz-queue.json' });
+  assert.strictEqual(queued.discover, 'queue');
+  assert.strictEqual(queued.queue, '/site/rtagz-queue.json');
+  assert.ok(!('queue' in buildConfig({ discover: 'queue' })), 'no path given: rosetta-tagz puts the queue beside the overrides it was given');
+  assert.ok(!('queue' in buildConfig({ discover: true, queue: '/site/rtagz-queue.json' })), 'a queue path means nothing without the queue state');
 });
 
 test('rtagz: the settings block is read from rtagz, and from stone, its name before 2026-10-31, with one logged line', () => {
@@ -1143,4 +1151,88 @@ test('rtagz: a discovered tag\'s sourceRatio reaches its reference, its tag edge
   assert.strictEqual(tagEdge('instead').attrs.sourceRatio, 1.008);
   assert.deepStrictEqual(tagEdge('ML').attrs, { concept: 'c_ml', weight: 1, origin: 'explicit' }, 'an explicit tag\'s attrs are as before');
   assert.ok(!('sourceRatio' in tagEdge('odd').attrs));
+});
+
+test('rtagz: a card that ends with no tagz carries untaggedBecause from the report and the site\'s switches; a tagged card never does, and a stale line goes', () => {
+  const results = cloneResults();
+  const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
+  const universe = {
+    concepts: [
+      { id: 'c_x', canonical: 'X', pinned: false, discovered: false, n: 1, nEmergent: 0, variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }], rank: [] },
+    ],
+    items: [
+      { key: 'ScienceWire::wire-2', source: 'ScienceWire', url: 'https://wire.test/orphan-1', title: 'Breakthrough in Artificial Intelligence Hardware', tags: [] },
+      { key: 'Posts::https://example.test/post-2.html', source: 'Posts', url: 'https://example.test/post-2.html', title: 'On Machine Learning and Systems', tags: [{ c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' }] },
+    ],
+    relations: [],
+  };
+  const report = (reasons, candidates) => ({
+    built: 'x', stages: [],
+    untagged: { bar: 1.6, count: 1, none: 1, items: [{ key: 'ScienceWire::wire-2', source: 'ScienceWire', id: 'wire-2', title: 'Breakthrough', reason: reasons[0], reasons, why: ['…'], under: [], ...(candidates ? { candidates } : {}) }] },
+  });
+  const wire2 = () => results.find((r) => r.config && r.config.title === 'ScienceWire').items.find((i) => i.id === 'wire-2');
+  const post2 = () => results.find((r) => r.config && r.config.title === 'Posts').items.find((i) => i.id === 'https://example.test/post-2.html');
+  wire2().untaggedBecause = 'stale, from an earlier build';
+  post2().untaggedBecause = 'stale, from an earlier build';
+
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['noDiscovery']), { siteTitle: 'Fixture Site', discover: false, emerge: true });
+  assert.deepStrictEqual(wire2().tags, []);
+  assert.strictEqual(wire2().untaggedBecause, 'source gave none, discovery off');
+  assert.ok(!('untaggedBecause' in post2()), 'a tagged card carries no line, and the stale one went');
+
+  const queued = { phrases: 5, single: 2, queued: [{ phrase: 'neural hardware', score: 2.8, sourceRatio: 2.1 }] };
+  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['queued'], queued), { siteTitle: 'Fixture Site', discover: 'queue', emerge: true });
+  assert.strictEqual(wire2().untaggedBecause, 'source gave none, candidates queued (1)');
+  assert.deepStrictEqual(summary.untagged.items[0].candidates, queued, 'the queued candidates stay in the summary');
+  assert.ok(!wire2()._references.find((r) => r.type === 'untagged').candidates, 'and off the card\'s own note, as before');
+
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['noRecurring'], { phrases: 5, single: 5 }), { siteTitle: 'Fixture Site', discover: true, emerge: true });
+  assert.strictEqual(wire2().untaggedBecause, 'source gave none, nothing recurred');
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['functionWord', 'tooCommon']), { siteTitle: 'Fixture Site', discover: true, emerge: true });
+  assert.strictEqual(wire2().untaggedBecause, 'emerge found no concept');
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['functionWord', 'tooCommon']), { siteTitle: 'Fixture Site', discover: true, emerge: false });
+  assert.strictEqual(wire2().untaggedBecause, 'source gave none, every phrase refused');
+
+  // without rosetta-tagz nothing writes the line (the phase does not run), and the summary never carries it
+  assert.ok(!('untaggedBecause' in summary));
+});
+
+test('rtagz: the real engine in queue mode writes the queue beside the site\'s overrides, attaches no discovered tag, and every card with no tagz says why', async (t) => {
+  const envEngine = process.env.POSTPIPE_RTAGZ_ENGINE;
+  const engineDir = envEngine || path.join(__dirname, '..', 'rosetta-tagz');
+  if (!fs.existsSync(path.join(engineDir, 'bin', 'rtz-build'))) {
+    t.skip('rtz-build not found');
+    return;
+  }
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postpipe-rtagz-queue-'));
+  try {
+    const cacheDir = path.join(tmpDir, 'cache');
+    fs.writeFileSync(path.join(tmpDir, 'rtagz-overrides.json'), JSON.stringify({ ignore: ['untagged'] }), 'utf8');
+    const { items, rtagz } = await loadCorpus(entriesFromResults(cloneResults()), {
+      colorCachePath: path.join(tmpDir, 'colors.json'),
+      siteRoot: tmpDir,
+      cacheDir,
+      rtagz: { enabled: true, engine: engineDir, overrides: 'rtagz-overrides.json', emerge: true, discover: 'queue', timeoutMs: 30000 },
+    });
+    assert.ok(rtagz, 'the phase ran');
+    const queuePath = path.join(tmpDir, 'rtagz-queue.json');
+    assert.ok(fs.existsSync(queuePath), 'the queue is in the site, beside rtagz-overrides.json');
+    const queue = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
+    assert.strictEqual(queue.schema, 'rosetta-tagz/queue@1');
+    assert.ok(Array.isArray(queue.candidates));
+    assert.deepStrictEqual(rtagz.queue, { path: queuePath, candidates: queue.candidates.length }, 'the summary says where the queue is and how long');
+    const config = JSON.parse(fs.readFileSync(path.join(cacheDir, 'rtz.config.json'), 'utf8'));
+    assert.strictEqual(config.discover, 'queue');
+    assert.strictEqual(config.queue, queuePath);
+    for (const item of items) {
+      for (const ref of item._references || []) assert.ok(!(ref.type === 'tag' && ref.origin === 'discovered'), `${item.id}: no discovered tag in queue mode`);
+      if (item.tags.length === 0) {
+        assert.match(item.untaggedBecause, /^(source gave none, (discovery off|nothing recurred|candidates queued \(\d+\)|every phrase refused)|emerge found no concept)$/, item.id);
+      } else {
+        assert.ok(!('untaggedBecause' in item), `${item.id} has tagz`);
+      }
+    }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

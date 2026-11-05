@@ -108,6 +108,16 @@ pass that only fills the slots the first pass left, so a viewer can try another 
 evidence on top of everything a build at the bar holds instead of mixing it in, so a viewer set at the
 bar shows exactly the build at the bar (FORMATS.md, "Trying another bar").
 
+Since 2026-11-04 two things sit in front of the band. A function-word gate (`lib/stopwords.js`:
+prepositions, conjunctions, determiners, pronouns, auxiliaries, common adverbs, the participles of light
+verbs) refuses a candidate before any bar is read, because "onto", "roughly", "allowing" and "staying"
+had cleared every bar on haroldyounghumxn.site (issue #20): the band is kept as the scoring, and the gate
+is a list, extended by a site through its overrides `ignore`. And a queue (issue #32): with discover
+`"queue"` nothing is attached, every would-be hub is written to a file with its score, its items and its
+why, and a human moves the ones they want into the overrides' `accept` list, which attaches them with no
+bar to clear. The untagged report names what was refused and what is queued for each item, so a card
+with no tag can say why (FORMATS.md, "The queue").
+
 Every record either stage emits carries its provenance in PROV terms: `wasDerivedFrom`
 (`[{type: 'text', phrase, count, inTitle}]`, where `phrase` is the span of the item's own words that
 matched, so an item that says "court" is never said to contain "courts"; discovery's is spelled as the

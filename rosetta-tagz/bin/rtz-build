@@ -27,7 +27,11 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
     "ledger": "stone.ledger.json",     concept-id ledger, kept across builds; default OUTDIR/ledger.json, false for none
     "seeds": [],                       optional extra seed files
     "noSeed": false,
-    "discover": false,                 propose new tags for untagged items from recurring phrases
+    "discover": false,                 propose new tags for untagged items from recurring phrases:
+                                       true attaches them; "queue" writes them to the queue file and
+                                       attaches none (only the overrides' "accept" list is attached)
+    "queue": "rtagz-queue.json",       the queue file for discover "queue"; default beside the overrides
+                                       file (or in OUTDIR with none); provisional
     "emerge": true,                    earn tags from item text (concepts rtz-stone already made)
     "engine": { "mergeThreshold": 0.7 },  optional overrides of lib/config.js defaults
     "skos": { "base": "urn:rosetta-tagz:", "lang": "en" }   the SKOS files' base IRI and label language
@@ -35,8 +39,9 @@ rtz.config.json (paths are relative to the config file; ~ is expanded):
   }
 
 Writes to OUTDIR: records.jsonl, [records.discovered.jsonl, discover.report.json], stone.json, records.all.jsonl, universe.json,
-skos.jsonld and skos.ttl (rtz-skos; a failure there is one line, never a failed build), view.html, build.json (stages; the ledger summary: path, minted, reused, retired, splits, merges, this build's events;
-and untagged: every item with no tag shown at the build's bar, and why), and the ledger at its path`;
+skos.jsonld and skos.ttl (rtz-skos; a failure there is one line, never a failed build), view.html, build.json (stages; discover, the mode that ran;
+the ledger summary: path, minted, reused, retired, splits, merges, this build's events; queue: its path and count, with discover "queue";
+and untagged: every item with no tag shown at the build's bar, and why), the ledger at its path, and the queue at its path`;
 
 const { values } = cli('rtz-build', usage, {
   config: { type: 'string' },
@@ -84,15 +89,28 @@ if (config.engine) {
   engineFile = ['--config', path.join(out, 'engine.json')];
 }
 let baseRecords = path.join(out, 'records.jsonl');
-const discovering = Boolean(config.discover || values.discover);
+// discover: true | "queue" | false (the --discover flag is true); anything else truthy is true
+const discoverMode = values.discover ? true : config.discover === 'queue' ? 'queue' : Boolean(config.discover);
+const discovering = Boolean(discoverMode);
+const overridesPath = config.overrides && fs.existsSync(resolve(config.overrides)) ? resolve(config.overrides) : null;
 const reportPath = path.join(out, 'discover.report.json');
+let queuePath = null;
 if (discovering) {
-  log('discover');
+  log(discoverMode === 'queue' ? 'discover (queue)' : 'discover');
   baseRecords = path.join(out, 'records.discovered.jsonl');
-  stage('discover', 'rtz-discover', [path.join(out, 'records.jsonl'), '--all', '-o', baseRecords, '--report', reportPath, ...engineFile]);
+  const args = [path.join(out, 'records.jsonl'), '--all', '-o', baseRecords, '--report', reportPath, ...engineFile];
+  if (overridesPath) args.push('--overrides', overridesPath);
+  if (discoverMode === 'queue') {
+    // the queue lives beside the overrides file, the file a human moves its candidates into
+    queuePath = config.queue ? resolve(config.queue) : config.overrides ? path.join(path.dirname(resolve(config.overrides)), 'rtagz-queue.json') : path.join(out, 'rtagz-queue.json');
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    args.push('--queue', queuePath);
+  }
+  stage('discover', 'rtz-discover', args);
 }
+manifest.discover = discoverMode;
 const stoneArgs = [baseRecords, '-o', path.join(out, 'stone.json'), ...engineFile];
-if (config.overrides && fs.existsSync(resolve(config.overrides))) stoneArgs.push('--overrides', resolve(config.overrides));
+if (overridesPath) stoneArgs.push('--overrides', overridesPath);
 const ledgerPath = config.ledger === false ? null : config.ledger ? resolve(config.ledger) : path.join(out, 'ledger.json');
 if (ledgerPath) stoneArgs.push('--ledger', ledgerPath);
 if (config.noSeed) stoneArgs.push('--no-seed');
@@ -132,6 +150,16 @@ if (!values['no-view']) {
 }
 const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
 if (stone.ledger) manifest.ledger = stone.ledger;
+// The queue's summary is a reading of the file rtz-discover wrote; it never fails the build.
+if (queuePath) {
+  try {
+    const q = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
+    manifest.queue = { path: queuePath, candidates: (q.candidates ?? []).length };
+    log(`queue: ${manifest.queue.candidates} candidates in ${queuePath}, none attached; move one into the overrides' "accept" list to make it a tag`);
+  } catch (e) {
+    log(`rtz-build: queue not summarized (${e.message})`);
+  }
+}
 // The untagged report is a reading of files already written; it never fails the build.
 try {
   const universe = JSON.parse(fs.readFileSync(path.join(out, 'universe.json'), 'utf8'));
