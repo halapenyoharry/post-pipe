@@ -9,6 +9,11 @@ import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, close
 import { containerLook } from './containerLook';
 import { nodePaletteFor } from '../../lib/nodePalettes';
 import { tightened } from '../../lib/tightness';
+import {
+  MODE_PREF as EDGE_WEIGHT_MODE_PREF, PENALTY_PREF as DEGREE_PENALTY_PREF,
+  EDGE_WEIGHT_MODES, DEGREE_PENALTIES,
+  degreesOf, effectiveWeight, linkStrength, linkDistance, normaliseEdgeWeights, edgeWeightLine,
+} from '../../lib/edgeWeight';
 import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
 import { normalizeAngle, angleDelta, rotatedView, viewToScreen, screenToView } from './rotation';
@@ -273,7 +278,7 @@ function feedToGraph(feed, config = {}) {
       : isRefEdge
         ? referenceEdgeLabel(edge)
         : (edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer);
-    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label, weight };
+    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label, _baseLabel: label, weight };
     if (refType) link.refType = refType;
     if (edge.attrs) link.attrs = edge.attrs;
     // A discovered tag's source coherence ratio, for the panel's slider of
@@ -327,7 +332,16 @@ function feedToGraph(feed, config = {}) {
     containers = Array.from(inferred.values());
   }
 
-  return { nodes, links, containmentEdges, containers, relations };
+  // Degrees over all non-containment edges in the feed, not only the drawn
+  // ones, keyed by the node ids the renderer uses (and by each item's own id).
+  const degrees = degreesOf(
+    allEdges.map((e) => (e ? { ...e, source: resolveEndpoint(e.source), target: resolveEndpoint(e.target) } : e)),
+  );
+  for (const [itemId, slug] of idToSlug) {
+    if (degrees.has(slug) && !degrees.has(itemId)) degrees.set(itemId, degrees.get(slug));
+  }
+
+  return { nodes, links, containmentEdges, containers, relations, degrees };
 }
 
 // The centroid of the saved positions among a list of node states (entries
@@ -680,6 +694,19 @@ export function GraphViewer({
   // Set once the simulation exists: re-reads the tightness preference and
   // retunes the forces.
   const tightnessUpdateRef = useRef(null);
+  // Set once the simulation exists: re-reads the edge-weight mode and degree
+  // penalty preferences and retunes the link force and hover labels.
+  const edgeWeightsUpdateRef = useRef(null);
+  const edgeWeightsChosen = () => {
+    const vs = viewStateRef.current;
+    const mode = vs && vs.preference ? vs.preference(EDGE_WEIGHT_MODE_PREF) : null;
+    const degreePenalty = vs && vs.preference ? vs.preference(DEGREE_PENALTY_PREF) : null;
+    return normaliseEdgeWeights({
+      ...(GS.edgeWeights || {}),
+      ...(mode ? { mode } : {}),
+      ...(degreePenalty ? { degreePenalty } : {}),
+    });
+  };
   // Readers' contributions (settings.contributions): counted on the cards,
   // and their connections drawn as their own edge layer, the readers
   // dimension, off until the reader turns it on.
@@ -706,11 +733,27 @@ export function GraphViewer({
   // it does not, so size is filed against the item alone.
   // A container's anchor (where a site rests it on its cover's art) is part
   // of that signature too.
-  const layoutKeys = useRef({ settings: null, feed: null, keys: new Map() });
+  const layoutKeys = useRef({ settings: null, feed: null, ewSig: null, keys: new Map() });
   const placeOf = (name) => {
     const c = layoutKeys.current;
-    if (c.settings !== graphSettings || c.feed !== feedData) { c.settings = graphSettings; c.feed = feedData; c.keys = new Map(); }
-    if (!c.keys.has(name)) c.keys.set(name, layoutKey(name, graphSettings, { anchors: anchorsOf(feedData), layouts: layoutsOf(feedData) }) + '::');
+    const ew = edgeWeightsChosen();
+    const ewSig = `${ew.mode}:${ew.degreePenalty}`;
+    if (c.settings !== graphSettings || c.feed !== feedData || c.ewSig !== ewSig) {
+      c.settings = graphSettings;
+      c.feed = feedData;
+      c.ewSig = ewSig;
+      c.keys = new Map();
+    }
+    if (!c.keys.has(name)) {
+      c.keys.set(
+        name,
+        layoutKey(name, graphSettings, {
+          anchors: anchorsOf(feedData),
+          layouts: layoutsOf(feedData),
+          edgeWeights: { mode: ew.mode, degreePenalty: ew.degreePenalty },
+        }) + '::',
+      );
+    }
     return c.keys.get(name);
   };
   const positionKey = (d) => placeOf(layoutRef.current) + persistKey(d);
@@ -779,6 +822,7 @@ export function GraphViewer({
       if (schemeUpdateRef.current) schemeUpdateRef.current();
       if (paletteUpdateRef.current) paletteUpdateRef.current();
       if (tightnessUpdateRef.current) tightnessUpdateRef.current();
+      if (edgeWeightsUpdateRef.current) edgeWeightsUpdateRef.current();
       // A colour the reader gives a feed reaches its tag nodes as well, and
       // the pieces per tag chosen in the panel hides or shows tags.
       if (svgRef.current && cardsLayerRef.current) {
@@ -2578,15 +2622,78 @@ export function GraphViewer({
         return CL.nodes.has(d.id) ? forces.chargeStrength * 0.05 : forces.chargeStrength;
       });
     }
-    if (CL.nodes.size > 0) {
-      refreshContainerForces();
-      const linkForce = simulation.force('link');
-      const defaultLinkStrength = linkForce.strength();
-      linkForce.strength((l) => {
-        const rs = rootOfNode(endId(l.source));
-        return rs && rs === rootOfNode(endId(l.target)) ? 0 : defaultLinkStrength(l);
-      });
+    if (CL.nodes.size > 0) refreshContainerForces();
+
+    // Every link's effective weight (settings.graph.edgeWeights, lib/edgeWeight.js):
+    // in weighted mode, strength and distance follow Flow's reference weight,
+    // degree penalty and recency times a per-type weight; in uniform mode, one
+    // distance (forces.linkDistance) and D3's default strength. Inside a
+    // laid-out container, links between members of the same root stay at zero.
+    const linkForce = simulation.force('link');
+    const defaultLinkStrength = linkForce.strength();
+    const feedItemsForEw = ((feedData && feedData.items) || []).filter((it) => it && typeof it.id === 'string');
+    let ewNewestMs = null;
+    const ewSessionRank = new Map();
+    feedItemsForEw.forEach((it, idx) => {
+      ewSessionRank.set(it.id, idx);
+      const t = it.date_published ? Date.parse(it.date_published) : NaN;
+      if (Number.isFinite(t) && (ewNewestMs === null || t > ewNewestMs)) ewNewestMs = t;
+    });
+    const edgeWeightBaseCtx = {
+      degrees: data.degrees,
+      nodeById: nodeBySlug,
+      newestMs: ewNewestMs,
+      ranks: ewSessionRank,
+      count: feedItemsForEw.length,
+    };
+    let ewShown = edgeWeightsChosen();
+    let activeLinks = data.links;
+    let effMax = 0;
+    function tuneLinkForce() {
+      if (ewShown.mode === 'weighted') {
+        linkForce.distance((l) => linkDistance(
+          l._edgeWeight ? l._edgeWeight.eff : 0,
+          effMax,
+          forces.linkDistance,
+          ewShown.distanceSpread,
+        ));
+        linkForce.strength((l) => {
+          if (CL.nodes.size > 0) {
+            const rs = rootOfNode(endId(l.source));
+            if (rs && rs === rootOfNode(endId(l.target))) return 0;
+          }
+          return linkStrength(l._edgeWeight ? l._edgeWeight.eff : 0);
+        });
+      } else {
+        linkForce.distance(forces.linkDistance);
+        linkForce.strength(CL.nodes.size > 0 ? (l) => {
+          const rs = rootOfNode(endId(l.source));
+          return rs && rs === rootOfNode(endId(l.target)) ? 0 : defaultLinkStrength(l);
+        } : defaultLinkStrength);
+      }
     }
+    function computeLinkWeights(nextLinks, { setLinks = true } = {}) {
+      if (nextLinks) activeLinks = nextLinks;
+      ewShown = edgeWeightsChosen();
+      const ctx = { ...edgeWeightBaseCtx, settings: ewShown };
+      for (const l of data.links) {
+        const f = effectiveWeight(l, ctx);
+        l._edgeWeight = f;
+        const base = l._baseLabel !== undefined ? l._baseLabel : (l.label || '');
+        l.label = ewShown.mode === 'weighted'
+          ? (base ? `${base}\n${edgeWeightLine(l, f)}` : edgeWeightLine(l, f))
+          : base;
+      }
+      effMax = 0;
+      for (const l of activeLinks) {
+        if (l._edgeWeight && l._edgeWeight.eff > effMax) effMax = l._edgeWeight.eff;
+      }
+      if (setLinks) {
+        linkForce.links(activeLinks);
+        tuneLinkForce();
+      }
+    }
+    computeLinkWeights(data.links, { setLinks: false });
 
     // Another tightness chosen in the panel: the three forces retuned and the
     // simulation warmed again, gently. Positions, pins and the zoom are left
@@ -2599,12 +2706,20 @@ export function GraphViewer({
         && next.chargeStrength === forces.chargeStrength
         && next.collidePadding === forces.collidePadding) return;
       forces = next;
-      simulation.force('link').distance(forces.linkDistance);
+      tuneLinkForce();
       if (CL.nodes.size > 0) refreshContainerForces();
       else {
         simulation.force('charge').strength(chargeStrength);
         simulation.force('collide').radius(collideRadius);
       }
+      if (layoutRef.current !== 'force') return;
+      simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+    };
+    edgeWeightsUpdateRef.current = () => {
+      const next = edgeWeightsChosen();
+      if (next.mode === ewShown.mode && next.degreePenalty === ewShown.degreePenalty) return;
+      computeLinkWeights(activeLinks);
+      links.attr('data-label', (d) => d.label);
       if (layoutRef.current !== 'force') return;
       simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
     };
@@ -4732,7 +4847,7 @@ export function GraphViewer({
       ++tickCount;
       if (redrawAxisRef.current && tickCount % 25 === 0) redrawAxisRef.current();
     });
-    simulation.force('link').links(data.links);
+    computeLinkWeights(data.links);
 
     // ── Scheme and depth ──────────────────────────────────────────────────
     // The panel's concept scheme (preference conceptScheme, null for the
@@ -4904,7 +5019,8 @@ export function GraphViewer({
       if (hadGroups || hasGroups) {
         // A second link from one piece to the representative (_dupByGroup) is
         // hidden and pulls nothing: the force sees each piece–tag pair once.
-        simulation.force('link').links(data.links.filter((l) => !l._dupByGroup));
+        computeLinkWeights(data.links.filter((l) => !l._dupByGroup));
+        links.attr('data-label', (d) => d.label);
         simulation.force('charge').strength(simulation.force('charge').strength());
         simulation.force('collide').radius(simulation.force('collide').radius());
         applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
@@ -5514,6 +5630,7 @@ export function GraphViewer({
       paletteUpdateRef.current = null;
       schemeUpdateRef.current = null;
       tightnessUpdateRef.current = null;
+      edgeWeightsUpdateRef.current = null;
       readersUpdateRef.current = null;
       relationsUpdateRef.current = null;
       if (typeof window !== 'undefined') delete window.PostPipeGraphTags;

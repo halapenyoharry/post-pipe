@@ -347,6 +347,16 @@
       "velocityDecay": 0.7,
       "alphaDecay": 0.028
     },
+    "edgeWeights": {
+      "mode": "weighted",
+      "degreePenalty": "sqrt",
+      "recencyClock": "calendar",
+      "recencyHalfLifeDays": 365,
+      "recencyFloor": 0.2,
+      "distanceSpread": 1,
+      "weights": { "tag": 1, "broader": 1, "related": 1, "closeMatch": 1, "broadMatch": 1, "relatedMatch": 1, "exactMatch": 1, "authored": 1, "topology": 1 }
+    },
+    "_edgeWeights_note": "How strongly each link pulls in the cluster layout and how short it sits (src/lib/edgeWeight.js), from the same factors flow-score reads. mode: weighted (default, each link's strength and distance follow its effective weight) or uniform (one link distance and D3's default strength, as before). In weighted mode a link's effective weight is its own weight (0 to 1, 1 when absent) times the symmetric degree factor 1 / sqrt(penalty(deg(source)) * penalty(deg(target))) over all non-containment edges in the feed, times the recency factor floor + (1 - floor) * x of the card end (the mean of both ends for card-to-card, 1 for tag-to-tag), times weights[layer] (1 when not named). degreePenalty: none (n), sqrt (sqrt(n), default) or log (log(1 + n)). recencyClock: calendar (0.5 ^ ((newest - t) / day / recencyHalfLifeDays) from the newest dated card, 0 when undated, default) or session (1 - rank / (n - 1) in feed order). recencyHalfLifeDays: 365 by default. recencyFloor: 0.2 by default, so old or undated cards stay attached. distanceSpread: 1 by default; the strongest link in the force gets simulation.linkDistance and weaker links up to (1 + distanceSpread) times it (0 gives every link simulation.linkDistance). The reader can switch mode and degreePenalty in the panel. Non-default settings are part of the layout key.",
     "collapseGesture": "tap",
     "_collapseGesture_note": "tap (default) or doubletap: what opens and closes a container, on its title or its closed node, in the engine's own table of gestures (graph.bindings, docs/ACTIONS.md). A tap is under 4px of movement; more than that drags the container. With tap, a double-tap on a title zooms like anywhere else; with doubletap, it toggles the container instead and a single tap does nothing. A site's graph.bindings go over this.",
     "doubleTapMs": 250,

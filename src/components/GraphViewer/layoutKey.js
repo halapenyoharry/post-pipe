@@ -14,6 +14,8 @@
 //
 // The key never contains '::', which separates it from the item id.
 
+const { EDGE_WEIGHT_DEFAULTS, normaliseEdgeWeights } = require('../../lib/edgeWeight');
+
 const SPIRAL_KEYS = ['enabled', 'mode', 'spacing', 'startRadius', 'direction', 'strength', 'anchorEnd', 'openTowards', 'keepBelow', 'cardScale'];
 const SIM_KEYS = ['linkDistance', 'chargeStrength', 'collidePadding'];
 
@@ -52,8 +54,40 @@ function containerPart(layouts) {
   return ids.map((id) => [id, layouts[id]]);
 }
 
+// Edge weights: only when a setting differs from EDGE_WEIGHT_DEFAULTS, so a
+// site that leaves the block at its defaults keeps the keys it had, and a
+// reader who switches to uniform or another degree penalty gets a fresh key.
+function edgeWeightsPart(siteEw, overrideEw) {
+  const s = siteEw && typeof siteEw === 'object' && !Array.isArray(siteEw) ? siteEw : {};
+  const o = overrideEw && typeof overrideEw === 'object' && !Array.isArray(overrideEw) ? overrideEw : {};
+  const ew = normaliseEdgeWeights({
+    ...s,
+    ...o,
+    weights: {
+      ...(s.weights && typeof s.weights === 'object' && !Array.isArray(s.weights) ? s.weights : {}),
+      ...(o.weights && typeof o.weights === 'object' && !Array.isArray(o.weights) ? o.weights : {}),
+    },
+  });
+  const out = {};
+  if (ew.mode !== EDGE_WEIGHT_DEFAULTS.mode) out.mode = ew.mode;
+  if (ew.mode === 'weighted') {
+    if (ew.degreePenalty !== EDGE_WEIGHT_DEFAULTS.degreePenalty) out.degreePenalty = ew.degreePenalty;
+    if (ew.recencyClock !== EDGE_WEIGHT_DEFAULTS.recencyClock) out.recencyClock = ew.recencyClock;
+    if (ew.recencyHalfLifeDays !== EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays) out.recencyHalfLifeDays = ew.recencyHalfLifeDays;
+    if (ew.recencyFloor !== EDGE_WEIGHT_DEFAULTS.recencyFloor) out.recencyFloor = ew.recencyFloor;
+    if (ew.distanceSpread !== EDGE_WEIGHT_DEFAULTS.distanceSpread) out.distanceSpread = ew.distanceSpread;
+    const wDiff = {};
+    for (const k of Object.keys(ew.weights).sort()) {
+      const def = k in EDGE_WEIGHT_DEFAULTS.weights ? EDGE_WEIGHT_DEFAULTS.weights[k] : 1;
+      if (ew.weights[k] !== def) wDiff[k] = ew.weights[k];
+    }
+    if (Object.keys(wDiff).length) out.weights = wDiff;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 // The settings that move nodes, in a fixed order.
-function layoutSignature(graphSettings, { anchors, layouts } = {}) {
+function layoutSignature(graphSettings, { anchors, layouts, edgeWeights } = {}) {
   const g = graphSettings || {};
   const v = Number.isFinite(Number(g.layoutVersion)) && g.layoutVersion !== null && g.layoutVersion !== '' ? Number(g.layoutVersion) : 1;
   const card = g.card || {};
@@ -71,6 +105,8 @@ function layoutSignature(graphSettings, { anchors, layouts } = {}) {
   if (g.hull && typeof g.hull === 'object' && g.hull.padding != null) sig.hullPadding = g.hull.padding;
   const l = containerPart(layouts);
   if (l) sig.layouts = l;
+  const ew = edgeWeightsPart(g.edgeWeights, edgeWeights);
+  if (ew) sig.edgeWeights = ew;
   return JSON.stringify(sig);
 }
 
