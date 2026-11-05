@@ -332,9 +332,10 @@ function checkLabels({ feed, recordLabels, texts, overrides, vocabulary }) {
 // ─── Finding the inputs for a site ──────────────────────────────────────────
 
 // The cache folders the build may have used for this site, in the order
-// tried: post-pipe's own .feed-cache (generate-index runs from post-pipe's
-// root), the working directory's if that is elsewhere, then the stone/
-// folders a build before 2026-10-31 wrote.
+// tried: post-pipe's own .feed-cache (every build's since 2026-11-05,
+// wherever it is run from), the working directory's if that is elsewhere (a
+// build before then, run from another folder), then the stone/ folders a
+// build before 2026-10-31 wrote.
 function cacheCandidates(siteRoot) {
   const bases = [...new Set([path.join(POSTPIPE_ROOT, '.feed-cache'), path.resolve('.feed-cache')])];
   const out = bases.map((b) => path.resolve(cacheDirForSite(siteRoot, b)));

@@ -86,7 +86,14 @@ function foldTitle(raw) {
   return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
 }
 
-function cacheDirForSite(siteRoot, cacheBase = './.feed-cache') {
+// The folder a site's rosetta-tagz run works in is .feed-cache/rtagz/
+// <site>-<hash> under post-pipe's own folder, wherever the build is run from.
+// Until 2026-11-05 the default base was the working directory's .feed-cache,
+// so a build run from another folder (a worktree, say) kept its files there
+// and tools/rtagz-labels-check.js read an older run's from post-pipe's.
+const CACHE_BASE = path.join(POSTPIPE_ROOT, '.feed-cache');
+
+function cacheDirForSite(siteRoot, cacheBase = CACHE_BASE) {
   const abs = path.resolve(siteRoot || POSTPIPE_ROOT);
   const base = path.basename(abs);
   const hash = crypto.createHash('sha1').update(abs).digest('hex').slice(0, 8);
@@ -1078,6 +1085,7 @@ module.exports = {
   itemText,
   canonicalUrl,
   foldTitle,
+  CACHE_BASE,
   cacheDirForSite,
   mergeOverrides,
   buildConfig,
