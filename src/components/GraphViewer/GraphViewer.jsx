@@ -40,6 +40,7 @@ import { containerHas } from '../../lib/containers';
 import { tagReferences } from '../../lib/tagReferences';
 import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pairKey } from '../../lib/sourceRatio';
 import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
+import { listenInCard, toggleListen, stopListening } from '../../lib/listenInCard';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -834,6 +835,9 @@ export function GraphViewer({
     // node.resize, the cards have no resize handles, no drag reaches a
     // card's size, and sizes saved on an earlier visit are not brought back.
     const RESIZE_ON = isBound(BINDINGS, 'node.resize');
+    // Whether an open card holds the listening controls (settings.cards.listen,
+    // default true; src/lib/listenInCard.js).
+    const LISTEN_IN_CARD = listenInCard(typeof window !== 'undefined' ? window.SETTINGS : null);
 
     d3.select(container).selectAll('svg').remove();
     d3.select(container).selectAll('.cards-layer').remove();
@@ -1111,6 +1115,8 @@ export function GraphViewer({
         case 'node.zoomToReadable': if (ctx.d) zoomToReadable(ctx.d, ctx.x, ctx.y); return;
         case 'node.openReader': if (ctx.d) readCard(ctx.d); return;
         case 'node.select': if (ctx.d && ctx.cardEl) togglePinned(ctx.d, ctx.cardEl); return;
+        case 'node.listen': if (ctx.d && ctx.cardEl) listenCard(ctx.d, ctx.cardEl); return;
+        case 'node.stopListening': if (ctx.d && ctx.cardEl) stopListeningCard(ctx.cardEl); return;
         case 'view.deselect': deselect(); return;
         default: // none
       }
@@ -3381,8 +3387,10 @@ export function GraphViewer({
         .filter((event) => {
           if (event.ctrlKey) return false;
           if (event.button !== undefined && event.button !== 0) return false;
+          const t = event.target;
+          // The listening strip's buttons and sliders are not handles.
+          if (t && t.closest && t.closest('[data-pp-listen]')) return false;
           if (event.pointerType === 'touch' || event.type === 'touchstart') {
-            const t = event.target;
             if (t && t.closest && t.closest('.rp-scroll')) return false;
           }
           return true;
@@ -3810,6 +3818,8 @@ export function GraphViewer({
           },
           fullContent: d._fullContent || null,
           cardSettings: CARD,
+          // The listening strip in an open card (settings.cards.listen).
+          listen: LISTEN_IN_CARD,
           // No handles and no resizing unless the table binds node.resize.
           onResize: RESIZE_ON ? ({ width: newW, height: newH }) => {
             d._customWidth = newW;
@@ -3841,6 +3851,9 @@ export function GraphViewer({
     // Article-content fetch cache. Keyed by node id. Value is the body HTML
     // (with <h1> removed) or null on fetch failure.
     const articleContentCache = new Map();
+    // A fetch under way, by node id, so two asks in the same moment (a card
+    // opened and read aloud by one gesture) make one request.
+    const articleContentLoading = new Map();
     function loadFullContent(d) {
       // A title-only item has no page to fetch, by design.
       if ((d.originalItem && d.originalItem._posted) === 'title') {
@@ -3851,6 +3864,7 @@ export function GraphViewer({
         d._fullContent = articleContentCache.get(d.id);
         return Promise.resolve();
       }
+      if (articleContentLoading.has(d.id)) return articleContentLoading.get(d.id);
 
       // Only same-origin bodies can be fetched. A subscribed feed's article
       // lives on somebody else's server, which sends no CORS header and has no
@@ -3877,7 +3891,7 @@ export function GraphViewer({
         return r.text();
       };
 
-      return tryFetch()
+      const loading = tryFetch()
         .then(html => {
           const doc = new DOMParser().parseFromString(html, 'text/html');
           const h1 = doc.querySelector('h1');
@@ -3894,7 +3908,10 @@ export function GraphViewer({
         .catch(() => {
           articleContentCache.set(d.id, null);
           d._fullContent = null;
-        });
+        })
+        .then(() => { articleContentLoading.delete(d.id); });
+      articleContentLoading.set(d.id, loading);
+      return loading;
     }
 
     renderAllArticleBodies();
@@ -3941,6 +3958,7 @@ export function GraphViewer({
         if (Date.now() - lastCardDouble < 300) return;
         const t = event.target;
         if (t && (t.dataset?.popout === '1' || t.closest?.('[data-popout="1"]'))) return;
+        if (t && t.closest?.('[data-pp-listen]')) return;
         tapGate.cancel();
         cardDouble(d, event.currentTarget, pointOf(event));
       })
@@ -3954,6 +3972,12 @@ export function GraphViewer({
           return;
         }
         const target = event.target;
+        // The listening strip's own (CardListen): the card stays as it is.
+        if (target && target.closest?.('[data-pp-listen]')) {
+          event.stopPropagation();
+          tapGate.cancel();
+          return;
+        }
         const isPopout = target && (target.dataset?.popout === '1' ||
                                     target.closest?.('[data-popout="1"]'));
         if (isPopout) {
@@ -4088,6 +4112,28 @@ export function GraphViewer({
           if (pinnedIdsRef.current.has(d.id)) renderArticleBody(d);
         });
       }
+    }
+
+    // node.listen, by gesture: what the card's play button does (toggleListen,
+    // src/lib/listenInCard.js) on the card's text. A closed card opens first,
+    // as node.select opens it, and is read once its text has arrived; the
+    // render is flushed so the text read is the text shown.
+    function listenCard(d, cardEl) {
+      const T = typeof window !== 'undefined' ? window.TTS : null;
+      if (!T || d.link || d.type !== 'article') return;
+      const bodyOf = () => cardEl.querySelector('.rp-scroll');
+      if (pinnedIdsRef.current.has(d.id)) { toggleListen(T, bodyOf()); return; }
+      togglePinned(d, cardEl);
+      loadFullContent(d).then(() => {
+        if (!pinnedIdsRef.current.has(d.id)) return;
+        flushSync(() => renderArticleBody(d));
+        toggleListen(T, bodyOf());
+      });
+    }
+    // node.stopListening: ends the reading when it is this card's.
+    function stopListeningCard(cardEl) {
+      const T = typeof window !== 'undefined' ? window.TTS : null;
+      if (T) stopListening(T, cardEl.querySelector('.rp-scroll'));
     }
 
     // Bubble click (tag, topology, or placeholder): highlight only — no

@@ -278,3 +278,59 @@
   line-height: 1.35;
   opacity: 0.7;
 }
+
+/* The strip in an open card (CardListen, settings.cards.listen): one short
+   row under the card's title, the text below it the point. Small buttons,
+   a voice picker that gives way, and the speed as a short slider. */
+.cardStrip {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 26px;
+  margin: -2px 0 4px;
+  cursor: default;
+}
+.tbSmall {
+  width: 26px;
+  height: 26px;
+}
+.tbSmall :global(svg) {
+  width: 14px;
+  height: 14px;
+}
+.cardSelect {
+  flex: 1 1 60px;
+  min-width: 0;
+  max-width: 120px;
+  padding: 2px 4px;
+  font-size: 11px;
+  min-height: 22px;
+}
+.cardSpeed {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--tts-text);
+}
+.cardSpeed input[type=range] {
+  width: 44px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: color-mix(in srgb, var(--tts-accent) 20%, transparent);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.cardSpeed input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--tts-accent);
+  cursor: pointer;
+}
