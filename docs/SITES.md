@@ -10,7 +10,7 @@ post-pipe is an engine. It holds no user's site. A **site** is a separate folder
 A site is a folder holding at least:
 
 - `settings.json` — the site's values (title, author, base address, graph and reader settings, which engines it subscribes to). The notes that explain every setting live in `examples/site/settings.json`; copy a setting and its `_note` from there.
-- `feeds.opml` — the site's sources. Each `<outline>` is one source: a publisher's RSS, Atom or JSON feed, or a local folder as `local://<path>` (a leading `~` expands; a relative path resolves against the site). One source is one tag-system to rosetta-tagz.
+- `feeds.opml` — the site's sources. Each `<outline>` is one source: a publisher's RSS, Atom or JSON feed, a local folder as `local://<path>` (a leading `~` expands; a relative path resolves against the site), one article's page as `type="page"` (its address in `xmlUrl`), or a local list of such pages as `type="pages"` (a text file, one address per line, a path like `local`'s). One source is one tag-system to rosetta-tagz. The types are described in `README.md`.
 - optionally `auth/.env` — credentials for publishing (GitHub token, API keys). Read from the site first; the engine's own `auth/.env` is the fallback, announced with one logged line.
 - optionally `rtagz-overrides.json` — human decisions for rosetta-tagz (see `docs/POST-PIPE-USES-RTAGZ.md`).
 - optionally `rtagz-ids.json` — written by rosetta-tagz when the site turns it on: the concept ids it keeps from one build to the next. Worth tracking in the site's git.

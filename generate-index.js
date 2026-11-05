@@ -15,6 +15,8 @@ const LocalFolderAdapter = require('./src/adapters/LocalFolderAdapter');
 const RssAdapter         = require('./src/adapters/RssAdapter');
 const AtomAdapter        = require('./src/adapters/AtomAdapter');
 const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
+const PageAdapter        = require('./src/adapters/PageAdapter');
+const PageListAdapter    = require('./src/adapters/PageListAdapter');
 const { loadCorpus }     = require('./src/aggregator');
 const { cacheDirForSite, SKOS_FILES, rtagzSettings } = require('./src/lib/rtagz');
 const { parseOpml }      = require('./src/lib/opml');
@@ -34,6 +36,9 @@ const ADAPTERS = {
   atom:        AtomAdapter,
   json:        JsonFeedAdapter,
   'json-feed': JsonFeedAdapter,
+  // One article's page as one item; a local file listing many such pages.
+  page:        PageAdapter,
+  pages:       PageListAdapter,
 };
 
 // Read feeds.opml and turn each entry into an {adapter, config} pair the
@@ -85,7 +90,19 @@ function configFor(entry) {
       pagesDir: SITE_DIR,
     };
   }
+  if (entry.type === 'pages') {
+    // The list file: a path, like a local folder's (a leading ~ expands;
+    // a relative one resolves against the site).
+    return { ...base, path: resolveSitePath(entry.xmlUrl) };
+  }
   return { ...base, xmlUrl: entry.xmlUrl };
+}
+
+function resolveSitePath(p) {
+  let out = String(p || '').replace(/^local:\/\//, '').replace(/^file:\/\//, '');
+  if (out.startsWith('~')) out = path.join(require('os').homedir(), out.slice(1));
+  if (!out.startsWith('/')) out = path.resolve(SITE_ROOT, out);
+  return out;
 }
 
 const { buildEdges } = require('./src/corpus/buildEdges');

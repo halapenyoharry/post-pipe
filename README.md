@@ -14,7 +14,16 @@ post-pipe is also the publishing route for the writing it holds: a piece can go 
 
 ## Sites
 
-post-pipe holds no one's site. A site is its own folder, usually its own repository, with a `settings.json`, a `feeds.opml` naming its sources (RSS, Atom, JSON, or a local folder as `local://<path>`), and optionally credentials, rtagz overrides and the `rtagz-ids.json` that keeps tag ids stable. `examples/site/` is a complete, annotated site of five invented pieces; a fresh clone builds it. The full shape is in `docs/SITES.md`.
+post-pipe holds no one's site. A site is its own folder, usually its own repository, with a `settings.json`, a `feeds.opml` naming its sources (RSS, Atom, JSON, a local folder as `local://<path>`, or single pages), and optionally credentials, rtagz overrides and the `rtagz-ids.json` that keeps tag ids stable. `examples/site/` is a complete, annotated site of five invented pieces; a fresh clone builds it. The full shape is in `docs/SITES.md`.
+
+Each `<outline>` in `feeds.opml` is one source, and its `type` says what its `xmlUrl` is:
+
+- `rss`, `atom`, `json` — a feed at that address. With no `type`, a feed is assumed and its kind inferred.
+- `local` — a folder of pieces, as `local://<path>`.
+- `page` — one article's address. At build that one page is fetched and read: its title, author and date where the page marks them up, its canonical link, its tags (`article:tag`, `meta keywords`), and its main text by a plain readability pass. It becomes one item whose source is the entry's title, and lands in the graph beside whatever shares its tags. Nothing fetches that the file does not name.
+- `pages` — a local text file (a path like `local`'s) listing such addresses one per line; blank lines and lines starting with `#` are skipped. Each address is one item under the entry's title; a page that fails is left out of that build with a warning.
+
+The `+` in the top bar takes an address: when it leads to a feed, it shows the feed line to add, as before; when it answers with a page that names no feed, it shows the `page` line instead (and `node add-feed.js <url> --type=page` to add it).
 
 ```bash
 npm install

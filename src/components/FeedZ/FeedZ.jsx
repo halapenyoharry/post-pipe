@@ -3,7 +3,8 @@ import styles from './FeedZ.module.css';
 import { Icon } from '../Icon/Icon';
 import { Subscribe } from './Subscribe';
 import { sourceStatus } from '../../lib/sourceStatus';
-import { discoverFeedUrl } from '../../lib/feedAutodiscovery';
+import { discoverSource } from '../../lib/feedAutodiscovery';
+import { buildOutline, buildPageOutline, buildCommand } from '../../lib/addFeedLine';
 import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolders';
 
 /**
@@ -14,6 +15,8 @@ import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolde
  * the graph (without rebuilding the layout). A "+" pill at the end lets
  * you paste a feed URL — the component generates the OPML snippet to
  * the clipboard so you can add it to feeds.opml and rerun the build.
+ * When the address answers with a page that names no feed, the snippet
+ * is a type="page" entry instead: the page itself as one item.
  *
  * Editing remains an OPML-tool job; this component is just a helper for
  * the common "add one" case.
@@ -381,6 +384,11 @@ function AddPill({ autodiscover = true }) {
   // pendingUrl is the URL the user just submitted; the result panel stays
   // open (sticky) until they explicitly dismiss it. No auto-fade.
   const [pendingUrl, setPendingUrl] = useState(null);
+  // The route the panel shows for it: 'feed' (as ever) or, when
+  // autodiscovery read an HTML page that names no feed, 'page' (the page
+  // itself as one item), with the page's own title when it has one.
+  const [pendingKind, setPendingKind] = useState('feed');
+  const [pendingTitle, setPendingTitle] = useState('');
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -394,12 +402,20 @@ function AddPill({ autodiscover = true }) {
     if (!urlIsValid) return;
     const submitted = value.trim();
     setPendingUrl(submitted);
+    setPendingKind('feed');
+    setPendingTitle('');
     setValue('');
     setOpen(false);
     if (autodiscover !== false) {
-      discoverFeedUrl(submitted, { autodiscover: true }).then((resolved) => {
-        if (resolved && resolved !== submitted) {
-          setPendingUrl((cur) => (cur === submitted ? resolved : cur));
+      discoverSource(submitted, { autodiscover: true }).then((found) => {
+        if (!found) return;
+        if (found.kind === 'feed' && found.url && found.url !== submitted) {
+          setPendingUrl((cur) => (cur === submitted ? found.url : cur));
+        } else if (found.kind === 'page') {
+          setPendingUrl((cur) => {
+            if (cur === submitted) { setPendingKind('page'); setPendingTitle(found.title || ''); }
+            return cur;
+          });
         }
       });
     }
@@ -450,6 +466,9 @@ function AddPill({ autodiscover = true }) {
       {pendingUrl && (
         <AddResultPanel
           url={pendingUrl}
+          kind={pendingKind}
+          pageTitle={pendingTitle}
+          onKind={setPendingKind}
           onDismiss={() => setPendingUrl(null)}
         />
       )}
@@ -464,10 +483,14 @@ function AddPill({ autodiscover = true }) {
 //   2. OPML snippet (for hand-editing or external OPML tools)
 // Each line has its own "Copy" button so there's no ambiguity about
 // which one ended up on the clipboard.
-function AddResultPanel({ url, onDismiss }) {
+// kind 'page' (autodiscovery found an HTML page with no feed) shows the
+// same two ways for a type="page" entry, the page itself as one item, and
+// a line to take the feed route anyway; onKind switches between the two.
+function AddResultPanel({ url, kind = 'feed', pageTitle = '', onKind, onDismiss }) {
   const [copied, setCopied] = useState('');
-  const snippet = buildOutline(url);
-  const cliCommand = `node add-feed.js ${shell(url)}`;
+  const isPage = kind === 'page';
+  const snippet = isPage ? buildPageOutline(url, pageTitle) : buildOutline(url);
+  const cliCommand = buildCommand(url, isPage ? 'page' : 'feed', pageTitle);
 
   const copy = async (text, label) => {
     try {
@@ -485,8 +508,19 @@ function AddResultPanel({ url, onDismiss }) {
         title="Dismiss"
         aria-label="Dismiss"
       >×</button>
-      <div className={styles.resultTitle}>Add this feed</div>
+      <div className={styles.resultTitle} data-add-kind={isPage ? 'page' : 'feed'}>{isPage ? 'Add this page' : 'Add this feed'}</div>
       <div className={styles.resultUrl} title={url}>{url}</div>
+      {isPage && (
+        <div className={styles.resultHint} data-add-no-feed>
+          No feed was found at this address, so it is listed as one page: one card, in its place by its tags.
+          {typeof onKind === 'function' && (
+            <>
+              {' '}
+              <button type="button" className={styles.resultLink} onClick={() => onKind('feed')}>Add it as a feed anyway</button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className={styles.resultSection}>
         <div className={styles.resultLabel}>One-step (recommended)</div>
@@ -536,24 +570,5 @@ function isLikelyUrl(s) {
   }
 }
 
-// Shell-quote a URL for safe inclusion in the CLI command suggestion.
-// Single-quote everything and escape any embedded single quote.
-function shell(s) {
-  return `'${String(s).replace(/'/g, `'\\''`)}'`;
-}
-
-// Construct an OPML <outline> for a URL. We leave the type attribute off
-// so the parser's detectType() heuristic runs — that's usually right for
-// well-known feed extensions, and the user can edit if it isn't.
-function buildOutline(url) {
-  const safeUrl = url.replace(/"/g, '&quot;');
-  return `<outline text="${urlToLabel(url)}" title="${urlToLabel(url)}" xmlUrl="${safeUrl}"/>`;
-}
-
-function urlToLabel(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch (_) {
-    return url;
-  }
-}
+// The lines the panel shows (the <outline>, the command) are made in
+// src/lib/addFeedLine.js, so their text is tested without the component.

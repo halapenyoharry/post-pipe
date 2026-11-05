@@ -124,9 +124,66 @@ async function discoverFeedUrl(pageUrl, options = {}) {
   }
 }
 
+// The page's own title, for the page route's line: og:title, else <title>.
+function parsePageTitle(html) {
+  if (!looksLikeHtml(html)) return '';
+  const head = html.slice(0, 65536);
+  const metaRe = /<meta\b[^>]*>/gi;
+  let m;
+  while ((m = metaRe.exec(head)) !== null) {
+    const attrs = parseAttributes(m[0]);
+    const key = String(attrs.property || attrs.name || '').toLowerCase();
+    if ((key === 'og:title' || key === 'twitter:title') && attrs.content) return decodeBasicEntities(attrs.content).trim();
+  }
+  const t = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(head);
+  return t ? decodeBasicEntities(t[1]).replace(/\s+/g, ' ').trim() : '';
+}
+
+/**
+ * What a pasted address is, for the + pill: the feed autodiscovery of
+ * discoverFeedUrl plus the case it folds away. kind is 'feed' when the
+ * address led to a feed link (url is that feed), 'page' when the address
+ * answered with an HTML page that names no feed (url is the address; title
+ * is the page's own, when it has one), and 'unknown' when nothing could be
+ * read (the fetch failed or is off, or the answer is not an HTML page, as a
+ * feed address itself is not): the address is then taken as a feed, as ever.
+ *
+ * @param {string} pageUrl
+ * @param {Object} [options]   as discoverFeedUrl's
+ * @returns {Promise<{ url: string, kind: 'feed'|'page'|'unknown', title: string }>}
+ */
+async function discoverSource(pageUrl, options = {}) {
+  const input = typeof pageUrl === 'string' ? pageUrl.trim() : '';
+  const unknown = { url: input, kind: 'unknown', title: '' };
+  if (!input || options.autodiscover === false) return unknown;
+  const f = options.fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
+  if (typeof f !== 'function') return unknown;
+  try {
+    const res = await f(input, { headers: { Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' } });
+    let text = '';
+    let finalUrl = input;
+    if (typeof res === 'string') {
+      text = res;
+    } else if (res && typeof res === 'object') {
+      if (res.ok === false) return unknown;
+      if (typeof res.url === 'string' && res.url) finalUrl = res.url;
+      if (typeof res.text === 'function') text = await res.text();
+      else if (typeof res.body === 'string') text = res.body;
+    }
+    const found = parseAlternateFeedLink(text, finalUrl);
+    if (found) return { url: found, kind: 'feed', title: '' };
+    if (looksLikeHtml(text)) return { url: input, kind: 'page', title: parsePageTitle(text) };
+    return unknown;
+  } catch (_) {
+    return unknown;
+  }
+}
+
 module.exports = {
   FEED_MIME_TYPES,
   autodiscoverEnabled,
   parseAlternateFeedLink,
+  parsePageTitle,
   discoverFeedUrl,
+  discoverSource,
 };

@@ -147,3 +147,18 @@ test('per-feed display attributes (cardScale, itemCap, defaultHidden) are parsed
   assert.strictEqual(vs.isHidden('https://busy.test/rss'), false, 're-seeding does not override reader choice');
 });
 
+
+test('a page entry names one article\'s address; a pages entry names a local list of them', () => {
+  // Neither is inferred: an address with no type is a feed, as ever.
+  const feeds = parseOpml(wrap(
+    `<outline type="page" text="Kettle piece" xmlUrl="https://quietkitchen.example/essays/kettle-switch/"/>` +
+    `<outline type="pages" text="Kept pages" xmlUrl="kept-pages.txt"/>` +
+    `<outline text="Plain" xmlUrl="https://quietkitchen.example/essays/kettle-switch/"/>`,
+  ));
+  assert.strictEqual(feeds[0].type, 'page');
+  assert.strictEqual(feeds[0].title, 'Kettle piece');
+  assert.strictEqual(feeds[0].prominence, 'secondary', 'a page is a subscribed source, not the site\'s own corpus');
+  assert.strictEqual(feeds[1].type, 'pages');
+  assert.strictEqual(feeds[1].xmlUrl, 'kept-pages.txt');
+  assert.strictEqual(feeds[2].type, 'rss');
+});
