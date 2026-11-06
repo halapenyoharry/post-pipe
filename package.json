@@ -1,7 +1,7 @@
 {
   "name": "post-pipe",
   "version": "1.0.3",
-  "description": "An engine for reading a collection as a graph instead of a feed: a static site of cards, tagz and a reader, with routes to publish the pieces it holds",
+  "description": "Builds a static website from folders of writing, web pages, and RSS, Atom or JSON feeds: every piece is a card in a graph, joined to other cards through the tags they share, with a reader and text-to-speech",
   "license": "SEE LICENSE IN LICENSE",
   "main": "index.js",
   "bin": {
