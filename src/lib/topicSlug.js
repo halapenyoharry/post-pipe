@@ -24,7 +24,7 @@
 // (topicSlugs), a card whose pair another card already took pairs its first
 // with its third, else takes a numeric suffix (-2, -3).
 //
-// That is the issue's code. Three changes since (T49, 2026-11-05):
+// That is the issue's code. Four changes since (T49, 2026-11-05 and -06):
 //   a. A tag stays whole. A tag of several words that the body uses whole
 //      (wu-wei, behavioral science) is one word of the pair, spelled as the
 //      tag spells it, so a topic slug may have more than two parts
@@ -46,6 +46,17 @@
 //      appear in, in the strongest zone holding both, the zones ranked
 //      subtitle, tags, topology, summary, title, body (the issue's order of
 //      the subject set, then the title and the body).
+//   d. A tag is the card's own (the tag zone, its boost, a's whole tags)
+//      only when the piece or its feed wrote it: a tag reference whose
+//      origin is explicit, or a tag with no reference at all (a site without
+//      rosetta-tagz). A tag that rosetta-tagz found itself, every one of
+//      whose references is discovered or emergent, is read as text: it
+//      joins no zone and takes no boost, and its words count only where the
+//      card's text holds them. A tag with an explicit reference besides is
+//      the card's own. Harold, 2026-11-05: rosetta-tagz's tags "should only
+//      be as text I guess", so this is a switch: options.foundTags, 'text'
+//      by default, 'tags' to count every tag as the card's own, as before d
+//      (the build reads it from settings.cards.topicSlugFoundTags).
 // And HTML entities (&nbsp;, &amp;, &#8217;) are read as the characters they
 // stand for, so none of them is ever a word.
 //
@@ -58,11 +69,12 @@
 // rosetta-tagz/lib/. It reads a card's tags and its tag references
 // (_references) and writes nothing into them.
 //
-// Exports:
-//   topicSlug(item, corpusStats?) -> { slug, words, candidates }
-//   topicSlugs(items)             -> Array<{ id, slug, words, candidates }>
-//   buildCorpusStats(items)       -> { N, df }
-//   topicSlugOn(settings)         -> settings.cards.topicSlug !== false
+// Exports (options: { foundTags: 'text' | 'tags' }, 'text' when absent):
+//   topicSlug(item, corpusStats?, options?) -> { slug, words, candidates }
+//   topicSlugs(items, options?)             -> Array<{ id, slug, words, candidates }>
+//   buildCorpusStats(items, options?)       -> { N, df }
+//   topicSlugOn(settings)                   -> settings.cards.topicSlug !== false
+//   topicSlugOptions(settings)              -> the options a site's settings give
 //   tokenize(text), stem(word)
 
 const { slugify } = require('./cardSlug');
@@ -286,18 +298,38 @@ function firstString(...values) {
   return '';
 }
 
+// (d) The origins that say rosetta-tagz found a tag itself, in the card's text
+// (discovered) or against its concepts (emergent), where the piece or its feed
+// did not write it.
+const FOUND_ORIGINS = new Set(['discovered', 'emergent']);
+
+// (d) How the tags rosetta-tagz found are read: as tags only when asked.
+const foundTagsOf = (options) => (options && options.foundTags === 'tags' ? 'tags' : 'text');
+
 // A card's tags: its tags as written, then the value of any tag reference
-// (_references) not among them.
-function tagsOf(it) {
+// (_references) not among them. With found tags read as text (d), a tag every
+// one of whose references is found (discovered or emergent) is left out, and
+// its words count only where the card's text holds them; a tag with no
+// reference, or with an explicit one, is the card's own and stays.
+function tagsOf(it, foundTags = 'text') {
   const tags = listOf(it.tags);
-  const have = new Set(tags.map((t) => t.trim()));
+  const origins = new Map(); // value -> the origins of its references
   if (Array.isArray(it._references)) {
     for (const r of it._references) {
       const v = r && r.type === 'tag' && typeof r.value === 'string' ? r.value.trim() : '';
-      if (v && !have.has(v)) { have.add(v); tags.push(v); }
+      if (!v) continue;
+      if (!origins.has(v)) origins.set(v, []);
+      origins.get(v).push(r.origin);
     }
   }
-  return tags;
+  const have = new Set(tags.map((t) => t.trim()));
+  for (const v of origins.keys()) if (!have.has(v)) { have.add(v); tags.push(v); }
+  if (foundTags === 'tags') return tags;
+  const found = (t) => {
+    const o = origins.get(t.trim());
+    return Boolean(o) && o.every((x) => FOUND_ORIGINS.has(x));
+  };
+  return tags.filter((t) => !found(t));
 }
 
 // Between two tags, or two zones: no phrase runs across it.
@@ -330,9 +362,9 @@ function isWholeTag(t) {
   return w.length === 2 && /^\p{L}+$/u.test(w) && !isStop(w);
 }
 
-function extractZones(item) {
+function extractZones(item, foundTags = 'text') {
   const it = item && typeof item === 'object' ? item : {};
-  const tagList = tagsOf(it);
+  const tagList = tagsOf(it, foundTags);
   const topoList = [...listOf(it.topology), ...listOf(it.lineage)];
 
   // Each zone's tokens as they stand, where a phrase is looked for...
@@ -439,8 +471,10 @@ function statsOf(zonesList) {
   return { N: Math.max(1, zonesList.length), df };
 }
 
-function buildCorpusStats(items) {
-  return statsOf((Array.isArray(items) ? items : []).map(extractZones));
+// Give it the options its cards' topic slugs are reckoned with.
+function buildCorpusStats(items, options = {}) {
+  const foundTags = foundTagsOf(options);
+  return statsOf((Array.isArray(items) ? items : []).map((it) => extractZones(it, foundTags)));
 }
 
 // Every candidate of one card, best first.
@@ -597,16 +631,17 @@ function slugOf(pair, z) {
 
 const shown = (ranked) => ranked.slice(0, 8).map(({ word, score, tf, df: d, in: z }) => ({ word, score, tf, df: d, in: z }));
 
-function topicSlug(item, corpusStats = null) {
-  const z = extractZones(item);
+function topicSlug(item, corpusStats = null, options = {}) {
+  const z = extractZones(item, foundTagsOf(options));
   const ranked = rank(z, corpusStats);
   const { words, slug } = slugOf(choose(ranked).pair, z);
   return { slug, words, candidates: shown(ranked) };
 }
 
-function topicSlugs(items) {
+function topicSlugs(items, options = {}) {
   const list = Array.isArray(items) ? items : [];
-  const zonesList = list.map(extractZones);
+  const foundTags = foundTagsOf(options);
+  const zonesList = list.map((it) => extractZones(it, foundTags));
   const stats = statsOf(zonesList);
   const used = new Set();
   const out = [];
@@ -640,4 +675,13 @@ function topicSlugOn(settings) {
   return cards.topicSlug !== false;
 }
 
-module.exports = { topicSlug, topicSlugs, buildCorpusStats, topicSlugOn, tokenize, stem };
+// The options a site's settings give the topic slug (d):
+// settings.cards.topicSlugFoundTags (provisional), 'tags' to count the tags
+// rosetta-tagz found as the card's own; anything else, or nothing, reads them
+// as text.
+function topicSlugOptions(settings) {
+  const cards = settings && settings.cards && typeof settings.cards === 'object' ? settings.cards : {};
+  return { foundTags: cards.topicSlugFoundTags === 'tags' ? 'tags' : 'text' };
+}
+
+module.exports = { topicSlug, topicSlugs, buildCorpusStats, topicSlugOn, topicSlugOptions, tokenize, stem };

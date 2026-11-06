@@ -231,7 +231,7 @@ function readerFontFaces() {
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
 const { cardsLedgerPath, readLedger, writeLedger, assignSlugs } = require('./src/lib/cardSlug');
-const { topicSlugs, topicSlugOn } = require('./src/lib/topicSlug');
+const { topicSlugs, topicSlugOn, topicSlugOptions } = require('./src/lib/topicSlug');
 const { contributionsConfig } = require('./src/lib/contributions');
 const { timeOverlayConfig } = require('./src/lib/timeOverlay');
 const { lookFromSettings } = require('./src/components/GraphViewer/containerLook');
@@ -996,10 +996,13 @@ async function main() {
   // the corpus. It is not frozen: a card's topic slug may change from one
   // build to the next as the corpus changes. slug, slugSource and the cards
   // ledger are untouched. A site turns it off with cards.topicSlug false.
+  // The tags rosetta-tagz found itself (discovered or emergent) are read as
+  // text unless cards.topicSlugFoundTags is "tags".
   if (topicSlugOn(SETTINGS)) {
-    const topics = topicSlugs(items);
+    const topicOptions = topicSlugOptions(SETTINGS);
+    const topics = topicSlugs(items, topicOptions);
     items.forEach((item, i) => { item.topicSlug = topics[i].slug; });
-    console.log(`  topic slugs: ${items.length} (tools/topic-slugs.js shows each with its candidates)`);
+    console.log(`  topic slugs: ${items.length}, the tags rosetta-tagz found read as ${topicOptions.foundTags} (cards.topicSlugFoundTags; tools/topic-slugs.js shows each with its candidates)`);
   } else {
     console.log('  topic slugs: off (cards.topicSlug false)');
   }

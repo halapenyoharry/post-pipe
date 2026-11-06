@@ -120,6 +120,69 @@ test('change c: the pair keeps the order of the strongest zone holding both', ()
   assert.strictEqual(T.topicSlug({ ...lake, summary: 'Pollution is the story here.' }).slug, 'lake-pollution');
 });
 
+// Change d: a tag rosetta-tagz found itself (its every reference discovered or
+// emergent) is read as text unless options.foundTags is 'tags'.
+const ref = (value, origin) => (origin ? { type: 'tag', value, origin } : { type: 'tag', value });
+const glassAndOptics = {
+  title: 'Glass and optics',
+  summary: 'Optics of glass.',
+  content_html: '<p>Glass bends light. The optics of glass. Optics again.</p>',
+  tags: ['glass', 'optics'],
+  _references: [ref('glass', 'explicit'), ref('optics', 'discovered')],
+};
+const zonesOf = (r, word) => r.candidates.find((c) => c.word === word).in;
+
+test('change d, by default: a tag rosetta-tagz found is read as text, its words counted only where the text holds them', () => {
+  const r = T.topicSlug(glassAndOptics);
+  assert.deepStrictEqual(zonesOf(r, 'glass'), ['tags', 'summary', 'title', 'body'], 'the feed wrote glass: the card\'s own tag');
+  assert.deepStrictEqual(zonesOf(r, 'optics'), ['summary', 'title', 'body'], 'rosetta-tagz found optics: no tag zone, no tag weight');
+  assert.ok(r.candidates[1].score < r.candidates[0].score);
+  // The tags hold only glass now, so the summary gives the order.
+  assert.strictEqual(r.slug, 'optics-glass');
+  // Emergent is found too.
+  const emergent = { ...glassAndOptics, _references: [ref('glass', 'explicit'), ref('optics', 'emergent')] };
+  assert.deepStrictEqual(zonesOf(T.topicSlug(emergent), 'optics'), ['summary', 'title', 'body']);
+  assert.deepStrictEqual(T.topicSlugOptions({}), { foundTags: 'text' });
+  assert.deepStrictEqual(T.topicSlugOptions({ cards: { topicSlugFoundTags: 'Tags' } }), { foundTags: 'text' }, 'anything but "tags" reads them as text');
+});
+
+test('change d, the switch: foundTags "tags" counts every tag as the card\'s own, as before', () => {
+  const r = T.topicSlug(glassAndOptics, null, { foundTags: 'tags' });
+  assert.deepStrictEqual(zonesOf(r, 'optics'), ['tags', 'summary', 'title', 'body']);
+  assert.strictEqual(r.slug, 'glass-optics');
+  assert.deepStrictEqual(T.topicSlugOptions({ cards: { topicSlugFoundTags: 'tags' } }), { foundTags: 'tags' });
+  // As if no reference said where a tag came from.
+  const items = [glassAndOptics, { title: 'Solar Standard', tags: ['standards'], _references: [ref('standards', 'discovered')] }];
+  const unmarked = items.map((it) => ({ ...it, _references: it._references.map((x) => ref(x.value)) }));
+  assert.deepStrictEqual(T.topicSlugs(items, { foundTags: 'tags' }), T.topicSlugs(unmarked));
+});
+
+test('change d: a tag the piece or its feed wrote is its own, even when rosetta-tagz found it too; so is a tag with no reference', () => {
+  const mixed = { ...glassAndOptics, _references: [ref('glass', 'explicit'), ref('optics', 'discovered'), ref('optics', 'explicit')] };
+  assert.deepStrictEqual(zonesOf(T.topicSlug(mixed), 'optics'), ['tags', 'summary', 'title', 'body']);
+  assert.strictEqual(T.topicSlug(mixed).slug, 'glass-optics');
+  // A site without rosetta-tagz: no reference, or a reference that names no origin.
+  const none = { ...glassAndOptics, _references: undefined };
+  const unmarked = { ...glassAndOptics, _references: [ref('glass'), ref('optics')] };
+  assert.deepStrictEqual(zonesOf(T.topicSlug(none), 'optics'), ['tags', 'summary', 'title', 'body']);
+  assert.deepStrictEqual(zonesOf(T.topicSlug(unmarked), 'optics'), ['tags', 'summary', 'title', 'body']);
+});
+
+test('change d: a card whose every tag rosetta-tagz found is read like a card without tags, and a found tag is never whole', () => {
+  const solar = { title: 'Solar Standard', tags: ['standards'], _references: [ref('standards', 'discovered')] };
+  assert.deepStrictEqual(T.topicSlug(solar), T.topicSlug({ title: 'Solar Standard' }));
+  assert.strictEqual(T.topicSlug(solar).slug, 'solar-standard');
+  assert.strictEqual(T.topicSlug(solar, null, { foundTags: 'tags' }).slug, 'solar-standards');
+  // An emergent wu-wei is text, and wu is too short for running text.
+  const wu = { title: 'Negentropic Wu Wei', tags: ['wu-wei'], _references: [ref('wu-wei', 'emergent')] };
+  assert.strictEqual(T.topicSlug(wu).slug, 'negentropic-wei');
+  assert.strictEqual(T.topicSlug(wu, null, { foundTags: 'tags' }).slug, 'negentropic-wu-wei');
+  // Nor is a found tag counted across the corpus as a whole tag.
+  const corpus = [wu, { title: 'Wu wei, again' }];
+  assert.strictEqual(T.buildCorpusStats(corpus).df.get('wu wei'), undefined);
+  assert.strictEqual(T.buildCorpusStats(corpus, { foundTags: 'tags' }).df.get('wu wei'), 2);
+});
+
 test('over a corpus: idf from every card, a pair already taken pairs first and third, then a numeric suffix', () => {
   const same = (id) => ({ id, tags: ['glass', 'optics', 'lens'], content_html: '<p>Glass, glass and glass. Optics and optics. A lens.</p>' });
   const items = [same('a'), same('b'), same('c'), { id: 'd', title: 'Harbor lights', content_html: '<p>Harbor lights at night.</p>' }];
@@ -187,9 +250,16 @@ test('the build: items carry topicSlug; cards.topicSlug false leaves them withou
     assert.strictEqual(topic['Negentropic Wu Wei'], 'negentropic-wu-wei');
     assert.strictEqual(topic['Solar Standard'], 'solar-standards');
     assert.strictEqual(topic['Three gates'], 'texas-election');
-    assert.match(on.log, /topic slugs: 3/);
+    assert.match(on.log, /topic slugs: 3, the tags rosetta-tagz found read as text/);
     // What the build wrote is what the module gives for the feed it wrote.
     assert.deepStrictEqual(on.items.map((it) => it.topicSlug), T.topicSlugs(on.items).map((r) => r.slug));
+
+    // cards.topicSlugFoundTags reaches the build; without rosetta-tagz no tag
+    // was found, so the words are the same.
+    put('settings.json', settings({ topicSlugFoundTags: 'tags' }));
+    const asTags = build();
+    assert.match(asTags.log, /topic slugs: 3, the tags rosetta-tagz found read as tags/);
+    assert.deepStrictEqual(asTags.items.map((it) => it.topicSlug), on.items.map((it) => it.topicSlug));
 
     put('settings.json', settings({ topicSlug: false }));
     const off = build();
@@ -227,6 +297,23 @@ test('tools/topic-slugs.js: one block per card from a path or stdin, --json the 
     assert.deepStrictEqual(json.cards.map((c) => [c.title, c.slug, c.topicSlug]), [['Negentropic Wu Wei', 'negentropic_wu-wei', 'negentropic-wu-wei'], ['Solar Standard', null, 'solar-standards']]);
     assert.strictEqual(json.cards[0].builtTopicSlug, 'wei-negentropic');
     assert.ok(json.cards[0].candidates.length <= 4 && json.cards[0].candidates.every((c) => typeof c.word === 'string' && typeof c.score === 'number'));
+
+    // --found-tags, text by default, as a default build.
+    assert.strictEqual(json.foundTags, 'text');
+    const found = { items: [{ title: 'Solar Standard', tags: ['standards'], _references: [{ type: 'tag', value: 'standards', origin: 'discovered' }], _source: { title: 'Posts' } }] };
+    fs.writeFileSync(p, JSON.stringify(found));
+    const asText = [];
+    const asTags = [];
+    assert.strictEqual(tool.run([p, '--json'], { log: (s) => asText.push(s) }), 0);
+    assert.strictEqual(tool.run([p, '--json', '--found-tags', 'tags'], { log: (s) => asTags.push(s) }), 0);
+    assert.strictEqual(JSON.parse(asText.join('\n')).cards[0].topicSlug, 'solar-standard');
+    assert.strictEqual(JSON.parse(asTags.join('\n')).cards[0].topicSlug, 'solar-standards');
+    assert.strictEqual(JSON.parse(asTags.join('\n')).foundTags, 'tags');
+    const header = [];
+    assert.strictEqual(tool.run([p, '--found-tags', 'text'], { log: (s) => header.push(s) }), 0);
+    assert.match(header[0], /found tags read as: text/);
+    assert.strictEqual(tool.run([p, '--found-tags', 'both'], { log: () => {} }), 2);
+    assert.strictEqual(tool.run([p, '--found-tags'], { log: () => {} }), 2);
 
     assert.deepStrictEqual(fs.readdirSync(dir), ['feed.json'], 'the tool writes no file');
     assert.strictEqual(tool.run(['--nope'], { log: () => {} }), 2);
