@@ -25,11 +25,12 @@ flowchart TB
     overrides["rtagz-overrides.json<br/>human decisions"]
     ids["rtagz-ids.json<br/>concept ids kept between builds"]
     contrib["contributions.json<br/>what readers brought"]
+    cards["cards.json<br/>card slugs, frozen (2026-11-04)"]
   end
 
   subgraph BUILD["generate-index.js  (POSTPIPE_SITE=site)"]
-    adapters["adapters<br/>local · rss · atom · json"]
-    p1["phase 1 fetch<br/>failed feed → last good copy"]
+    adapters["adapters<br/>local · rss · atom · json · page · pages"]
+    p1["phase 1 fetch<br/>failed feed → the newer of its last good copy<br/>and the site's saved copy"]
     p2["phase 2 colours<br/>explicit first, then hashed apart"]
     rt["rtagz phase<br/>rtz-build · emerge · discover<br/>never fails the build"]
     p3["phase 3 sources + provenance<br/>every item stamped"]
@@ -51,7 +52,7 @@ flowchart TB
   subgraph BROWSER["Reader's browser, first paint"]
     vs["viewState (localStorage, prefix post-pipe:)<br/>positions per layout · sizes · pins<br/>bookmarks · reading progress<br/>pruned to items that still exist"]
     opening["Opening: art ↔ graph<br/>startOn: remembered"]
-    layout["layout chosen<br/>cluster | ring · tightness · min pieces per tag<br/>scheme + depth"]
+    layout["view and layout chosen<br/>cluster | ring · tightness · edge weights<br/>min pieces per tag · scheme + depth"]
     first["first frame:<br/>cards at remembered positions,<br/>else force settles"]
   end
 
@@ -59,6 +60,7 @@ flowchart TB
   opml --> adapters --> p1 --> p2 --> rt --> p3 --> edges --> feed
   overrides --> rt
   ids <--> ledger
+  cards <--> BUILD
   rt <--> RTAGZ
   schemes --> feed
   rt --> skos
@@ -72,7 +74,7 @@ flowchart TB
   layout --> first
 ```
 
-What holds still across a rebuild: the card's slug, the tag's concept id (through the ledger), and the reader's arrangement (through viewState, keyed by those ids). Everything else may move. That triad is the floor the ring layout, the neat view and reader-built orderings stand on.
+What holds still across a rebuild: the card's slug (frozen in the site's `cards.json` since 2026-11-04), the tag's concept id (through the ledger), and the reader's arrangement (through viewState, keyed by the item's id and the tag's concept id; the viewer does not read the frozen slug yet). Everything else may move. That triad is the floor the ring layout, the neat view and reader-built orderings stand on.
 
 ---
 
@@ -100,7 +102,8 @@ flowchart LR
     a3["node.zoomToReadable"]
     a4["node.openReader"]
     a5["node.select"]
-    a6["panel controls:<br/>layout · tightness · min pieces<br/>scheme · depth · tag list · lines to relatives"]
+    a7["node.listen · node.stopListening"]
+    a6["panel and top-bar controls:<br/>layout · tightness · edge weights · min pieces<br/>scheme · depth · tag list · lines to relatives<br/>tagz shown, as pills or dots"]
   end
 
   subgraph STATE["state that changes"]
@@ -120,6 +123,7 @@ flowchart LR
   a1 & a5 --> graphst
   a2 & a3 --> view
   a4 --> reader
+  a7 --> reader
   a6 --> graphst
   graphst --> vs2
   reader --> vs2
@@ -183,21 +187,23 @@ The operations a reader performs, named once: **scanning** a field rather than a
 |---|---|---|---|
 | what a gesture means | bindings table | gesture → intent | built (ACTIONS.md) |
 | where things are | viewState by stable id | arrangement memory | built |
-| what a tag is called | rtagz schemes, scheme chosen in panel | shared vocabulary | built, deepening (IPTC next) |
-| how deep to look | depth slider; folded lines as an option | granularity | in this release |
-| what comes first | layout forces; ring radius attribute (#18) | one ordering vs. many | partly built |
+| what a tag is called | rtagz schemes, scheme chosen in panel | shared vocabulary | built; published vocabularies (IPTC) on hold since 2026-10-31 |
+| how deep to look | depth slider; folded lines as an option | granularity | built |
+| what comes first | layout forces, links weighted by degree and recency since 2026-11-04 (`graph.edgeWeights`); ring radius attribute (#18) | one ordering vs. many | partly built |
 | the scroll | neat view (#16) | low-cost default | not built |
-| whose weights | reader-built orderings (#17) | own algorithm | not built |
+| whose weights | reader-built orderings (#17) | own algorithm | programs only: `flow/` orders cards under a preset's weights (2026-11-01); nothing in the viewer |
 | what a point means | nearest-wins / region select (#21) | pointing in a crowd | not built |
 
 ---
 
 ## To confirm (`?` lines)
 
-- Whether `contributions.json` is read at launch or on opening a piece.
-- Whether `startOn: remembered` falls back to art or graph on a first visit with no storage.
-- Whether drag positions are stored per layout (`placeOf(layout) + persistKey`) in all layouts or only force and ring.
-- Whether the tag list / min-pieces slider writes to viewState or only to in-memory panel state.
+Checked against the code on 2026-11-05; each answer follows its question.
+
+- Whether `contributions.json` is read at launch or on opening a piece. At launch: `useContributions` fetches it once when the page mounts, apart from `feed.json` (`src/components/Contributions/useContributions.js`).
+- Whether `startOn: remembered` falls back to art or graph on a first visit with no storage. The art (`startState` in `src/lib/opening.js`); a `#read=` link opens on the graph.
+- Whether drag positions are stored per layout (`placeOf(layout) + persistKey`) in all layouts or only force and ring. In every layout: the key is the layout's name and the settings that shape it (`layoutKey.js`, with non-default edge weights since 2026-11-04), then the item's id or the tag's concept; sizes are filed against the item alone (`GraphViewer.jsx`).
+- Whether the tag list / min-pieces slider writes to viewState or only to in-memory panel state. The slider writes the viewState preference `minTagPieces`, kept on the device; the tag list writes nothing: it follows that preference and the graph's counts, and a row picks its tag in the graph (`graph:select-tag`), which is not kept.
 
 ---
 

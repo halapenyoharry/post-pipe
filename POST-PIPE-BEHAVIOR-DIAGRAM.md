@@ -1,6 +1,8 @@
 # post-pipe, full behavior diagram
 
-**Last updated:** 2026-10-31
+**Last updated:** 2026-11-05
+
+(2026-11-05: the build phase, the artifacts, the publishing phase and the implicit conventions below describe the code as it is now. The runtime phase is the viewer as it was before 2026-05-12, inline in `index.html`; that day (905d0e4) it moved into React components in `src/`, described under "The runtime today" after the collapse inventory. The inventory keeps its first wording, with what has happened since noted on each item.)
 
 This diagram enumerates every behavior I can identify in the current post-pipe codebase. Items flagged with ⊕ are collapsed, meaning multiple distinct responsibilities are currently implemented in one file or one function and would be worth separating in any serious refactor. Items without a flag are discrete responsibilities already living in their own identifiable slot.
 
@@ -14,12 +16,12 @@ flowchart TB
 subgraph BUILD["Build phase: node generate-index.js"]
     direction TB
 
-    settings["settings.json<br/>(site metadata, theme, TTS config,<br/>toolbar config, frontmatter_display,<br/>export license header, content_dir)"]
+    settings["settings.json<br/>(site metadata, theme, TTS config,<br/>toolbar config, frontmatter_display,<br/>export license header, graph, cards,<br/>rtagz, views)"]
     envfile["auth/.env<br/>(GEMINI_API_KEY)"]
 
     subgraph INGEST["ingest.js, folder → Content[]"]
-        walk["walk content root,<br/>skip dotfolders + authors + node_modules"]
-        detect["substrate detector<br/>(audio/video/image/text → kind)"]
+        walk["walk a local source's folder,<br/>skip dot and underscore folders,<br/>authors + node_modules"]
+        detect["substrate detector<br/>(audio/video/image/text → kind;<br/>a link piece → link)"]
         readfm["frontmatter.json reader"]
         readqmd["index.qmd YAML reader"]
         findbody["body resolver<br/>(index.md, index.qmd, index.html, fallback)"]
@@ -30,11 +32,11 @@ subgraph BUILD["Build phase: node generate-index.js"]
         buildunstr["builder: unstructured"]
     end
 
-    subgraph FEED_SOURCES["src/lib/opml.js + src/aggregator.js + src/adapters/<br/>(LocalFolderAdapter, RssAdapter, AtomAdapter, JsonFeedAdapter,<br/>.feed-cache/colors.json + .feed-cache/last-good/)"]
+    subgraph FEED_SOURCES["src/lib/opml.js + src/aggregator.js + src/adapters/<br/>(LocalFolderAdapter, RssAdapter, AtomAdapter, JsonFeedAdapter,<br/>PageAdapter, PageListAdapter; post-pipe's .feed-cache/colors.json<br/>+ .feed-cache/last-good/, the site's saved copies)"]
         opmlparse["parseOpml(feeds.opml)"]
-        feedfetch["fetch external feeds (fetchText)"]
+        feedfetch["fetch external feeds and pages (fetchText)"]
         feedparse["parse RSS / Atom / JSON Feed"]
-        feedcache["cache last good copy + feed colors"]
+        feedcache["keep last good copy + feed colors;<br/>a failed fetch shows the newer of it<br/>and the site's saved copy"]
     end
 
     subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + HTML emitter)"]
@@ -43,7 +45,7 @@ subgraph BUILD["Build phase: node generate-index.js"]
         covercopy["cover image copy<br/>into _site/covers/"]
         toiso["toIsoDate() date normalizer"]
         statusbucket["statusBucket()<br/>(status → draft/published for graph color)"]
-        buildfeed["buildFeed() JSON Feed 1.1 + buildEdges()"]
+        buildfeed["buildFeed() JSON Feed 1.1 + buildEdges()<br/>+ relationEdges() + card slugs (cards.json)"]
         icons["inline SVG icon library<br/>(play, pause, stop, medium,<br/>substack, youtube, etc.)"]
         buildhtml["buildIndexHTML() ⊕<br/>(reads dist/ bundles + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
         mergesort["aggregator.loadCorpus()<br/>(merge adapters, resolve colors, run rtagz, sort by date)"]
@@ -95,7 +97,7 @@ end
 
 subgraph SITE["_site/ (build output)"]
     feedjson["feed.json<br/>JSON Feed 1.1 + extended schema"]
-    indexhtml["index.html ⊕⊕⊕<br/>(single 425KB file contains:<br/>graph renderer, reader panel,<br/>TTS integration, CSS, fonts,<br/>D3 library, tts.js, SVG icons,<br/>runtime settings)"]
+    indexhtml["index.html ⊕⊕⊕<br/>(one file: the components bundle<br/>dist/post-pipe-components.umd.js,<br/>with React, D3 and the viewer from src/,<br/>its CSS, tts.js, the view state,<br/>fonts, runtime settings)"]
     covers["covers/ (copied cover images)"]
 end
 
@@ -107,7 +109,7 @@ covercopy --> covers
 %% RUNTIME PHASE, what happens when a user opens index.html
 %% ═══════════════════════════════════════════════════════════════════
 
-subgraph RUNTIME["Runtime phase: browser loads _site/index.html"]
+subgraph RUNTIME["Runtime phase before 2026-05-12: browser loads _site/index.html<br/>(the viewer inline; React components in src/ since, see The runtime today)"]
     direction TB
 
     subgraph GRAPH["Graph module ⊕<br/>(inline in index.html, ~800 lines)"]
@@ -249,10 +251,10 @@ USER_CONTENT -.->|source for| PUB
 subgraph IMPLICIT["Implicit conventions, not enforced"]
     conv1["data contract: feed.json shape<br/>(JSON Feed 1.1 + extended fields)"]
     conv2["render contract: index.html<br/>consumes feed.json at load"]
-    conv3["viewer state: window._postGraph<br/>(global, used to freeze sim<br/>during node-expand reader)"]
+    conv3["viewer state: window.PostPipeGraph<br/>(open and close containers) and<br/>window.PostPipeGraphTags; the reader's<br/>arrangement in localStorage<br/>(window._postGraph before 2026-05-12)"]
     conv4["styling: CSS vars from settings.json<br/>(theme.bg, theme.accent, etc.)"]
     conv5["TTS engines register themselves<br/>via window.TTS at script load"]
-    conv6["_site/ is git-tracked<br/>and the deploy surface"]
+    conv6["_site/ is git-ignored<br/>and the deploy surface"]
 end
 
 classDef collapsed fill:#3a1f3a,stroke:#f39c12,color:#eee
@@ -265,31 +267,35 @@ Items marked ⊕ above, in order of refactor priority.
 
 **Tier 1, blocking the graph refactor you asked about:**
 
-1. `generate-index.js::buildIndexHTML()` ⊕⊕⊕. Single function currently emits the entire viewer as a template literal. Contains CSS, HTML structure, D3 library injection, tts.js injection, font injection, SVG icons, runtime settings injection, graph rendering JS, reader panel JS, TTS integration JS. Seven or eight distinct responsibilities in one function. This is the single biggest source of the "can't iterate on the graph" problem.
+1. `generate-index.js::buildIndexHTML()` ⊕⊕⊕. Single function currently emits the entire viewer as a template literal. Contains CSS, HTML structure, D3 library injection, tts.js injection, font injection, SVG icons, runtime settings injection, graph rendering JS, reader panel JS, TTS integration JS. Seven or eight distinct responsibilities in one function. This is the single biggest source of the "can't iterate on the graph" problem. (Resolved 2026-05-12, 905d0e4: `buildIndexHTML()` now inlines the components bundle `dist/post-pipe-components.umd.js`, built from `src/` by `npm run build`, with `tts.js`, the view state and the fonts; the viewer's code no longer lives in a template literal.)
 
-2. `_site/index.html` ⊕⊕⊕. Downstream of (1). Same collapse, materialized. 425KB of mixed responsibility.
+2. `_site/index.html` ⊕⊕⊕. Downstream of (1). Same collapse, materialized. 425KB of mixed responsibility. (Since 2026-05-12 the file is assembled from separate sources; it stays one self-contained file by design.)
 
-3. Graph module inside index.html ⊕. The D3 code, feedToGraph transformer, PostGraph class, tag interaction, hover, click, resize. Internally coherent but has no boundary, no export, no testability.
+3. Graph module inside index.html ⊕. The D3 code, feedToGraph transformer, PostGraph class, tag interaction, hover, click, resize. Internally coherent but has no boundary, no export, no testability. (Extracted 2026-05-12: `src/components/GraphViewer/GraphViewer.jsx`, 6,055 lines on 2026-11-05, with pure parts beside it, such as `layouts.js`, `containerLayout.js` and `layoutKey.js`, and in `src/lib/`, most with tests in `test/`.)
 
 **Tier 2, structural but not urgent:**
 
 4. `generate-index.js` ⊕ as a whole. Orchestrator (reads `feeds.opml` via `src/lib/opml.js`, calls `src/aggregator.js` across `src/adapters/*`, builds edges) + HTML emitter (`buildIndexHTML()`) share one file; local `Content` → JSON Feed transformation now lives in `src/adapters/LocalFolderAdapter.js`.
 
-5. Reader panel ⊕ inside index.html. Phone mode, sidebar mode, swap logic, substrate dispatch, toolbar, frontmatter panel, syndication links, all one module's worth of code with no boundary.
+5. Reader panel ⊕ inside index.html. Phone mode, sidebar mode, swap logic, substrate dispatch, toolbar, frontmatter panel, syndication links, all one module's worth of code with no boundary. (Extracted 2026-05-12: `src/components/ReaderPanel/`.)
 
-6. `renderSubstrate()` ⊕. Dispatches by kind (essay, multi, image, audio, video, archive, fragment, unexplored) but each branch lives inline. Should be a dispatch table with per-kind renderers.
+6. `renderSubstrate()` ⊕. Dispatches by kind (essay, multi, image, audio, video, archive, fragment, unexplored) but each branch lives inline. Should be a dispatch table with per-kind renderers. (Now `fetchContent(item)` in `ReaderPanel.jsx`, still one function with a branch per case.)
 
-7. Reader toolbar ⊕. Six button handlers plus TTS controls plus syndication link generator, all wired up inline.
+7. Reader toolbar ⊕. Six button handlers plus TTS controls plus syndication link generator, all wired up inline. (Still inside `ReaderPanel.jsx`; the TTS controls are their own component, `src/components/TTS/TTS.jsx`.)
 
-8. `clickTag` handler ⊕ inside PostGraph. Tag activation, dim behavior, force rewiring, background-click restoration, all one handler.
+8. `clickTag` handler ⊕ inside PostGraph. Tag activation, dim behavior, force rewiring, background-click restoration, all one handler. (PostGraph is gone since 2026-05-12; choosing a tag lives in `GraphViewer.jsx`, its relatives in `src/lib/tagNetwork.js`, and what a tap does is the bindings table, `src/lib/actions.js`.)
 
-9. TTS module ⊕. tts.js itself I haven't read in full, but from the integration code it contains the registry, the engine implementations, the state machine, the progress emitter, and the highlighter. Probably wants to be split once you touch it.
+9. TTS module ⊕. tts.js itself I haven't read in full, but from the integration code it contains the registry, the engine implementations, the state machine, the progress emitter, and the highlighter. Probably wants to be split once you touch it. (The controls became a component on 2026-05-12, `src/components/TTS/TTS.jsx`; `tts.js` still holds the registry, the two engines, the play state and the highlighter.)
 
 **Tier 3, minor:**
 
-10. Feed ingestion (formerly `platforms/feed-ingester.js`). Split into `src/lib/opml.js` (OPML parser), `src/aggregator.js` (concurrent adapter runner, color resolution, rosetta-tagz phase, source stamping), `src/adapters/` (`LocalFolderAdapter.js`, `RssAdapter.js`, `AtomAdapter.js`, `JsonFeedAdapter.js`, `fetchText.js`, `detectFeedColor.js`, `lastGoodCopy.js`), and `src/lib/colorCache.js`.
+10. Feed ingestion (formerly `platforms/feed-ingester.js`). Split into `src/lib/opml.js` (OPML parser), `src/aggregator.js` (concurrent adapter runner, color resolution, rosetta-tagz phase, source stamping), `src/adapters/` (`LocalFolderAdapter.js`, `RssAdapter.js`, `AtomAdapter.js`, `JsonFeedAdapter.js`, `PageAdapter.js` and `PageListAdapter.js` since 2026-11-04 with `src/lib/pageExtract.js`, `fetchText.js`, `detectFeedColor.js`, `lastGoodCopy.js`), and `src/lib/colorCache.js`.
 
 11. `index.js` CLI ⊕. Argparse + stdin handling + platform dispatch. Small enough that it's fine.
+
+## The runtime today
+
+(2026-11-05.) The page `buildIndexHTML()` writes inlines `dist/post-pipe-components.umd.js` and a short script that fetches `feed.json` and mounts the app: the current view's component from the registry `src/views/index.js` (GraphViewer, drawn with the cluster or the ring layout), `ReaderPanel`, `TTS` over `tts.js`'s `window.TTS`, the top bar `FeedZ`, `Toolbar`, `Settings` (the panel), `TimeOverlay`, `TimeOfDay`, `Theme` and `Opening` (the cover). What a gesture does is the bindings table (`src/lib/actions.js`, `docs/ACTIONS.md`); the reader's arrangement, sizes, pins, bookmarks and reading progress are kept by `src/lib/viewState.js` in the browser's localStorage. The embed (`src/embed.jsx`, `PostPipe.init`) mounts the current view's component, `ReaderPanel`, `FeedZ`, `Toolbar`, `Settings`, `Theme` and `TimeOfDay`, with `ConfigPanel`, and mounts `TTS` in the reader when `features.tts` is on (it speaks through `tts.js`, which the host page loads).
 
 ## What the diagram reveals about the Topospace question
 
@@ -300,3 +306,5 @@ Extracting it is the small change that unlocks everything else. Once the graph i
 The reader panel is the second candidate for extraction, but only after the graph, because the reader depends on the graph's click events and the graph is the load-bearing thing.
 
 The three collapses in index.html (graph, reader, TTS) are each big enough that extracting them one at a time is the correct pace. Doing all three at once would be a rewrite.
+
+(2026-11-05: the extraction happened on 2026-05-12, 905d0e4: the graph, the reader and the TTS controls are React components in `src/`, exported from `src/index.jsx` and built into `dist/`, `dist-lib/` and `dist-embed/`.)

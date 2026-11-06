@@ -7,12 +7,12 @@ flowchart TB
 subgraph BUILD["Build phase: node generate-index.js"]
     direction TB
 
-    settings["settings.json<br/>(site metadata, theme, TTS config,<br/>toolbar config, frontmatter_display,<br/>export license header, content_dir)"]
+    settings["settings.json<br/>(site metadata, theme, TTS config,<br/>toolbar config, frontmatter_display,<br/>export license header, graph, cards,<br/>rtagz, views)"]
     envfile["auth/.env<br/>(GEMINI_API_KEY)"]
 
     subgraph INGEST["ingest.js, folder → Content[]"]
-        walk["walk content root,<br/>skip dotfolders + authors + node_modules"]
-        detect["substrate detector<br/>(audio/video/image/text → kind)"]
+        walk["walk a local source's folder,<br/>skip dot and underscore folders,<br/>authors + node_modules"]
+        detect["substrate detector<br/>(audio/video/image/text → kind;<br/>a link piece → link)"]
         readfm["frontmatter.json reader"]
         readqmd["index.qmd YAML reader"]
         findbody["body resolver<br/>(index.md, index.qmd, index.html, fallback)"]
@@ -23,11 +23,11 @@ subgraph BUILD["Build phase: node generate-index.js"]
         buildunstr["builder: unstructured"]
     end
 
-    subgraph FEED_SOURCES["src/lib/opml.js + src/aggregator.js + src/adapters/<br/>(LocalFolderAdapter, RssAdapter, AtomAdapter, JsonFeedAdapter,<br/>.feed-cache/colors.json + .feed-cache/last-good/)"]
+    subgraph FEED_SOURCES["src/lib/opml.js + src/aggregator.js + src/adapters/<br/>(LocalFolderAdapter, RssAdapter, AtomAdapter, JsonFeedAdapter,<br/>PageAdapter, PageListAdapter; post-pipe's .feed-cache/colors.json<br/>+ .feed-cache/last-good/, the site's saved copies)"]
         opmlparse["parseOpml(feeds.opml)"]
-        feedfetch["fetch external feeds (fetchText)"]
+        feedfetch["fetch external feeds and pages (fetchText)"]
         feedparse["parse RSS / Atom / JSON Feed"]
-        feedcache["cache last good copy + feed colors"]
+        feedcache["keep last good copy + feed colors;<br/>a failed fetch shows the newer of it<br/>and the site's saved copy"]
     end
 
     subgraph GENIDX["generate-index.js ⊕<br/>(orchestrator + HTML emitter)"]
@@ -36,7 +36,7 @@ subgraph BUILD["Build phase: node generate-index.js"]
         covercopy["cover image copy<br/>into _site/covers/"]
         toiso["toIsoDate() date normalizer"]
         statusbucket["statusBucket()<br/>(status → draft/published for graph color)"]
-        buildfeed["buildFeed() JSON Feed 1.1 + buildEdges()"]
+        buildfeed["buildFeed() JSON Feed 1.1 + buildEdges()<br/>+ relationEdges() + card slugs (cards.json)"]
         icons["inline SVG icon library<br/>(play, pause, stop, medium,<br/>substack, youtube, etc.)"]
         buildhtml["buildIndexHTML() ⊕<br/>(reads dist/ bundles + tts.js + fonts,<br/>embeds settings, emits full viewer)"]
         mergesort["aggregator.loadCorpus()<br/>(merge adapters, resolve colors, run rtagz, sort by date)"]
@@ -88,7 +88,7 @@ end
 
 subgraph SITE["_site/ (build output)"]
     feedjson["feed.json<br/>JSON Feed 1.1 + extended schema"]
-    indexhtml["index.html ⊕⊕⊕<br/>(single 425KB file contains:<br/>graph renderer, reader panel,<br/>TTS integration, CSS, fonts,<br/>D3 library, tts.js, SVG icons,<br/>runtime settings)"]
+    indexhtml["index.html ⊕⊕⊕<br/>(one file: the components bundle<br/>dist/post-pipe-components.umd.js,<br/>with React, D3 and the viewer from src/,<br/>its CSS, tts.js, the view state,<br/>fonts, runtime settings)"]
     covers["covers/ (copied cover images)"]
 end
 
@@ -100,7 +100,7 @@ covercopy --> covers
 %% RUNTIME PHASE, what happens when a user opens index.html
 %% ═══════════════════════════════════════════════════════════════════
 
-subgraph RUNTIME["Runtime phase: browser loads _site/index.html"]
+subgraph RUNTIME["Runtime phase before 2026-05-12: browser loads _site/index.html<br/>(the viewer inline; React components in src/ since, see The runtime today)"]
     direction TB
 
     subgraph GRAPH["Graph module ⊕<br/>(inline in index.html, ~800 lines)"]
@@ -242,10 +242,10 @@ USER_CONTENT -.->|source for| PUB
 subgraph IMPLICIT["Implicit conventions, not enforced"]
     conv1["data contract: feed.json shape<br/>(JSON Feed 1.1 + extended fields)"]
     conv2["render contract: index.html<br/>consumes feed.json at load"]
-    conv3["viewer state: window._postGraph<br/>(global, used to freeze sim<br/>during node-expand reader)"]
+    conv3["viewer state: window.PostPipeGraph<br/>(open and close containers) and<br/>window.PostPipeGraphTags; the reader's<br/>arrangement in localStorage<br/>(window._postGraph before 2026-05-12)"]
     conv4["styling: CSS vars from settings.json<br/>(theme.bg, theme.accent, etc.)"]
     conv5["TTS engines register themselves<br/>via window.TTS at script load"]
-    conv6["_site/ is git-tracked<br/>and the deploy surface"]
+    conv6["_site/ is git-ignored<br/>and the deploy surface"]
 end
 
 classDef collapsed fill:#3a1f3a,stroke:#f39c12,color:#eee

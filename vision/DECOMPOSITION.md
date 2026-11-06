@@ -2,7 +2,7 @@
 
 #post-pipe #architecture #vision #decomposition #negentropy
 
-**Last updated:** 2026-05-12 (revised same day, additions for Layer 0 Exoskeleton, Bundle relaxations, Layer 2 edges-first and rosetta-tagz, Layer 3 multi-corpus, Layer 5 split into Tile and Panel, source adapters and feed caching)
+**Last updated:** 2026-11-05 (what it says of the current code, and which steps of the sequence are built). Written 2026-05-12 (revised same day, additions for Layer 0 Exoskeleton, Bundle relaxations, Layer 2 edges-first and rosetta-tagz, Layer 3 multi-corpus, Layer 5 split into Tile and Panel, source adapters and feed caching)
 **Status:** Active. Companion to [[FUTURE-STATE]] and to [[ARCHITECTURE]] in the project root.
 
 ---
@@ -121,11 +121,11 @@ A graph-of-graphs structure for translating between tag-systems.
 
 - Each tag-system is its own graph. Nodes are tag-labels, edges are within-system relationships (hierarchy, hyponymy, near-synonymy, opposition).
 - rosetta-tagz is the graph between systems. Nodes are tag-systems or specific tags within them. Edges are cross-system relationships (identity, synergy, adjacency, opposition, containment, near-equivalence).
-- The user picks which system to display labels through. The viewer translates tag-labels via rosetta-tagz before drawing them.
+- The user picks which system to display labels through. The viewer translates tag-labels via rosetta-tagz before drawing them. (Built 2026-10-25: the panel's scheme choice relabels the tag bubbles by that scheme's labels; `docs/POST-PIPE-USES-RTAGZ.md`.)
 
 **Prior art.** W3C's SKOS (Simple Knowledge Organization System) is exactly this shape and exists specifically for representing tag-vocabularies and their cross-mappings. WordNet is the canonical English example. Not required to adopt SKOS directly, but the wheel is already round and worth knowing.
 
-**Build order.** Empirical, not architected from above. Build the source adapters first, observe the actual tag vocabularies that show up across sources, then build the translation layer once there is something to translate between. Before that, there is no signal to translate.
+**Build order.** Empirical, not architected from above. Build the source adapters first, observe the actual tag vocabularies that show up across sources, then build the translation layer once there is something to translate between. Before that, there is no signal to translate. (It went in that order: the RSS, Atom and JSON Feed adapters came on 2026-06-01, and rosetta-tagz first ran on post-pipe's sources on 2026-10-22.)
 
 ### Source adapters
 
@@ -139,6 +139,8 @@ A corpus is produced by source adapters. The filesystem walker that ingests `~/P
 | `obsidian://vault/...` | Vault reader | Leaf bundles with wikilink edges |
 | `https://.../user.atom` | Microblog stream | Short leaf bundles, time-ordered |
 | `stream://...` | Continuous substrate | One bundle pointing at a live URL |
+
+(Built, as of 2026-11-05: the filesystem walker, as a site's `local://` source, and the RSS, Atom and JSON Feed adapters (`src/adapters/`, 2026-06-01), and since 2026-11-04 one article's page or a local list of pages. A microblog's Atom feed is read by the Atom adapter like any feed; the vault and stream adapters are not built.)
 
 The corpus produced by any adapter has the same shape. The viewer mounts on the corpus. Layers 3 through 7 do not know any of this happened.
 
@@ -308,7 +310,7 @@ For corpora ingested from external sources, feed management is a well-trodden pr
 - **IndexedDB or OPFS.** Browser-side equivalent for web-based aggregators.
 - **Hybrid.** Live fetch with TTL-based disk cache, refresh on expiry. FreshRSS, Miniflux, most server-side aggregators.
 
-The decomposition does not specify which pattern. The choice depends on whether the universal viewer runs in the browser, on the desktop, or both. The structural commitment is just that each source adapter knows how to fetch, parse, and persist its own substrate, and produces bundles into the corpus on demand. Caching is an adapter concern, not a layer concern.
+The decomposition does not specify which pattern. The choice depends on whether the universal viewer runs in the browser, on the desktop, or both. (post-pipe today fetches each feed at build and keeps the last good copy of each as one file per feed address in its own `.feed-cache/last-good/`, the one-cache-file-per-source pattern, with the feeds' colours in `.feed-cache/colors.json`; since 2026-11-05 a site can also ship a saved copy of a feed. A copy is used only when a fetch fails.) The structural commitment is just that each source adapter knows how to fetch, parse, and persist its own substrate, and produces bundles into the corpus on demand. Caching is an adapter concern, not a layer concern.
 
 The decomposition commits to the roles, not the implementations.
 
@@ -333,18 +335,21 @@ The decomposition commits to the roles, not the implementations.
 | Current artifact | Lands at layer | Notes |
 |---|---|---|
 | Exoskeleton (separate project) | 0 | Below post-pipe, will host post-pipe's panels and the universal viewer's panels alike |
-| [`ingest.js`](../ingest.js) | 1 → 2 source adapter | Walks `~/Posts/` bundles, produces corpus. One source adapter among future many. |
+| [`ingest.js`](../ingest.js) | 1 → 2 source adapter | Walks a local source's folder of bundles (a site's `local://` outline, such as `~/Posts/`), through `src/adapters/LocalFolderAdapter.js`, and produces corpus. One source adapter among several since 2026-06-01. |
+| [`src/adapters/`](../src/adapters/) | 1 → 2 source adapters | The local folder, RSS, Atom and JSON Feed (2026-06-01), one page and a list of pages (2026-11-04), each fetched feed with a last good copy |
 | [`generate-index.js`](../generate-index.js) | 2 → output | Emits corpus as `feed.json` |
-| `_site/feed.json` | 2 | Materialized corpus, data contract |
+| `_site/feed.json` | 2 | Materialized corpus, data contract; its `edges` are objects since 2026-09-10 |
+| [`src/corpus/buildEdges.js`](../src/corpus/buildEdges.js), `relationEdges.js` | 2, edges first-class | Each edge an object with `layer`, `role`, `directed` and `attrs` (2026-09-10); rosetta-tagz's relations between tags as edges on layers named by their SKOS relation (2026-10-25) |
+| [`rosetta-tagz/`](../rosetta-tagz/) | 2, corpus ↔ rosetta-tagz | Merges each source's spellings into concepts and keeps every source's own; run by post-pipe at build since 2026-10-22, a folder of this repository since 2026-10-31 |
 | [`tts.js`](../tts.js) | 5 tile | Already a tile registry in spirit |
-| `_site/index.html` graph code | 3 + 4, fused | Lens and renderer collapsed, needs separation |
-| `_site/index.html` reader code | 4 + 5, fused | Renderer and tile/panel slot collapsed, needs separation |
+| [`src/components/GraphViewer/`](../src/components/GraphViewer/) (the graph code in `_site/index.html` until 2026-05-12) | 3 + 4, fused | Lens and renderer collapsed, needs separation |
+| [`src/components/ReaderPanel/`](../src/components/ReaderPanel/) (the reader code in `_site/index.html` until 2026-05-12) | 4 + 5, fused | Renderer and tile/panel slot collapsed, needs separation |
 | Reader toolbar | 5, collapsed | Tiles fused into one bar |
 | Reader (entire) | 5 panel | A panel by another name, currently hardwired |
 | Graph viewer (entire) | 5 panel | Same |
 | [`platforms/*.js`](../platforms/) | 5 tile, publishing | Already operate per-bundle |
-| [`settings.json`](../settings.json) | configuration, cross-layer | Theme tokens, engine list, feed list |
-| `~/Posts/` | 1 + 2 source | post-pipe stays the canonical home for your own work |
+| each site's `settings.json` ([`examples/site/settings.json`](../examples/site/settings.json) explains every setting) | configuration, cross-layer | Theme tokens, engine list; the engine's own root `settings.json` left it on 2026-10-23, and the feed list is the site's `feeds.opml` |
+| `~/Posts/` | 1 + 2 source | The owner's own corpus, read when a site's `feeds.opml` lists it (`local://~/Posts`); since 2026-10-23 the engine holds no one's site (`docs/SITES.md`) |
 
 The work ahead is mostly separation. Identifying where layers are currently fused, then extracting them. The [[POST-PIPE-BEHAVIOR-DIAGRAM]] catalog lists the collapse points in tier-priority order.
 
@@ -366,11 +371,11 @@ Whether the universal viewer is a separate binary, or a mode of post-pipe, is a 
 
 Not a prioritized roadmap. The dependency order. Earlier moves unblock later ones. Each is independent of the rest at the layer above it.
 
-1. **Extract the graph as its own component** at Layer 4. Currently fused with the lens spec inside `index.html`. Extract first because everything else in the reader depends on graph click events.
+1. **Extract the graph as its own component** at Layer 4. Currently fused with the lens spec inside `index.html`. Extract first because everything else in the reader depends on graph click events. (Done 2026-05-12, 905d0e4: `src/components/GraphViewer/`; the lens spec is still inside it.)
 
-2. **Extract the reader as its own component** at Layer 4 + Layer 5 panel. Depends on the graph having a stable click-event contract.
+2. **Extract the reader as its own component** at Layer 4 + Layer 5 panel. Depends on the graph having a stable click-event contract. (Done 2026-05-12: `src/components/ReaderPanel/`.)
 
-3. **Extract TTS as a tile** at Layer 5. Already structured as a registry, just needs to leave the inline script.
+3. **Extract TTS as a tile** at Layer 5. Already structured as a registry, just needs to leave the inline script. (In part, 2026-05-12: the controls are `src/components/TTS/TTS.jsx` over `tts.js`'s registry, which the page still inlines; there is no tile registry.)
 
 4. **Mount the components inside the exoskeleton** at Layer 0. The exoskeleton becomes the host. post-pipe's `index.html` keeps working as a standalone artifact, the exoskeleton becomes the alternative host with full panel management and OSC routing.
 
@@ -378,15 +383,15 @@ Not a prioritized roadmap. The dependency order. Earlier moves unblock later one
 
 6. **Split the reader toolbar into tiles** at Layer 5. Tile registry, same pattern as the TTS engine registry. Existing buttons become individual tiles, the toolbar becomes a tile-slot.
 
-7. **Promote edges to first-class objects** at Layer 2. The corpus today stores tags as a list field on each bundle, edges are derived. Reshaping the corpus so edges are objects with their own properties unlocks all subsequent multi-corpus and rosetta-tagz work. This is the structural move that makes the universal viewer different in kind, not just degree, from existing RSS readers.
+7. **Promote edges to first-class objects** at Layer 2. The corpus today stores tags as a list field on each bundle, edges are derived. Reshaping the corpus so edges are objects with their own properties unlocks all subsequent multi-corpus and rosetta-tagz work. This is the structural move that makes the universal viewer different in kind, not just degree, from existing RSS readers. (Done 2026-09-10: `feed.json` carries `edges`, objects with `layer`, `role`, `directed` and `attrs`, from `src/corpus/buildEdges.js`; each item still keeps its tags as a list too.)
 
 8. **Migrate the ingester to relaxed leaf bundles** at Layer 1 → 2. Independent of most of the above because `feed.json` shape can stay stable.
 
-9. **Build source adapters beyond the filesystem walker** at the Layer 1 source-adapter boundary. RSS, JSON Feed, Atom, scattered markdown, Obsidian vault. Each is a separate adapter. The universal viewer becomes useful around here.
+9. **Build source adapters beyond the filesystem walker** at the Layer 1 source-adapter boundary. RSS, JSON Feed, Atom, scattered markdown, Obsidian vault. Each is a separate adapter. The universal viewer becomes useful around here. (Done for RSS, JSON Feed and Atom on 2026-06-01, and for one page or a list of pages on 2026-11-04; not for scattered markdown or an Obsidian vault.)
 
-10. **Build the view-list panel** at Layer 5. The multi-corpus management surface. Lists corpora, lets the user reorder and toggle them, picks the semantic system for label display.
+10. **Build the view-list panel** at Layer 5. The multi-corpus management surface. Lists corpora, lets the user reorder and toggle them, picks the semantic system for label display. (In part, in two places: the top bar's source pills show and hide each source (2026-06-01), and the panel picks the scheme the tag labels are read through (2026-10-25); nothing reorders them.)
 
-11. **Build rosetta-tagz** at Layer 2. Empirical, after several source adapters exist. Without source diversity, there is no signal to translate.
+11. **Build rosetta-tagz** at Layer 2. Empirical, after several source adapters exist. Without source diversity, there is no signal to translate. (Done: post-pipe runs it at build since 2026-10-22; it has been a folder of this repository since 2026-10-31.)
 
 12. **Build multi-corpus lenses** at Layer 3. Depends on rosetta-tagz and edges-first.
 
@@ -394,7 +399,7 @@ Not a prioritized roadmap. The dependency order. Earlier moves unblock later one
 
 14. **Build the personal infeed** at Layer 7. Receives flow outputs. Plays them. Starts as the simplest possible queue and player.
 
-Steps 1, 2, 3 are the Jules-shaped work currently being scoped. Step 4 is the exoskeleton integration. Step 5 is the architectural payoff that splits lens from renderer. Step 6 is the toolbar dissolution from layer #5 of [[FUTURE-STATE]]. Step 7 is the structural shift that makes the viewer different in kind from existing RSS readers. Step 8 is the schema move. Step 9 is when the universal viewer actually starts being useful. Steps 10 through 12 are the cross-corpus / rosetta-tagz arc. Steps 13 and 14 are the part of the dream that has not been touched yet, and turn the system from a viewer into flow-composing personal infrastructure.
+Steps 1, 2, 3 are the Jules-shaped work currently being scoped (written 2026-05-12; steps 1 and 2 were done that day, step 3 in part). Step 4 is the exoskeleton integration. Step 5 is the architectural payoff that splits lens from renderer. Step 6 is the toolbar dissolution from layer #5 of [[FUTURE-STATE]]. Step 7 is the structural shift that makes the viewer different in kind from existing RSS readers. Step 8 is the schema move. Step 9 is when the universal viewer actually starts being useful. Steps 10 through 12 are the cross-corpus / rosetta-tagz arc. Steps 13 and 14 are the part of the dream that has not been touched yet, and turn the system from a viewer into flow-composing personal infrastructure.
 
 ---
 
