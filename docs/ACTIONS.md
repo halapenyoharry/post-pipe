@@ -9,6 +9,8 @@ The viewer never decides by itself what a tap does. It asks the table and runs t
 
 The code is [`src/lib/actions.js`](../src/lib/actions.js); this file is the readable version of it.
 
+This table is the seed of a layer shared across Harold's apps, drafted 2026-11-06 as `docs/ur-control/README.md` in the exoskeleton repository (to move to its own `ur-control` repository): what a viewport owes the input layer, every device family from mouse to game controllers, the gesture vocabulary, and profile templates. `profiles/post-pipe-engine.json` there is this engine's table row for row, and `profiles/elinor-jones.json` is the example below. Read it before adding a gesture or a device here.
+
 ## Targets
 
 | target | what it is |
