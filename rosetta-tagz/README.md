@@ -8,7 +8,8 @@ pull any tag up as a small graph to see what it relates to.
 > 2026-10-31, its history with it). It is still its own part: its own programs (`bin/`), tests (run
 > them from this folder) and docs (`docs/`), no dependencies, and no imports from post-pipe or into it.
 > post-pipe reaches it only by running its programs; post-pipe's side of that contract is
-> `docs/POST-PIPE-USES-RTAGZ.md` in post-pipe. It writes only where a config's `out` and `ledger` point.
+> `docs/POST-PIPE-USES-RTAGZ.md` in post-pipe. It writes only where a config's `out`, `ledger` and, with
+> discover `"queue"`, `queue` point (the queue's default is `rtagz-queue.json` beside the overrides file).
 
 No AI inference by default. No dependencies. No network at runtime (the viewer is one offline HTML file).
 
@@ -19,6 +20,7 @@ No AI inference by default. No dependencies. No network at runtime (the viewer i
    rtz-ingest ────────────────────────────►  records.jsonl     items + tags, one JSON per line
       │
       ├─ rtz-discover   (optional)           new tags for untagged items, from recurring phrases
+      │                                      (it reads overrides.json's ignore and accept lists)
       ▼
    rtz-stone  ◄── overrides.json  ◄── you    concepts, canonical labels, relations   → stone.json
       │
@@ -31,14 +33,15 @@ No AI inference by default. No dependencies. No network at runtime (the viewer i
       └─ rtz-view                                      → one standalone 3D HTML file
 ```
 
-Every box is a separate program. They pass JSON Lines over stdin/stdout, so you can `jq`, `sort`,
-`tee`, or replace any stage with your own.
+Every box is a separate program. The record stages pass JSON Lines over stdin/stdout, so you can `jq`,
+`sort`, `tee`, or replace any stage with your own; `stone.json` and `universe.json` are single JSON
+documents, and rtz-skos writes its two files into a folder.
 
 ## Quick start
 
 ```bash
 cd ~/Projects/post-pipe/rosetta-tagz
-npm test                                            # 158 tests, ~2 s
+npm test                                            # 202 tests, ~2 s
 bin/rtz build --config examples/synthetic/rtz.config.json
 open out/synthetic/view.html                        # or serve out/ on a local port
 ```
@@ -55,7 +58,7 @@ For each concept (a cluster of equivalent tags across tag-systems):
 | **canonical label** | the winning spelling, chosen by four weighted parts (below) |
 | **why** | every candidate's score broken into `freq`, `cover`, `trust`, `quality` |
 | **what each system calls it** | `Journal writes ai · Wire writes AI · Archive writes A.I.` |
-| **relations** | `broader`/`narrower`, `related`, `adjacent`, `near`, plus your own `synergy`/`opposes` |
+| **relations** | `broader`/`narrower`, `related`, `adjacent`, `near`, plus your own `synergy`/`opposes`; between tag-systems `near`, `broader` and (with similar texts) `related` are named `closeMatch`, `broadMatch` and `relatedMatch` (SKOS) |
 | **items** | including tags an item *earned from its text* (dashed) |
 
 ### How the canonical label is chosen
@@ -90,7 +93,7 @@ Signals combine by noisy-OR. Tags that **co-occur on one item in one system** ar
 synonyms (the author used both), so fuzzy evidence is discounted for them: `AI` and `AGI` stay apart.
 Merging is average-linkage with a size cap, so chains like `AI → ML → learning → school` cannot form.
 
-Pairs with real but insufficient evidence become `near` relations: a **review queue**.
+Pairs with real but insufficient evidence become `near` relations (`closeMatch` across tag-systems): a **review queue**.
 
 ```bash
 bin/rtz lookup out/stone.json --review        # what to decide, with the evidence and the exact command
@@ -103,8 +106,8 @@ bin/rtz build --config …                      # rebuild
 | adapter | reads |
 |---|---|
 | `jsonfeed` | JSON Feed 1.1 and post-pipe's `feed.json` (one feed splits into its real sources via `_source.title`) |
-| `frontmatter` | `<piece>/frontmatter.json` (post-pipe Gen-2) or the YAML header of `index.qmd`/`index.md` (Gen-1). `--field idea.topology` reads a different vocabulary of the same pieces as its own tag-system |
-| `markdown` | `.md` with YAML `tags:`; `--inline` adds `#hashtags` (Obsidian) |
+| `frontmatter` | `<piece>/frontmatter.json` (post-pipe Gen-2) or the YAML header of `index.qmd`/`index.md`/`index.markdown` (Gen-1). `--field idea.topology` reads a different vocabulary of the same pieces as its own tag-system |
+| `markdown` | `.md` or `.markdown` with YAML `tags:` (or `tag:`); `--inline` adds `#hashtags` (Obsidian) |
 | `pairs` | `item<TAB>tag[<TAB>title<TAB>url]`, the lowest common denominator |
 | `jsonl` | already in record format |
 
@@ -121,15 +124,17 @@ carries both vocabularies. That is also the strongest alignment evidence there i
   tags (`origin: "discovered"`). They enter rtz-stone as ordinary evidence, so they can fold into other
   systems' vocabularies, and are attached to your tagged items that contain them, bridging the wire to
   your writing. On the real post-pipe feed this took 60 isolated ScienceDaily items to 43 connected ones.
-  Two copies of one story count as one item, and every discovered tag carries its measured
+  Two copies of one story count as one item, and every discovered tag the bars measured carries its
   `sourceRatio`, so a viewer can try a stricter or looser bar without a rebuild (`docs/FORMATS.md`).
-  A discovered label is always a spelling the text has (`energy-efficient`, `Jupiter`), never invented.
+  A discovered label is always a spelling the text has (`energy-efficient`, `Jupiter`), never invented;
+  a phrase your overrides `accept` keeps the spelling written there.
   Quality is decent, not perfect: leftovers like `think` appear dashed, low-weight, with a visible reason.
   A phrase holding a function word (`onto`, `roughly`, `allowing`; `lib/stopwords.js`) is refused whatever
   its score, and the untagged report says so. Edit `seed/generic-words.txt` (plain data) to teach it more
   words that are never topics, or name them in your overrides' `ignore` list.
 - **The queue** (`discover: "queue"` in the build config, since 2026-11-04): discovery runs and attaches
-  nothing; what it would have attached goes to `rtagz-queue.json` beside your overrides file, with each
+  only the phrases your overrides `accept`; what it would have attached goes to `rtagz-queue.json` beside
+  your overrides file (or where the config's `queue` names), with each
   candidate's score, the items it would tag and why it passed. `rtz-override accept <label>` takes one,
   and the next build attaches it wherever the text says it. `docs/FORMATS.md`, "The queue".
 
@@ -143,7 +148,8 @@ carries both vocabularies. That is also the strongest alignment evidence there i
 - **Concepts**: vocabulary only, joined by relations
 - Click a node: why it has its name, what each system calls it, relations, items. **Explore** cuts its k-hop neighbourhood
 - Sliders: the four weights, `prefer`, and per-system **trust**. Names change live; an `overrides.json` fragment is generated
-- Search accepts any spelling (`a.i.` finds AI)
+- Search matches any spelling a tag-system wrote, ignoring case, accents and punctuation (`a.i.` finds AI where
+  someone wrote `A.I.`)
 
 Browsers block `file://` in some embedded panes; any static server on loopback works, e.g.
 `python3 -m http.server 1799 --bind 127.0.0.1 --directory out`.
@@ -177,12 +183,17 @@ Unknown signal names count as fuzzy evidence (discounted by co-occurrence, scale
 
 ```
 bin/            the programs (rtz is a git-style dispatcher: `rtz stone` = `rtz-stone`)
-lib/            engine; lib/signals/ one file per evidence signal; lib/adapters/ one per source format
+lib/            engine; lib/signals/ the evidence signals (lexical.js holds stem, tokenset and edit);
+                lib/adapters/ the source formats (folders.js holds frontmatter and markdown; jsonl is in index.js)
 seed/           common.json (alias groups, seed hierarchy), generic-words.txt (data, edit freely)
 viewer/         viewer.html template; vendor/ holds the MIT-licensed 3d-force-graph bundle (offline)
-examples/       synthetic corpus (4 tag-systems, safe to share) and a full overrides example
+examples/       synthetic corpus (4 tag-systems, safe to share) and an overrides example with every key
+                rtz-override writes
 test/           node:test; `npm test`
-docs/           DESIGN.md (why it is built this way), FORMATS.md (every file format)
+docs/           DESIGN.md (why it is built this way), FORMATS.md (every file the programs read and write;
+                the build config is in `rtz-build --help`)
+tools/          skos-check.py (an rdflib check of the SKOS files)
+inbox/          requests from post-pipe, dated
 out/, local/    build output and private configs. git-ignored: they contain your corpus text
 ```
 

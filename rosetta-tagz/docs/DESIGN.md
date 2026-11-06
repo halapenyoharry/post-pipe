@@ -18,7 +18,7 @@ containment / opposition / synergy / near-equivalence. Mapping:
 | vision | here |
 |---|---|
 | identity | tags with the same `norm` are one *term*; spellings are `forms` |
-| near-equivalence | terms merged into one *concept* (stem, tokenset, seed, anchor + corroboration) and `near` relations |
+| near-equivalence | terms merged into one *concept* (stem, tokenset, seed, anchor + corroboration) and `near` relations (`closeMatch` across tag-systems) |
 | containment | `broader` / `narrower` |
 | adjacency | `adjacent`, `related` |
 | synergy, opposition | human-authored in `overrides.json` only |
@@ -28,7 +28,8 @@ containment / opposition / synergy / near-equivalence. Mapping:
 ## Principles
 
 1. **Unix.** Small programs, JSONL in and out, files you can read. `rtz build` is only the pipeline
-   written down; it spawns the real programs. Anything can be swapped: an adapter, a signal, the whole
+   written down; it spawns the real programs, then writes `build.json` itself, the untagged report
+   (`lib/untagged.js`) included. Anything can be swapped: an adapter, a signal, the whole
    scorer.
 2. **No inference unless it earns its place.** Everything is lexical structure, curated data, shared
    items, and TF-IDF. A model can be added at exactly one seam (pair evidence) and is never required.
@@ -49,7 +50,9 @@ False merges are worse than missed ones: they silently lose a distinction and ar
   the review queue.
 - **Anti-synonymy.** If two tags co-occur on the same item in the same system, the author chose both, so
   they are probably different (`AI`/`AGI`). Fuzzy evidence is multiplied by `1 − 0.85 × (co-occurrence ratio)`.
-- **Average linkage + size cap.** A merge must hold up against every member already in the cluster.
+- **Average linkage + size cap.** A merge is measured against every member already in the cluster: the mean
+  confidence over every pair across the two must reach `mergeThreshold`, and no concept grows past
+  `maxClusterSize` (12).
 - **Combination.** `1 − Π(1 − s)` over signals, with structural/curated signals exempt from the penalty.
 - **Anchor math.** A shared item with *k* tags per side supports each pairing by `1/k`, summed over shared
   items, `score = cap · S/(S+0.5)`. One noisy item cannot merge anything; two clean 1-to-1 items can.
@@ -60,7 +63,8 @@ False merges are worse than missed ones: they silently lose a distinction and ar
 ## Why relations are separate from merges
 
 `broader` uses subsumption (Sanderson & Croft 1999): A is broader than B when
-`P(A|B) ≥ 0.8` and `P(B|A) < 0.6` with enough support. `related` is normalised PMI, shrunk by `n/(n+1)`
+`P(A|B) ≥ 0.8` and `P(B|A) ≤ 0.6` with enough support; provisionally, also lexical containment
+corroborated by usage, and seeds (FORMATS.md, "Relations"). `related` is normalised PMI, shrunk by `n/(n+1)`
 so two co-occurrences don't read as certainty. `adjacent` is TF-IDF cosine between concepts' item
 profiles, only for pairs that never share an item. Each concept keeps its strongest K relations.
 
@@ -102,7 +106,8 @@ corpus two ProPublica articles about one Ruidoso flood had carried 18 incidental
 (`memory`, `danger`, `onto`, …) and junk relations (`memory` broadMatch
 `Climate and Environment`); raw cosine could not be the test, because two short items on one topic are
 more alike by it than the two articles (FORMATS.md has the numbers). Also since then every discovered
-record carries its measured `sourceRatio`, and hubs down to `sourceRatioFloor` are chosen in a second
+record carries its measured `sourceRatio` (since 2026-11-04, all but an accepted phrase's: a human's choice
+always shows), and hubs down to `sourceRatioFloor` are chosen in a second
 pass that only fills the slots the first pass left, so a viewer can try another bar than
 `sourceCoherenceRatio` without a rebuild. rtz-stone, rtz-emerge and rtz-universe layer that below-bar
 evidence on top of everything a build at the bar holds instead of mixing it in, so a viewer set at the
@@ -119,14 +124,14 @@ bar to clear. The untagged report names what was refused and what is queued for 
 with no tag can say why (FORMATS.md, "The queue").
 
 Every record either stage emits carries its provenance in PROV terms: `wasDerivedFrom`
-(`[{type: 'text', phrase, count, inTitle}]`, where `phrase` is the span of the item's own words that
+(`[{type: 'text', phrase, count, inTitle}]`, to which an accepted phrase adds `{type: 'overrides', key: 'accept', label}`; where `phrase` is the span of the item's own words that
 matched, so an item that says "court" is never said to contain "courts"; discovery's is spelled as the
-item writes it, emergence's is the matched words in lower case) and `wasGeneratedBy`
+item writes it, emergence's is the matched words in lower case, or an acronym in the capitals it matched) and `wasGeneratedBy`
 (`{activity: 'discover' | 'emerge', parameters}`, the stage and the numbers that admitted the tag;
 emergence's `context` is present only for a lone word, where it was computed).
 
 Since 2026-10-31 a discovered label is a spelling the text has (Harold's rule of 2026-10-25: no tag
-label is invented). Before, rtz-discover carried out the lower-case words it had counted, so on
+label is invented; since 2026-11-04 a phrase the overrides `accept` keeps the spelling written there). Before, rtz-discover carried out the lower-case words it had counted, so on
 haroldyounghumxn.site `energy efficient` (the text writes "energy-efficient") had no origin at all, and
 `antarctica`, `jupiter` and four others matched the text only with case ignored. Counting and matching
 still run on the normalized key; at the end the hub's lower-case form is chosen exactly as before, and
@@ -145,7 +150,7 @@ assertions, not every edge it ends up with.
 
 ## What was verified, and how
 
-- 178 `node:test` tests (2026-10-31): normalisation, each signal, clustering, overrides, canonical scoring,
+- 178 `node:test` tests (2026-10-31; 202 on 2026-11-05): normalisation, each signal, clustering, overrides, canonical scoring,
   emergence/discovery, all four graph projections, and the real programs run as separate processes
   (including the fully piped form and an external scorer).
 - Real corpus runs (your Posts + post-pipe's feed) found five defects the synthetic data hid; each now
