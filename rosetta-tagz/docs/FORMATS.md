@@ -15,7 +15,9 @@ preserved where it matters, so other programs can add their own.
 - `origin`: `explicit` (a human wrote it), `discovered` (rtz-discover), `emergent` (rtz-emerge; ignored
   by rtz-stone). Emergent/discovered tags carry `why`; emergent also carries `concept`; either carries
   `sourceRatio` when a viewer can hide it (see "Trying another bar" below).
-- A tag record without `type` but with `item` and `label` is accepted.
+- A tag record without `type` but with `item` and `label` is accepted by rtz-stone, rtz-discover and
+  rtz-universe; rtz-translate and rtz-norm pass it through untouched, and rtz-emerge does not count it
+  among what an item already carries.
 - Items with no tags are meaningful: they are the orphans discovery and emergence exist for.
 
 ### Discovered tags (`rtz-discover`)
@@ -72,7 +74,8 @@ second `wasDerivedFrom` entry `{type: "overrides", key: "accept", label}`, and `
 `{activity: "discover", parameters: {accepted: true, df, items}}`.
 
 **Spelling** (since 2026-10-31). No label is invented: `label`, and `phrase` in `wasDerivedFrom`, are
-spellings the text has, with hyphens, capitals and accents as written (`energy-efficient`, `Jupiter`, and
+spellings the text has (an accepted phrase's `label` is spelled as the overrides' `accept` list writes it;
+its `phrase` is still the text's), with hyphens, capitals and accents as written (`energy-efficient`, `Jupiter`, and
 `Diego` from "UC San Diego", where "San" is too short to be a candidate). Counting and matching still use
 the normalized key, so df, coherence, near-copies, selection and the output order are what they were.
 Only the spelling carried out changed: read back through `words` (lower case, joiners as spaces), every
@@ -168,7 +171,7 @@ too: 71 of the 103 hubs both values admit, by 1% at the median (`atmosphere` 4.4
 `chain` is the default: on that corpus `all-pairs` brings in more generic words than it fixes, and
 loses a real cross-source topic (`injection`).
 
-The value is in every discovered record's parameters, and an unknown value is an error naming the two.
+The value is in every discovered record's parameters but an accepted phrase's, and an unknown value is an error naming the two.
 Set it like the other discovery parameters, `{"discover": {"nearCopyGrouping": "all-pairs"}}`, in the file
 `rtz-discover --config` reads, or under `engine` in rtz-build's config. rtz-discover logs each group of
 two or more items on stderr, and each near-copy pair `all-pairs` left in different groups, with its
@@ -204,8 +207,8 @@ bar" below for what this is for.
 | `pin` | `{"ml":"Machine Learning"}` | canonical label for the concept containing `ml` |
 | `relations` | `[{"a","b","type","note"}]` | `broader`, `narrower`, `contains`, `related`, `adjacent`, `synergy`, `opposes`, or a SKOS mapping name `closeMatch`, `broadMatch`, `narrowMatch`, `relatedMatch`, `exactMatch`; any other `type` is dropped with one line on stderr. Stored `locked`, the narrow side flipped (below); it replaces a computed relation saying the same of the pair under either name (`near`/`closeMatch`, `related`/`relatedMatch`, `broader`/`broadMatch`). `b` may be `"<schemeId>:<externalId>"`, a concept of a published vocabulary, kept verbatim |
 | `notRelated` | `[{"a","b","type"?}]` | (provisional) forbid a relation: without `type` every relation between the pair, in both directions; with one, that type (old names flipped as in `relations`; a name and the mapping typing turns it into name the same row: `near` removes a `closeMatch`, `related` a `relatedMatch`, `broader` a `broadMatch`, and the other way round). Applied last, after seeds, computed relations and `relations`; what went is listed in `stone.json.forbidden` |
-| `ignore` | `["untagged"]` | drop these tags entirely; since 2026-11-04 rtz-discover reads it too and refuses a candidate phrase it names (reason `ignored`), which is how a site extends the function-word gate (lib/stopwords.js) |
-| `accept` | `["quantum computing"]` | (provisional, 2026-11-04) phrases a human took from the queue: rtz-discover attaches each one to every item whose text holds it, spelled as written here, with no bar to clear, in any discover mode. Nothing is attached for a phrase no item writes |
+| `ignore` | `["untagged"]` | rtz-stone makes no concept of these tags (rtz-universe does not read the overrides, so an ignored tag still reaches `universe.json` as an unmapped `u_…` concept on its item; post-pipe leaves them out of the records it hands over); since 2026-11-04 rtz-discover reads it too and refuses a candidate phrase it names (reason `ignored`), which is how a site extends the function-word gate (lib/stopwords.js) |
+| `accept` | `["quantum computing"]` | (provisional, 2026-11-04) phrases a human took from the queue: rtz-discover attaches each one to every item whose text holds it, spelled as written here, with no bar to clear, with discover `true` or `"queue"` (with `false` rtz-discover does not run). Nothing is attached for a phrase no item writes |
 | `sourceWeights` | `{"ScienceDaily":0.4}` | trust per tag-system when picking canonical labels |
 | `canon` | `{"weights":{…},"prefer":"short"}` | override the scoring weights / length preference |
 | `config` | partial `lib/config.js` defaults | e.g. `{"mergeThreshold":0.75}`; read by rtz-stone only: rtz-discover and rtz-emerge take theirs from `--config` (rtz-build's `engine`) |
@@ -262,7 +265,8 @@ If a real tag-system is literally named `site` or `discovered`, its scheme id is
 `discovered (system)`, so the two never collide (`schemeOfSource` in `lib/corpus.js`). `source`,
 `systems{}`, `sources{}` and item keys keep the real source name; only scheme ids are renamed.
 
-Filing: a variant's `formsBySource`, `bySource` and `itemsBySource` are keyed by scheme, so a spelling
+Filing: a variant's `formsBySource` and `bySource` (and, in memory, a term's `itemsBySource`, which the
+anti-synonym penalty reads) are keyed by scheme, so a spelling
 only discovery wrote sits under `discovered`, never under the system of the item it was found on.
 `count` still includes discovered occurrences; `explicit` counts only human-written ones.
 
@@ -285,7 +289,8 @@ level down, inside a term: a variant's `label` (`displayForm`) is chosen among t
 whenever a human wrote the term, so the text's `Labor` that discovery carried out never renames a human's
 `labor` (before 2026-10-31 a discovered lower-case `climate change` could outrank a human's `Climate
 Change` this way). Only a concept nobody wrote (`discovered: true`) ranks among its own spellings. The viewer's live re-ranking scores
-the same pool, so it never stars a spelling rtz-stone would not. Within the pool, a variant's `count`
+the same pool, except that for a concept nobody wrote it also ranks the spellings under the bar
+(`universe.json` does not say which they are), so there it can star one rtz-stone did not. Within the pool, a variant's `count`
 and `bySource` still include its discovered occurrences (and `discovered` counts as one covering
 scheme, trust weight 1 unless `sourceWeights.discovered` says otherwise), so discovery evidence can
 still move the choice *between two human spellings*; whether it should is an open question for the
@@ -447,7 +452,7 @@ concepts[]   as in stone.json (ledger{since,event,previousLabel?} included when 
              plus n (tagged items), nEmergent (earned/discovered), unmapped?
 relations[]  as in stone.json (skos, why, PROV); a relation to an external "<scheme>:<id>" passes through
 forbidden[]  as in stone.json
-items[]: {key, source, alsoIn[], title, excerpt, url, kind, date,
+items[]: {key, source, id, alsoIn[], title, excerpt, url, kind, date,
           tags[]: {c: conceptId, w, origin, raw[{l,n,s}], sys[], via, why,
                    wasDerivedFrom?[], wasGeneratedBy?{activity, parameters}, sourceRatio?}}   // PROV, when known
 ```
@@ -459,7 +464,7 @@ label under `discovered` (never under the system of the item it was found on), a
 `site` alone (it is a canonical from the `stone.json` that earned it, not a word any system wrote). Their
 `inScheme`, `prefLabel`, `altLabel` and the variant's `forms`, `formsBySource`, `bySource` and
 `explicit` follow from the records that named them, so a `u_` concept has the same shape as a concept
-in `stone.json`: `inScheme: ["Posts", "site"]`, `prefLabel` with the label under both, `altLabel` with an
+in `stone.json`, without `discovered`: `inScheme: ["Posts", "site"]`, `prefLabel` with the label under both, `altLabel` with an
 empty list per scheme.
 
 Provenance on a tag (PROV terms): an `explicit` tag `wasDerivedFrom` one
@@ -467,21 +472,22 @@ Provenance on a tag (PROV terms): an `explicit` tag `wasDerivedFrom` one
 `wasGeneratedBy {activity:"ingest", parameters:{}}` (the record stream does not say which adapter
 ingested it, so nothing is claimed). An earned tag (`discovered`, `emergent`) carries the
 `wasDerivedFrom`/`wasGeneratedBy` its stage wrote on the record, if any: `wasDerivedFrom[0].phrase`
-is a span of the item's own words (lower-cased, as `words()` reads them), never the label whose stems
-matched it. A PROV field is either present with a value or absent; it is never `null`.
+is a span of the item's own words, never the label whose stems matched it: as the text writes it for a
+discovered tag; in lower case, as `words()` reads them, for an emergent one, except an acronym, which keeps
+the capitals it matched. A PROV field is either present with a value or absent; it is never `null`.
 
 ## `build.json` and untagged items
 
-`rtz-build` writes `build.json` last: `built`, `config`, `stages[]` (`name`, `program`, `ms`), `ledger`
-(above) and `untagged`, every item of the universe that ends with no tag a viewer shows at the build's
+`rtz-build` writes `build.json` last: `built`, `config`, `stages[]` (`name`, `program`, `ms`), `discover`
+(the mode that ran), `ledger` (above), `queue` (with discover `"queue"`, below) and `untagged`, every item of the universe that ends with no tag a viewer shows at the build's
 bar, and why, as far as the build knows (`lib/untagged.js`). Nothing is forced onto such an item.
 
 ```
 untagged: { bar, count, none, items[]: {
   key, source, id, title,
-  reason, reasons[], why[],                        // reason is reasons[0]; why is one plain sentence per reason
+  reason, reasons[], why[],                        // reason is reasons[0]; why is one plain sentence per reason (two for underBar when both apply)
   under[]: {concept, label, origin, sourceRatio},  // its tags under the bar, highest ratio first
-  candidates?: {phrases, single, underBar?, underFloor?, nearCopy?, tooCommon?, incoherent?, dropped?, notChosen?}
+  candidates?: {phrases, single, queued?, underBar?, underFloor?, nearCopy?, tooCommon?, incoherent?, functionWord?, ignored?, dropped?, notChosen?}
 } }
 ```
 
@@ -498,21 +504,22 @@ untagged: { bar, count, none, items[]: {
   without it), `functionWord` (phrases holding a function word, refused whatever their score),
   `ignored` (phrases the overrides `ignore`), `dropped` (a hub chosen and then left on fewer than
   `minDf` items), `notChosen` (a hub at the bar that no item chose); when none applies, `noRecurring`
-  (no candidate phrase is on another item) or `noCandidate` (the text has no candidate phrase); with
+  (no candidate phrase is on another item) or `noCandidate` (the text has no candidate phrase, or discovery
+  did not report the item); with
   discovery off, `noDiscovery`. `queued`, `functionWord` and `ignored` are from 2026-11-04; a report
   without them is read as before.
 - `candidates` lists every candidate phrase in each group with its numbers, spelled as the item writes
   it: `{phrase, score, sourceRatio?}` queued, `{phrase, sourceRatio}` under and below the bar
   (`attached` says whether a below-bar hub was attached), `{phrase, items, df}` for near-copies,
   `{phrase, df, of}` too common, `{phrase, df, coherence, bar}` incoherent, `{phrase, df}` function
-  words and ignored. `single` counts the phrases on this item alone. `why` names at most eight phrases
+  words, ignored and dropped, `{phrase, sourceRatio}` not chosen. `single` counts the phrases on this item alone. `why` names at most eight phrases
   per sentence and says how many more there are.
 
 The reasons come from `rtz-discover --report FILE` (rtz-build writes it as `discover.report.json` when
 discovery runs, and reads it only then): `{schema: "rosetta-tagz/discover-report@1", bar, floor, minDf,
 maxDfRatio, items, queue, untagged: {<item key>: {members[], candidates, single, queued[], functionWord[],
 ignored[], nearCopy[], tooCommon[], incoherent[], underFloor[], underBar[], dropped[], notChosen[]}}}`, one
-entry for every item no tag-system tagged and no hub at or above the bar reached (`queue` says whether
+entry for every item no tag-system tagged and no hub at or above the bar, and no accepted phrase, reached (`queue` says whether
 the run queued instead of attaching). `members` lists every record key of the same article. The
 report is a reading of what discovery measured; it changes no record (the records rtz-discover writes are
 the same with or without `--report`). The report's file name and the reason codes are provisional. A
@@ -537,12 +544,12 @@ chosen it: tf, idf, the bigram boost and coherence); `sourceRatio` as on a recor
 to compare with); `df` the items counted (near-copies once); `items` every item it would have been
 attached to; `why` the sentence its records would have carried. A candidate under the bar but at or
 above the floor is listed with its ratio, and its `why` says so. The gate applies: no function word is
-queued. The queue is rewritten on every build; it is a reading of this corpus, never a decision.
+queued. The queue is rewritten on every build whose discover is `"queue"` (another build leaves the file as it is); it is a reading of this corpus, never a decision.
 
 **Choosing a candidate.** Add its label to the overrides file's `accept` list, by hand or with
 `rtz-override accept <label>`, and rebuild: discovery then attaches that phrase to every item whose
-text holds it, spelled as you wrote it, with no bar to clear (above, "Accepted phrases"), in any
-discover mode, and it leaves the queue. To keep one out, `rtz-override ignore <label>`: it is refused
+text holds it, spelled as you wrote it, with no bar to clear (above, "Accepted phrases"), with discover
+`true` or `"queue"`, and it leaves the queue. To keep one out, `rtz-override ignore <label>`: it is refused
 (reason `ignored`) and leaves the queue too. `build.json` carries `discover` (the mode that ran) and,
 with `"queue"`, `queue: {path, candidates}`; the untagged report says of each item what is queued for
 it (reason `queued`). The record stream of a queue build holds only the accepted phrases' records, so
@@ -626,14 +633,14 @@ everything a viewer can hide carries the ratio it must be set at or below to sho
 
 | where | `sourceRatio` |
 |---|---|
-| discovered record | its measured ratio (absent only when there was nothing to compare with) |
+| discovered record | its measured ratio (absent when there was nothing to compare with, and on a phrase the overrides `accept`) |
 | emergent record | when every spelling it matched has one: the highest of them; for a tag only below-bar records made possible, the highest below-bar ratio at which it appears, whatever the concept's other spellings (its parameters then carry `sourceCoherenceRatio`) |
 | `stone.json` variant | when every record of the spelling is a discovered one carrying a ratio: the highest |
 | `stone.json` / `universe.json` concept | when every variant has one: the highest (so a concept only discovery made shows when any of its hubs would) |
 | `universe.json` item tag | when every record behind it carries one: the highest; a tag a human wrote never has one |
 
 The rule for a viewer set at v: show what has no `sourceRatio` or one ≥ v, and a relation when both
-its concepts show. The build's own bar is `sourceCoherenceRatio` in any discovered record's parameters;
+its concepts show. The build's own bar is `sourceCoherenceRatio` in the parameters of any discovered record the bars measured (an accepted phrase's has none);
 a viewer set there shows exactly what the build at that bar has, apart from the counts noted at the end. On post-pipe's site corpus of 2026-10-31 a
 build with the floor at 1.0, filtered at 1.6, gave the build at 1.6 line for line: its 212 discovered
 tags, its 141 concepts (once the below-bar spellings and their links are set aside), its 86

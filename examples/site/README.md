@@ -6,7 +6,7 @@ This folder is post-pipe's test page: a complete example site that anyone, a per
 
 From the engine root:
 
-- `node generate-index.js` builds this example site by default (writing output to `examples/site/_site/`). The build fetches the two feeds over the network; nothing else is fetched. When a fetch fails, that feed's cards come from its saved copy (below).
+- `node generate-index.js` builds this example site by default (writing output to `examples/site/_site/`). The build fetches the two feeds over the network and, when post-pipe's `.feed-cache/colors.json` has no colour for a feed yet (the first build on a machine), that feed's home page, for its `theme-color`; nothing else is fetched. When a fetch fails, that feed's cards come from its saved copy (below).
 - `POSTPIPE_SITE=/path/to/site node generate-index.js` builds any other site folder.
 
 The build writes its slug ledger (`cards.json`) and rosetta-tagz's ids (`rtagz-ids.json`, and `rtagz-queue.json` when discovery queues) beside `settings.json`. They follow the live feeds, so git ignores them here; a real site usually tracks its own.

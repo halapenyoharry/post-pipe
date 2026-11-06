@@ -12,7 +12,7 @@ Names marked *(provisional)* were chosen by the droids that built them and wait 
 - post-pipe never imports anything from `rosetta-tagz/lib/`. It writes files, runs `rosetta-tagz/bin/rtz-build` as a separate process, and reads the files that come back.
 - post-pipe writes nothing under `rosetta-tagz/`. When rosetta-tagz has to change for post-pipe, the lead droid writes a request to `rosetta-tagz/inbox/from-post-pipe-<date>.md`, and the change lands in a rosetta-tagz commit.
 - rosetta-tagz creates no items. Its output is tagz and relations on items that exist because a file or a feed item exists.
-- No network. rosetta-tagz has none at run time; post-pipe's only network is the feeds the site's `feeds.opml` lists.
+- No network. rosetta-tagz has none at run time; post-pipe's only network is the feeds and pages the site's `feeds.opml` lists, and, for a source with no colour yet in `.feed-cache/colors.json` and no `customColor`, its home page once for its `theme-color`.
 - rosetta-tagz never fails a post-pipe build. A missing engine, a non-zero exit, a timeout, unreadable output or a thrown error is one logged line, and the build goes on with the tagz as the sources wrote them.
 
 ## A site turns it on
@@ -145,7 +145,7 @@ Two files, `universe.json` and `build.json`, from `runRtagzPhase` in `src/lib/rt
 
 **`universe.json`**: `items[]` (each with `key` `<source>::<id>`, `url`, `title`, and `tags[]` of `{c, w, origin, raw[], sys[], via, why, wasDerivedFrom, wasGeneratedBy, sourceRatio}`), `concepts[]` (id, canonical, pinned, discovered, variants, rank, `inScheme`, `prefLabel` and `altLabel` per scheme, ledger note, `sourceRatio`), `relations[]` (`a`, `b`, `type`, `weight`, `skos`, `why`, `wasDerivedFrom`, `wasGeneratedBy`) and `forbidden[]`. rosetta-tagz's FORMATS.md has every field.
 
-**`build.json`**: `built`, the ledger summary, and `untagged` *(the report's shape is provisional)*:
+**`build.json`**: `built`, the ledger summary, `queue` (`{path, candidates}`, when the build queued) and `untagged` *(the report's shape is provisional)*:
 
 ```
 untagged: { bar, count, none, items[]: { key, source, id, title, reason, reasons[], why[], under[], candidates } }

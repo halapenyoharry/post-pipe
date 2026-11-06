@@ -8,37 +8,41 @@
 
 post-pipe is a **corpus viewer with optional publishing routes** — not a blog pipeline.
 
-You point it at a folder (`~/Posts/` by default). It walks the folder, detects what kind of content each subfolder contains (essay, image, audio, video, multi-substrate work, archive, fragment), and produces a spatial graph view of your entire intellectual topology. When a piece is text and wants to travel, publishing routes exist for GitHub Pages / Medium / Substack / YouTube / etc. — but publishing is a *capability*, not the purpose.
+You point it at a site: a folder holding `settings.json` and `feeds.opml` (`POSTPIPE_SITE`; with none set, the example site in `examples/site/`, which reads two public feeds). Its sources are folders of writing (`local://<path>` in `feeds.opml`, such as `~/Posts/`), published feeds and single pages. It walks each folder, detects what kind of content each subfolder contains (essay, image, audio, video, multi-substrate work, archive, fragment, link), and produces a spatial graph view of your entire intellectual topology. When a piece is text and wants to travel, publishing routes exist for GitHub Pages and, through it, Medium (Substack and YouTube are stubs) — but publishing is a *capability*, not the purpose.
 
 Metadata is a gradient, not a gate. Folders with rich `frontmatter.json` produce rich nodes (topology, energy, forms, explicit edges). Folders with legacy `.qmd` YAML read in a lossy mode. Folders with nothing but a PNG or an unplaced `.md` still appear — labeled `scattered` with a TODO for metadata.
 
 ```mermaid
 flowchart LR
-    subgraph ROOT["~/Posts/ (user's corpus)"]
+    subgraph ROOT["a local source (local://, such as ~/Posts/)"]
         G2["{slug}/frontmatter.json + index.md\n(Gen 2 — rich)"]
         G1["{slug}/index.qmd\n(legacy YAML)"]
         G0["{slug}/ (unstructured)\n(image / audio / fragment)"]
     end
 
-    subgraph INGEST["ingest.js"]
+    subgraph INGEST["ingest.js (through src/adapters/LocalFolderAdapter.js)"]
         G2 --> SCAN["substrate detect"]
         G1 --> SCAN
         G0 --> SCAN
         SCAN --> CONTENT["Content[]"]
     end
 
-    subgraph BUILD["generate-index.js"]
+    FEEDS["feeds and pages\n(rss · atom · json · page · pages)"]
+
+    subgraph BUILD["generate-index.js + src/aggregator.js"]
         CONTENT --> FEED["_site/feed.json"]
+        FEEDS --> FEED
         FEED --> VIEWER["_site/index.html\n(D3 graph + substrate-dispatched reader)"]
     end
 
     subgraph ROUTES["Platform routes (optional)"]
-        ESSAY["essay + rendered HTML"] --> MEDIUM["Medium"]
-        ESSAY --> SUBSTACK["Substack"]
-        VIDEO["video"] --> YOUTUBE["YouTube"]
+        ESSAY["essay + rendered HTML"] --> GHPAGES["GitHub Pages"]
+        GHPAGES --> MEDIUM["Medium (import)"]
+        ESSAY --> SUBSTACK["Substack (stub)"]
+        VIDEO["video"] --> YOUTUBE["YouTube (stub)"]
     end
 
-    VIEWER -.->|click essay node| GHPAGES["GitHub Pages\n(rendered HTML)"]
+    VIEWER -.->|open an essay| PAGE["_site/{id}.html\n(the piece's own page)"]
     CONTENT -.->|"manual publish step"| ROUTES
 
     style ROOT fill:#1a1a2e,color:#e0e0e0
@@ -51,13 +55,13 @@ flowchart LR
 
 ## Content Model
 
-Every folder in `~/Posts/` becomes one `Content` object. The object shape is shared across all schemas; missing fields default gracefully.
+Every folder in a local source (`local://<path>`, such as `~/Posts/`) becomes one `Content` object, which `src/adapters/LocalFolderAdapter.js` turns into a JSON Feed item; items from feeds and pages come from their own adapters. The object shape is shared across all schemas; missing fields default gracefully.
 
 ```js
 {
   id:            "art-is-pattern",                 // folder name
   kind:          "essay",                          // essay | image | podcast-episode |
-                                                   // video | multi | archive | fragment
+                                                   // video | multi | archive | fragment | link
   title:         "Art Isn't Magic. It's Complexity.",
   short_title:   "Art Is Pattern",
   summary:       "...",                            // idea.tldr || idea.seed
@@ -88,10 +92,12 @@ Every folder in `~/Posts/` becomes one `Content` object. The object shape is sha
 
   // Operational
   todos:         ["_TODO-MIGRATE.md"],             // files triggering human review
-  source:        "local",                          // vs "feed:aeon" for RSS nodes
+  source:        "local",                          // items from feeds carry _source instead
   schema:        "gen2" | "legacy-qmd" | "unstructured"
 }
 ```
+
+Objects also carry `author`, `tags`, `series`, `series_part`, `license`, `updated`, `reading_time` and `posted`, and, from front matter, `references`, `timeline` and `scene`. A piece whose front matter names a `link` and that has no text is `kind: "link"`, with `link` and `subtitle` (`src/lib/linkNode.js`, 2026-10-01).
 
 The ingester in [`ingest.js`](./ingest.js) produces these objects. It's metadata-graceful: missing frontmatter never excludes a folder. Substrate detection falls back to file-extension inspection when no explicit `idea.substrate` is declared.
 
@@ -164,10 +170,10 @@ Folders that contain content but no structured metadata. Ingester detects substr
 
 | files present | detected kind |
 |---|---|
-| any `.m4a` / `.mp3` | `podcast-episode` |
-| any `.mp4` / `.mov` | `video` |
-| any `.md` / `.qmd` / `index.html` | `essay` |
-| only `.jpg` / `.png` / `.webp` | `image` |
+| any `.m4a` / `.mp3` / `.wav` / `.ogg` / `.flac` / `.aac` | `podcast-episode` |
+| any `.mp4` / `.mov` / `.webm` / `.mkv` / `.avi` | `video` |
+| any `.md` / `.qmd` (not a `_TODO` file) / `index.html` | `essay` |
+| only `.jpg` / `.jpeg` / `.png` / `.gif` / `.webp` / `.svg` | `image` |
 | multiple substrates | `multi` |
 | nothing recognizable | `fragment` |
 
@@ -179,10 +185,11 @@ Each Gen 0 folder gets a `_TODO-METADATA.md` with a research checklist. Full pro
 
 The generated `_site/index.html` is a self-contained page with:
 
-1. **D3 force-directed graph** — nodes are content items; edges are tag co-occurrence (and in future: explicit `connected_to` edges, substrate clusters). Its tag nodes are drawn by default as their pills, with every edge to them; `graph.tag.labels: false`, or the reader's "Show their labels" off in the panel, draws each as a small dot instead (`settings.graph.tag.markRadius`, 7 graph units), and `graph.tag.show: false`, or "Show tagz on the graph" off, draws none (`src/lib/tagPills.js`, preferences `showTags` and `showTagLabels`, provisional, 2026-11-05; the labels are the default by Harold's word of that day). In every state the tag nodes stay in the simulation with their pills' footprint and keep pulling, so the cards sit where they would; a tag hovered, or picked with its relatives, shows its pill
-2. **Reader panel** — slides in on node click; dispatches rendering based on `content.kind`. Its tag row draws the item's tag references as chips (`src/lib/tagReferences.js`); a card with no tagz shows instead the one line the build wrote on it, `untaggedBecause` (`src/lib/untaggedBecause.js`, provisional, 2026-11-04), saying why, from what rosetta-tagz reported
+1. **D3 force-directed graph** — nodes are content items and their tagz; edges are `feed.json`'s `edges` (`src/corpus/buildEdges.js`, since 2026-09-10): an item's tags (layer `tag`), a series' next (`sequence`), `connected_to` (`authored`), `topology`, references (layer `reference`), and containment, which the hulls show instead of a line; `graph.visibleLayers` picks which draw lines; substrate clusters are not built. The cluster layout weights each link (`settings.graph.edgeWeights`, `src/lib/edgeWeight.js`, 2026-11-04): weighted by default, each link's strength and length following its own weight, the degree of its two ends and its card's recency, by the same degree and recency formulas `flow/`'s flow-score uses; uniform gives every link one distance, as before. Its tag nodes are drawn by default as their pills, with every edge to them; `graph.tag.labels: false`, or the reader's "Show their labels" off in the panel, draws each as a small dot instead (`settings.graph.tag.markRadius`, 7 graph units), and `graph.tag.show: false`, or "Show tagz on the graph" off, draws none (`src/lib/tagPills.js`, preferences `showTags` and `showTagLabels`, provisional, 2026-11-05; the labels are the default by Harold's word of that day). In every state the tag nodes stay in the simulation with their pills' footprint and keep pulling, so the cards sit where they would; a tag hovered, or picked with its relatives, shows its pill
+2. **Reader panel** — opens on a double tap on a card (`node.openReader`; a tap opens the card in place, `node.select`, and the button inside an open card opens the reader too; `docs/ACTIONS.md`); dispatches rendering based on `content.kind`. Its tag row draws the item's tag references as chips (`src/lib/tagReferences.js`); a card with no tagz shows instead the one line the build wrote on it, `untaggedBecause` (`src/lib/untaggedBecause.js`, provisional, 2026-11-04), saying why, from what rosetta-tagz reported
 3. **TTS toolbar** — engine-agnostic registry (browser / gemini)
 4. **Syndication toolbar** — platform icons linking to cross-posted versions
+5. **Top bar** (`FeedZ` in `src/components/FeedZ/FeedZ.jsx`) — a pill per source, which hides or shows it and says when its items were taken in; the site's pages and links; the view switch; the `+`; and, by default since 2026-11-05, the graph's controls (undo, redo, Reset, the dimensions menu, the list of the tagz, and the sliders that open the panel, where the view actions and the layout are; `settings.toolbar.position`, `src/lib/toolbar.js`). `toolbar.position: "bottom"` keeps the bar along the bottom (`src/components/Toolbar`), the default before 2026-11-05.
 
 ### Views: the registry (2026-11-04)
 
@@ -190,15 +197,20 @@ A view is one way of drawing the feed (`vision/VIEWS.md`). The registry is `src/
 
 - `src/lib/views.js` holds the pure helpers, with no component, so the tests run in node: `siteViews(settings, registry)` reads `settings.views` (default `["cluster"]`, unknown ids skipped with one logged line), `viewById`, `viewLayout`, `viewFromSearch(location.search, listed)` for `?view=<id>`, and `currentView(listed, viewState.state)`, the view in force.
 - The page (`generate-index.js`) and the embed (`src/embed.jsx`) mount the current entry's component with the entry's props under the page's own, and pass the site's views to the top bar (`FeedZ`: `views`, `currentView`, `onSelectView`), which shows the switch only when there is more than one.
-- The reader's choice lives in `viewState.state.view`, set with `setView(id, layout, { silent })`: the view and the layout it draws with in one step. `resetLayout` clears it. The bottom bar's layout picker still sets `state.layout` alone; `currentView` resolves a layout that contradicts the chosen view to the listed view drawn with that layout, and the page syncs the state silently, so the two controls always agree.
+- The reader's choice lives in `viewState.state.view`, set with `setView(id, layout, { silent })`: the view and the layout it draws with in one step. `resetLayout` clears it. The layout picker (the Layout row in the main view's panel, and in the bottom bar with `toolbar.position: "bottom"`) still sets `state.layout` alone; `currentView` resolves a layout that contradicts the chosen view to the listed view drawn with that layout, and the page syncs the state silently, so the two controls always agree.
 
 ### Substrate dispatch in the reader
 
-`renderSubstrate(article, body, headerHTML)` routes to:
+`fetchContent(item)` in `src/components/ReaderPanel/ReaderPanel.jsx` routes to:
 
-- `essay` / `multi` — `fetch({pages_url})` and inject HTML (existing path)
-- `image` — `<img>` inline with the cover URL
+- a piece from a source other than the site's own folder (a feed's item, a page) — the text the feed carried, often a summary, and a link out to the piece (`renderFeedItem`)
+- a title-only piece (`_posted: "title"`) — its title and status, nothing fetched
+- a `placeholder` piece — a box naming its chapter as in progress
+- `essay` / `multi` — fetch the piece's own page (`item.url`; first the sibling `{id}.html` beside the viewer when the page is served from elsewhere), drop its `h1`, and inject the HTML (existing path)
+- `image` — `<img>` inline with the item's image
 - `podcast-episode` / `video` / `archive` / `fragment` — placeholder box + metadata summary (until per-substrate renderers are built)
+
+A link piece never opens the reader: a tap on its card follows its link.
 
 Metadata rows (`seed`, `tldr`, `topology`, `energy`, `note`) render below the body for non-essay kinds so the reader never sees a blank panel.
 
@@ -221,12 +233,12 @@ window.TTS.register(engineName, {
 
 ### Engines
 
-- **Browser (Web Speech API)** — instant, OS-native voices. Only a curated few English voices are offered: `settings.tts.engines.browser.preferredVoices` (ordered names, matched exactly or by prefix) and `maxVoices` (default 5); one English fallback if none of the names exist on the device.
+- **Browser (Web Speech API)** — instant, OS-native voices. Every voice the device has is offered (since 2026-10-24): Google's first, then `settings.tts.engines.browser.preferredVoices` in order (matched exactly or by prefix), then the rest, the page's language first within each, grouped by language in the picker; no cap unless `maxVoices` is set to a number, except in an embed, which caps the list at 5 unless it is set (`src/lib/voices.js`).
 - **Google Gemini** — 30 multilingual voices via API; billed, so off in the picker unless `exposed: true`.
 
 ### Highlighting principle
 
-Sentence highlighting in the viewer is **ambient confirmation, not wayfinding** — the text itself pulses at the reading rate without demanding attention. No sidebar progress, no karaoke, no forceful scroll. Current implementation dwells-then-fades from API latency accident; the sidecar-timings path (see [`research/TTS Highlighting_ Chunking vs. Sentence Mode.md`](research/)) will lift that aesthetic into a deterministic spec (400ms fade, 150ms look-ahead gap, 200ms paragraph-first dwell).
+Sentence highlighting in the viewer is **ambient confirmation, not wayfinding** — the text itself pulses at the reading rate without demanding attention. No sidebar progress, no karaoke, no forceful scroll. Current implementation dwells-then-fades from API latency accident; the sidecar-timings path (see `research/TTS Highlighting_ Chunking vs. Sentence Mode.md`, in the local `research/` folder, which git ignores) will lift that aesthetic into a deterministic spec (400ms fade, 150ms look-ahead gap, 200ms paragraph-first dwell).
 
 This principle is load-bearing and must survive all future TTS work.
 
@@ -238,17 +250,17 @@ An open card on the canvas (`node.select`) holds the same voice the reader has: 
 
 ## GitHub Pages
 
-- Repo: `halapenyoharry/haroldyoung-human-posts`
-- Pages URL: `https://halapenyoharry.github.io/haroldyoung-human-posts/`
-- Auth token in `auth/.env` (gitignored)
+- Repo: named by `GITHUB_OWNER` and `GITHUB_REPO` in the site's `auth/.env` (the engine's `auth/.env` is the fallback); publishing stops with a message naming a missing one (until 2026-10-22 the engine named `halapenyoharry/haroldyoung-human-posts` itself)
+- Pages URL: `https://<owner>.github.io/<repo>/`
+- Auth token: `GITHUB_TOKEN`, in the same `auth/.env` (gitignored)
 
 For essays, the push flow is:
 1. `quarto render index.qmd --to html -M embed-resources:true` (for legacy folders)
    — or —
    future `render.js` step for Gen 2 `.md` → self-contained HTML
 2. `pushArticle()` in `platforms/github-pages.js` uploads `{slug}.html`
-3. `node generate-index.js` rebuilds `feed.json` + `index.html` from `~/Posts/`
-4. `pushFile()` uploads those to Pages root
+3. `node generate-index.js` rebuilds `feed.json` + `index.html` from the site's sources
+4. `update-index.js` uploads those, and `covers/`, to the Pages root with `pushFile()`
 
 Non-essay substrates (image/audio/video) will get their own push paths as renderers are added.
 
@@ -264,13 +276,13 @@ Beside the slug, and never in its place, every item carries `topicSlug` (provisi
 
 ## RSS / JSON Feed
 
-`_site/feed.json` is JSON Feed 1.1 compatible, extended with the rich content model (`kind`, `substrate`, `seed`, `topology`, `energy`, `forms`, `connected_to`, `todos`). Standard feed readers ignore unknown fields; the viewer consumes all of them.
+`_site/feed.json` is JSON Feed 1.1 compatible, extended with the rich content model (`kind`, `substrate`, `seed`, `topology`, `energy`, `forms`, `connected_to`, `todos`), and beside `items` it carries `edges` (since 2026-09-10), `_sources`, `containers` when the site declares containment, and `_rtagz` when rosetta-tagz ran. Standard feed readers ignore unknown fields; the viewer consumes all of them.
 
 The D3 graph fetches `feed.json` at load and derives its shape client-side. `feed.json` is the single source of truth; the graph is a view.
 
-External feeds and the site's own local folder are declared in `feeds.opml` (or the path in `settings.json` `feeds_opml_path`), parsed by `src/lib/opml.js`. Each outline entry is routed by `generate-index.js` and `src/aggregator.js` to its source adapter (`src/adapters/LocalFolderAdapter.js`, `src/adapters/RssAdapter.js`, `src/adapters/AtomAdapter.js`, `src/adapters/JsonFeedAdapter.js`, or, for one article's page and a local list of pages, `src/adapters/PageAdapter.js` and `src/adapters/PageListAdapter.js`, which read a page through `src/lib/pageExtract.js`), with feed colors cached in the engine's own `.feed-cache/colors.json` (like its last good copies and rosetta-tagz's working folders, under post-pipe's folder wherever the build is run from, since 2026-11-05), so external items appear as peer nodes in the graph alongside the local corpus.
+External feeds and the site's own local folder are declared in `feeds.opml` (or the path in `settings.json` `feeds_opml_path`), parsed by `src/lib/opml.js`. Each outline entry is routed by `generate-index.js` and `src/aggregator.js` to its source adapter (`src/adapters/LocalFolderAdapter.js`, `src/adapters/RssAdapter.js`, `src/adapters/AtomAdapter.js`, `src/adapters/JsonFeedAdapter.js`, or, for one article's page and a local list of pages, `src/adapters/PageAdapter.js` and `src/adapters/PageListAdapter.js`, which read a page through `src/lib/pageExtract.js`), with feed colors (an outline's `customColor`, else the `theme-color` of the source's home page, fetched once, else a hue made from its id, `src/adapters/detectFeedColor.js`; for a local folder the home page is the site's `base_url`) cached in the engine's own `.feed-cache/colors.json` (like its last good copies and rosetta-tagz's working folders, under post-pipe's folder wherever the build is run from, since 2026-11-05), so external items appear as peer nodes in the graph alongside the local corpus.
 
-A fetched feed or page whose fetch fails shows its cards from a copy (`src/adapters/lastGoodCopy.js`, 2026-11-05): the engine's last good copy, which every good fetch leaves in the engine's `.feed-cache/last-good/` on the machine that builds, or the site's saved copy, a file in the site's folder that the outline names with `savedCopy` (provisional) and the site ships, as `examples/site/saved/` does. Both are `{ url, fetchedAt, body }`; the build takes the newer by `fetchedAt` (`copiesNewestFirst`), and the source is marked `stale` with `copyDate`, `copyFrom` (`site` or `engine`) and `error`. An ordinary build never writes the site's copy; `node generate-index.js --save-copies` writes it from that build's good fetch. Every source in `_sources` also says when its items were taken in: a fetched one `fetchedAt` (this build's fetch, or the copy's) and `feedUpdated` (the feed's own date: RSS `lastBuildDate`, else the channel's `pubDate`; Atom's `updated`; null for JSON Feed and for a page), a local folder or a list of pages `readAt`. The top bar's source pill shows these in a popover on a mouse's hover, the keyboard's focus or a finger's dwell (`FeedPill` in `src/components/FeedZ/FeedZ.jsx`, its lines from `sourceLines` in `src/lib/sourceStatus.js`).
+A fetched feed or page whose fetch fails shows its cards from a copy (`src/adapters/lastGoodCopy.js`, 2026-11-05): the engine's last good copy, which every good fetch leaves in the engine's `.feed-cache/last-good/` on the machine that builds, or the site's saved copy, a file in the site's folder that the outline names with `savedCopy` (provisional) and the site ships, as `examples/site/saved/` does. Both are `{ url, fetchedAt, body }`; the build takes the newer by `fetchedAt` (`copiesNewestFirst`), and the source is marked `stale` with `copyDate`, `copyFrom` (`site` or `engine`) and `error`. An ordinary build never writes the site's copy; `node generate-index.js --save-copies` writes it from that build's good fetch. Every source in `_sources` also says when its items were taken in: a fetched one `fetchedAt` (this build's fetch, or the copy's) and `feedUpdated` (the feed's own date: RSS `lastBuildDate`, else the channel's `pubDate`, else its `dc:date`; Atom's `updated`; null for JSON Feed and for a page), a local folder or a list of pages `readAt`. The top bar's source pill shows these in a popover on a mouse's hover, the keyboard's focus or a finger's dwell (`FeedPill` in `src/components/FeedZ/FeedZ.jsx`, its lines from `sourceLines` in `src/lib/sourceStatus.js`).
 
 The top bar's `+` (`AddPill` in `src/components/FeedZ/FeedZ.jsx`) asks `src/lib/feedAutodiscovery.js` what a pasted address is (`discoverSource`: a feed, a page naming no feed, or nothing readable) and shows the line to add from `src/lib/addFeedLine.js`: the feed line as ever, or a `type="page"` line.
 
@@ -298,7 +310,7 @@ The article [`the-collaborator-that-acts-or-asks`](../Posts/the-collaborator-tha
 | Platform | Status | Notes |
 |----------|--------|-------|
 | GitHub Pages | ✅ Working | Push via GitHub API |
-| Medium | ⚠️ Partial | Push works; Playwright import step manual |
+| Medium | ⚠️ Partial | Push works; the Playwright import step has no Medium session (see below) |
 | Substack | ⏳ Stub | Not implemented |
 | YouTube | ⏳ Stub | Not implemented |
 
@@ -308,8 +320,8 @@ Platform modules are substrate-aware in principle but not yet in code: essay →
 
 ## Known Issues / Work in Progress
 
-- **`post-pipe/articles/`** — the old content root, retained in `archive/` for reference. All active content lives in `~/Posts/`.
+- **`post-pipe/articles/`** — the old content root, kept for reference in the local `archive/` folder, which git ignores. The engine holds no content now: each site names its sources in its own `feeds.opml` (`docs/SITES.md`), and `~/Posts/` is the owner's corpus, read when a site lists it.
 - **Quarto rendering** still the path for Gen 1 legacy articles. A native `.md` → self-contained HTML renderer is planned to remove the Quarto dependency for Gen 2.
 - **Substrate renderers** beyond `essay` and `image` are placeholders. Audio/video renderers need media-file copy paths into `_site/` or CDN routing.
 - **Prepared-audio + sidecar timings pipeline** (see plan in conversation history) — phase 1 is `prepare-audio.js` that synthesizes sentence-by-sentence at publish time and emits `audio.mp3` + `timings.json`. Bypasses forced alignment entirely.
-- **Medium import** — `medium.com/p/import` URL is dead. Correct path: `medium.com/me/stories` → "Import a story" button. Playwright step needs updating.
+- **Medium import** — `medium.com/p/import` URL is dead; the Playwright step now goes to `medium.com/me/stories` → "Import a story" button. It opens a fresh browser with no Medium session, so it cannot get past Medium's sign-in on its own, and `--publish` changes only what it prints.

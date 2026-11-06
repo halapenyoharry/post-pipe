@@ -34,7 +34,7 @@ Each requirement quotes Harold, then states the rule it sets.
 | R2 | "think algorythemic procedural organic branching" | The roots are grown by an algorithm, not drawn from a picture: seeded, so the same data grows the same roots on every load, and organic (tapering, gently curving, forking at natural angles). |
 | R3 | "each main root is a container", "the container name is the name of the root and labled thus" | Off the tap root (the whole feed), one main root per container (in a novel, one per act). The container's name is written along its root. |
 | R4 | "a root breaks off again when the 'next' is not the same as chrono order" | Within a container, a root runs as long as the story's next item is also the next in time. Where the story jumps in time, a new root breaks off. The proposed formal rule and examples are in section 3; Harold confirms it. |
-| R5 | "we still have next as an option to render as a moving dot, the dot btw, should go from first, then when it gets to second it goes to third and so on" | One dot travels the story's order: from the first item to the second, then to the third, along the drawn roots, crossing at the forks. It is optional (a setting). This is not today's pulse, which runs on every sequence link at once (`src/components/GraphViewer/GraphViewer.jsx:2595-2598`, `GraphViewer.module.css:89-94`). |
+| R5 | "we still have next as an option to render as a moving dot, the dot btw, should go from first, then when it gets to second it goes to third and so on" | One dot travels the story's order: from the first item to the second, then to the third, along the drawn roots, crossing at the forks. It is optional (a setting). This is not today's pulse, which runs on every sequence link at once (`src/components/GraphViewer/GraphViewer.jsx:3396-3401`, `GraphViewer.module.css:80-101`, lines as of 2026-11-05). |
 | R6 | "it's child roots ... only show up when you open the container by clicking on the name of the root" (answer: hidden until opened) | At first only the tap root, the main roots and their names show. Clicking a root's name opens the container: its child roots and items grow in. Clicking again closes it. |
 | R7 | "There is areaa for banner above the graph of roots, for image or text (this is like our second frame)" | A banner slot above the roots that holds an image or text, as the site's second frame holds the small plant and the title. |
 | R8 | "if you zoom in the root system zooms in to but becomes lighter as n ot to distract too much, but does this smoothlyu and blends into the top so it meets the image, if there is one that matches up" | The roots zoom with everything else, and grow lighter as the zoom goes in, smoothly, never in a step. At the top the roots fade into the banner, so a banner image whose bottom matches the roots (as the cover's plant meets its roots) reads as one picture. |
@@ -71,7 +71,7 @@ The main root is the line of the present, and flashbacks and parallel threads gr
 
 - **From a post-pipe feed** (the main host):
   - containers become the main roots;
-  - story order comes from `series` and `series_part` and the `next` links built in `src/corpus/buildEdges.js:123-131`;
+  - story order comes from `series` and `series_part` and the `next` links built in `src/corpus/buildEdges.js:203-215`;
   - time comes from `timeline.calendar_time`, read the way `src/components/GraphViewer/layouts.js` reads it for the chronology dimension (`parseLooseDate` :428, `dimensionIntervals` :486).
 - **From any JSON** (for exoskeleton and other hosts):
   - a plain schema: `{ id, label, chrono?, next?, children? }`;
@@ -113,7 +113,7 @@ Exoskeleton (Tauri 2 + React 19, AGPL-3.0-or-later) has a JSON suite: one JSON d
 - **Wiring**, following its 2026-09-12 precedent for adding a panel:
   - the lazy import in `src/App.tsx`;
   - the accent and glyph in `src/ColoredTab.tsx`, and the accent variable in `src/App.css`;
-  - a registry entry in `src/persistence/default-layout.ts` (`introducedAt` 11, companion `json-edit`), and a bump of `CURRENT_VERSION` in `src/persistence/storage.ts`;
+  - a registry entry in `src/persistence/default-layout.ts` (`introducedAt` 11, companion `json-edit`), and a bump of `CURRENT_VERSION` in `src/persistence/storage.ts` (exoskeleton's json-graph3d-inspect took 11 on 2026-10-08, so on 2026-11-05 the next is 12);
   - the `json-lab` preset;
   - `npx tsc --noEmit`, `npm run build` and `npm test`.
 - **Data and sync:**
