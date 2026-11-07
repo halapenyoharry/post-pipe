@@ -15,6 +15,7 @@ export { Theme } from './components/Theme/Theme';
 export { Opening } from './components/Opening/Opening';
 export { useContributions } from './components/Contributions/useContributions';
 export { topBarConfig, resolvePages, graphFeed, topBarOrder, resumeTarget } from './lib/topBar';
+export { chosenOrder, PREF as READING_ORDER_PREF } from './lib/readingOrder';
 export { VIEWS, siteViews, viewById, viewLayout, viewFromSearch, currentView } from './views/index';
 export { toolbarConfig } from './lib/toolbar';
 export { React, ReactDOM };

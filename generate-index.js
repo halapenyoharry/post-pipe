@@ -22,6 +22,7 @@ const PageAdapter        = require('./src/adapters/PageAdapter');
 const PageListAdapter    = require('./src/adapters/PageListAdapter');
 const { loadCorpus }     = require('./src/aggregator');
 const { cacheDirForSite, SKOS_FILES, rtagzSettings } = require('./src/lib/rtagz');
+const { runFlows }       = require('./src/lib/flowBuild');
 const { parseOpml }      = require('./src/lib/opml');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
@@ -562,6 +563,12 @@ ${reactJs}
     const viewById = PPC.viewById || function (list, id) { return list.find(function (v) { return v.id === id; }) || null; };
     const viewFromSearch = PPC.viewFromSearch || function () { return null; };
     const currentView = PPC.currentView || function (list) { return list[0] || null; };
+    // The reading order in force (feed.flows, one per Flow preset the site
+    // lists, and the reader's choice of them; src/lib/readingOrder.js), for
+    // where the book starts a reader with no place yet. Read guardedly too:
+    // with an older bundle, or no flows, the book is as it was.
+    const chosenOrder = PPC.chosenOrder || function () { return null; };
+    const READING_ORDER_PREF = PPC.READING_ORDER_PREF || 'readingOrder';
 
     // The top bar's pages (settings.topBar.pages): buttons beside the source
     // pills that open an item in the reader. An item kept out of the graph
@@ -829,7 +836,10 @@ ${reactJs}
             resume: TOP_BAR.resume,
             order: topBarOrder(TOP_BAR),
             onResume: function () {
-              var it = resumeTarget(feed.items || [], viewState && viewState.state ? viewState.state.reading : null, TOP_BAR);
+              // Where this reader was; else the site's start; else, with Flow
+              // presets, the first card of the reading order in force.
+              var order = chosenOrder(feed, viewState && viewState.preference ? viewState.preference(READING_ORDER_PREF) : null);
+              var it = resumeTarget(feed.items || [], viewState && viewState.state ? viewState.state.reading : null, TOP_BAR, order);
               if (it && (!selectedRef.current || selectedRef.current.id !== it.id)) selectArticle(it);
             },
             showAddButton: TOP_BAR.addFeed,
@@ -1063,6 +1073,21 @@ async function main() {
   }
   feed._sources = sources;
   if (rtagz) feed._rtagz = rtagz;
+
+  // Flow's orders, once the feed is complete (src/lib/flowBuild.js): for each
+  // preset the site lists under flow.presets (provisional), Flow's programs
+  // run over the feed, and feed.flows (provisional) holds each order as the
+  // feed's item ids, which the reader's Next and Previous and the top bar's
+  // book follow (src/lib/readingOrder.js). A preset that fails is one logged
+  // line and no order; a site that lists none runs no Flow, and its
+  // feed.json gains nothing.
+  const flows = await runFlows(feed, SETTINGS, { siteRoot: SITE_ROOT });
+  if (flows && flows.length) {
+    feed.flows = flows;
+    console.log(`  flow: ${flows.length} ${flows.length === 1 ? 'order' : 'orders'} (${flows.map((f) => `${f.name}, ${f.order.length} cards`).join('; ')})`);
+  } else if (flows) {
+    console.log('  flow: no order this build (each listed preset failed, said above)');
+  }
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 

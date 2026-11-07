@@ -13,6 +13,7 @@ import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
 import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
+import { flowNav, PREF as READING_ORDER_PREF } from '../../lib/readingOrder';
 import { Contributions } from './Contributions';
 import { nonTagReferences } from '../../corpus/buildEdges';
 import { tagReferences } from '../../lib/tagReferences';
@@ -386,8 +387,13 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     return attachFollowAlong(bodyRef.current);
   }, [followOn, displayHtml, article]);
 
-  // Where the reader can go from here, along the sequence edges.
-  const nav = useMemo(() => (article && feedData ? neighbours(feedData, article.id) : { prev: [], next: [] }), [article, feedData]);
+  // Where the reader can go from here: along the sequence edges, or, when the
+  // site lists Flow presets, to the neighbouring card in the reading order
+  // this reader chose (src/lib/readingOrder.js; flow.next false keeps the
+  // sequence edges). The same options go to the arrow keys and swipes.
+  const orderPref = viewState && viewState.preference ? viewState.preference(READING_ORDER_PREF) : null;
+  const flowOpts = useMemo(() => flowNav(feedData, settings, orderPref), [feedData, settings, orderPref]);
+  const nav = useMemo(() => (article && feedData ? neighbours(feedData, article.id, flowOpts) : { prev: [], next: [] }), [article, feedData, flowOpts]);
 
   const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -408,7 +414,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   };
   const goStep = (dir) => {
     if (!article || !feedData) return;
-    const item = step(feedData, article.id, dir);
+    const item = step(feedData, article.id, dir, flowOpts);
     if (item) goTo(item, dir);
   };
   const goStepRef = useRef(goStep);

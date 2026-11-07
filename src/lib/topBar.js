@@ -22,10 +22,12 @@
 //
 // resume: a button that opens the reader where this reader was: the item
 // they read most recently (the last one with reading progress, by its last
-// touch in the view state), else the site's start (an item id or slug), else
-// the first item. The top bar's own pages (an about page, say) and link
-// items never count as where the reader was. The reader itself returns to
-// the place in the item it was left at.
+// touch in the view state), else the site's start (an item id or slug), else,
+// when the site lists Flow presets (flow.presets), the first card that can
+// be read in the reading order in force (the one this reader chose, else the
+// site's first; readingOrder.js), else the first item. The top bar's own pages (an about page, say) and link
+// items never count as where the reader was, nor as an order's first card.
+// The reader itself returns to the place in the item it was left at.
 //   "resume": { "label": "read", "icon": "<path .../>", "start": "<item id or slug>" }
 // order: the buttons' order, by id ("resume", a page's id, a link's id,
 // "subscribe"); any left out follow in the default order (resume, pages,
@@ -34,6 +36,7 @@
 
 const { siteIcon } = require('./icons');
 const { isLinkItem } = require('./linkNode');
+const { isReadable } = require('./readerNav');
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
@@ -97,8 +100,10 @@ function topBarOrder(config) {
 
 // Where the resume button opens the reader (see resume above). items: the
 // feed's items; reading: the view state's reading memory (id -> { at, max,
-// scroll, t }); config: topBarConfig's result.
-function resumeTarget(items, reading, config) {
+// scroll, t }); config: topBarConfig's result; order (optional): the item
+// ids of the reading order in force (readingOrder.js chosenOrder), for a
+// reader with no place yet on a site whose resume names no start.
+function resumeTarget(items, reading, config, order) {
   const list = Array.isArray(items) ? items : [];
   const pageIds = new Set(((config && config.pages) || []).map((p) => p.id));
   const isPage = (it) => pageIds.has(it.id) || pageIds.has(slugOf(it));
@@ -116,6 +121,10 @@ function resumeTarget(items, reading, config) {
   if (best) return best;
   const start = config && config.resume && config.resume.start;
   if (start) { const s = eligible.find((it) => it.id === start || slugOf(it) === start); if (s) return s; }
+  if (Array.isArray(order) && order.length) {
+    const byId = new Map(eligible.map((it) => [it.id, it]));
+    for (const id of order) { const it = byId.get(id); if (it && isReadable(it)) return it; }
+  }
   return eligible[0] || null;
 }
 
