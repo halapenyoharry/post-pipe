@@ -1,11 +1,13 @@
 // The reading order (src/lib/readingOrder.js): which of the feed's flows is
 // in force, what the device keeps for the reader's choice, when Next and
 // Previous follow it, and the choice remembered and put back by Reset the
-// view, with Next, Previous and the book's start changing with it.
+// view, with Next, Previous and the book's start changing with it. Apart from
+// the order, what the reader says of a card the graph is hiding because the
+// visitor turned its source's pill off: the card keeps its place in the order.
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav } = require('../src/lib/readingOrder');
+const { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, hiddenInGraphLine } = require('../src/lib/readingOrder');
 const { neighbours, step } = require('../src/lib/readerNav');
 const { topBarConfig, resumeTarget } = require('../src/lib/topBar');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
@@ -105,4 +107,90 @@ test('the choice is remembered on this device, moves Next, Previous and the book
   // Choosing the first again keeps nothing.
   again.setPreference(PREF, prefFor(feed, 'by-weight'));
   assert.strictEqual(again.preference(PREF), null);
+});
+
+test('hiddenInGraph names the source a card is hidden with: ids in an array or in a Set', () => {
+  const item = { id: 'a', title: 'A', _source: { id: 'feed-1', title: 'Feed One', type: 'feed', color: '#c0ffee' } };
+  const hidden = { id: 'feed-1', title: 'Feed One' };
+  // The view state keeps them as an array of source ids.
+  assert.deepStrictEqual(hiddenInGraph(item, ['feed-1']), hidden);
+  assert.deepStrictEqual(hiddenInGraph(item, ['feed-2', 'feed-1']), hidden);
+  // The page hands the graph a Set of them.
+  assert.deepStrictEqual(hiddenInGraph(item, new Set(['feed-1'])), hidden);
+  assert.deepStrictEqual(hiddenInGraph(item, new Set(['feed-2', 'feed-1'])), hidden);
+  // Nothing hidden: no list yet (the view state is not loaded), or none in it.
+  assert.strictEqual(hiddenInGraph(item, null), null);
+  assert.strictEqual(hiddenInGraph(item, undefined), null);
+  assert.strictEqual(hiddenInGraph(item, []), null);
+  assert.strictEqual(hiddenInGraph(item, new Set()), null);
+});
+
+test('hiddenInGraph is null for a source that is showing, a card with no source, or no card', () => {
+  const item = { id: 'a', _source: { id: 'feed-1', title: 'Feed One' } };
+  assert.strictEqual(hiddenInGraph(item, ['feed-2']), null, 'another source is off, this one is showing');
+  assert.strictEqual(hiddenInGraph(item, new Set(['feed-2'])), null);
+  assert.strictEqual(hiddenInGraph({ id: 'a' }, ['feed-1']), null, 'no source stamp');
+  assert.strictEqual(hiddenInGraph({ id: 'a', _source: null }, ['feed-1']), null);
+  assert.strictEqual(hiddenInGraph({ id: 'a', _source: { title: 'No id' } }, [undefined]), null, 'a source with no id cannot be hidden');
+  assert.strictEqual(hiddenInGraph(null, ['feed-1']), null);
+  assert.strictEqual(hiddenInGraph(undefined, ['feed-1']), null);
+});
+
+test('hiddenInGraph finds the source through originalItem, as a graph node carries the feed item', () => {
+  const original = { id: 'a', _source: { id: 'feed-1', title: 'Feed One' } };
+  const node = { id: 'a', type: 'article', originalItem: original };
+  assert.deepStrictEqual(hiddenInGraph(node, ['feed-1']), { id: 'feed-1', title: 'Feed One' });
+  assert.strictEqual(hiddenInGraph(node, ['feed-2']), null);
+  // A stamp on the node itself is read first, as the reader's byline reads it.
+  const both = { id: 'a', _source: { id: 'feed-2', title: 'Feed Two' }, originalItem: original };
+  assert.deepStrictEqual(hiddenInGraph(both, ['feed-2']), { id: 'feed-2', title: 'Feed Two' });
+  assert.strictEqual(hiddenInGraph(both, ['feed-1']), null);
+});
+
+test('a hidden source with no title is still named, with an empty title', () => {
+  assert.deepStrictEqual(hiddenInGraph({ _source: { id: 'feed-1' } }, ['feed-1']), { id: 'feed-1', title: '' });
+  assert.deepStrictEqual(hiddenInGraph({ _source: { id: 'feed-1', title: null } }, ['feed-1']), { id: 'feed-1', title: '' });
+  assert.deepStrictEqual(hiddenInGraph({ _source: { id: 'feed-1', title: '  ' } }, ['feed-1']), { id: 'feed-1', title: '' }, 'spaces are no title');
+});
+
+test('the line the reader draws: the source\'s pill is off, or only that the card is hidden in the graph', () => {
+  // The wording is provisional (the owner names things); it lives in one place.
+  assert.strictEqual(hiddenInGraphLine({ id: 'feed-1', title: 'Feed One' }), 'hidden in the graph: Feed One\'s pill is off');
+  assert.strictEqual(hiddenInGraphLine({ id: 'feed-1', title: '' }), 'hidden in the graph');
+  assert.strictEqual(hiddenInGraphLine(null), '', 'a card that is not hidden has no line');
+});
+
+test('a card from a hidden source stays in the reading order: Next, Previous and the book visit it, and the reader marks it', () => {
+  const one = { id: 'feed-1', title: 'Feed One' };
+  const two = { id: 'feed-2', title: 'Feed Two' };
+  const from = (id, source) => ({ id, url: `/${id}.html`, title: id.toUpperCase(), _source: source });
+  const sourced = {
+    items: [from('a', one), from('b', two), from('c', one)],
+    edges: [],
+    flows: [
+      { name: 'in-order', mode: 'score', order: ['a', 'b', 'c'] },
+      { name: 'b-first', mode: 'walk', order: ['b', 'a', 'c'] },
+    ],
+  };
+  const [a, b, c] = sourced.items;
+  // The pill of feed-2 is off, so the graph does not draw b.
+  const hiddenSources = ['feed-2'];
+
+  // Next and Previous (and with them the arrow keys and the swipes) pass
+  // through b as they would with every pill on.
+  const nav = flowNav(sourced, {}, null);
+  assert.strictEqual(step(sourced, 'a', 'next', nav).id, 'b');
+  assert.strictEqual(step(sourced, 'c', 'prev', nav).id, 'b');
+  assert.deepStrictEqual(ids(neighbours(sourced, 'b', nav).prev), ['a']);
+  assert.deepStrictEqual(ids(neighbours(sourced, 'b', nav).next), ['c']);
+  // The book opens a reader with no place yet at the order's first card, b.
+  assert.strictEqual(resumeTarget(sourced.items, null, topBarConfig({}), chosenOrder(sourced, 'b-first')).id, 'b');
+
+  // The reader says b is hidden in the graph; a and c, whose pills are on, say nothing.
+  assert.deepStrictEqual(hiddenInGraph(b, hiddenSources), { id: 'feed-2', title: 'Feed Two' });
+  assert.strictEqual(hiddenInGraph(a, hiddenSources), null);
+  assert.strictEqual(hiddenInGraph(c, hiddenSources), null);
+  // Turning the pill back on takes the line away; the order never moved.
+  assert.strictEqual(hiddenInGraph(b, []), null);
+  assert.strictEqual(step(sourced, 'a', 'next', nav).id, 'b');
 });

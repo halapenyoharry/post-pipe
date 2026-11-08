@@ -13,7 +13,7 @@ import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
 import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
-import { flowNav, PREF as READING_ORDER_PREF } from '../../lib/readingOrder';
+import { flowNav, hiddenInGraph, hiddenInGraphLine, PREF as READING_ORDER_PREF } from '../../lib/readingOrder';
 import { Contributions } from './Contributions';
 import { nonTagReferences } from '../../corpus/buildEdges';
 import { tagReferences } from '../../lib/tagReferences';
@@ -543,6 +543,13 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const rights = rightsLine(settings && settings.rights);
   const nonTagRefs = nonTagReferences(article);
 
+  // A card whose source's pill the visitor has turned off in the top bar is
+  // still in the reading order; the reader says it is hidden in the graph
+  // (src/lib/readingOrder.js). Read on every render: the page re-renders the
+  // reader whenever the view state changes (its subscribe(bump)), so a pill
+  // toggled while the reader is open changes the line at once.
+  const hiddenSource = hiddenInGraph(article, viewState && viewState.state ? viewState.state.hiddenSources : null);
+
   return (
     <>
       <div
@@ -726,6 +733,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             )}
             {metaParts.length > 0 && (
               <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
+            )}
+            {hiddenSource && (
+              <div className={styles.articleMeta} data-reader-hidden-in-graph>{hiddenInGraphLine(hiddenSource)}</div>
             )}
           </div>
           <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />

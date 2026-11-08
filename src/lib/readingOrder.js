@@ -17,6 +17,9 @@
 //
 // A site that lists no preset has no flows, and none of this applies. Nothing
 // here moves anything in the graph.
+//
+// Apart from the order, hiddenInGraph names the source a card is hidden with
+// in the graph, with flows or without: the reader says so.
 
 const { topBarConfig, resolvePages } = require('./topBar');
 
@@ -70,4 +73,32 @@ function flowNav(feed, settings, pref) {
   return { order: flow.order, skip: new Set(pages.map((p) => p.item.id)) };
 }
 
-module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav };
+// Whether the graph is hiding a card: the visitor has turned its source's pill
+// off in the top bar (hiddenSources, as viewState keeps them: an array of
+// source ids, or a Set). Gives { id, title } of that source ('' when it has no
+// title), else null: no item, no source (its _source, or its originalItem's,
+// as a graph node carries it) or a source that is showing. The reading order
+// does not change for such a card: the book, Next, Previous, the arrow keys
+// and the swipes visit it as any other, and the reader says it is hidden in
+// the graph. The owner's decision (2026-11-08): "if they are part of the graph
+// they should show up in the flow, or this early version. with indication
+// they are hidden in graph."
+function hiddenInGraph(item, hiddenSources) {
+  const source = item && (item._source || (item.originalItem && item.originalItem._source));
+  if (!source || source.id === undefined || source.id === null) return null;
+  const hidden = hiddenSources instanceof Set
+    ? hiddenSources.has(source.id)
+    : Array.isArray(hiddenSources) && hiddenSources.includes(source.id);
+  if (!hidden) return null;
+  return { id: source.id, title: typeof source.title === 'string' ? source.title.trim() : '' };
+}
+
+// The line the reader draws for a card hidden in the graph, after its date and
+// reading time; nothing for a card that is not. The wording is provisional:
+// the owner names things, and this is the one place it changes.
+function hiddenInGraphLine(hidden) {
+  if (!hidden) return '';
+  return hidden.title ? `hidden in the graph: ${hidden.title}'s pill is off` : 'hidden in the graph';
+}
+
+module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, hiddenInGraphLine };
