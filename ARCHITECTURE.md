@@ -60,7 +60,7 @@ Every change is checked against these. Each is Harold's; the date is the day he 
 - **The engine is content-agnostic.** Nothing specific to one site or corpus (names, tags, colours, authors, chapter lists) is in the engine; it goes in that site's `settings.json`. post-pipe holds no one's site.
 - **Emergence.** A card exists because a file or a feed item exists. The engine never makes up content.
 - **Metadata is a gradient, not a gate.** No piece is refused for lacking metadata (above).
-- **No network beyond what a site lists.** A build fetches only the feeds and pages its `feeds.opml` names, and a source's home page once for its colour; the viewer fetches only its own files. No CDNs. One known gap: images inside a feed item's own HTML load from the publisher's server when the reader shows them (Known Issues, at the end).
+- **No network beyond what a site lists.** A build fetches only the feeds and pages its `feeds.opml` names, and a source's home page once for its colour. No CDNs. At run time the viewer loads its own files, a piece's page from the piece's own address when that page is not beside the viewer, and what the site's settings point it at (contributions, an opening text). One known gap: images inside a feed item's own HTML load from the publisher's server when the reader shows them (Known Issues, at the end).
 - **Stillness** (2026-05-25). The layout settles once and stays; nothing moves on a click, a resize or the reader opening. Movement happens only when a reader can read meaning in it.
 - **The card is the preview surface** (2026-05-25). A hovered or tapped card opens in place, in the space it already has; no tooltip elsewhere repeats it. Opening the reader moves no card.
 - **Cards never disappear** (2026-10-31). At every zoom a card is drawn as a card with its title and scales with the graph; zoom changes no layout. Zoom-level rules found in older notes (the title alone when far out, a dot below 35%) were never Harold's.
@@ -71,6 +71,7 @@ Every change is checked against these. Each is Harold's; the date is the day he 
 - **Hidden in the graph is not out of the corpus** (2026-11-08). A source hidden with its pill hides its cards from the graph only; they stay in the reading order, and the reader says they are hidden in the graph.
 - **Add before override** (2026-10-25). A change to something that works arrives first as an option beside it; the working thing is replaced only when Harold says so after seeing both.
 - **Options, not questions** (2026-10-31). When a choice is open, it ships as a switch (a panel setting or a `settings.json` key) with a default, so both can be seen working.
+- **Every site gets a favicon** (2026-10-31), asked for or not. A site with neither `site.icons` nor a `favicon.svg` of its own gets a placeholder, one circle in its accent colour (grey when it names none), and the build says so (`faviconPlan` in `src/lib/shareMeta.js`).
 - **Names and design are Harold's.** A name marked *provisional* in these documents is a placeholder until he keeps or replaces it; where a change needed a visual choice he had not made, the plainest was built.
 
 ---
