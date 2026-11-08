@@ -3,8 +3,16 @@
 // page to read (title-only, `_posted: 'title'`) is still listed, with the
 // status line its container carries ("soon"), so the reader can say what is
 // coming instead of linking to nothing.
+//
+// In a flow (opts.order: the item ids in the order the reader chose, from
+// readingOrder.js flowNav), the neighbours are instead the nearest card on
+// each side in that order that the reader can open: one that can be read,
+// that is not a link card (a link is followed, never read), and that
+// opts.skip (a Set of item ids, the top bar's own pages) does not name. A
+// card opts.skip names, or one the order does not hold, has none.
 
 const { containerHas } = require('./containers');
+const { isLinkItem } = require('./linkNode');
 
 function itemIndex(feed) {
   const byId = new Map();
@@ -30,7 +38,8 @@ function navStatus(feed, item, fallback = 'not yet published') {
   return withStatus ? String(withStatus.status) : fallback;
 }
 
-function neighbours(feed, id) {
+function neighbours(feed, id, opts) {
+  if (opts && Array.isArray(opts.order)) return flowNeighbours(feed, id, opts.order, opts.skip);
   const byId = itemIndex(feed);
   const prev = [];
   const next = [];
@@ -42,9 +51,28 @@ function neighbours(feed, id) {
   return { prev, next };
 }
 
+// The nearest card either side of id in order that the reader can open.
+function flowNeighbours(feed, id, order, skip) {
+  const byId = itemIndex(feed);
+  const skipped = skip instanceof Set ? skip : new Set(Array.isArray(skip) ? skip : []);
+  const at = order.indexOf(id);
+  if (at < 0 || skipped.has(id)) return { prev: [], next: [] };
+  const openable = (oid) => {
+    if (skipped.has(oid)) return null;
+    const item = byId.get(oid);
+    return item && isReadable(item) && !isLinkItem(item) ? item : null;
+  };
+  let prev = null;
+  for (let i = at - 1; i >= 0 && !prev; i--) prev = openable(order[i]);
+  let next = null;
+  for (let i = at + 1; i < order.length && !next; i++) next = openable(order[i]);
+  return { prev: prev ? [prev] : [], next: next ? [next] : [] };
+}
+
 // The one place an arrow key or a swipe goes: the first readable neighbour.
-function step(feed, id, dir) {
-  const { prev, next } = neighbours(feed, id);
+// opts as for neighbours: in a flow, the nearest card it can open.
+function step(feed, id, dir, opts) {
+  const { prev, next } = neighbours(feed, id, opts);
   const list = dir === 'prev' ? prev : next;
   return list.find(isReadable) || null;
 }

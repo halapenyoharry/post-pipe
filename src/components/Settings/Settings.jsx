@@ -25,6 +25,7 @@ import {
   showTagsChosen, showTagsPrefFor, showTagLabelsChosen, showTagLabelsPrefFor,
 } from '../../lib/tagPills';
 import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
+import { PREF as READING_ORDER_PREF, feedFlows, chosenFlow, prefFor as readingOrderPrefFor } from '../../lib/readingOrder';
 import {
   PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText, travelLength, ratioAt, positionOf,
 } from '../../lib/sourceRatio';
@@ -350,6 +351,11 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   // Whether the tagz are drawn (lib/tagPills.js): their switch, and the
   // labels switch under it, inert while they are not.
   const tagsShown = showTagsChosen(viewState.preference(TAG_SHOW_PREF), S);
+  // The site's reading orders (feed.flows, one per Flow preset it lists;
+  // lib/readingOrder.js) and the one in force (preference readingOrder,
+  // provisional, null for the site's first): with two or more, a choice.
+  const flows = feedFlows(feedData);
+  const flowNow = chosenFlow(feedData, viewState.preference(READING_ORDER_PREF));
 
   const modeChoice = modes.length > 1 && (
     <Choice
@@ -649,13 +655,29 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
           onChange={(v) => viewState.setPreference(FOLDED_PREF, v === 'bubble' ? null : v)}
         />
       )}
+      {/* The reading order Next, Previous and the top bar's book follow, when
+          the site lists two or more Flow presets (flow.presets; the
+          preference readingOrder, provisional, null for the site's first;
+          lib/readingOrder.js): each choice is a preset's name, its
+          description its title, and the chosen one's description is the line
+          under the row. Changing it moves nothing in the graph. */}
+      {W === 'graph' && flows.length > 1 && flowNow && (<>
+        <Choice
+          label="Reading order"
+          name={READING_ORDER_PREF}
+          options={flows.map((f) => ({ id: f.name, label: f.name, title: f.description || f.name }))}
+          value={flowNow.name}
+          onChange={(v) => viewState.setPreference(READING_ORDER_PREF, readingOrderPrefFor(feedData, v))}
+        />
+        {flowNow.description && <div className={styles.hint} data-reading-order-description>{flowNow.description}</div>}
+      </>)}
     </>),
 
     memory: () => (<>
       <button
         className={styles.resetBtn}
         data-settings-reset
-        title="Layout, zoom, rotation, open and closed containers, selection, showing tagz and their labels, and colors, back to how the site starts"
+        title={`Layout, zoom, rotation, open and closed containers, selection, showing tagz and their labels, ${flows.length > 1 ? 'the reading order, ' : ''}and colors, back to how the site starts`}
         onClick={() => {
           setOpen(false);
           if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);

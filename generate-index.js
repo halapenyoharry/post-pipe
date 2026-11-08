@@ -22,9 +22,24 @@ const PageAdapter        = require('./src/adapters/PageAdapter');
 const PageListAdapter    = require('./src/adapters/PageListAdapter');
 const { loadCorpus }     = require('./src/aggregator');
 const { cacheDirForSite, SKOS_FILES, rtagzSettings } = require('./src/lib/rtagz');
+const { runFlows }       = require('./src/lib/flowBuild');
 const { parseOpml }      = require('./src/lib/opml');
 
 const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
+
+// The page's colours: settings.theme's own, else the original dark look's
+// (theme name default), so a site that names no colours still gets an opaque
+// reader and readable text. Until 2026-11-07 a colour the site left unset
+// was written as "undefined" and the reader's surface came out see-through.
+const DEFAULT_THEME_COLOURS = {
+  bg: '#1a1a2e', surface: '#0a0e1a', accent: '#64ffda', text: '#a8b2d1',
+  text_bright: '#ccd6f6', border: 'rgba(100, 255, 218, 0.2)',
+  node_published: '#3498db', node_draft: '#7f8c8d', tag_color: '#f39c12',
+};
+const themeColour = (key) => {
+  const v = SETTINGS.theme && SETTINGS.theme[key];
+  return typeof v === 'string' && v.trim() ? v : DEFAULT_THEME_COLOURS[key];
+};
 const SITE_DIR     = path.join(SITE_ROOT, '_site');
 const COVERS_DIR   = path.join(SITE_DIR, 'covers');
 const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
@@ -401,28 +416,28 @@ ${themeFontFaces()}
 ${siteFontFaces()}
 
   :root {
-    --bg: ${SETTINGS.theme.bg};
-    --surface: ${SETTINGS.theme.surface};
-    --accent: ${SETTINGS.theme.accent};
-    --text: ${SETTINGS.theme.text};
-    --text-bright: ${SETTINGS.theme.text_bright};
-    --border: ${SETTINGS.theme.border};
+    --bg: ${themeColour('bg')};
+    --surface: ${themeColour('surface')};
+    --accent: ${themeColour('accent')};
+    --text: ${themeColour('text')};
+    --text-bright: ${themeColour('text_bright')};
+    --border: ${themeColour('border')};
 
     /* Variables mapped for the new React Components */
-    --gv-node-draft: ${SETTINGS.theme.node_draft};
-    --gv-node-published: ${SETTINGS.theme.node_published};
-    --gv-tag-color: ${SETTINGS.theme.tag_color};
-    --gv-accent: ${SETTINGS.theme.accent};
+    --gv-node-draft: ${themeColour('node_draft')};
+    --gv-node-published: ${themeColour('node_published')};
+    --gv-tag-color: ${themeColour('tag_color')};
+    --gv-accent: ${themeColour('accent')};
 
-    --rp-bg: ${SETTINGS.theme.bg};
-    --rp-surface: ${SETTINGS.theme.surface};
-    --rp-border: ${SETTINGS.theme.border};
-    --rp-accent: ${SETTINGS.theme.accent};
-    --rp-text: ${SETTINGS.theme.text};
-    --rp-text-bright: ${SETTINGS.theme.text_bright};
+    --rp-bg: ${themeColour('bg')};
+    --rp-surface: ${themeColour('surface')};
+    --rp-border: ${themeColour('border')};
+    --rp-accent: ${themeColour('accent')};
+    --rp-text: ${themeColour('text')};
+    --rp-text-bright: ${themeColour('text_bright')};
 
-    --tts-accent: ${SETTINGS.theme.accent};
-    --tts-text: ${SETTINGS.theme.text};
+    --tts-accent: ${themeColour('accent')};
+    --tts-text: ${themeColour('text')};
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -562,6 +577,12 @@ ${reactJs}
     const viewById = PPC.viewById || function (list, id) { return list.find(function (v) { return v.id === id; }) || null; };
     const viewFromSearch = PPC.viewFromSearch || function () { return null; };
     const currentView = PPC.currentView || function (list) { return list[0] || null; };
+    // The reading order in force (feed.flows, one per Flow preset the site
+    // lists, and the reader's choice of them; src/lib/readingOrder.js), for
+    // where the book starts a reader with no place yet. Read guardedly too:
+    // with an older bundle, or no flows, the book is as it was.
+    const chosenOrder = PPC.chosenOrder || function () { return null; };
+    const READING_ORDER_PREF = PPC.READING_ORDER_PREF || 'readingOrder';
 
     // The top bar's pages (settings.topBar.pages): buttons beside the source
     // pills that open an item in the reader. An item kept out of the graph
@@ -829,7 +850,10 @@ ${reactJs}
             resume: TOP_BAR.resume,
             order: topBarOrder(TOP_BAR),
             onResume: function () {
-              var it = resumeTarget(feed.items || [], viewState && viewState.state ? viewState.state.reading : null, TOP_BAR);
+              // Where this reader was; else the site's start; else, with Flow
+              // presets, the first card of the reading order in force.
+              var order = chosenOrder(feed, viewState && viewState.preference ? viewState.preference(READING_ORDER_PREF) : null);
+              var it = resumeTarget(feed.items || [], viewState && viewState.state ? viewState.state.reading : null, TOP_BAR, order);
               if (it && (!selectedRef.current || selectedRef.current.id !== it.id)) selectArticle(it);
             },
             showAddButton: TOP_BAR.addFeed,
@@ -1063,6 +1087,21 @@ async function main() {
   }
   feed._sources = sources;
   if (rtagz) feed._rtagz = rtagz;
+
+  // Flow's orders, once the feed is complete (src/lib/flowBuild.js): for each
+  // preset the site lists under flow.presets (provisional), Flow's programs
+  // run over the feed, and feed.flows (provisional) holds each order as the
+  // feed's item ids, which the reader's Next and Previous and the top bar's
+  // book follow (src/lib/readingOrder.js). A preset that fails is one logged
+  // line and no order; a site that lists none runs no Flow, and its
+  // feed.json gains nothing.
+  const flows = await runFlows(feed, SETTINGS, { siteRoot: SITE_ROOT });
+  if (flows && flows.length) {
+    feed.flows = flows;
+    console.log(`  flow: ${flows.length} ${flows.length === 1 ? 'order' : 'orders'} (${flows.map((f) => `${f.name}, ${f.order.length} cards`).join('; ')})`);
+  } else if (flows) {
+    console.log('  flow: no order this build (each listed preset failed, said above)');
+  }
 
   if (!fs.existsSync(SITE_DIR)) fs.mkdirSync(SITE_DIR);
 

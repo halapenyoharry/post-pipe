@@ -1,6 +1,6 @@
 # post-pipe Architecture & Design Decisions
 
-**Last updated:** 2026-11-05
+**Last updated:** 2026-11-08
 
 ---
 
@@ -50,6 +50,28 @@ flowchart LR
     style BUILD fill:#16213e,color:#e0e0e0
     style ROUTES fill:#0d1117,color:#e0e0e0
 ```
+
+---
+
+## Rules the engine keeps
+
+Every change is checked against these. Each is Harold's; the date is the day he set or restated it, where one was written down.
+
+- **The engine is content-agnostic.** Nothing specific to one site or corpus (names, tags, colours, authors, chapter lists) is in the engine; it goes in that site's `settings.json`. post-pipe holds no one's site.
+- **Emergence.** A card exists because a file or a feed item exists. The engine never makes up content.
+- **Metadata is a gradient, not a gate.** No piece is refused for lacking metadata (above).
+- **No network beyond what a site lists.** A build fetches only the feeds and pages its `feeds.opml` names, and a source's home page once for its colour; the viewer fetches only its own files. No CDNs. One known gap: images inside a feed item's own HTML load from the publisher's server when the reader shows them (Known Issues, at the end).
+- **Stillness** (2026-05-25). The layout settles once and stays; nothing moves on a click, a resize or the reader opening. Movement happens only when a reader can read meaning in it.
+- **The card is the preview surface** (2026-05-25). A hovered or tapped card opens in place, in the space it already has; no tooltip elsewhere repeats it. Opening the reader moves no card.
+- **Cards never disappear** (2026-10-31). At every zoom a card is drawn as a card with its title and scales with the graph; zoom changes no layout. Zoom-level rules found in older notes (the title alone when far out, a dot below 35%) were never Harold's.
+- **Labels mean text** (2026-11-05). Hiding labels hides the text a node carries, never the node or its lines: cards are joined through their tagz, and removing either removes the structure.
+- **No assumed ranking** (2026-10-27). "We don't make assumptions, we just have weights and information and we display what the information says as best we can." A tag's origin (written, discovered, emergent) is an attribute to read or filter by, never a trust order; bad output is fixed in the layer that makes it, not hidden in the viewer.
+- **Highlighting is ambient confirmation, never wayfinding** (Highlighting principle, under Text-to-Speech).
+- **The slug merges nothing** (2026-11-04). One article arriving from two sources is two cards, and both show.
+- **Hidden in the graph is not out of the corpus** (2026-11-08). A source hidden with its pill hides its cards from the graph only; they stay in the reading order, and the reader says they are hidden in the graph.
+- **Add before override** (2026-10-25). A change to something that works arrives first as an option beside it; the working thing is replaced only when Harold says so after seeing both.
+- **Options, not questions** (2026-10-31). When a choice is open, it ships as a switch (a panel setting or a `settings.json` key) with a default, so both can be seen working.
+- **Names and design are Harold's.** A name marked *provisional* in these documents is a placeholder until he keeps or replaces it; where a change needed a visual choice he had not made, the plainest was built.
 
 ---
 
@@ -186,10 +208,12 @@ Each Gen 0 folder gets a `_TODO-METADATA.md` with a research checklist. Full pro
 The generated `_site/index.html` is a self-contained page with:
 
 1. **D3 force-directed graph** — nodes are content items and their tagz; edges are `feed.json`'s `edges` (`src/corpus/buildEdges.js`, since 2026-09-10): an item's tags (layer `tag`), a series' next (`sequence`), `connected_to` (`authored`), `topology`, references (layer `reference`), and containment, which the hulls show instead of a line; `graph.visibleLayers` picks which draw lines; substrate clusters are not built. The cluster layout weights each link (`settings.graph.edgeWeights`, `src/lib/edgeWeight.js`, 2026-11-04): weighted by default, each link's strength and length following its own weight, the degree of its two ends and its card's recency, by the same degree and recency formulas `flow/`'s flow-score uses; uniform gives every link one distance, as before. Its tag nodes are drawn by default as their pills, with every edge to them; `graph.tag.labels: false`, or the reader's "Show their labels" off in the panel, draws each as a small dot instead (`settings.graph.tag.markRadius`, 7 graph units), and `graph.tag.show: false`, or "Show tagz on the graph" off, draws none (`src/lib/tagPills.js`, preferences `showTags` and `showTagLabels`, provisional, 2026-11-05; the labels are the default by Harold's word of that day). In every state the tag nodes stay in the simulation with their pills' footprint and keep pulling, so the cards sit where they would; a tag hovered, or picked with its relatives, shows its pill
-2. **Reader panel** — opens on a double tap on a card (`node.openReader`; a tap opens the card in place, `node.select`, and the button inside an open card opens the reader too; `docs/ACTIONS.md`); dispatches rendering based on `content.kind`. Its tag row draws the item's tag references as chips (`src/lib/tagReferences.js`); a card with no tagz shows instead the one line the build wrote on it, `untaggedBecause` (`src/lib/untaggedBecause.js`, provisional, 2026-11-04), saying why, from what rosetta-tagz reported
+2. **Reader panel** — opens on a double tap on a card (`node.openReader`; a tap opens the card in place, `node.select`, and the button inside an open card opens the reader too; `docs/ACTIONS.md`); dispatches rendering based on `content.kind`. Its tag row draws the item's tag references as chips (`src/lib/tagReferences.js`); a card with no tagz shows instead the one line the build wrote on it, `untaggedBecause` (`src/lib/untaggedBecause.js`, provisional, 2026-11-04), saying why, from what rosetta-tagz reported. Its nav row (Next and Previous: the titles either side, above and below the text), the arrow keys and a swipe go along `sequence` edges (`src/lib/readerNav.js`), or, on a site with Flow presets, along the reading order in force (below)
 3. **TTS toolbar** — engine-agnostic registry (browser / gemini)
 4. **Syndication toolbar** — platform icons linking to cross-posted versions
-5. **Top bar** (`FeedZ` in `src/components/FeedZ/FeedZ.jsx`) — a pill per source, which hides or shows it and says when its items were taken in; the site's pages and links; the view switch; the `+`; and, by default since 2026-11-05, the graph's controls (undo, redo, Reset, the dimensions menu, the list of the tagz, and the sliders that open the panel, where the view actions and the layout are; `settings.toolbar.position`, `src/lib/toolbar.js`). `toolbar.position: "bottom"` keeps the bar along the bottom (`src/components/Toolbar`), the default before 2026-11-05.
+5. **Top bar** (`FeedZ` in `src/components/FeedZ/FeedZ.jsx`) — a pill per source, which hides or shows it and says when its items were taken in; the book (`topBar.resume`, `resumeTarget` in `src/lib/topBar.js`), which opens the reader where this reader was; the site's pages and links; the view switch; the `+`; and, by default since 2026-11-05, the graph's controls (undo, redo, Reset, the dimensions menu, the list of the tagz, and the sliders that open the panel, where the view actions and the layout are; `settings.toolbar.position`, `src/lib/toolbar.js`). `toolbar.position: "bottom"` keeps the bar along the bottom (`src/components/Toolbar`), the default before 2026-11-05.
+
+The page's colours come from the site's `settings.theme` (`bg`, `surface`, `accent`, `text`, `text_bright`, `border`, `node_published`, `node_draft`, `tag_color`), which `generate-index.js` writes into the page's CSS variables. A colour the site leaves unset takes the original dark look's (`DEFAULT_THEME_COLOURS`, 2026-11-07), so a site that names none still gets an opaque reader; before, an unset colour was written as `undefined`. `theme.name` picks the look (the default, or sketchbook), and the notes in `examples/site/settings.json` give each key.
 
 ### Views: the registry (2026-11-04)
 
@@ -198,6 +222,17 @@ A view is one way of drawing the feed (`vision/VIEWS.md`). The registry is `src/
 - `src/lib/views.js` holds the pure helpers, with no component, so the tests run in node: `siteViews(settings, registry)` reads `settings.views` (default `["cluster"]`, unknown ids skipped with one logged line), `viewById`, `viewLayout`, `viewFromSearch(location.search, listed)` for `?view=<id>`, and `currentView(listed, viewState.state)`, the view in force.
 - The page (`generate-index.js`) and the embed (`src/embed.jsx`) mount the current entry's component with the entry's props under the page's own, and pass the site's views to the top bar (`FeedZ`: `views`, `currentView`, `onSelectView`), which shows the switch only when there is more than one.
 - The reader's choice lives in `viewState.state.view`, set with `setView(id, layout, { silent })`: the view and the layout it draws with in one step. `resetLayout` clears it. The layout picker (the Layout row in the main view's panel, and in the bottom bar with `toolbar.position: "bottom"`) still sets `state.layout` alone; `currentView` resolves a layout that contradicts the chosen view to the listed view drawn with that layout, and the page syncs the state silently, so the two controls always agree.
+
+### Reading in Flow's order (2026-11-07)
+
+A site can let its readers read its cards one after another in an order Flow (`flow/`) gives, with the controls a reader already has: the book and the reader's Next and Previous. `settings.flow.presets` (provisional) lists the presets: names of presets in `flow/presets/`, or paths to the site's own, relative to the site.
+
+- **The build** (`src/lib/flowBuild.js`, called by `generate-index.js` once the feed is complete, after its items, edges, `_sources`, `containers` and `_rtagz`): Flow's programs run as child processes on `process.execPath`, fed JSON on stdin, each stopped after 120 s, as rosetta-tagz's are: `flow-select --all` once over the feed, then for each preset `flow-score --preset <file>` and `flow-order`. The orders go into `feed.json` as `flows` (provisional): `[{ name, description, mode, order }]`, where `name` and `description` are the preset's own, `mode` is flow-order's (`score` or `walk`; a walk's start is `order[0]`), and `order` is the cards' item ids (flow-select gives a card its item's id), in the order the site lists the presets. The same feed gives the same orders, byte for byte, and they are what the three programs give run by hand on the written `feed.json`. A preset that cannot be found, a program that fails or runs too long, or a second preset with a name already used, is one logged line and no order. With no preset listed, no Flow runs and `feed.json` gains nothing.
+- **The reading order in force** (`src/lib/readingOrder.js`): the one the reader chose, else the site's first. With two or more orders, the main view's panel offers them as one row at the end of its View group, Reading order (provisional), each choice a preset's name with its description as its title, and the chosen one's description in a line under the row; the choice is the preference `readingOrder` (provisional, null for the site's first), remembered on the device, and Reset the view (the graph's reset-all) puts it back to the first. Changing it moves nothing in the graph.
+- **Next and Previous** (`neighbours` and `step` in `src/lib/readerNav.js`, given `flowNav`'s `{ order, skip }`): the nav row, the arrow keys and the swipes go to the nearest card either side in the order in force that the reader can open, passing over a title-only card, a link card (followed, never read) and the top bar's own pages (`skip`); the row shows that one card each side. A top bar page has no neighbours in the order. `flow.next: false` (provisional) keeps them on `sequence` edges.
+- **The book** (`resumeTarget(items, reading, config, order)` in `src/lib/topBar.js`, `order` from `chosenOrder`): where this reader was, as before; else the site's `topBar.resume.start` when it names one; else the first card of the order in force that can be read and is neither a top bar page nor a link; else the first item.
+- **A card hidden in the graph** (2026-11-08): a card whose source the reader has hidden with its pill (`viewState.state.hiddenSources`) stays in the order, so the book, Next and Previous, the arrow keys and the swipes reach it as any other; the reader says so in one line under the title, after the byline and the date, "hidden in the graph: ProPublica's pill is off" (provisional; `hiddenInGraph` and `hiddenInGraphLine` in `src/lib/readingOrder.js`). The line follows the pill while the reader is open, and shows on any site, with an order or without. Harold: "if they are part of the graph they should show up in the flow, or this early version. with indication they are hidden in graph." A card hidden inside a closed container gets no line yet.
+- **Not built**: readers turning the weights themselves (#17), the flow drawn as a line on the graph, the scroll view (#16).
 
 ### Substrate dispatch in the reader
 
@@ -276,7 +311,7 @@ Beside the slug, and never in its place, every item carries `topicSlug` (provisi
 
 ## RSS / JSON Feed
 
-`_site/feed.json` is JSON Feed 1.1 compatible, extended with the rich content model (`kind`, `substrate`, `seed`, `topology`, `energy`, `forms`, `connected_to`, `todos`), and beside `items` it carries `edges` (since 2026-09-10), `_sources`, `containers` when the site declares containment, and `_rtagz` when rosetta-tagz ran. Standard feed readers ignore unknown fields; the viewer consumes all of them.
+`_site/feed.json` is JSON Feed 1.1 compatible, extended with the rich content model (`kind`, `substrate`, `seed`, `topology`, `energy`, `forms`, `connected_to`, `todos`), and beside `items` it carries `edges` (since 2026-09-10), `_sources`, `containers` when the site declares containment, `_rtagz` when rosetta-tagz ran, and `flows` when the site lists Flow presets (since 2026-11-07; see Reading in Flow's order). Standard feed readers ignore unknown fields; the viewer consumes all of them.
 
 The D3 graph fetches `feed.json` at load and derives its shape client-side. `feed.json` is the single source of truth; the graph is a view.
 
@@ -323,5 +358,9 @@ Platform modules are substrate-aware in principle but not yet in code: essay →
 - **`post-pipe/articles/`** — the old content root, kept for reference in the local `archive/` folder, which git ignores. The engine holds no content now: each site names its sources in its own `feeds.opml` (`docs/SITES.md`), and `~/Posts/` is the owner's corpus, read when a site lists it.
 - **Quarto rendering** still the path for Gen 1 legacy articles. A native `.md` → self-contained HTML renderer is planned to remove the Quarto dependency for Gen 2.
 - **Substrate renderers** beyond `essay` and `image` are placeholders. Audio/video renderers need media-file copy paths into `_site/` or CDN routing.
-- **Prepared-audio + sidecar timings pipeline** (see plan in conversation history) — phase 1 is `prepare-audio.js` that synthesizes sentence-by-sentence at publish time and emits `audio.mp3` + `timings.json`. Bypasses forced alignment entirely.
+- **Prepared-audio + sidecar timings pipeline** (the plan was talked through in an earlier session and never written into the repository; the local `research/TTS Highlighting_ Chunking vs. Sentence Mode.md` holds the highlighting side of it) — phase 1 is `prepare-audio.js` that synthesizes sentence-by-sentence at publish time and emits `audio.mp3` + `timings.json`. Bypasses forced alignment entirely.
 - **Medium import** — `medium.com/p/import` URL is dead; the Playwright step now goes to `medium.com/me/stories` → "Import a story" button. It opens a fresh browser with no Medium session, so it cannot get past Medium's sign-in on its own, and `--publish` changes only what it prints.
+- **Images inside a feed item's own HTML** load from the publisher's server when the reader shows the item: the test page's 20 ProPublica items hold 77 such images, on www.propublica.org (counted 2026-11-08). The rule above names nothing fetched beyond `feeds.opml`; whether a feed's own images count as the feed is open, and Harold's call.
+- **Flow's programs get 120 s** at build, a fixed limit, as rosetta-tagz's do (`src/lib/flowBuild.js`); a slower preset gives no order and one logged line.
+- **A card hidden inside a closed container** gets no "hidden in the graph" line in the reader; only a source hidden with its pill gives one (2026-11-08).
+- **The reader's nav row is named "Chapters either side"** for screen readers on every site, chapters or not.

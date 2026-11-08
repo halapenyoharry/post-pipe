@@ -49,6 +49,7 @@ import { listenInCard, toggleListen, stopListening } from '../../lib/listenInCar
 import {
   PREF as TAG_SHOW_PREF, LABELS_PREF as TAG_LABELS_PREF, tagDrawing, tagMarkRadius, tagMarkHitRadius,
 } from '../../lib/tagPills';
+import { PREF as READING_ORDER_PREF } from '../../lib/readingOrder';
 
 // The settings a link node's newTab rule is read from.
 const settingsForLinks = () => (typeof window !== 'undefined' ? window.SETTINGS : null);
@@ -5622,8 +5623,9 @@ export function GraphViewer({
     // The positions go through viewState, so Undo can bring them back.
     const handleResetAll = () => {
       const vs = viewStateRef.current;
-      // Showing the tagz, and their labels, goes back to the site's own too.
-      if (vs && vs.resetLayout) vs.resetLayout({ prefs: [TAG_SHOW_PREF, TAG_LABELS_PREF] });
+      // Showing the tagz, and their labels, goes back to the site's own too,
+      // and so does the reading order (the site's first Flow preset).
+      if (vs && vs.resetLayout) vs.resetLayout({ prefs: [TAG_SHOW_PREF, TAG_LABELS_PREF, READING_ORDER_PREF] });
       if (onNodeSelectRef.current) onNodeSelectRef.current(null);
       focusNode(null);
       hideEdgeLabel();
