@@ -94,7 +94,8 @@
         if (!parent) return NodeFilter.FILTER_REJECT;
         const tag = parent.tagName;
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NAV') return NodeFilter.FILTER_REJECT;
-        // Not the text: what readers contributed under it.
+        // Not the text: what readers contributed under it, and the source's
+        // pill the reader draws over it for a card hidden in the graph.
         if (parent.closest && parent.closest('[data-pp-not-text]')) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }

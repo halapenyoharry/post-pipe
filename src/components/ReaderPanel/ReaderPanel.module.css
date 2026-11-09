@@ -570,6 +570,34 @@
   color: #666;
 }
 
+/* The open card's source pill (FeedZ's FeedPill, its own look), where a line
+   under the byline and date would be, left-aligned. A flex row, so the pill
+   sits in no line box of the reader's tall line height. */
+.sourcePill {
+  display: flex;
+  margin-top: 4px;
+}
+
+/* Words for a screen reader only. */
+.offscreen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The pill's popover lives in the page's body: over the reader, and shown
+   in the cover's art state too, where the top bar's own are put away. */
+[data-source-popover].sourcePillPopover {
+  z-index: 110;
+}
+
+:global(html[data-pp-cover-bar="hidden"]) [data-source-popover].sourcePillPopover {
+  visibility: visible;
+}
+
 .rightsLine {
   margin-top: 40px;
   padding-top: 16px;
