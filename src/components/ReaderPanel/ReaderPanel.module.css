@@ -1106,3 +1106,64 @@
 .bmActions button { background: none; border: none; color: var(--rp-accent); font: inherit; font-size: 12px; padding: 4px 6px; cursor: pointer; border-radius: 4px; }
 .bmActions button:hover { background: color-mix(in srgb, var(--rp-accent) 12%, transparent); }
 .bmEmpty { color: var(--rp-text); opacity: 0.7; font-style: italic; }
+
+/* The reader as a scroll (Settings → Reading → Words before the next, every
+   choice but one at a time): the open card, cut at about the chosen number
+   of words with "read the rest" under it, then the cards Next would visit,
+   each under a rule, each cut the same way. The plainest look; the design is
+   Harold's to give. */
+.readRest {
+  display: inline-flex;
+  align-items: center;
+  margin: 4px 0 8px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--rp-border);
+  border-radius: 999px;
+  color: var(--rp-accent);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.readRest:hover { background: color-mix(in srgb, var(--rp-accent) 8%, transparent); }
+.readRest:focus-visible,
+.followingOpen:focus-visible {
+  outline: 2px solid var(--rp-accent);
+  outline-offset: 2px;
+}
+.following {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--rp-border);
+}
+.body .followingTitle {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 10px;
+  padding-bottom: 0;
+  border-bottom: none;
+  color: var(--rp-text-bright);
+}
+.followingOpen {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.followingOpen:hover { color: var(--rp-accent); }
+.following .sourcePill { margin-bottom: 4px; }
+.followingText { margin-top: 20px; }
+.followingMore { height: 1px; }
+:global(html[data-pp-theme="sketchbook"]) .followingTitle {
+  font-family: var(--pp-title-font);
+  font-weight: 400;
+  color: var(--sk-ink);
+}
