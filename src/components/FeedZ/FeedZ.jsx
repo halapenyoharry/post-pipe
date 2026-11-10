@@ -304,7 +304,7 @@ function FolderPill({ group, allHidden, onToggle, showCount }) {
 }
 
 // A source's pill. The top bar draws one per source; the reader draws the
-// same pill for the open card's source while it is hidden in the graph
+// same pill for the open card's source, on or off as the top bar's is
 // (ReaderPanel, src/lib/readingOrder.js readerSourcePill), passing
 // popoverClassName so the popover shows over the reader.
 export function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge, popoverClassName = '' }) {

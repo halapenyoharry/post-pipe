@@ -2,13 +2,14 @@
 // in force, what the device keeps for the reader's choice, when Next and
 // Previous follow it, and the choice remembered and put back by Reset the
 // view, with Next, Previous and the book's start changing with it. Apart from
-// the order, what the reader shows of a card the graph is hiding because the
-// visitor turned its source's pill off: the source's own pill, in its off
-// look, and the card keeps its place in the order.
+// the order, the source pill the reader shows for every card with a source,
+// the top bar's own, on or off as it is there; and a card the graph is hiding
+// because the visitor turned its source's pill off keeps its place in the
+// order, its pill in the off look.
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, cardKey, HIDDEN_IN_GRAPH, readerSourcePill } = require('../src/lib/readingOrder');
+const { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, HIDDEN_IN_GRAPH, readerSourcePill } = require('../src/lib/readingOrder');
 const { neighbours, step } = require('../src/lib/readerNav');
 const { topBarConfig, resumeTarget } = require('../src/lib/topBar');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
@@ -169,33 +170,46 @@ const pillItems = [
 ];
 
 // What the reader does on every render (ReaderPanel): it draws the pill
-// readerSourcePill gives, if any, and keeps the card it was drawn for.
+// readerSourcePill gives for the open card, if any.
 function readerOf(vs, sources = pillSources) {
-  let kept = null;
-  return (item) => {
-    const pill = readerSourcePill(item, vs.state.hiddenSources, kept, sources);
-    kept = pill ? pill.card : null;
-    return pill;
-  };
+  return (item) => readerSourcePill(item, vs.state.hiddenSources, sources);
 }
 
-test('the reader shows the source pill for a card whose source is hidden, and none for a card whose source is showing', () => {
+test('the reader shows the open card\'s source pill for every card with a source: on while the source shows, off while it is hidden', () => {
   const [a, b, c] = pillItems;
-  assert.deepStrictEqual(readerSourcePill(b, ['feed-2'], null, pillSources), { source: pillSources[1], hidden: true, card: 'b' });
-  assert.deepStrictEqual(readerSourcePill(b, new Set(['feed-2']), null, pillSources), { source: pillSources[1], hidden: true, card: 'b' });
-  assert.strictEqual(readerSourcePill(a, ['feed-2'], null, pillSources), null, 'feed-1 is showing');
-  assert.strictEqual(readerSourcePill(c, ['feed-2'], null, pillSources), null);
-  assert.strictEqual(readerSourcePill(b, [], null, pillSources), null, 'every pill on');
-  assert.strictEqual(readerSourcePill(b, null, null, pillSources), null, 'no view state yet');
-  assert.strictEqual(readerSourcePill({ id: 'x' }, ['feed-2'], null, pillSources), null, 'a card with no source');
-  assert.strictEqual(readerSourcePill(null, ['feed-2'], null, pillSources), null, 'the reader is closed');
-  // Only for the open card: a card kept for another card is no reason.
-  assert.strictEqual(readerSourcePill(a, [], 'b', pillSources), null);
+  // Hidden in the graph: the pill in its off look.
+  assert.deepStrictEqual(readerSourcePill(b, ['feed-2'], pillSources), { source: pillSources[1], hidden: true });
+  assert.deepStrictEqual(readerSourcePill(b, new Set(['feed-2']), pillSources), { source: pillSources[1], hidden: true });
+  // Showing in the graph: the pill all the same, in its on look.
+  assert.deepStrictEqual(readerSourcePill(a, ['feed-2'], pillSources), { source: pillSources[0], hidden: false }, 'feed-1 is showing');
+  assert.deepStrictEqual(readerSourcePill(c, ['feed-2'], pillSources), { source: pillSources[0], hidden: false });
+  assert.deepStrictEqual(readerSourcePill(b, [], pillSources), { source: pillSources[1], hidden: false }, 'every pill on');
+  assert.deepStrictEqual(readerSourcePill(b, new Set(), pillSources), { source: pillSources[1], hidden: false });
+  assert.deepStrictEqual(readerSourcePill(b, null, pillSources), { source: pillSources[1], hidden: false }, 'no view state yet');
 });
 
-test('the pill is the top bar\'s own: the feed\'s entry for the source (title, count, colour), in the off look while hidden', () => {
-  const b = pillItems[1];
-  const pill = readerSourcePill(b, ['feed-2'], null, pillSources);
+test('no pill on a site whose top bar shows no source pills, just like the graph view', () => {
+  const b = { id: 'b', _source: { id: 'feed-2', title: 'Two' } };
+  assert.strictEqual(readerSourcePill(b, [], pillSources, { topBar: { showSourcePills: false } }), null);
+  assert.strictEqual(readerSourcePill(b, ['feed-2'], pillSources, { topBar: { showSourcePills: false } }), null, 'hidden or not');
+  assert.deepStrictEqual(readerSourcePill(b, [], pillSources, { topBar: { showSourcePills: true } }), { source: pillSources[1], hidden: false });
+  assert.deepStrictEqual(readerSourcePill(b, [], pillSources, { topBar: {} }), { source: pillSources[1], hidden: false }, 'the top bar shows pills by default');
+  assert.deepStrictEqual(readerSourcePill(b, [], pillSources, {}), { source: pillSources[1], hidden: false });
+});
+
+test('no pill without a source stamp, or with the reader closed', () => {
+  assert.strictEqual(readerSourcePill({ id: 'x' }, ['feed-2'], pillSources), null, 'a card with no source');
+  assert.strictEqual(readerSourcePill({ id: 'x' }, [], pillSources), null);
+  assert.strictEqual(readerSourcePill({ id: 'x', _source: null }, [], pillSources), null);
+  assert.strictEqual(readerSourcePill({ id: 'x', _source: { title: 'No id' } }, [], pillSources), null, 'a stamp with no id');
+  assert.strictEqual(readerSourcePill({ id: 'x', originalItem: { id: 'x' } }, [], pillSources), null, 'a graph node whose item has no source');
+  assert.strictEqual(readerSourcePill(null, ['feed-2'], pillSources), null, 'the reader is closed');
+  assert.strictEqual(readerSourcePill(undefined, [], pillSources), null);
+});
+
+test('the pill is the top bar\'s own: the feed\'s entry for the source (title, count, colour), on or off as the top bar\'s', () => {
+  const [a, b] = pillItems;
+  const pill = readerSourcePill(b, ['feed-2'], pillSources);
   // The very object the top bar hands its pill (FeedZ, from feed._sources).
   assert.strictEqual(pill.source, pillSources[1]);
   assert.strictEqual(pill.source.title, 'ProPublica');
@@ -204,23 +218,27 @@ test('the pill is the top bar\'s own: the feed\'s entry for the source (title, c
   // hidden is what FeedPill draws as its off look (dimmed, the title struck
   // through), as the top bar's pill for a hidden source.
   assert.strictEqual(pill.hidden, true);
+  // A showing source hands the same entry, in the on look.
+  const on = readerSourcePill(a, ['feed-2'], pillSources);
+  assert.strictEqual(on.source, pillSources[0]);
+  assert.strictEqual(on.hidden, false);
   // A feed with no entry in _sources still gets its pill, from the card's stamp.
-  const stampOnly = readerSourcePill(b, ['feed-2'], null, []);
+  const stampOnly = readerSourcePill(b, ['feed-2'], []);
   assert.deepStrictEqual(stampOnly.source, stampOf(pillSources[1]));
-  assert.strictEqual(readerSourcePill(b, ['feed-2'], null, undefined).source, b._source);
-  // A graph node carries the feed item as originalItem; its key is the item's id.
+  assert.strictEqual(readerSourcePill(b, ['feed-2'], undefined).source, b._source);
+  assert.strictEqual(readerSourcePill(a, [], undefined).source, a._source);
+  // A graph node carries the feed item as originalItem.
   const node = { id: 'node-b', type: 'article', originalItem: b };
-  assert.deepStrictEqual(readerSourcePill(node, ['feed-2'], null, pillSources), { source: pillSources[1], hidden: true, card: 'b' });
-  assert.strictEqual(cardKey(node), 'b');
-  assert.strictEqual(cardKey({ url: '/u.html' }), '/u.html');
-  assert.strictEqual(cardKey({}), null);
-  assert.strictEqual(cardKey(null), null);
+  assert.deepStrictEqual(readerSourcePill(node, ['feed-2'], pillSources), { source: pillSources[1], hidden: true });
+  assert.deepStrictEqual(readerSourcePill(node, [], pillSources), { source: pillSources[1], hidden: false });
 });
 
 test('a tap on the reader\'s pill toggles the source, as the top bar\'s does, and both show it at once', () => {
   const vs = createViewState({ backend: memoryBackend(), corpusId: 'c', debounceMs: 0 });
   const read = readerOf(vs);
   const b = pillItems[1];
+  // Every pill on: the reader's pill is there, on.
+  assert.strictEqual(read(b).hidden, false);
   vs.toggleSource('feed-2');                      // the top bar's pill turns ProPublica off
   const pill = read(b);
   assert.strictEqual(pill.hidden, true);
@@ -235,48 +253,30 @@ test('a tap on the reader\'s pill toggles the source, as the top bar\'s does, an
   assert.strictEqual(read(b).hidden, true);
 });
 
-test('after the tap turns the source back on, the pill stays, in its on look, while the same card is open', () => {
-  const vs = createViewState({ backend: memoryBackend(), corpusId: 'c', debounceMs: 0 });
-  const read = readerOf(vs);
-  const b = pillItems[1];
-  vs.toggleSource('feed-2');
-  assert.strictEqual(read(b).hidden, true);
-  vs.toggleSource('feed-2');
-  // Under the reader's finger: still there, on, render after render.
-  for (let i = 0; i < 3; i++) assert.deepStrictEqual(read(b), { source: pillSources[1], hidden: false, card: 'b' });
-  // The same card again as a graph node keeps it too.
-  assert.strictEqual(read({ id: 'node-b', originalItem: b }).hidden, false);
-  // The pure answer: kept for this card, the source showing.
-  assert.deepStrictEqual(readerSourcePill(b, [], 'b', pillSources), { source: pillSources[1], hidden: false, card: 'b' });
-});
-
-test('on the next card whose source is showing the pill is gone, and closing the reader forgets it', () => {
+test('the pill stays through every tap, on every card, and after the reader closes and opens again', () => {
   const vs = createViewState({ backend: memoryBackend(), corpusId: 'c', debounceMs: 0 });
   const read = readerOf(vs);
   const [a, b, c] = pillItems;
   vs.toggleSource('feed-2');
-  read(b);
+  assert.deepStrictEqual(read(b), { source: pillSources[1], hidden: true });
   vs.toggleSource('feed-2');
-  assert.strictEqual(read(b).hidden, false, 'kept on b after the tap');
-  // Next: c, whose source is showing. No pill, and none back on b.
-  assert.strictEqual(read(c), null);
-  assert.strictEqual(read(b), null, 'b again, its source showing: no pill');
-  // Kept, then the reader closes: opening the same card again shows nothing.
-  vs.toggleSource('feed-2');
-  read(b);
-  vs.toggleSource('feed-2');
-  assert.strictEqual(read(b).hidden, false);
+  // Under the reader's finger: still there, now on, render after render.
+  for (let i = 0; i < 3; i++) assert.deepStrictEqual(read(b), { source: pillSources[1], hidden: false });
+  // Next: c, whose source is showing, shows its own pill, on.
+  assert.deepStrictEqual(read(c), { source: pillSources[0], hidden: false });
+  assert.deepStrictEqual(read(b), { source: pillSources[1], hidden: false }, 'b again');
+  // The reader closes and opens b again: the pill is there.
   assert.strictEqual(read(null), null, 'the reader closes');
-  assert.strictEqual(read(b), null, 'b opened again, its source showing');
-  // A hidden source still shows its pill on any card from it.
+  assert.deepStrictEqual(read(b), { source: pillSources[1], hidden: false });
+  // Hiding feed-1 turns a's and c's pills off, and leaves b's on.
   vs.toggleSource('feed-1');
   assert.strictEqual(read(a).hidden, true);
   assert.strictEqual(read(c).hidden, true);
-  assert.strictEqual(read(b), null);
+  assert.strictEqual(read(b).hidden, false);
 });
 
 test('what a screen reader hears before the pill while the source is hidden', () => {
-  // No visible words; provisional, in one place.
+  // No visible words; Harold approved them on 2026-11-10. In one place.
   assert.strictEqual(HIDDEN_IN_GRAPH, 'hidden in the graph');
 });
 
@@ -306,13 +306,14 @@ test('a card from a hidden source stays in the reading order: Next, Previous and
   // The book opens a reader with no place yet at the order's first card, b.
   assert.strictEqual(resumeTarget(sourced.items, null, topBarConfig({}), chosenOrder(sourced, 'b-first')).id, 'b');
 
-  // The reader shows b's source pill, off; a and c, whose pills are on, show none.
+  // The reader shows b's source pill, off; a and c, whose pills are on, show
+  // theirs, on.
   assert.deepStrictEqual(hiddenInGraph(b, hiddenSources), { id: 'feed-2', title: 'Feed Two' });
-  assert.deepStrictEqual(readerSourcePill(b, hiddenSources, null, []), { source: two, hidden: true, card: 'b' });
+  assert.deepStrictEqual(readerSourcePill(b, hiddenSources, []), { source: two, hidden: true });
   assert.strictEqual(hiddenInGraph(a, hiddenSources), null);
-  assert.strictEqual(readerSourcePill(a, hiddenSources, null, []), null);
+  assert.deepStrictEqual(readerSourcePill(a, hiddenSources, []), { source: one, hidden: false });
   assert.strictEqual(hiddenInGraph(c, hiddenSources), null);
-  assert.strictEqual(readerSourcePill(c, hiddenSources, null, []), null);
+  assert.deepStrictEqual(readerSourcePill(c, hiddenSources, []), { source: one, hidden: false });
   // Turning the pill back on: b is no longer hidden; the order never moved.
   assert.strictEqual(hiddenInGraph(b, []), null);
   assert.strictEqual(step(sourced, 'a', 'next', nav).id, 'b');

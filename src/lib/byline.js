@@ -1,16 +1,17 @@
-// Whose name goes under the title: the reader's byline.
+// Whose name goes under the title: the reader's byline, kept for the piece's
+// author. Where the piece came from is the source pill's to say, under the
+// byline and date (src/lib/readingOrder.js readerSourcePill). The owner,
+// 2026-11-10: "the by line should be reserved for the author of the piece if
+// provided."
 //
-// A piece names its own authors, and they win. A piece that names no one
-// takes a name from where it came from:
-//   - from the site's own folder (its source is of type 'local', or it has
-//     no source stamp at all), the site's author (settings.author), which is
-//     also what the build gives such a piece;
-//   - from any other source (a publisher's feed), that source's title, as
-//     the site's feed list writes it, linking to the piece itself.
-// Nothing to show gives null.
+// A piece names its own authors, and they win. A piece from the site's own
+// folder (its source is of type 'local', or it has no source stamp at all)
+// that names no one takes the site's author (settings.author), which is what
+// the build gives such a piece, so it is the piece's author. A piece from any
+// other source (a publisher's feed) that names no one has no byline. Nothing
+// to show gives null.
 //
-// Author names are shown lowercase, as the engine has always drawn them; a
-// source's title is shown as written.
+// Author names are shown lowercase, as the engine has always drawn them.
 
 function sourceOf(article) {
   if (!article) return null;
@@ -37,14 +38,10 @@ function byline(settings, article) {
 
   const source = sourceOf(article);
   const local = !source || source.type === 'local';
-  if (local) {
-    const site = settings && settings.author;
-    const name = ((site && (site.name || site.display)) || '').trim().toLowerCase();
-    return name ? { name, url: (site && site.url) || null } : null;
-  }
-
-  const title = (source.title || '').trim();
-  return title ? { name: title, url: pieceLink(article) } : null;
+  if (!local) return null;
+  const site = settings && settings.author;
+  const name = ((site && (site.name || site.display)) || '').trim().toLowerCase();
+  return name ? { name, url: (site && site.url) || null } : null;
 }
 
 module.exports = { byline };

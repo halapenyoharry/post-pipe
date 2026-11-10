@@ -1,5 +1,7 @@
-// The reader's byline: a piece's own authors, else the site's author for a
-// piece from the site's own folder, else the title of the source it came from.
+// The reader's byline, kept for the piece's author: a piece's own authors,
+// else the site's author for a piece from the site's own folder, else none.
+// The source a piece came from is named by the reader's source pill, never by
+// the byline.
 
 const { test } = require('node:test');
 const assert = require('node:assert');
@@ -25,12 +27,24 @@ test('a local piece with no author takes the site author, as the build does', ()
   assert.strictEqual(byline({}, { _source: local }), null);
 });
 
-test('a piece from another source with no author shows that source, linking to the piece', () => {
+test('a publisher\'s piece that names its author shows that author, not the source', () => {
+  const a = { authors: [{ name: 'Ann Writer' }], url: 'https://publisher.test/story', _source: feed };
+  assert.deepStrictEqual(byline(settings, a), { name: 'ann writer', url: 'https://publisher.test/story' });
+  const legacy = { author: 'Bo Reporter', url: 'https://publisher.test/story', _source: feed };
+  assert.deepStrictEqual(byline(settings, legacy), { name: 'bo reporter', url: 'https://publisher.test/story' });
+  const wrapped = { authors: [{ name: 'Ann Writer' }], url: 'https://publisher.test/story', originalItem: { _source: feed } };
+  assert.deepStrictEqual(byline(settings, wrapped), { name: 'ann writer', url: 'https://publisher.test/story' });
+});
+
+test('a publisher\'s piece with no author has no byline: the source pill names the source', () => {
   const a = { authors: [], url: 'https://publisher.test/story', canonical_url: 'https://publisher.test/story', _source: feed };
-  assert.deepStrictEqual(byline(settings, a), { name: 'A Publisher', url: 'https://publisher.test/story' });
+  assert.strictEqual(byline(settings, a), null);
   const wrapped = { originalItem: { _source: feed }, url: 'https://publisher.test/story' };
-  assert.deepStrictEqual(byline(settings, wrapped), { name: 'A Publisher', url: 'https://publisher.test/story' });
+  assert.strictEqual(byline(settings, wrapped), null, 'a graph node carrying the feed item');
+  assert.strictEqual(byline(settings, { author: '  ', _source: feed }), null, 'spaces are no author');
   assert.strictEqual(byline(settings, { _source: { type: 'rss' } }), null);
+  // The site's author is not taken for a publisher's piece.
+  assert.strictEqual(byline({ author: { name: 'Some Author' } }, { _source: feed }), null);
 });
 
 test('no piece, no byline', () => {

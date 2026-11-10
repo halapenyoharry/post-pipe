@@ -570,9 +570,9 @@
   color: #666;
 }
 
-/* The open card's source pill (FeedZ's FeedPill, its own look), where a line
-   under the byline and date would be, left-aligned. A flex row, so the pill
-   sits in no line box of the reader's tall line height. */
+/* The open card's source pill (FeedZ's FeedPill, its own look), under the
+   byline and date, left-aligned. A flex row, so the pill sits in no line box
+   of the reader's tall line height. */
 .sourcePill {
   display: flex;
   margin-top: 4px;

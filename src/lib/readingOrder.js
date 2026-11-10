@@ -19,8 +19,8 @@
 // here moves anything in the graph.
 //
 // Apart from the order, hiddenInGraph names the source a card is hidden with
-// in the graph, with flows or without, and readerSourcePill decides when the
-// reader shows that source's own pill.
+// in the graph, with flows or without, and readerSourcePill gives the pill the
+// reader shows for the open card's source, on every site.
 
 const { topBarConfig, resolvePages } = require('./topBar');
 
@@ -101,39 +101,37 @@ function hiddenInGraph(item, hiddenSources) {
   return { id: source.id, title: typeof source.title === 'string' ? source.title.trim() : '' };
 }
 
-// The open card as the reader keys it: its feed item's id, else its own id,
-// else its url; null when it has none.
-function cardKey(item) {
-  if (!item) return null;
-  const k = (item.originalItem && item.originalItem.id) || item.id || item.url;
-  return k === undefined || k === null || k === '' ? null : k;
-}
-
 // What a screen reader hears before the pill while the card is hidden in the
 // graph. No visible words. The owner, 2026-11-10: '"hidden in graph" is fine.'
 const HIDDEN_IN_GRAPH = 'hidden in the graph';
 
 // The source pill the reader draws under the byline and date: the top bar's
-// own pill for the open card's source (FeedPill), in the look the source has.
+// own pill for the open card's source (FeedPill), in the look the source has
+// there: on while it shows in the graph, off while the visitor has hidden it.
+// It shows for every card that carries a source stamp, whichever look the
+// source has, and stays through a tap on it, which only changes its look. The
+// pill names where the piece came from; the byline is left to the piece's
+// author (src/lib/byline.js). The owner, 2026-11-10: "so the pill that is
+// shown in the graph view should be the source in the reader view and it
+// should show up just like it does in the graph view the by line should be
+// reserved for the author of the piece if provided."
 //
-// When it shows: while the open card's source is hidden in the graph. Once
-// shown it stays, in whichever look the source then has, for as long as that
-// card stays open, so a tap that turns the source back on does not take the
-// pill from under the finger. Another card, or the reader closing, starts
-// again: the pill shows only for a hidden source. kept is the key of the card
-// the pill was last shown for (null for none); the reader keeps it.
+// Just like the graph view: a site whose top bar shows no source pills
+// (topBar.showSourcePills false, as epicofelinorjones.com sets) shows none in
+// the reader either; settings is the site's, and without it the top bar's
+// default (pills shown) holds.
 //
-// Gives { source, hidden, card }: source the feed's own entry for it (from
-// sources, the feed's _sources, which the top bar draws), else the card's
-// stamp; hidden whether the graph hides it; card the key to keep. Else null.
-function readerSourcePill(item, hiddenSources, kept, sources) {
+// Gives { source, hidden }: source the feed's own entry for it (from sources,
+// the feed's _sources, which the top bar draws), else the card's stamp;
+// hidden whether the graph hides it. Null for no card, a card with no source
+// stamp or a stamp with no id, or a site whose top bar shows no source pills.
+function readerSourcePill(item, hiddenSources, sources, settings) {
+  if (!topBarConfig(settings).showSourcePills) return null;
   const stamp = sourceOf(item);
   if (!stamp || stamp.id === undefined || stamp.id === null) return null;
-  const card = cardKey(item);
   const hidden = hiddenInGraph(item, hiddenSources) !== null;
-  if (!hidden && (card === null || kept !== card)) return null;
   const entry = Array.isArray(sources) ? sources.find((s) => s && s.id === stamp.id) : null;
-  return { source: entry || stamp, hidden, card };
+  return { source: entry || stamp, hidden };
 }
 
-module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, cardKey, HIDDEN_IN_GRAPH, readerSourcePill };
+module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, HIDDEN_IN_GRAPH, readerSourcePill };

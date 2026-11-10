@@ -489,18 +489,15 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     return () => window.removeEventListener('postpipe:reader-mark', onMark);
   }, []);
 
-  // The open card's source pill, under the byline and date: shown while the
-  // card's source is hidden in the graph, and kept for as long as this card
-  // stays open once shown (the rule is in src/lib/readingOrder.js
-  // readerSourcePill). pillKept is the card it was last shown for; it is set
-  // here, during the render, so another card or the reader closing forgets it
-  // at once. Read on every render: the page re-renders the reader whenever the
-  // view state changes (its subscribe(bump)), so a tap on this pill or on the
-  // top bar's changes both at once.
-  const [pillKept, setPillKept] = useState(null);
-  const sourcePill = readerSourcePill(article, viewState && viewState.state ? viewState.state.hiddenSources : null, pillKept, feedData && feedData._sources);
-  const pillCard = sourcePill ? sourcePill.card : null;
-  if (pillCard !== pillKept) setPillKept(pillCard);
+  // The open card's source pill, under the byline and date: the top bar's own
+  // pill for the card's source, on while the source shows in the graph and
+  // off while it is hidden there, for every card that carries a source stamp
+  // (the rule is in src/lib/readingOrder.js readerSourcePill), unless the
+  // site's top bar shows no source pills. Read on every
+  // render: the page re-renders the reader whenever the view state changes
+  // (its subscribe(bump)), so a tap on this pill or on the top bar's changes
+  // both at once.
+  const sourcePill = readerSourcePill(article, viewState && viewState.state ? viewState.state.hiddenSources : null, feedData && feedData._sources, settings);
 
   if (!article) return null;
 
@@ -543,9 +540,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
-  // The byline (src/lib/byline.js): the piece's own authors; else the site's
-  // author for a piece from the site's own folder, as the build gives it;
-  // else the title of the source the piece came from.
+  // The byline (src/lib/byline.js), kept for the piece's author: its own
+  // authors; else the site's author for a piece from the site's own folder,
+  // as the build gives it; else none. The source pill under it names where
+  // the piece came from.
   const by = byline(settings, article);
   const authorName = by ? by.name : '';
   const authorLink = by ? by.url : null;
