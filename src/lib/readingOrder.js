@@ -110,7 +110,7 @@ function cardKey(item) {
 }
 
 // What a screen reader hears before the pill while the card is hidden in the
-// graph. No visible words; provisional, as the owner names things.
+// graph. No visible words. The owner, 2026-11-10: '"hidden in graph" is fine.'
 const HIDDEN_IN_GRAPH = 'hidden in the graph';
 
 // The source pill the reader draws under the byline and date: the top bar's
