@@ -1,6 +1,6 @@
 {
   "name": "post-pipe",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Builds a static website from folders of writing, web pages, and RSS, Atom or JSON feeds: every piece is a card in a graph, joined to other cards through the tags they share, with a reader and text-to-speech",
   "license": "SEE LICENSE IN LICENSE",
   "main": "index.js",
