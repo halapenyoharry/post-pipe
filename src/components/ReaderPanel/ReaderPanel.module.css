@@ -490,6 +490,10 @@
   line-height: 1.9;
   font-size: calc(15px * var(--pp-text-scale, 1));
   color: var(--rp-text);
+  /* A size container, so a picture in the text can be measured against
+     what the reader shows (55cqh, below). Its size comes from the panel,
+     never from its text, so containing it changes nothing else. */
+  container-type: size;
 }
 
 .body::-webkit-scrollbar {
@@ -529,6 +533,47 @@
 .body :global(strong) { color: var(--rp-text-bright); font-weight: 600; }
 .body :global(a) { color: var(--rp-accent); text-decoration: none; }
 .body :global(a:hover) { text-decoration: underline; }
+
+/* Pictures in the text (Harold, 2026-11-11: "They should shrink to fit
+   inside the text's margins, so a reader never ends up lost in empty
+   space."). Every picture in a card's text, the open card's and the cards'
+   beneath it, sits inside the text column: never wider than the text,
+   centred, and never taller than about 55% of what the reader shows (55cqh,
+   55% of the scroll body's height, the size container above), shrunk
+   whole, never cropped. A publisher's own
+   margins, floats and offsets give way (inline ones too, hence !important).
+   An iframe keeps its own height (it has no shape to keep), capped the same.
+   The bookmark's mark, drawn into a paragraph, is no picture. */
+.body :is([data-reader-text], [data-reader-following-text]) :is(img, picture, video, iframe, svg):not(svg svg, :global(.bookmarkRibbon) svg) {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 55cqh;
+  float: none !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  inset: auto !important;
+  object-fit: contain;
+}
+.body :is([data-reader-text], [data-reader-following-text]) :is(img, video, svg):not(svg svg, :global(.bookmarkRibbon) svg) {
+  height: auto;
+}
+/* A picture's frame: as wide as the text at most, no margin outside it
+   (1em above and below, as browsers give a figure), and its caption wraps
+   within the column. */
+.body :is([data-reader-text], [data-reader-following-text]) figure {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 1em 0 !important;
+  float: none !important;
+  inset: auto !important;
+}
+.body :is([data-reader-text], [data-reader-following-text]) figcaption {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 
 .articleHeader {
   margin-bottom: 32px;
@@ -911,6 +956,8 @@
     color: #222 !important;
     padding: 0 !important;
     overflow: visible !important;
+    /* On paper the text sets its own height. */
+    container-type: normal;
   }
   .articleTitle { color: #000 !important; }
   .articleKicker { color: #555 !important; }

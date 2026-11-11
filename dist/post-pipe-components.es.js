@@ -8008,7 +8008,7 @@ var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescr
 	n(), t.exports = h();
 })), _ = /* @__PURE__ */ c(u()), v = /* @__PURE__ */ c(g());
 //#endregion
-//#region ../../../node_modules/d3-array/src/max.js
+//#region node_modules/d3-array/src/max.js
 function y(e, t) {
 	let n;
 	if (t === void 0) for (let t of e) t != null && (n < t || n === void 0 && t >= t) && (n = t);
@@ -8019,7 +8019,7 @@ function y(e, t) {
 	return n;
 }
 //#endregion
-//#region ../../../node_modules/d3-array/src/min.js
+//#region node_modules/d3-array/src/min.js
 function b(e, t) {
 	let n;
 	if (t === void 0) for (let t of e) t != null && (n > t || n === void 0 && t >= t) && (n = t);
@@ -8030,7 +8030,7 @@ function b(e, t) {
 	return n;
 }
 //#endregion
-//#region ../../../node_modules/d3-array/src/mean.js
+//#region node_modules/d3-array/src/mean.js
 function x(e, t) {
 	let n = 0, r = 0;
 	if (t === void 0) for (let t of e) t != null && (t = +t) >= t && (++n, r += t);
@@ -8041,7 +8041,7 @@ function x(e, t) {
 	if (n) return r / n;
 }
 //#endregion
-//#region ../../../node_modules/d3-dispatch/src/dispatch.js
+//#region node_modules/d3-dispatch/src/dispatch.js
 var S = { value: () => {} };
 function C() {
 	for (var e = 0, t = arguments.length, n = {}, r; e < t; ++e) {
@@ -8112,7 +8112,7 @@ var O = {
 	xmlns: "http://www.w3.org/2000/xmlns/"
 };
 //#endregion
-//#region ../../../node_modules/d3-selection/src/namespace.js
+//#region node_modules/d3-selection/src/namespace.js
 function k(e) {
 	var t = e += "", n = t.indexOf(":");
 	return n >= 0 && (t = e.slice(0, n)) !== "xmlns" && (e = e.slice(n + 1)), O.hasOwnProperty(t) ? {
@@ -8121,7 +8121,7 @@ function k(e) {
 	} : e;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/creator.js
+//#region node_modules/d3-selection/src/creator.js
 function A(e) {
 	return function() {
 		var t = this.ownerDocument, n = this.namespaceURI;
@@ -8138,7 +8138,7 @@ function M(e) {
 	return (t.local ? j : A)(t);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selector.js
+//#region node_modules/d3-selection/src/selector.js
 function N() {}
 function P(e) {
 	return e == null ? N : function() {
@@ -8146,19 +8146,19 @@ function P(e) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/select.js
+//#region node_modules/d3-selection/src/selection/select.js
 function F(e) {
 	typeof e != "function" && (e = P(e));
 	for (var t = this._groups, n = t.length, r = Array(n), i = 0; i < n; ++i) for (var a = t[i], o = a.length, s = r[i] = Array(o), c, l, u = 0; u < o; ++u) (c = a[u]) && (l = e.call(c, c.__data__, u, a)) && ("__data__" in c && (l.__data__ = c.__data__), s[u] = l);
 	return new Ft(r, this._parents);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/array.js
+//#region node_modules/d3-selection/src/array.js
 function I(e) {
 	return e == null ? [] : Array.isArray(e) ? e : Array.from(e);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selectorAll.js
+//#region node_modules/d3-selection/src/selectorAll.js
 function L() {
 	return [];
 }
@@ -8168,7 +8168,7 @@ function ee(e) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/selectAll.js
+//#region node_modules/d3-selection/src/selection/selectAll.js
 function R(e) {
 	return function() {
 		return I(e.apply(this, arguments));
@@ -8180,7 +8180,7 @@ function te(e) {
 	return new Ft(r, i);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/matcher.js
+//#region node_modules/d3-selection/src/matcher.js
 function z(e) {
 	return function() {
 		return this.matches(e);
@@ -8192,7 +8192,7 @@ function B(e) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/selectChild.js
+//#region node_modules/d3-selection/src/selection/selectChild.js
 var V = Array.prototype.find;
 function ne(e) {
 	return function() {
@@ -8206,7 +8206,7 @@ function ie(e) {
 	return this.select(e == null ? re : ne(typeof e == "function" ? e : B(e)));
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/selectChildren.js
+//#region node_modules/d3-selection/src/selection/selectChildren.js
 var ae = Array.prototype.filter;
 function oe() {
 	return Array.from(this.children);
@@ -8220,19 +8220,19 @@ function ce(e) {
 	return this.selectAll(e == null ? oe : se(typeof e == "function" ? e : B(e)));
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/filter.js
+//#region node_modules/d3-selection/src/selection/filter.js
 function le(e) {
 	typeof e != "function" && (e = z(e));
 	for (var t = this._groups, n = t.length, r = Array(n), i = 0; i < n; ++i) for (var a = t[i], o = a.length, s = r[i] = [], c, l = 0; l < o; ++l) (c = a[l]) && e.call(c, c.__data__, l, a) && s.push(c);
 	return new Ft(r, this._parents);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/sparse.js
+//#region node_modules/d3-selection/src/selection/sparse.js
 function ue(e) {
 	return Array(e.length);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/enter.js
+//#region node_modules/d3-selection/src/selection/enter.js
 function de() {
 	return new Ft(this._enter || this._groups.map(ue), this._parents);
 }
@@ -8255,14 +8255,14 @@ fe.prototype = {
 	}
 };
 //#endregion
-//#region ../../../node_modules/d3-selection/src/constant.js
+//#region node_modules/d3-selection/src/constant.js
 function pe(e) {
 	return function() {
 		return e;
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/data.js
+//#region node_modules/d3-selection/src/selection/data.js
 function me(e, t, n, r, i, a) {
 	for (var o = 0, s, c = t.length, l = a.length; o < l; ++o) (s = t[o]) ? (s.__data__ = a[o], r[o] = s) : n[o] = new fe(e, a[o]);
 	for (; o < c; ++o) (s = t[o]) && (i[o] = s);
@@ -8294,31 +8294,31 @@ function ve(e) {
 	return typeof e == "object" && "length" in e ? e : Array.from(e);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/exit.js
+//#region node_modules/d3-selection/src/selection/exit.js
 function ye() {
 	return new Ft(this._exit || this._groups.map(ue), this._parents);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/join.js
+//#region node_modules/d3-selection/src/selection/join.js
 function be(e, t, n) {
 	var r = this.enter(), i = this, a = this.exit();
 	return typeof e == "function" ? (r = e(r), r &&= r.selection()) : r = r.append(e + ""), t != null && (i = t(i), i &&= i.selection()), n == null ? a.remove() : n(a), r && i ? r.merge(i).order() : i;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/merge.js
+//#region node_modules/d3-selection/src/selection/merge.js
 function xe(e) {
 	for (var t = e.selection ? e.selection() : e, n = this._groups, r = t._groups, i = n.length, a = r.length, o = Math.min(i, a), s = Array(i), c = 0; c < o; ++c) for (var l = n[c], u = r[c], d = l.length, f = s[c] = Array(d), p, m = 0; m < d; ++m) (p = l[m] || u[m]) && (f[m] = p);
 	for (; c < i; ++c) s[c] = n[c];
 	return new Ft(s, this._parents);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/order.js
+//#region node_modules/d3-selection/src/selection/order.js
 function Se() {
 	for (var e = this._groups, t = -1, n = e.length; ++t < n;) for (var r = e[t], i = r.length - 1, a = r[i], o; --i >= 0;) (o = r[i]) && (a && o.compareDocumentPosition(a) ^ 4 && a.parentNode.insertBefore(o, a), a = o);
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/sort.js
+//#region node_modules/d3-selection/src/selection/sort.js
 function Ce(e) {
 	e ||= we;
 	function t(t, n) {
@@ -8334,18 +8334,18 @@ function we(e, t) {
 	return e < t ? -1 : e > t ? 1 : e >= t ? 0 : NaN;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/call.js
+//#region node_modules/d3-selection/src/selection/call.js
 function Te() {
 	var e = arguments[0];
 	return arguments[0] = this, e.apply(null, arguments), this;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/nodes.js
+//#region node_modules/d3-selection/src/selection/nodes.js
 function Ee() {
 	return Array.from(this);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/node.js
+//#region node_modules/d3-selection/src/selection/node.js
 function De() {
 	for (var e = this._groups, t = 0, n = e.length; t < n; ++t) for (var r = e[t], i = 0, a = r.length; i < a; ++i) {
 		var o = r[i];
@@ -8354,25 +8354,25 @@ function De() {
 	return null;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/size.js
+//#region node_modules/d3-selection/src/selection/size.js
 function Oe() {
 	let e = 0;
 	for (let t of this) ++e;
 	return e;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/empty.js
+//#region node_modules/d3-selection/src/selection/empty.js
 function ke() {
 	return !this.node();
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/each.js
+//#region node_modules/d3-selection/src/selection/each.js
 function Ae(e) {
 	for (var t = this._groups, n = 0, r = t.length; n < r; ++n) for (var i = t[n], a = 0, o = i.length, s; a < o; ++a) (s = i[a]) && e.call(s, s.__data__, a, i);
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/attr.js
+//#region node_modules/d3-selection/src/selection/attr.js
 function je(e) {
 	return function() {
 		this.removeAttribute(e);
@@ -8414,12 +8414,12 @@ function Le(e, t) {
 	return this.each((t == null ? n.local ? Me : je : typeof t == "function" ? n.local ? Ie : Fe : n.local ? Pe : Ne)(n, t));
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/window.js
+//#region node_modules/d3-selection/src/window.js
 function Re(e) {
 	return e.ownerDocument && e.ownerDocument.defaultView || e.document && e || e.defaultView;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/style.js
+//#region node_modules/d3-selection/src/selection/style.js
 function ze(e) {
 	return function() {
 		this.style.removeProperty(e);
@@ -8443,7 +8443,7 @@ function Ue(e, t) {
 	return e.style.getPropertyValue(t) || Re(e).getComputedStyle(e, null).getPropertyValue(t);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/property.js
+//#region node_modules/d3-selection/src/selection/property.js
 function We(e) {
 	return function() {
 		delete this[e];
@@ -8464,7 +8464,7 @@ function qe(e, t) {
 	return arguments.length > 1 ? this.each((t == null ? We : typeof t == "function" ? Ke : Ge)(e, t)) : this.node()[e];
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/classed.js
+//#region node_modules/d3-selection/src/selection/classed.js
 function Je(e) {
 	return e.trim().split(/^|\s+/);
 }
@@ -8516,7 +8516,7 @@ function nt(e, t) {
 	return this.each((typeof t == "function" ? tt : t ? $e : et)(n, t));
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/text.js
+//#region node_modules/d3-selection/src/selection/text.js
 function rt() {
 	this.textContent = "";
 }
@@ -8535,7 +8535,7 @@ function ot(e) {
 	return arguments.length ? this.each(e == null ? rt : (typeof e == "function" ? at : it)(e)) : this.node().textContent;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/html.js
+//#region node_modules/d3-selection/src/selection/html.js
 function st() {
 	this.innerHTML = "";
 }
@@ -8554,7 +8554,7 @@ function ut(e) {
 	return arguments.length ? this.each(e == null ? st : (typeof e == "function" ? lt : ct)(e)) : this.node().innerHTML;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/raise.js
+//#region node_modules/d3-selection/src/selection/raise.js
 function dt() {
 	this.nextSibling && this.parentNode.appendChild(this);
 }
@@ -8562,7 +8562,7 @@ function ft() {
 	return this.each(dt);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/lower.js
+//#region node_modules/d3-selection/src/selection/lower.js
 function pt() {
 	this.previousSibling && this.parentNode.insertBefore(this, this.parentNode.firstChild);
 }
@@ -8570,7 +8570,7 @@ function mt() {
 	return this.each(pt);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/append.js
+//#region node_modules/d3-selection/src/selection/append.js
 function ht(e) {
 	var t = typeof e == "function" ? e : M(e);
 	return this.select(function() {
@@ -8578,7 +8578,7 @@ function ht(e) {
 	});
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/insert.js
+//#region node_modules/d3-selection/src/selection/insert.js
 function gt() {
 	return null;
 }
@@ -8589,7 +8589,7 @@ function _t(e, t) {
 	});
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/remove.js
+//#region node_modules/d3-selection/src/selection/remove.js
 function vt() {
 	var e = this.parentNode;
 	e && e.removeChild(this);
@@ -8598,7 +8598,7 @@ function yt() {
 	return this.each(vt);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/clone.js
+//#region node_modules/d3-selection/src/selection/clone.js
 function bt() {
 	var e = this.cloneNode(!1), t = this.parentNode;
 	return t ? t.insertBefore(e, this.nextSibling) : e;
@@ -8611,12 +8611,12 @@ function St(e) {
 	return this.select(e ? xt : bt);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/datum.js
+//#region node_modules/d3-selection/src/selection/datum.js
 function Ct(e) {
 	return arguments.length ? this.property("__data__", e) : this.node().__data__;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/on.js
+//#region node_modules/d3-selection/src/selection/on.js
 function wt(e) {
 	return function(t) {
 		e.call(this, t, this.__data__);
@@ -8671,7 +8671,7 @@ function Ot(e, t, n) {
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/dispatch.js
+//#region node_modules/d3-selection/src/selection/dispatch.js
 function kt(e, t, n) {
 	var r = Re(e), i = r.CustomEvent;
 	typeof i == "function" ? i = new i(t, n) : (i = r.document.createEvent("Event"), n ? (i.initEvent(t, n.bubbles, n.cancelable), i.detail = n.detail) : i.initEvent(t, !1, !1)), e.dispatchEvent(i);
@@ -8690,12 +8690,12 @@ function Mt(e, t) {
 	return this.each((typeof t == "function" ? jt : At)(e, t));
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/iterator.js
+//#region node_modules/d3-selection/src/selection/iterator.js
 function* Nt() {
 	for (var e = this._groups, t = 0, n = e.length; t < n; ++t) for (var r = e[t], i = 0, a = r.length, o; i < a; ++i) (o = r[i]) && (yield o);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/selection/index.js
+//#region node_modules/d3-selection/src/selection/index.js
 var Pt = [null];
 function Ft(e, t) {
 	this._groups = e, this._parents = t;
@@ -8745,19 +8745,19 @@ Ft.prototype = It.prototype = {
 	[Symbol.iterator]: Nt
 };
 //#endregion
-//#region ../../../node_modules/d3-selection/src/select.js
+//#region node_modules/d3-selection/src/select.js
 function Rt(e) {
 	return typeof e == "string" ? new Ft([[document.querySelector(e)]], [document.documentElement]) : new Ft([[e]], Pt);
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/sourceEvent.js
+//#region node_modules/d3-selection/src/sourceEvent.js
 function zt(e) {
 	let t;
 	for (; t = e.sourceEvent;) e = t;
 	return e;
 }
 //#endregion
-//#region ../../../node_modules/d3-selection/src/pointer.js
+//#region node_modules/d3-selection/src/pointer.js
 function Bt(e, t) {
 	if (e = zt(e), t === void 0 && (t = e.currentTarget), t) {
 		var n = t.ownerSVGElement || t;
@@ -8773,7 +8773,7 @@ function Bt(e, t) {
 	return [e.pageX, e.pageY];
 }
 //#endregion
-//#region ../../../node_modules/d3-drag/src/noevent.js
+//#region node_modules/d3-drag/src/noevent.js
 var Vt = { passive: !1 }, Ht = {
 	capture: !0,
 	passive: !1
@@ -8785,7 +8785,7 @@ function Wt(e) {
 	e.preventDefault(), e.stopImmediatePropagation();
 }
 //#endregion
-//#region ../../../node_modules/d3-drag/src/nodrag.js
+//#region node_modules/d3-drag/src/nodrag.js
 function Gt(e) {
 	var t = e.document.documentElement, n = Rt(e).on("dragstart.drag", Wt, Ht);
 	"onselectstart" in t ? n.on("selectstart.drag", Wt, Ht) : (t.__noselect = t.style.MozUserSelect, t.style.MozUserSelect = "none");
@@ -8797,10 +8797,10 @@ function Kt(e, t) {
 	}, 0)), "onselectstart" in n ? r.on("selectstart.drag", null) : (n.style.MozUserSelect = n.__noselect, delete n.__noselect);
 }
 //#endregion
-//#region ../../../node_modules/d3-drag/src/constant.js
+//#region node_modules/d3-drag/src/constant.js
 var qt = (e) => () => e;
 //#endregion
-//#region ../../../node_modules/d3-drag/src/event.js
+//#region node_modules/d3-drag/src/event.js
 function Jt(e, { sourceEvent: t, subject: n, target: r, identifier: i, active: a, x: o, y: s, dx: c, dy: l, dispatch: u }) {
 	Object.defineProperties(this, {
 		type: {
@@ -8861,7 +8861,7 @@ Jt.prototype.on = function() {
 	return e === this._ ? this : e;
 };
 //#endregion
-//#region ../../../node_modules/d3-drag/src/drag.js
+//#region node_modules/d3-drag/src/drag.js
 function Yt(e) {
 	return !e.ctrlKey && !e.button;
 }
@@ -8967,7 +8967,7 @@ function $t() {
 	}, f;
 }
 //#endregion
-//#region ../../../node_modules/d3-color/src/define.js
+//#region node_modules/d3-color/src/define.js
 function en(e, t, n) {
 	e.prototype = t.prototype = n, n.constructor = e;
 }
@@ -8977,7 +8977,7 @@ function tn(e, t) {
 	return n;
 }
 //#endregion
-//#region ../../../node_modules/d3-color/src/color.js
+//#region node_modules/d3-color/src/color.js
 function nn() {}
 var rn = .7, an = 1 / rn, on = "\\s*([+-]?\\d+)\\s*", sn = "\\s*([+-]?(?:\\d*\\.)?\\d+(?:[eE][+-]?\\d+)?)\\s*", cn = "\\s*([+-]?(?:\\d*\\.)?\\d+(?:[eE][+-]?\\d+)?)%\\s*", ln = /^#([0-9a-f]{3,8})$/, un = RegExp(`^rgb\\(${on},${on},${on}\\)$`), dn = RegExp(`^rgb\\(${cn},${cn},${cn}\\)$`), fn = RegExp(`^rgba\\(${on},${on},${on},${sn}\\)$`), pn = RegExp(`^rgba\\(${cn},${cn},${cn},${sn}\\)$`), mn = RegExp(`^hsl\\(${sn},${cn},${cn}\\)$`), hn = RegExp(`^hsla\\(${sn},${cn},${cn},${sn}\\)$`), gn = {
 	aliceblue: 15792383,
@@ -9264,10 +9264,10 @@ function Rn(e, t, n) {
 	return (e < 60 ? t + (n - t) * e / 60 : e < 180 ? n : e < 240 ? t + (n - t) * (240 - e) / 60 : t) * 255;
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/constant.js
+//#region node_modules/d3-interpolate/src/constant.js
 var zn = (e) => () => e;
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/color.js
+//#region node_modules/d3-interpolate/src/color.js
 function Bn(e, t) {
 	return function(n) {
 		return e + n * t;
@@ -9288,7 +9288,7 @@ function Un(e, t) {
 	return n ? Bn(e, n) : zn(isNaN(e) ? t : e);
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/rgb.js
+//#region node_modules/d3-interpolate/src/rgb.js
 var Wn = (function e(t) {
 	var n = Hn(t);
 	function r(e, t) {
@@ -9300,7 +9300,7 @@ var Wn = (function e(t) {
 	return r.gamma = e, r;
 })(1);
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/numberArray.js
+//#region node_modules/d3-interpolate/src/numberArray.js
 function Gn(e, t) {
 	t ||= [];
 	var n = e ? Math.min(t.length, e.length) : 0, r = t.slice(), i;
@@ -9313,7 +9313,7 @@ function Kn(e) {
 	return ArrayBuffer.isView(e) && !(e instanceof DataView);
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/array.js
+//#region node_modules/d3-interpolate/src/array.js
 function qn(e, t) {
 	var n = t ? t.length : 0, r = e ? Math.min(n, e.length) : 0, i = Array(r), a = Array(n), o;
 	for (o = 0; o < r; ++o) i[o] = nr(e[o], t[o]);
@@ -9324,7 +9324,7 @@ function qn(e, t) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/date.js
+//#region node_modules/d3-interpolate/src/date.js
 function Jn(e, t) {
 	var n = /* @__PURE__ */ new Date();
 	return e = +e, t = +t, function(r) {
@@ -9332,14 +9332,14 @@ function Jn(e, t) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/number.js
+//#region node_modules/d3-interpolate/src/number.js
 function Yn(e, t) {
 	return e = +e, t = +t, function(n) {
 		return e * (1 - n) + t * n;
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/object.js
+//#region node_modules/d3-interpolate/src/object.js
 function Xn(e, t) {
 	var n = {}, r = {}, i;
 	for (i in (typeof e != "object" || !e) && (e = {}), (typeof t != "object" || !t) && (t = {}), t) i in e ? n[i] = nr(e[i], t[i]) : r[i] = t[i];
@@ -9349,7 +9349,7 @@ function Xn(e, t) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/string.js
+//#region node_modules/d3-interpolate/src/string.js
 var Zn = /[-+]?(?:\d+\.?\d*|\.?\d+)(?:[eE][-+]?\d+)?/g, Qn = new RegExp(Zn.source, "g");
 function $n(e) {
 	return function() {
@@ -9373,13 +9373,13 @@ function tr(e, t) {
 	});
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/value.js
+//#region node_modules/d3-interpolate/src/value.js
 function nr(e, t) {
 	var n = typeof t, r;
 	return t == null || n === "boolean" ? zn(t) : (n === "number" ? Yn : n === "string" ? (r = xn(t)) ? (t = r, Wn) : tr : t instanceof xn ? Wn : t instanceof Date ? Jn : Kn(t) ? Gn : Array.isArray(t) ? qn : typeof t.valueOf != "function" && typeof t.toString != "function" || isNaN(t) ? Xn : Yn)(e, t);
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/transform/decompose.js
+//#region node_modules/d3-interpolate/src/transform/decompose.js
 var rr = 180 / Math.PI, ir = {
 	translateX: 0,
 	translateY: 0,
@@ -9400,7 +9400,7 @@ function ar(e, t, n, r, i, a) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/transform/parse.js
+//#region node_modules/d3-interpolate/src/transform/parse.js
 var or;
 function sr(e) {
 	let t = new (typeof DOMMatrix == "function" ? DOMMatrix : WebKitCSSMatrix)(e + "");
@@ -9410,7 +9410,7 @@ function cr(e) {
 	return e == null || (or ||= document.createElementNS("http://www.w3.org/2000/svg", "g"), or.setAttribute("transform", e), !(e = or.transform.baseVal.consolidate())) ? ir : (e = e.matrix, ar(e.a, e.b, e.c, e.d, e.e, e.f));
 }
 //#endregion
-//#region ../../../node_modules/d3-interpolate/src/transform/index.js
+//#region node_modules/d3-interpolate/src/transform/index.js
 function lr(e, t, n, r) {
 	function i(e) {
 		return e.length ? e.pop() + " " : "";
@@ -9547,7 +9547,7 @@ function Ir(e) {
 	_r || (vr &&= clearTimeout(vr), e - wr > 24 ? (e < Infinity && (vr = setTimeout(Nr, e - Er.now() - Tr)), yr &&= clearInterval(yr)) : (yr ||= (Cr = Er.now(), setInterval(Pr, br)), _r = 1, Dr(Nr)));
 }
 //#endregion
-//#region ../../../node_modules/d3-timer/src/timeout.js
+//#region node_modules/d3-timer/src/timeout.js
 function Lr(e, t, n) {
 	var r = new Ar();
 	return t = t == null ? 0 : +t, r.restart((n) => {
@@ -9555,7 +9555,7 @@ function Lr(e, t, n) {
 	}, t, n), r;
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/schedule.js
+//#region node_modules/d3-transition/src/transition/schedule.js
 var Rr = m(), zr = C("start", "end", "cancel", "interrupt"), Br = [];
 function Vr(e, t, n, r, i, a) {
 	var o = e.__transition;
@@ -9620,7 +9620,7 @@ function Gr(e, t, n) {
 	}
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/interrupt.js
+//#region node_modules/d3-transition/src/interrupt.js
 function Kr(e, t) {
 	var n = e.__transition, r, i, a = !0, o;
 	if (n) {
@@ -9635,14 +9635,14 @@ function Kr(e, t) {
 	}
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/selection/interrupt.js
+//#region node_modules/d3-transition/src/selection/interrupt.js
 function qr(e) {
 	return this.each(function() {
 		Kr(this, e);
 	});
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/tween.js
+//#region node_modules/d3-transition/src/transition/tween.js
 function Jr(e, t) {
 	var n, r;
 	return function() {
@@ -9694,13 +9694,13 @@ function Zr(e, t, n) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/interpolate.js
+//#region node_modules/d3-transition/src/transition/interpolate.js
 function Qr(e, t) {
 	var n;
 	return (typeof t == "number" ? Yn : t instanceof xn ? Wn : (n = xn(t)) ? (t = n, Wn) : tr)(e, t);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/attr.js
+//#region node_modules/d3-transition/src/transition/attr.js
 function $r(e) {
 	return function() {
 		this.removeAttribute(e);
@@ -9744,7 +9744,7 @@ function ai(e, t) {
 	return this.attrTween(e, typeof t == "function" ? (n.local ? ii : ri)(n, r, Zr(this, "attr." + e, t)) : t == null ? (n.local ? ei : $r)(n) : (n.local ? ni : ti)(n, r, t));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/attrTween.js
+//#region node_modules/d3-transition/src/transition/attrTween.js
 function oi(e, t) {
 	return function(n) {
 		this.setAttribute(e, t.call(this, n));
@@ -9780,7 +9780,7 @@ function ui(e, t) {
 	return this.tween(n, (r.local ? ci : li)(r, t));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/delay.js
+//#region node_modules/d3-transition/src/transition/delay.js
 function di(e, t) {
 	return function() {
 		Hr(this, e).delay = +t.apply(this, arguments);
@@ -9796,7 +9796,7 @@ function pi(e) {
 	return arguments.length ? this.each((typeof e == "function" ? di : fi)(t, e)) : Wr(this.node(), t).delay;
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/duration.js
+//#region node_modules/d3-transition/src/transition/duration.js
 function mi(e, t) {
 	return function() {
 		Ur(this, e).duration = +t.apply(this, arguments);
@@ -9812,7 +9812,7 @@ function gi(e) {
 	return arguments.length ? this.each((typeof e == "function" ? mi : hi)(t, e)) : Wr(this.node(), t).duration;
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/ease.js
+//#region node_modules/d3-transition/src/transition/ease.js
 function _i(e, t) {
 	if (typeof t != "function") throw Error();
 	return function() {
@@ -9824,7 +9824,7 @@ function vi(e) {
 	return arguments.length ? this.each(_i(t, e)) : Wr(this.node(), t).ease;
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/easeVarying.js
+//#region node_modules/d3-transition/src/transition/easeVarying.js
 function yi(e, t) {
 	return function() {
 		var n = t.apply(this, arguments);
@@ -9837,14 +9837,14 @@ function bi(e) {
 	return this.each(yi(this._id, e));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/filter.js
+//#region node_modules/d3-transition/src/transition/filter.js
 function xi(e) {
 	typeof e != "function" && (e = z(e));
 	for (var t = this._groups, n = t.length, r = Array(n), i = 0; i < n; ++i) for (var a = t[i], o = a.length, s = r[i] = [], c, l = 0; l < o; ++l) (c = a[l]) && e.call(c, c.__data__, l, a) && s.push(c);
 	return new Yi(r, this._parents, this._name, this._id);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/merge.js
+//#region node_modules/d3-transition/src/transition/merge.js
 function Si(e) {
 	if (e._id !== this._id) throw Error();
 	for (var t = this._groups, n = e._groups, r = t.length, i = n.length, a = Math.min(r, i), o = Array(r), s = 0; s < a; ++s) for (var c = t[s], l = n[s], u = c.length, d = o[s] = Array(u), f, p = 0; p < u; ++p) (f = c[p] || l[p]) && (d[p] = f);
@@ -9852,7 +9852,7 @@ function Si(e) {
 	return new Yi(o, this._parents, this._name, this._id);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/on.js
+//#region node_modules/d3-transition/src/transition/on.js
 function Ci(e) {
 	return (e + "").trim().split(/^|\s+/).every(function(e) {
 		var t = e.indexOf(".");
@@ -9871,7 +9871,7 @@ function Ti(e, t) {
 	return arguments.length < 2 ? Wr(this.node(), n).on.on(e) : this.each(wi(n, e, t));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/remove.js
+//#region node_modules/d3-transition/src/transition/remove.js
 function Ei(e) {
 	return function() {
 		var t = this.parentNode;
@@ -9883,7 +9883,7 @@ function Di() {
 	return this.on("end.remove", Ei(this._id));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/select.js
+//#region node_modules/d3-transition/src/transition/select.js
 function Oi(e) {
 	var t = this._name, n = this._id;
 	typeof e != "function" && (e = P(e));
@@ -9891,7 +9891,7 @@ function Oi(e) {
 	return new Yi(a, this._parents, t, n);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/selectAll.js
+//#region node_modules/d3-transition/src/transition/selectAll.js
 function ki(e) {
 	var t = this._name, n = this._id;
 	typeof e != "function" && (e = ee(e));
@@ -9902,13 +9902,13 @@ function ki(e) {
 	return new Yi(a, o, t, n);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/selection.js
+//#region node_modules/d3-transition/src/transition/selection.js
 var Ai = It.prototype.constructor;
 function U() {
 	return new Ai(this._groups, this._parents);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/style.js
+//#region node_modules/d3-transition/src/transition/style.js
 function ji(e, t) {
 	var n, r, i;
 	return function() {
@@ -9947,7 +9947,7 @@ function Ii(e, t, n) {
 	return t == null ? this.styleTween(e, ji(e, r)).on("end.style." + e, Mi(e)) : typeof t == "function" ? this.styleTween(e, Pi(e, r, Zr(this, "style." + e, t))).each(Fi(this._id, e)) : this.styleTween(e, Ni(e, r, t), n).on("end.style." + e, null);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/styleTween.js
+//#region node_modules/d3-transition/src/transition/styleTween.js
 function Li(e, t, n) {
 	return function(r) {
 		this.style.setProperty(e, t.call(this, r), n);
@@ -9969,7 +9969,7 @@ function zi(e, t, n) {
 	return this.tween(r, Ri(e, t, n ?? ""));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/text.js
+//#region node_modules/d3-transition/src/transition/text.js
 function Bi(e) {
 	return function() {
 		this.textContent = e;
@@ -9985,7 +9985,7 @@ function Hi(e) {
 	return this.tween("text", typeof e == "function" ? Vi(Zr(this, "text", e)) : Bi(e == null ? "" : e + ""));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/textTween.js
+//#region node_modules/d3-transition/src/transition/textTween.js
 function Ui(e) {
 	return function(t) {
 		this.textContent = e.call(this, t);
@@ -10007,7 +10007,7 @@ function Gi(e) {
 	return this.tween(t, Wi(e));
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/transition.js
+//#region node_modules/d3-transition/src/transition/transition.js
 function Ki() {
 	for (var e = this._name, t = this._id, n = Zi(), r = this._groups, i = r.length, a = 0; a < i; ++a) for (var o = r[a], s = o.length, c, l = 0; l < s; ++l) if (c = o[l]) {
 		var u = Wr(c, t);
@@ -10021,7 +10021,7 @@ function Ki() {
 	return new Yi(r, this._parents, e, n);
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/end.js
+//#region node_modules/d3-transition/src/transition/end.js
 function qi() {
 	var e, t, n = this, r = n._id, i = n.size();
 	return new Promise(function(a, o) {
@@ -10035,7 +10035,7 @@ function qi() {
 	});
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/transition/index.js
+//#region node_modules/d3-transition/src/transition/index.js
 var Ji = 0;
 function Yi(e, t, n, r) {
 	this._groups = e, this._parents = t, this._name = n, this._id = r;
@@ -10080,7 +10080,7 @@ Yi.prototype = Xi.prototype = {
 	[Symbol.iterator]: Qi[Symbol.iterator]
 };
 //#endregion
-//#region ../../../node_modules/d3-ease/src/cubic.js
+//#region node_modules/d3-ease/src/cubic.js
 function $i(e) {
 	return --e * e * e + 1;
 }
@@ -10088,7 +10088,7 @@ function ea(e) {
 	return ((e *= 2) <= 1 ? e * e * e : (e -= 2) * e * e + 2) / 2;
 }
 //#endregion
-//#region ../../../node_modules/d3-transition/src/selection/transition.js
+//#region node_modules/d3-transition/src/selection/transition.js
 var ta = {
 	time: null,
 	delay: 0,
@@ -10107,7 +10107,7 @@ function ra(e) {
 }
 It.prototype.interrupt = qr, It.prototype.transition = ra;
 //#endregion
-//#region ../../../node_modules/d3-brush/src/brush.js
+//#region node_modules/d3-brush/src/brush.js
 var { abs: ia, max: aa, min: oa } = Math;
 ["w", "e"].map(sa), ["n", "s"].map(sa), [
 	"n",
@@ -10123,7 +10123,7 @@ function sa(e) {
 	return { type: e };
 }
 //#endregion
-//#region ../../../node_modules/d3-path/src/path.js
+//#region node_modules/d3-path/src/path.js
 var ca = Math.PI, la = 2 * ca, ua = 1e-6, da = la - ua;
 function fa(e) {
 	this._ += e[0];
@@ -10185,7 +10185,7 @@ function ha() {
 }
 ha.prototype = ma.prototype;
 //#endregion
-//#region ../../../node_modules/d3-force/src/center.js
+//#region node_modules/d3-force/src/center.js
 function ga(e, t) {
 	var n, r = 1;
 	e ??= 0, t ??= 0;
@@ -10205,7 +10205,7 @@ function ga(e, t) {
 	}, i;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/add.js
+//#region node_modules/d3-quadtree/src/add.js
 function _a(e) {
 	let t = +this._x.call(null, e), n = +this._y.call(null, e);
 	return va(this.cover(t, n), t, n, e);
@@ -10239,7 +10239,7 @@ function ya(e) {
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/cover.js
+//#region node_modules/d3-quadtree/src/cover.js
 function ba(e, t) {
 	if (isNaN(e = +e) || isNaN(t = +t)) return this;
 	var n = this._x0, r = this._y0, i = this._x1, a = this._y1;
@@ -10269,7 +10269,7 @@ function ba(e, t) {
 	return this._x0 = n, this._y0 = r, this._x1 = i, this._y1 = a, this;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/data.js
+//#region node_modules/d3-quadtree/src/data.js
 function xa() {
 	var e = [];
 	return this.visit(function(t) {
@@ -10279,17 +10279,17 @@ function xa() {
 	}), e;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/extent.js
+//#region node_modules/d3-quadtree/src/extent.js
 function Sa(e) {
 	return arguments.length ? this.cover(+e[0][0], +e[0][1]).cover(+e[1][0], +e[1][1]) : isNaN(this._x0) ? void 0 : [[this._x0, this._y0], [this._x1, this._y1]];
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/quad.js
+//#region node_modules/d3-quadtree/src/quad.js
 function Ca(e, t, n, r, i) {
 	this.node = e, this.x0 = t, this.y0 = n, this.x1 = r, this.y1 = i;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/find.js
+//#region node_modules/d3-quadtree/src/find.js
 function wa(e, t, n) {
 	var r, i = this._x0, a = this._y0, o, s, c, l, u = this._x1, d = this._y1, f = [], p = this._root, m, h;
 	for (p && f.push(new Ca(p, i, a, u, d)), n == null ? n = Infinity : (i = e - n, a = t - n, u = e + n, d = t + n, n *= n); m = f.pop();) if (!(!(p = m.node) || (o = m.x0) > u || (s = m.y0) > d || (c = m.x1) < i || (l = m.y1) < a)) if (p.length) {
@@ -10305,7 +10305,7 @@ function wa(e, t, n) {
 	return r;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/remove.js
+//#region node_modules/d3-quadtree/src/remove.js
 function Ta(e) {
 	if (isNaN(u = +this._x.call(null, e)) || isNaN(d = +this._y.call(null, e))) return this;
 	var t, n = this._root, r, i, a, o = this._x0, s = this._y0, c = this._x1, l = this._y1, u, d, f, p, m, h, g, _;
@@ -10323,12 +10323,12 @@ function Ea(e) {
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/root.js
+//#region node_modules/d3-quadtree/src/root.js
 function Da() {
 	return this._root;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/size.js
+//#region node_modules/d3-quadtree/src/size.js
 function Oa() {
 	var e = 0;
 	return this.visit(function(t) {
@@ -10338,7 +10338,7 @@ function Oa() {
 	}), e;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/visit.js
+//#region node_modules/d3-quadtree/src/visit.js
 function ka(e) {
 	var t = [], n, r = this._root, i, a, o, s, c;
 	for (r && t.push(new Ca(r, this._x0, this._y0, this._x1, this._y1)); n = t.pop();) if (!e(r = n.node, a = n.x0, o = n.y0, s = n.x1, c = n.y1) && r.length) {
@@ -10348,7 +10348,7 @@ function ka(e) {
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/visitAfter.js
+//#region node_modules/d3-quadtree/src/visitAfter.js
 function Aa(e) {
 	var t = [], n = [], r;
 	for (this._root && t.push(new Ca(this._root, this._x0, this._y0, this._x1, this._y1)); r = t.pop();) {
@@ -10363,7 +10363,7 @@ function Aa(e) {
 	return this;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/x.js
+//#region node_modules/d3-quadtree/src/x.js
 function ja(e) {
 	return e[0];
 }
@@ -10371,7 +10371,7 @@ function Ma(e) {
 	return arguments.length ? (this._x = e, this) : this._x;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/y.js
+//#region node_modules/d3-quadtree/src/y.js
 function Na(e) {
 	return e[1];
 }
@@ -10379,7 +10379,7 @@ function Pa(e) {
 	return arguments.length ? (this._y = e, this) : this._y;
 }
 //#endregion
-//#region ../../../node_modules/d3-quadtree/src/quadtree.js
+//#region node_modules/d3-quadtree/src/quadtree.js
 function Fa(e, t, n) {
 	var r = new Ia(t ?? ja, n ?? Na, NaN, NaN, NaN, NaN);
 	return e == null ? r : r.addAll(e);
@@ -10416,19 +10416,19 @@ Ra.copy = function() {
 	return e;
 }, Ra.add = _a, Ra.addAll = ya, Ra.cover = ba, Ra.data = xa, Ra.extent = Sa, Ra.find = wa, Ra.remove = Ta, Ra.removeAll = Ea, Ra.root = Da, Ra.size = Oa, Ra.visit = ka, Ra.visitAfter = Aa, Ra.x = Ma, Ra.y = Pa;
 //#endregion
-//#region ../../../node_modules/d3-force/src/constant.js
+//#region node_modules/d3-force/src/constant.js
 function za(e) {
 	return function() {
 		return e;
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-force/src/jiggle.js
+//#region node_modules/d3-force/src/jiggle.js
 function Ba(e) {
 	return (e() - .5) * 1e-6;
 }
 //#endregion
-//#region ../../../node_modules/d3-force/src/collide.js
+//#region node_modules/d3-force/src/collide.js
 function Va(e) {
 	return e.x + e.vx;
 }
@@ -10473,7 +10473,7 @@ function Ua(e) {
 	}, o;
 }
 //#endregion
-//#region ../../../node_modules/d3-force/src/link.js
+//#region node_modules/d3-force/src/link.js
 function Wa(e) {
 	return e.index;
 }
@@ -10520,14 +10520,14 @@ function Ka(e) {
 	}, f;
 }
 //#endregion
-//#region ../../../node_modules/d3-force/src/lcg.js
+//#region node_modules/d3-force/src/lcg.js
 var qa = 1664525, Ja = 1013904223, Ya = 4294967296;
 function Xa() {
 	let e = 1;
 	return () => (e = (qa * e + Ja) % Ya) / Ya;
 }
 //#endregion
-//#region ../../../node_modules/d3-force/src/simulation.js
+//#region node_modules/d3-force/src/simulation.js
 function Za(e) {
 	return e.x;
 }
@@ -10604,7 +10604,7 @@ function to(e) {
 	};
 }
 //#endregion
-//#region ../../../node_modules/d3-force/src/manyBody.js
+//#region node_modules/d3-force/src/manyBody.js
 function no() {
 	var e, t, n, r, i = za(-30), a, o = 1, s = Infinity, c = .81;
 	function l(n) {
@@ -10654,18 +10654,18 @@ function no() {
 	}, l;
 }
 //#endregion
-//#region ../../../node_modules/d3-polygon/src/centroid.js
+//#region node_modules/d3-polygon/src/centroid.js
 function ro(e) {
 	for (var t = -1, n = e.length, r = 0, i = 0, a, o = e[n - 1], s, c = 0; ++t < n;) a = o, o = e[t], c += s = a[0] * o[1] - o[0] * a[1], r += (a[0] + o[0]) * s, i += (a[1] + o[1]) * s;
 	return c *= 3, [r / c, i / c];
 }
 //#endregion
-//#region ../../../node_modules/d3-polygon/src/cross.js
+//#region node_modules/d3-polygon/src/cross.js
 function io(e, t, n) {
 	return (t[0] - e[0]) * (n[1] - e[1]) - (t[1] - e[1]) * (n[0] - e[0]);
 }
 //#endregion
-//#region ../../../node_modules/d3-polygon/src/hull.js
+//#region node_modules/d3-polygon/src/hull.js
 function ao(e, t) {
 	return e[0] - t[0] || e[1] - t[1];
 }
@@ -10692,7 +10692,7 @@ function so(e) {
 	return l;
 }
 //#endregion
-//#region ../../../node_modules/d3-shape/src/constant.js
+//#region node_modules/d3-shape/src/constant.js
 function co(e) {
 	return function() {
 		return e;
@@ -10701,7 +10701,7 @@ function co(e) {
 var W = Math.PI;
 W / 2, 2 * W;
 //#endregion
-//#region ../../../node_modules/d3-shape/src/path.js
+//#region node_modules/d3-shape/src/path.js
 function lo(e) {
 	let t = 3;
 	return e.digits = function(n) {
@@ -10720,7 +10720,7 @@ function uo(e) {
 	return typeof e == "object" && "length" in e ? e : Array.from(e);
 }
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/linear.js
+//#region node_modules/d3-shape/src/curve/linear.js
 function fo(e) {
 	this._context = e;
 }
@@ -10753,7 +10753,7 @@ function po(e) {
 	return new fo(e);
 }
 //#endregion
-//#region ../../../node_modules/d3-shape/src/point.js
+//#region node_modules/d3-shape/src/point.js
 function mo(e) {
 	return e[0];
 }
@@ -10761,7 +10761,7 @@ function ho(e) {
 	return e[1];
 }
 //#endregion
-//#region ../../../node_modules/d3-shape/src/line.js
+//#region node_modules/d3-shape/src/line.js
 function go(e, t) {
 	var n = co(!0), r = null, i = po, a = null, o = lo(s);
 	e = typeof e == "function" ? e : e === void 0 ? mo : co(e), t = typeof t == "function" ? t : t === void 0 ? ho : co(t);
@@ -10783,10 +10783,10 @@ function go(e, t) {
 	}, s;
 }
 //#endregion
-//#region ../../../node_modules/d3-shape/src/noop.js
+//#region node_modules/d3-shape/src/noop.js
 function _o() {}
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/basis.js
+//#region node_modules/d3-shape/src/curve/basis.js
 function vo(e, t, n) {
 	e._context.bezierCurveTo((2 * e._x0 + e._x1) / 3, (2 * e._y0 + e._y1) / 3, (e._x0 + 2 * e._x1) / 3, (e._y0 + 2 * e._y1) / 3, (e._x0 + 4 * e._x1 + t) / 6, (e._y0 + 4 * e._y1 + n) / 6);
 }
@@ -10829,7 +10829,7 @@ yo.prototype = {
 	}
 };
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/basisClosed.js
+//#region node_modules/d3-shape/src/curve/basisClosed.js
 function bo(e) {
 	this._context = e;
 }
@@ -10874,7 +10874,7 @@ function xo(e) {
 	return new bo(e);
 }
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/cardinal.js
+//#region node_modules/d3-shape/src/curve/cardinal.js
 function So(e, t, n) {
 	e._context.bezierCurveTo(e._x1 + e._k * (e._x2 - e._x0), e._y1 + e._k * (e._y2 - e._y0), e._x2 + e._k * (e._x1 - t), e._y2 + e._k * (e._y1 - n), e._x2, e._y2);
 }
@@ -10926,7 +10926,7 @@ Co.prototype = {
 	}, n;
 })(0);
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/cardinalClosed.js
+//#region node_modules/d3-shape/src/curve/cardinalClosed.js
 function wo(e, t) {
 	this._context = e, this._k = (1 - t) / 6;
 }
@@ -10975,7 +10975,7 @@ wo.prototype = {
 	}, n;
 })(0);
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/catmullRom.js
+//#region node_modules/d3-shape/src/curve/catmullRom.js
 function To(e, t, n) {
 	var r = e._x1, i = e._y1, a = e._x2, o = e._y2;
 	if (e._l01_a > 1e-12) {
@@ -11040,7 +11040,7 @@ Eo.prototype = {
 	}, n;
 })(.5);
 //#endregion
-//#region ../../../node_modules/d3-shape/src/curve/catmullRomClosed.js
+//#region node_modules/d3-shape/src/curve/catmullRomClosed.js
 function Do(e, t) {
 	this._context = e, this._alpha = t;
 }
@@ -11094,7 +11094,7 @@ var Oo = (function e(t) {
 	}, n;
 })(.5), ko = (e) => () => e;
 //#endregion
-//#region ../../../node_modules/d3-zoom/src/event.js
+//#region node_modules/d3-zoom/src/event.js
 function Ao(e, { sourceEvent: t, target: n, transform: r, dispatch: i }) {
 	Object.defineProperties(this, {
 		type: {
@@ -11121,7 +11121,7 @@ function Ao(e, { sourceEvent: t, target: n, transform: r, dispatch: i }) {
 	});
 }
 //#endregion
-//#region ../../../node_modules/d3-zoom/src/transform.js
+//#region node_modules/d3-zoom/src/transform.js
 function jo(e, t, n) {
 	this.k = e, this.x = t, this.y = n;
 }
@@ -11168,7 +11168,7 @@ function No(e) {
 	return e.__zoom;
 }
 //#endregion
-//#region ../../../node_modules/d3-zoom/src/noevent.js
+//#region node_modules/d3-zoom/src/noevent.js
 function Po(e) {
 	e.stopImmediatePropagation();
 }
@@ -11176,7 +11176,7 @@ function Fo(e) {
 	e.preventDefault(), e.stopImmediatePropagation();
 }
 //#endregion
-//#region ../../../node_modules/d3-zoom/src/zoom.js
+//#region node_modules/d3-zoom/src/zoom.js
 function Io(e) {
 	return (!e.ctrlKey || e.type === "wheel") && !e.button;
 }
@@ -20012,117 +20012,117 @@ function il({ feedData: e, onNodeSelect: t, hiddenSources: n, filteredArticleIds
 	});
 }
 var J = {
-	overlay: "_overlay_1blj3_4",
-	open: "_open_1blj3_16",
-	panel: "_panel_1blj3_30",
-	minimized: "_minimized_1blj3_67",
-	wide: "_wide_1blj3_74",
-	full: "_full_1blj3_79",
-	tb: "_tb_1blj3_92",
-	growBtn: "_growBtn_1blj3_92",
-	toolbar: "_toolbar_1blj3_107",
-	dragGrip: "_dragGrip_1blj3_124",
-	windowControls: "_windowControls_1blj3_132",
-	restorePill: "_restorePill_1blj3_138",
-	popIn: "_popIn_1blj3_1",
-	pillIcon: "_pillIcon_1blj3_167",
-	pillLabel: "_pillLabel_1blj3_171",
-	pillTitle: "_pillTitle_1blj3_177",
-	pillAuthor: "_pillAuthor_1blj3_187",
-	pillAction: "_pillAction_1blj3_193",
-	toolbarGroup: "_toolbarGroup_1blj3_208",
-	ttsMount: "_ttsMount_1blj3_217",
-	toolbarSeparator: "_toolbarSeparator_1blj3_229",
-	toolbarSpacer: "_toolbarSpacer_1blj3_236",
-	closeX: "_closeX_1blj3_276",
-	navItem: "_navItem_1blj3_277",
-	tbLabeled: "_tbLabeled_1blj3_283",
-	tbText: "_tbText_1blj3_289",
-	active: "_active_1blj3_295",
-	copied: "_copied_1blj3_300",
-	tbTooltip: "_tbTooltip_1blj3_332",
-	syndLink: "_syndLink_1blj3_354",
-	canonical: "_canonical_1blj3_372",
-	progress: "_progress_1blj3_388",
-	progressFill: "_progressFill_1blj3_397",
-	progressSide: "_progressSide_1blj3_404",
-	frontmatterPanel: "_frontmatterPanel_1blj3_422",
-	fmRow: "_fmRow_1blj3_436",
-	fmLabel: "_fmLabel_1blj3_443",
-	fmValue: "_fmValue_1blj3_452",
-	fmTag: "_fmTag_1blj3_456",
-	fmUntagged: "_fmUntagged_1blj3_467",
-	fmSyndLink: "_fmSyndLink_1blj3_474",
-	body: "_body_1blj3_484",
-	articleHeader: "_articleHeader_1blj3_533",
-	articleKicker: "_articleKicker_1blj3_537",
-	articleTitle: "_articleTitle_1blj3_545",
-	articleByline: "_articleByline_1blj3_553",
-	articleMeta: "_articleMeta_1blj3_568",
-	sourcePill: "_sourcePill_1blj3_576",
-	offscreen: "_offscreen_1blj3_582",
-	sourcePillPopover: "_sourcePillPopover_1blj3_593",
-	rightsLine: "_rightsLine_1blj3_601",
-	copyToast: "_copyToast_1blj3_610",
-	show: "_show_1blj3_626",
-	bookmarkRibbon: "_bookmarkRibbon_1blj3_631",
-	ribbonTooltip: "_ribbonTooltip_1blj3_654",
-	inlineNoteForm: "_inlineNoteForm_1blj3_680",
-	inlineNoteInput: "_inlineNoteInput_1blj3_686",
-	marksPanel: "_marksPanel_1blj3_702",
-	marksHeader: "_marksHeader_1blj3_711",
-	marksList: "_marksList_1blj3_723",
-	markItem: "_markItem_1blj3_729",
-	markBody: "_markBody_1blj3_746",
-	markQuote: "_markQuote_1blj3_752",
-	markNote: "_markNote_1blj3_759",
-	markNoteEmpty: "_markNoteEmpty_1blj3_768",
-	markNoteInput: "_markNoteInput_1blj3_773",
-	markActions: "_markActions_1blj3_785",
-	markBtn: "_markBtn_1blj3_792",
-	markBtnDanger: "_markBtnDanger_1blj3_812",
-	marksListPanel: "_marksListPanel_1blj3_818",
-	inlineNotePanel: "_inlineNotePanel_1blj3_828",
-	noteInput: "_noteInput_1blj3_834",
-	marksLegend: "_marksLegend_1blj3_850",
-	markMain: "_markMain_1blj3_862",
-	markTitle: "_markTitle_1blj3_867",
-	noMarks: "_noMarks_1blj3_893",
-	following: "_following_1blj3_935",
-	navTop: "_navTop_1blj3_992",
-	navBottom: "_navBottom_1blj3_993",
-	navSide: "_navSide_1blj3_1001",
-	navSideNext: "_navSideNext_1blj3_1002",
-	navNext: "_navNext_1blj3_1021",
-	navLine: "_navLine_1blj3_1022",
-	navArrow: "_navArrow_1blj3_1023",
-	navTitle: "_navTitle_1blj3_1024",
-	navLocked: "_navLocked_1blj3_1029",
-	navStatus: "_navStatus_1blj3_1031",
-	turnOut_next: "_turnOut_next_1blj3_1039",
-	ppTurnOutNext: "_ppTurnOutNext_1blj3_1",
-	turnOut_prev: "_turnOut_prev_1blj3_1040",
-	ppTurnOutPrev: "_ppTurnOutPrev_1blj3_1",
-	turnIn_next: "_turnIn_next_1blj3_1041",
-	ppTurnInNext: "_ppTurnInNext_1blj3_1",
-	turnIn_prev: "_turnIn_prev_1blj3_1042",
-	ppTurnInPrev: "_ppTurnInPrev_1blj3_1",
-	notYet: "_notYet_1blj3_1052",
-	notYetTitle: "_notYetTitle_1blj3_1059",
-	notYetStatus: "_notYetStatus_1blj3_1060",
-	bmList: "_bmList_1blj3_1088",
-	bmRow: "_bmRow_1blj3_1100",
-	bmMain: "_bmMain_1blj3_1101",
-	bmTitle: "_bmTitle_1blj3_1102",
-	bmNote: "_bmNote_1blj3_1103",
-	bmNoteInput: "_bmNoteInput_1blj3_1104",
-	bmActions: "_bmActions_1blj3_1105",
-	bmEmpty: "_bmEmpty_1blj3_1108",
-	readRest: "_readRest_1blj3_1115",
-	followingOpen: "_followingOpen_1blj3_1132",
-	followingTitle: "_followingTitle_1blj3_1141",
-	followingText: "_followingText_1blj3_1163",
-	followingMore: "_followingMore_1blj3_1164"
+	overlay: "_overlay_1fb9f_4",
+	open: "_open_1fb9f_16",
+	panel: "_panel_1fb9f_30",
+	minimized: "_minimized_1fb9f_67",
+	wide: "_wide_1fb9f_74",
+	full: "_full_1fb9f_79",
+	tb: "_tb_1fb9f_92",
+	growBtn: "_growBtn_1fb9f_92",
+	toolbar: "_toolbar_1fb9f_107",
+	dragGrip: "_dragGrip_1fb9f_124",
+	windowControls: "_windowControls_1fb9f_132",
+	restorePill: "_restorePill_1fb9f_138",
+	popIn: "_popIn_1fb9f_1",
+	pillIcon: "_pillIcon_1fb9f_167",
+	pillLabel: "_pillLabel_1fb9f_171",
+	pillTitle: "_pillTitle_1fb9f_177",
+	pillAuthor: "_pillAuthor_1fb9f_187",
+	pillAction: "_pillAction_1fb9f_193",
+	toolbarGroup: "_toolbarGroup_1fb9f_208",
+	ttsMount: "_ttsMount_1fb9f_217",
+	toolbarSeparator: "_toolbarSeparator_1fb9f_229",
+	toolbarSpacer: "_toolbarSpacer_1fb9f_236",
+	closeX: "_closeX_1fb9f_276",
+	navItem: "_navItem_1fb9f_277",
+	tbLabeled: "_tbLabeled_1fb9f_283",
+	tbText: "_tbText_1fb9f_289",
+	active: "_active_1fb9f_295",
+	copied: "_copied_1fb9f_300",
+	tbTooltip: "_tbTooltip_1fb9f_332",
+	syndLink: "_syndLink_1fb9f_354",
+	canonical: "_canonical_1fb9f_372",
+	progress: "_progress_1fb9f_388",
+	progressFill: "_progressFill_1fb9f_397",
+	progressSide: "_progressSide_1fb9f_404",
+	frontmatterPanel: "_frontmatterPanel_1fb9f_422",
+	fmRow: "_fmRow_1fb9f_436",
+	fmLabel: "_fmLabel_1fb9f_443",
+	fmValue: "_fmValue_1fb9f_452",
+	fmTag: "_fmTag_1fb9f_456",
+	fmUntagged: "_fmUntagged_1fb9f_467",
+	fmSyndLink: "_fmSyndLink_1fb9f_474",
+	body: "_body_1fb9f_484",
+	articleHeader: "_articleHeader_1fb9f_578",
+	articleKicker: "_articleKicker_1fb9f_582",
+	articleTitle: "_articleTitle_1fb9f_590",
+	articleByline: "_articleByline_1fb9f_598",
+	articleMeta: "_articleMeta_1fb9f_613",
+	sourcePill: "_sourcePill_1fb9f_621",
+	offscreen: "_offscreen_1fb9f_627",
+	sourcePillPopover: "_sourcePillPopover_1fb9f_638",
+	rightsLine: "_rightsLine_1fb9f_646",
+	copyToast: "_copyToast_1fb9f_655",
+	show: "_show_1fb9f_671",
+	bookmarkRibbon: "_bookmarkRibbon_1fb9f_547",
+	ribbonTooltip: "_ribbonTooltip_1fb9f_699",
+	inlineNoteForm: "_inlineNoteForm_1fb9f_725",
+	inlineNoteInput: "_inlineNoteInput_1fb9f_731",
+	marksPanel: "_marksPanel_1fb9f_747",
+	marksHeader: "_marksHeader_1fb9f_756",
+	marksList: "_marksList_1fb9f_768",
+	markItem: "_markItem_1fb9f_774",
+	markBody: "_markBody_1fb9f_791",
+	markQuote: "_markQuote_1fb9f_797",
+	markNote: "_markNote_1fb9f_804",
+	markNoteEmpty: "_markNoteEmpty_1fb9f_813",
+	markNoteInput: "_markNoteInput_1fb9f_818",
+	markActions: "_markActions_1fb9f_830",
+	markBtn: "_markBtn_1fb9f_837",
+	markBtnDanger: "_markBtnDanger_1fb9f_857",
+	marksListPanel: "_marksListPanel_1fb9f_863",
+	inlineNotePanel: "_inlineNotePanel_1fb9f_873",
+	noteInput: "_noteInput_1fb9f_879",
+	marksLegend: "_marksLegend_1fb9f_895",
+	markMain: "_markMain_1fb9f_907",
+	markTitle: "_markTitle_1fb9f_912",
+	noMarks: "_noMarks_1fb9f_938",
+	following: "_following_1fb9f_982",
+	navTop: "_navTop_1fb9f_1039",
+	navBottom: "_navBottom_1fb9f_1040",
+	navSide: "_navSide_1fb9f_1048",
+	navSideNext: "_navSideNext_1fb9f_1049",
+	navNext: "_navNext_1fb9f_1068",
+	navLine: "_navLine_1fb9f_1069",
+	navArrow: "_navArrow_1fb9f_1070",
+	navTitle: "_navTitle_1fb9f_1071",
+	navLocked: "_navLocked_1fb9f_1076",
+	navStatus: "_navStatus_1fb9f_1078",
+	turnOut_next: "_turnOut_next_1fb9f_1086",
+	ppTurnOutNext: "_ppTurnOutNext_1fb9f_1",
+	turnOut_prev: "_turnOut_prev_1fb9f_1087",
+	ppTurnOutPrev: "_ppTurnOutPrev_1fb9f_1",
+	turnIn_next: "_turnIn_next_1fb9f_1088",
+	ppTurnInNext: "_ppTurnInNext_1fb9f_1",
+	turnIn_prev: "_turnIn_prev_1fb9f_1089",
+	ppTurnInPrev: "_ppTurnInPrev_1fb9f_1",
+	notYet: "_notYet_1fb9f_1099",
+	notYetTitle: "_notYetTitle_1fb9f_1106",
+	notYetStatus: "_notYetStatus_1fb9f_1107",
+	bmList: "_bmList_1fb9f_1135",
+	bmRow: "_bmRow_1fb9f_1147",
+	bmMain: "_bmMain_1fb9f_1148",
+	bmTitle: "_bmTitle_1fb9f_1149",
+	bmNote: "_bmNote_1fb9f_1150",
+	bmNoteInput: "_bmNoteInput_1fb9f_1151",
+	bmActions: "_bmActions_1fb9f_1152",
+	bmEmpty: "_bmEmpty_1fb9f_1155",
+	readRest: "_readRest_1fb9f_1162",
+	followingOpen: "_followingOpen_1fb9f_1179",
+	followingTitle: "_followingTitle_1fb9f_1188",
+	followingText: "_followingText_1fb9f_1210",
+	followingMore: "_followingMore_1fb9f_1211"
 }, al = /* @__PURE__ */ o(((e, t) => {
 	function n(e) {
 		return typeof e == "string" ? e.toLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ").trim() : "";
