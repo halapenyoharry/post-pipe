@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styles from './Settings.module.css';
 import { readerFonts } from '../../lib/readerSettings';
+import { wordsChoice } from '../../lib/readerWords';
 import { TTSSettings } from '../TTS/TTS';
 import { config as todConfig } from '../../lib/timeOfDay';
 import { THEMES, themeName } from '../../lib/theme';
@@ -100,6 +101,18 @@ const SIZES = [
   { id: 'm', label: 'M', title: 'Medium text' },
   { id: 'l', label: 'L', title: 'Large text' },
   { id: 'xl', label: 'XL', title: 'Extra large text' },
+];
+
+// How much of each card the reader shows before the next (the reading aid
+// 'words', src/lib/readerWords.js). The row's label, these labels and their
+// titles are provisional: Harold's to keep or replace.
+const WORDS = [
+  { id: 50, label: '50', title: 'About 50 words of each card, then the next' },
+  { id: 100, label: '100', title: 'About 100 words of each card, then the next' },
+  { id: 250, label: '250', title: 'About 250 words of each card, then the next' },
+  { id: 500, label: '500', title: 'About 500 words of each card, then the next' },
+  { id: 'whole', label: 'Whole', title: 'Each card whole, then the next' },
+  { id: 'one', label: 'One at a time', title: 'One card at a time, as before' },
 ];
 
 // One switch: its name, its state, and a line saying what it does.
@@ -745,6 +758,15 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
         </div>
       ))}
       <Choice label="Size" name="size" options={SIZES} value={size} onChange={(v) => viewState.setReaderAid('size', v)} />
+      {/* Words before the next (provisional label): the reader's own choice,
+          else the site's reader.words, else 100. */}
+      <Choice
+        label="Words before the next"
+        name="words"
+        options={WORDS}
+        value={wordsChoice(S, viewState.readerAid ? viewState.readerAid('words') : null)}
+        onChange={(v) => viewState.setReaderAid && viewState.setReaderAid('words', v)}
+      />
       <div className={styles.choiceRow}>
         <span className={styles.rowLabel}>Paragraphs</span>
         <span className={styles.choices}>

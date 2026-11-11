@@ -210,6 +210,11 @@ export function TTS({ targetRef }) {
     // Paused, wherever it was paused (the reader, or a card): read on.
     // Otherwise the reader's text, from its start.
     if (state === 'paused' && T.resume) { T.resume(); return; }
+    // Said before the voice takes the text, so whoever draws it can make it
+    // whole first: the reader, when it shows the open card cut at a number of
+    // words (ReaderPanel, Words before the next), shows all of it. Listeners
+    // run before dispatchEvent returns.
+    window.dispatchEvent(new CustomEvent('postpipe:voice-before-play', { detail: { container: targetRef.current } }));
     T.play(targetRef.current, { scrollContainer: targetRef.current });
   };
 

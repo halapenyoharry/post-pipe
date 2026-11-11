@@ -453,6 +453,48 @@ test('reading aids default off, persist, and keep a font name', async () => {
   assert.strictEqual(b.readerAid('font'), 'opendyslexic');
 });
 
+test("viewState's own list of word choices is readerWords' list (the page has no require, so viewState writes it out)", () => {
+  const { READER_WORDS } = require('../src/lib/viewState');
+  const { WORDS_CHOICES } = require('../src/lib/readerWords');
+  assert.deepStrictEqual(READER_WORDS, WORDS_CHOICES);
+});
+
+test('viewState.js runs as a plain script, as generate-index.js puts it in the page: no require', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '../src/lib/viewState.js'), 'utf8').replace(/module\.exports[\s\S]*?};/, '');
+  assert.doesNotMatch(src, /\brequire\s*\(/);
+});
+
+test("the reading aid 'words' is null until chosen, keeps a choice across visits, and clears", async () => {
+  const backend = memoryBackend();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
+  assert.strictEqual(a.readerAid('words'), null);
+  a.setReaderAid('words', 250);
+  assert.strictEqual(a.readerAid('words'), 250);
+  a.setReaderAid('words', 'one');
+  await a.flush();
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  assert.strictEqual(b.readerAid('words'), 'one');
+  // Anything not a choice clears it, as null does.
+  b.setReaderAid('words', 'lots');
+  assert.strictEqual(b.readerAid('words'), null);
+  b.setReaderAid('words', 'whole');
+  assert.strictEqual(b.readerAid('words'), 'whole');
+  b.setReaderAid('words', null);
+  assert.strictEqual(b.readerAid('words'), null);
+  assert.ok(!('words' in b.state.readerAids));
+  // A stored value that is not a choice reads as unset.
+  const c = mk({ backend: memoryBackend({ ...b.state, readerAids: { words: 120 } }), corpusId: 'c' });
+  await c.ready();
+  assert.strictEqual(c.readerAid('words'), null);
+  // The other aids are as they were.
+  assert.strictEqual(b.readerAid('size'), 'm');
+  assert.strictEqual(b.readerAid('followAlong'), false);
+});
+
 test('the text size and view preferences persist', async () => {
   const backend = memoryBackend();
   const a = mk({ backend, corpusId: 'c' });

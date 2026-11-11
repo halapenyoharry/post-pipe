@@ -19,7 +19,8 @@
 // here moves anything in the graph.
 //
 // Apart from the order, hiddenInGraph names the source a card is hidden with
-// in the graph, with flows or without: the reader says so.
+// in the graph, with flows or without, and readerSourcePill gives the pill the
+// reader shows for the open card's source, on every site.
 
 const { topBarConfig, resolvePages } = require('./topBar');
 
@@ -73,18 +74,25 @@ function flowNav(feed, settings, pref) {
   return { order: flow.order, skip: new Set(pages.map((p) => p.item.id)) };
 }
 
+// The source stamp a card carries: its own _source, else its feed item's (a
+// graph node carries the item as originalItem).
+function sourceOf(item) {
+  return (item && (item._source || (item.originalItem && item.originalItem._source))) || null;
+}
+
 // Whether the graph is hiding a card: the visitor has turned its source's pill
 // off in the top bar (hiddenSources, as viewState keeps them: an array of
 // source ids, or a Set). Gives { id, title } of that source ('' when it has no
 // title), else null: no item, no source (its _source, or its originalItem's,
 // as a graph node carries it) or a source that is showing. The reading order
 // does not change for such a card: the book, Next, Previous, the arrow keys
-// and the swipes visit it as any other, and the reader says it is hidden in
-// the graph. The owner's decision (2026-11-08): "if they are part of the graph
+// and the swipes visit it as any other, and the reader shows the source's own
+// pill in its off look. The owner's decisions: "if they are part of the graph
 // they should show up in the flow, or this early version. with indication
-// they are hidden in graph."
+// they are hidden in graph." (2026-11-08); "you show the source show that it
+// is off in the graph with the same pill" (2026-11-09).
 function hiddenInGraph(item, hiddenSources) {
-  const source = item && (item._source || (item.originalItem && item.originalItem._source));
+  const source = sourceOf(item);
   if (!source || source.id === undefined || source.id === null) return null;
   const hidden = hiddenSources instanceof Set
     ? hiddenSources.has(source.id)
@@ -93,12 +101,37 @@ function hiddenInGraph(item, hiddenSources) {
   return { id: source.id, title: typeof source.title === 'string' ? source.title.trim() : '' };
 }
 
-// The line the reader draws for a card hidden in the graph, after its date and
-// reading time; nothing for a card that is not. The wording is provisional:
-// the owner names things, and this is the one place it changes.
-function hiddenInGraphLine(hidden) {
-  if (!hidden) return '';
-  return hidden.title ? `hidden in the graph: ${hidden.title}'s pill is off` : 'hidden in the graph';
+// What a screen reader hears before the pill while the card is hidden in the
+// graph. No visible words. The owner, 2026-11-10: '"hidden in graph" is fine.'
+const HIDDEN_IN_GRAPH = 'hidden in the graph';
+
+// The source pill the reader draws under the byline and date: the top bar's
+// own pill for the open card's source (FeedPill), in the look the source has
+// there: on while it shows in the graph, off while the visitor has hidden it.
+// It shows for every card that carries a source stamp, whichever look the
+// source has, and stays through a tap on it, which only changes its look. The
+// pill names where the piece came from; the byline is left to the piece's
+// author (src/lib/byline.js). The owner, 2026-11-10: "so the pill that is
+// shown in the graph view should be the source in the reader view and it
+// should show up just like it does in the graph view the by line should be
+// reserved for the author of the piece if provided."
+//
+// Just like the graph view: a site whose top bar shows no source pills
+// (topBar.showSourcePills false, as epicofelinorjones.com sets) shows none in
+// the reader either; settings is the site's, and without it the top bar's
+// default (pills shown) holds.
+//
+// Gives { source, hidden }: source the feed's own entry for it (from sources,
+// the feed's _sources, which the top bar draws), else the card's stamp;
+// hidden whether the graph hides it. Null for no card, a card with no source
+// stamp or a stamp with no id, or a site whose top bar shows no source pills.
+function readerSourcePill(item, hiddenSources, sources, settings) {
+  if (!topBarConfig(settings).showSourcePills) return null;
+  const stamp = sourceOf(item);
+  if (!stamp || stamp.id === undefined || stamp.id === null) return null;
+  const hidden = hiddenInGraph(item, hiddenSources) !== null;
+  const entry = Array.isArray(sources) ? sources.find((s) => s && s.id === stamp.id) : null;
+  return { source: entry || stamp, hidden };
 }
 
-module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, hiddenInGraphLine };
+module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, HIDDEN_IN_GRAPH, readerSourcePill };

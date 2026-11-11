@@ -16,6 +16,13 @@
 //   grows forever for items that no longer exist. prune() keeps that finite
 //   without discarding state for anything currently present.
 
+// The choices for the reading aid 'words' (provisional), the same list as
+// src/lib/readerWords.js WORDS_CHOICES (a test holds them equal). Written out
+// here, not required: generate-index.js copies this file into the page as a
+// plain script, where there is no require.
+const READER_WORDS = [50, 100, 250, 500, 'whole', 'one'];
+const isWordsChoice = (v) => READER_WORDS.includes(v);
+
 const VERSION = 1;
 
 // Every key the engine writes to a browser's storage starts with this, so
@@ -81,7 +88,7 @@ function emptyState(corpusId, layoutVersion) {
     colorProfileId: null, // which preset (if any) graphColors currently matches
     paragraphIndent: false,
     paragraphSpace: true,
-    readerAids: {},    // reading aids the reader turned on: followAlong, boldStart, font, size
+    readerAids: {},    // reading aids the reader chose: followAlong, boldStart, font, size, words
     prefs: {},         // how the page looks: theme, mode, timeOfDay
     nodes: {},      // id -> { x, y, w, h, pinned, t }
     containers: {}, // id -> 'open' | 'closed' (reader's choice; absent means the site's default)
@@ -633,15 +640,25 @@ function createViewState(opts = {}) {
     // (a highlighter that follows the finger), boldStart (bold word
     // beginnings), font ('default' or another face the page ships).
     // size: the reader's text size, 'm' unless chosen ('s', 'm', 'l', 'xl').
+    // words (provisional): how much of each card the reader shows before the
+    // next (src/lib/readerWords.js: 50, 100, 250, 500, 'whole' or 'one'),
+    // null unless chosen, when the site's reader.words or the engine's 100
+    // holds; setting null, or anything not a choice, clears it.
     readerAid(key) {
       const aids = state.readerAids || {};
       if (key === 'font') return typeof aids.font === 'string' ? aids.font : 'default';
       if (key === 'size') return typeof aids.size === 'string' ? aids.size : 'm';
+      if (key === 'words') return isWordsChoice(aids.words) ? aids.words : null;
       return aids[key] === true;
     },
     setReaderAid(key, value) {
       update((s) => {
         if (!s.readerAids || typeof s.readerAids !== 'object') s.readerAids = {};
+        if (key === 'words') {
+          if (isWordsChoice(value)) s.readerAids.words = value;
+          else delete s.readerAids.words;
+          return;
+        }
         s.readerAids[key] = key === 'font' ? String(value || 'default')
           : key === 'size' ? String(value || 'm') : Boolean(value);
       });
@@ -794,6 +811,7 @@ function createViewState(opts = {}) {
 }
 
 module.exports = {
+  READER_WORDS,
   STORAGE_PREFIX,
   forgetStorage,
   createViewState,

@@ -303,7 +303,11 @@ function FolderPill({ group, allHidden, onToggle, showCount }) {
   );
 }
 
-function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge }) {
+// A source's pill. The top bar draws one per source; the reader draws the
+// same pill for the open card's source, on or off as the top bar's is
+// (ReaderPanel, src/lib/readingOrder.js readerSourcePill), passing
+// popoverClassName so the popover shows over the reader.
+export function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge, popoverClassName = '' }) {
   const title = source.title || source.id;
   const status = sourceStatus(source);
   const failed = Boolean(status && status.kind === 'failed');
@@ -352,6 +356,7 @@ function FeedPill({ source, hidden, onToggle, viewState, showCount, staleAge }) 
           action={action}
           lines={lines}
           handlers={popover.popoverHandlers}
+          className={popoverClassName}
         />
       )}
     </>
@@ -481,7 +486,7 @@ function usePillPopover(enabled, pillRef, popoverRef) {
 // its aria-label, one string of whole sentences: what a tap does (as the
 // pill's title says), then each line, each ending in a full stop, so they
 // are read as sentences whether or not the popover is drawn.
-function SourcePopover({ id, popoverRef, anchorRef, open, action, lines, handlers }) {
+function SourcePopover({ id, popoverRef, anchorRef, open, action, lines, handlers, className = '' }) {
   useLayoutEffect(() => {
     if (!open) return undefined;
     const place = () => {
@@ -505,7 +510,7 @@ function SourcePopover({ id, popoverRef, anchorRef, open, action, lines, handler
       id={id}
       role="tooltip"
       aria-label={[action, ...lines].map((t) => `${t}.`).join(' ')}
-      className={styles.popover}
+      className={className ? `${styles.popover} ${className}` : styles.popover}
       hidden={!open}
       data-source-popover
       {...handlers}
