@@ -17,11 +17,18 @@
 //   without discarding state for anything currently present.
 
 // The choices for the reading aid 'words' (provisional), the same list as
-// src/lib/readerWords.js WORDS_CHOICES (a test holds them equal). Written out
-// here, not required: generate-index.js copies this file into the page as a
-// plain script, where there is no require.
-const READER_WORDS = [50, 100, 250, 500, 'whole', 'one'];
+// src/lib/readerWords.js WORDS_CHOICES, and the values no longer offered with
+// the choice each now means, as its RETIRED_WORDS (a test holds both equal):
+// 'one', one card at a time, offered 2026-11-10 to 2026-11-11, reads as
+// 'whole', every card being one at a time now. Written out here, not
+// required: generate-index.js copies this file into the page as a plain
+// script, where there is no require.
+const READER_WORDS = [50, 100, 250, 500, 'whole'];
+const READER_WORDS_RETIRED = { one: 'whole' };
 const isWordsChoice = (v) => READER_WORDS.includes(v);
+const wordsValue = (v) => (isWordsChoice(v) ? v
+  : typeof v === 'string' && Object.prototype.hasOwnProperty.call(READER_WORDS_RETIRED, v) ? READER_WORDS_RETIRED[v]
+    : null);
 
 const VERSION = 1;
 
@@ -640,22 +647,24 @@ function createViewState(opts = {}) {
     // (a highlighter that follows the finger), boldStart (bold word
     // beginnings), font ('default' or another face the page ships).
     // size: the reader's text size, 'm' unless chosen ('s', 'm', 'l', 'xl').
-    // words (provisional): how much of each card the reader shows before the
-    // next (src/lib/readerWords.js: 50, 100, 250, 500, 'whole' or 'one'),
-    // null unless chosen, when the site's reader.words or the engine's 100
+    // words (provisional): how much of the open card the reader shows
+    // before read the rest (src/lib/readerWords.js: 50, 100, 250, 500 or
+    // 'whole'; a stored or given 'one' reads and is kept as 'whole'), null
+    // unless chosen, when the site's reader.words or the engine's 100
     // holds; setting null, or anything not a choice, clears it.
     readerAid(key) {
       const aids = state.readerAids || {};
       if (key === 'font') return typeof aids.font === 'string' ? aids.font : 'default';
       if (key === 'size') return typeof aids.size === 'string' ? aids.size : 'm';
-      if (key === 'words') return isWordsChoice(aids.words) ? aids.words : null;
+      if (key === 'words') return wordsValue(aids.words);
       return aids[key] === true;
     },
     setReaderAid(key, value) {
       update((s) => {
         if (!s.readerAids || typeof s.readerAids !== 'object') s.readerAids = {};
         if (key === 'words') {
-          if (isWordsChoice(value)) s.readerAids.words = value;
+          const w = wordsValue(value);
+          if (w !== null) s.readerAids.words = w;
           else delete s.readerAids.words;
           return;
         }
@@ -812,6 +821,7 @@ function createViewState(opts = {}) {
 
 module.exports = {
   READER_WORDS,
+  READER_WORDS_RETIRED,
   STORAGE_PREFIX,
   forgetStorage,
   createViewState,

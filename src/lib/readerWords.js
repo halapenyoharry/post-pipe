@@ -1,17 +1,22 @@
-// readerWords.js — how much of each card the reader shows before the next
-// one, as it scrolls. Harold, 2026-11-10: "also the user should have the
-// option, in reader view, or flow, to choose how much text they want to see
-// as they scroll. by default they should see about 100 words before they see
-// the next thing."
+// readerWords.js — how much of the open card the reader shows at first.
+// Harold, 2026-11-10: "also the user should have the option, in reader view,
+// or flow, to choose how much text they want to see as they scroll. by
+// default they should see about 100 words before they see the next thing."
+// Since 2026-11-11 the reader shows one card at a time and nothing follows
+// beneath it ("For reading: one card fills the screen."), so the choice is
+// how much of that card shows before "read the rest".
 //
 // The choice (the reading aid 'words', and the site's reader.words, both
 // provisional):
 //
-//   50, 100, 250, 500  each card shows about that many words, then the next
-//                      card follows beneath it in the same scroll;
-//   'whole'            each card shows whole, and the next follows it, whole;
-//   'one'              one card at a time, the reader as it was before: the
-//                      open card whole, no cards beneath it.
+//   50, 100, 250, 500  the card shows about that many words, then read the
+//                      rest, which shows it whole in place;
+//   'whole'            the card shows whole.
+//
+// 'one' (one card at a time, a choice from 2026-11-10 to 2026-11-11) is no
+// longer offered, every card being one at a time now; a reader's device or a
+// site that still holds it reads it as 'whole' (RETIRED_WORDS), which is
+// what it showed.
 //
 // The reader's own choice wins, then the site's, then 100.
 //
@@ -25,18 +30,12 @@
 // of N), nothing is cut. The counting and the sentence ends are pure, on
 // strings (planCut, sentenceEnd); excerptHtml applies them to HTML with a
 // DOM Range, so an element the cut passes through stays well formed.
-//
-// The cards beneath the open one are the cards Next would visit in turn
-// (followingCards, through readerNav's step), and, at the end, one that
-// cannot be read yet, shown by its title and status as the nav row shows it.
 
-const { step, neighbours, isReadable } = require('./readerNav');
-
-const WORDS_CHOICES = [50, 100, 250, 500, 'whole', 'one'];
+const WORDS_CHOICES = [50, 100, 250, 500, 'whole'];
 const DEFAULT_WORDS = 100;
 
-// How many following cards the reader adds at a time.
-const FOLLOW_STEP = 5;
+// Values once offered and no longer, read as the choice they now mean.
+const RETIRED_WORDS = { one: 'whole' };
 
 // Nothing is cut when fewer words than this would be left, or fewer than
 // this share of N.
@@ -47,17 +46,25 @@ function isWordsChoice(v) {
   return WORDS_CHOICES.includes(v);
 }
 
+// A stored or written value as a choice: itself when it is one, the choice
+// a retired value now means ('one' → 'whole'), else null.
+function wordsValue(v) {
+  if (isWordsChoice(v)) return v;
+  if (typeof v === 'string' && Object.prototype.hasOwnProperty.call(RETIRED_WORDS, v)) return RETIRED_WORDS[v];
+  return null;
+}
+
 // settings.reader.words (provisional): the site's choice, else null.
 function siteWords(settings) {
-  const v = settings && settings.reader && settings.reader.words;
-  return isWordsChoice(v) ? v : null;
+  return wordsValue(settings && settings.reader && settings.reader.words);
 }
 
 // The choice in force: the reader's own (aid, the reading aid 'words' from
 // viewState) when it is one of the choices, else the site's when it is one,
-// else 100.
+// else 100. A retired value counts as the choice it now means.
 function wordsChoice(settings, aid) {
-  if (isWordsChoice(aid)) return aid;
+  const own = wordsValue(aid);
+  if (own !== null) return own;
   const site = siteWords(settings);
   return site !== null ? site : DEFAULT_WORDS;
 }
@@ -250,18 +257,13 @@ function excerptHtml(html, n, doc) {
   }
 }
 
-// Images that load only as they come near the screen (a following card's).
-function lazyImages(html) {
-  return String(html || '').replace(/<img\b(?![^>]*\bloading\s*=)/gi, '<img loading="lazy"');
-}
-
 // ── The open card's progress ────────────────────────────────────────────────
 
-// How far through the open card the reader is, 0..1, in a choice that is a
-// scroll: the card is measured alone, from the top of its header (start) to
-// the end of its text (end), in the scroll's own coordinates, as the whole
-// scroll is measured when the reader shows one card at a time: 0 at its top,
-// 1 once its end is in view, 1 for a card shorter than the view.
+// How far through the open card the reader is, 0..1: the card is measured
+// from the top of its header (start) to the end of its text (end), in the
+// reader's scroll's own coordinates, so the nav row, the rights line and
+// anything else drawn around the text count for nothing: 0 at its top, 1
+// once its end is in view, 1 for a card shorter than the view.
 function cardProgress({ scrollTop, clientHeight, start, end }) {
   const room = (end - start) - clientHeight;
   if (!(room > 0)) return 1;
@@ -276,37 +278,10 @@ function cardScrollFor(at, { clientHeight, start, end }) {
   return start + at * room;
 }
 
-// ── The cards beneath ───────────────────────────────────────────────────────
-
-// The cards Next would visit in turn from the card id, up to count: step()
-// from id, then from that card, and so on, stopping at a card already listed.
-// Where Next has nowhere to go but the nav row shows a card that cannot be
-// read yet, that card ends the list. opts as for readerNav (a flow's order).
-function followingCards(feed, id, opts, count = FOLLOW_STEP) {
-  const out = [];
-  const seen = new Set([id]);
-  let at = id;
-  while (out.length < count) {
-    const item = step(feed, at, 'next', opts);
-    if (item) {
-      if (seen.has(item.id)) break;
-      seen.add(item.id);
-      out.push(item);
-      at = item.id;
-      continue;
-    }
-    const locked = neighbours(feed, at, opts).next.find((it) => !isReadable(it) && !seen.has(it.id));
-    if (locked) out.push(locked);
-    break;
-  }
-  return out;
-}
-
 module.exports = {
-  WORDS_CHOICES, DEFAULT_WORDS, FOLLOW_STEP,
-  isWordsChoice, siteWords, wordsChoice,
+  WORDS_CHOICES, DEFAULT_WORDS, RETIRED_WORDS,
+  isWordsChoice, wordsValue, siteWords, wordsChoice,
   wordSpans, countWords, sentenceEnd, planCut, excerptText,
-  cutElement, excerptHtml, lazyImages,
+  cutElement, excerptHtml,
   cardProgress, cardScrollFor,
-  followingCards,
 };

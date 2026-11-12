@@ -22,7 +22,7 @@ import { nonTagReferences } from '../../corpus/buildEdges';
 import { tagReferences } from '../../lib/tagReferences';
 import { untaggedBecauseOf } from '../../lib/untaggedBecause';
 import { wrapText, provenanceLines } from '../../lib/provenance';
-import { wordsChoice, excerptHtml, followingCards, lazyImages, cardProgress, cardScrollFor, FOLLOW_STEP } from '../../lib/readerWords';
+import { wordsChoice, excerptHtml, cardProgress, cardScrollFor } from '../../lib/readerWords';
 
 // The words of the reader's own buttons for a cut card (provisional, Harold's
 // to keep or replace).
@@ -58,16 +58,12 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const [turnIn, setTurnIn] = useState(null);
   const turnTimers = useRef([]);
 
-  // How much of each card shows before the next (Settings → Reading, Words
-  // before the next, provisional; src/lib/readerWords.js): a number of
-  // words, 'whole', or 'one', one card at a time as the reader always was.
-  // In every choice but 'one' the reader is a scroll: the open card, then
-  // the cards Next would visit, one under another.
+  // The reader shows one card, the open one; nothing follows beneath it
+  // (Harold, 2026-11-11). How much of it shows at first (Settings →
+  // Reading, Words before the next, provisional; src/lib/readerWords.js):
+  // about a number of words, with "read the rest", or the whole card.
   const words = wordsChoice(settings, viewState && viewState.readerAid ? viewState.readerAid('words') : null);
-  const scrollMode = words !== 'one';
   const cutAt = typeof words === 'number' ? words : null;
-  const scrollModeRef = useRef(scrollMode);
-  scrollModeRef.current = scrollMode;
   // Whether the open card's text (contentHtml) shows whole for now, though
   // the choice cuts it: set with the text when it arrives (from wholeNext,
   // decided as the card opens), and by "read the rest", the voice, a jump
@@ -76,17 +72,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const wholeNext = useRef(false);
   // The card whose text contentHtml holds (its persistent id).
   const contentFor = useRef(null);
-  // A card opened from one of the cards beneath opens whole: its id.
-  const openWholeRef = useRef(null);
   // Whether the open card shows an excerpt now (set as it is drawn).
   const cutRef = useRef(false);
   // The scroll to keep while the open card's text grows in place.
   const keepScroll = useRef(null);
-  // How many of the cards beneath to list, and a tick each time one's text
-  // arrives, so the sentinel can ask for more.
-  const [followCount, setFollowCount] = useState(FOLLOW_STEP);
-  const [followTick, setFollowTick] = useState(0);
-  const moreRef = useRef(null);
   const headerRef = useRef(null);
   const articleRef = useRef(article);
   articleRef.current = article;
@@ -101,16 +90,13 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       setTurnOut(null);
       if (bodyRef.current) bodyRef.current.scrollTop = 0;
       setScrollProgress(0);
-      // Whole for now: opened from a card beneath, at a paragraph, or at a
-      // place partway through that the reader is put back at.
+      // Whole for now: opened at a paragraph, or at a place partway through
+      // that the reader is put back at.
       const id = getPersistentId(article);
       const progress = viewState && viewState.readingProgress ? viewState.readingProgress(id) : null;
       const toPlace = targetParagraph !== undefined && targetParagraph !== null;
       const partway = !!progress && progress.at > 0.02 && progress.at < 0.98;
-      const fromBelow = openWholeRef.current !== null && openWholeRef.current === article.id;
-      openWholeRef.current = null;
-      wholeNext.current = toPlace || partway || fromBelow;
-      setFollowCount(FOLLOW_STEP);
+      wholeNext.current = toPlace || partway;
       fetchContent(article);
     } else {
       setIsOpen(false);
@@ -136,8 +122,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // words of it unless it shows whole for now (excerptHtml, null when nothing
   // is cut); contentHtml stays the text whole.
   const excerpt = useMemo(
-    () => (scrollMode && cutAt && contentHtml && !shownWhole ? excerptHtml(contentHtml, cutAt) : null),
-    [scrollMode, cutAt, contentHtml, shownWhole],
+    () => (cutAt && contentHtml && !shownWhole ? excerptHtml(contentHtml, cutAt) : null),
+    [cutAt, contentHtml, shownWhole],
   );
   const cut = !!excerpt;
   cutRef.current = cut;
@@ -182,9 +168,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     window.removeEventListener('mouseup', handleToolbarMouseUp);
   };
 
-  // The open card's text, from the loader the cards beneath use too
-  // (itemHtml, below). Text that is at hand is set at once; a page that has
-  // to be fetched is set when it arrives.
+  // The open card's text (itemHtml, below). Text that is at hand is set at
+  // once; a page that has to be fetched is set when it arrives.
   const fetchContent = (item) => {
     const arrive = (html) => {
       contentFor.current = getPersistentId(item);
@@ -201,9 +186,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // Written at most every few hundred ms while scrolling, and at once on
   // reaching the end. Only for a chapter with text.
   //
-  // In a choice that is a scroll, the open card is measured alone: from the
-  // top of its header to the end of its text (openCardSpan), never the cards
-  // beneath it; and while it shows an excerpt its progress is not kept.
+  // The card is measured from the top of its header to the end of its text
+  // (openCardSpan), so the nav row, the rights line and Contributions under
+  // it count for nothing; and while it shows an excerpt its progress is not
+  // kept.
   const saveTimer = useRef(null);
   const progressFor = useRef(null);
   const saveProgress = () => {
@@ -211,35 +197,18 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     const el = bodyRef.current;
     const id = progressFor.current;
     if (!el || !id || !viewState || !viewState.setReadingProgress) return;
-    if (scrollModeRef.current) {
-      const span = openCardSpan(el);
-      if (cutRef.current || !span) return;
-      viewState.setReadingProgress(id, openCardFraction(el, span));
-      return;
-    }
-    const room = el.scrollHeight - el.clientHeight;
-    viewState.setReadingProgress(id, room > 0 ? el.scrollTop / room : 1);
+    const span = openCardSpan(el);
+    if (cutRef.current || !span) return;
+    viewState.setReadingProgress(id, openCardFraction(el, span));
   };
   const handleScroll = () => {
-    if (bodyRef.current && scrollModeRef.current) {
-      const el = bodyRef.current;
-      const pct = openCardFraction(el, openCardSpan(el)) * 100;
-      setScrollProgress(Math.max(0, Math.min(pct, 100)));
-      if (progressFor.current && !cutRef.current) {
-        if (pct >= 98) { clearTimeout(saveTimer.current); saveProgress(); }
-        else if (!saveTimer.current) saveTimer.current = setTimeout(saveProgress, 350);
-      }
-      return;
-    }
-    if (bodyRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
-      const room = scrollHeight - clientHeight;
-      const pct = room > 0 ? (scrollTop / room) * 100 : 100;
-      setScrollProgress(Math.max(0, Math.min(pct, 100)));
-      if (progressFor.current) {
-        if (pct >= 98) { clearTimeout(saveTimer.current); saveProgress(); }
-        else if (!saveTimer.current) saveTimer.current = setTimeout(saveProgress, 350);
-      }
+    const el = bodyRef.current;
+    if (!el) return;
+    const pct = openCardFraction(el, openCardSpan(el)) * 100;
+    setScrollProgress(Math.max(0, Math.min(pct, 100)));
+    if (progressFor.current && !cutRef.current) {
+      if (pct >= 98) { clearTimeout(saveTimer.current); saveProgress(); }
+      else if (!saveTimer.current) saveTimer.current = setTimeout(saveProgress, 350);
     }
   };
   // Where the open card's header starts and its text ends, in the reader's
@@ -269,9 +238,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     }
   };
 
-  // The paragraphs counted are the open card's own text's (textRef), never
-  // the cards beneath it; no paragraph sits above that text in the reader,
-  // so the numbers are what they always were.
+  // The paragraphs counted are the open card's own text's (textRef); no
+  // paragraph sits above that text in the reader, so the numbers are what
+  // they always were.
   const findTopVisibleParagraph = () => {
     if (!bodyRef.current || !textRef.current) return null;
     const containerRect = bodyRef.current.getBoundingClientRect();
@@ -316,22 +285,19 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     }
   };
 
-  // Download: the open card only. In a choice that is a scroll the cards
-  // beneath, the nav row and the reader's own buttons are left out, and a
-  // card showing an excerpt is shown whole first, so the file holds it all.
+  // Download: the open card. The nav rows and the reader's own button are
+  // left out, and a card showing an excerpt is shown whole first, so the
+  // file holds it all.
   const handleExport = () => {
     if (!article || !bodyRef.current || !allowDownload(settings)) return;
     const licenseHeader = settings?.export?.license_header || '';
     const license = licenseHeader.replace('{{canonical_url}}', article.canonical_url || article.url);
-    let bodyText = bodyRef.current.innerText;
-    if (scrollModeRef.current) {
-      if (cutRef.current) showWholeNow();
-      bodyText = Array.from(bodyRef.current.children)
-        .filter((el) => !el.matches('[data-reader-following], [data-reader-following-more], [data-reader-rest], [data-reader-nav-row]'))
-        .map((el) => el.innerText)
-        .filter((t) => t && t.trim())
-        .join('\n\n');
-    }
+    if (cutRef.current) showWholeNow();
+    const bodyText = Array.from(bodyRef.current.children)
+      .filter((el) => !el.matches('[data-reader-rest], [data-reader-nav-row]'))
+      .map((el) => el.innerText)
+      .filter((t) => t && t.trim())
+      .join('\n\n');
     const text = `${license}\n\n---\n\n${bodyText}`;
     const blob = new Blob([text], { type: 'text/markdown' });
     const a = document.createElement('a');
@@ -354,26 +320,17 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       const el = bodyRef.current;
       if (!el) return;
       const p = viewState.readingProgress(id);
-      // A scroll: the place is in the open card alone (cardScrollFor), and
-      // a card showing an excerpt keeps no progress.
-      if (scrollModeRef.current) {
-        const span = openCardSpan(el);
-        const to = span ? cardScrollFor(p.at, { clientHeight: el.clientHeight, start: span.start, end: span.end }) : null;
-        if ((targetParagraph === undefined || targetParagraph === null) && p.at > 0.02 && p.at < 0.98 && to !== null) {
-          el.scrollTop = to;
-        }
-        progressFor.current = id;
-        handleScroll();
-        if (to === null && span && !cutRef.current) saveProgress();
-        return;
-      }
-      const room = el.scrollHeight - el.clientHeight;
-      if ((targetParagraph === undefined || targetParagraph === null) && p.at > 0.02 && p.at < 0.98 && room > 0) {
-        el.scrollTop = p.at * room;
+      // The place is in the card's own span (cardScrollFor); a card showing
+      // an excerpt keeps no progress, and one no taller than the view is
+      // read once shown.
+      const span = openCardSpan(el);
+      const to = span ? cardScrollFor(p.at, { clientHeight: el.clientHeight, start: span.start, end: span.end }) : null;
+      if ((targetParagraph === undefined || targetParagraph === null) && p.at > 0.02 && p.at < 0.98 && to !== null) {
+        el.scrollTop = to;
       }
       progressFor.current = id;
       handleScroll();
-      if (room <= 0) saveProgress();
+      if (to === null && span && !cutRef.current) saveProgress();
     }, 60);
     return () => clearTimeout(t);
   }, [contentHtml]);
@@ -480,8 +437,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   goStepRef.current = goStep;
   useEffect(() => () => turnTimers.current.forEach(clearTimeout), []);
 
-  // ── The reader as a scroll (every choice of Words before the next but
-  // 'one'; src/lib/readerWords.js) ──
+  // ── The open card cut at about a number of words (src/lib/readerWords.js) ──
 
   // Show the open card whole, in place: its text grows below where the
   // reader is, and the scroll stays where it was.
@@ -525,36 +481,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     if (!article || targetParagraph === undefined || targetParagraph === null) return;
     showWhole();
   }, [targetParagraph]);
-
-  // A card beneath, opened by its title or its "read the rest": the same page
-  // turn as Next, and it opens whole.
-  const openFollowing = (item) => {
-    if (!item || !onNavigate || !isReadable(item)) return;
-    openWholeRef.current = item.id;
-    goTo(item, 'next');
-  };
-
-  // The cards beneath: those Next would visit in turn, FOLLOW_STEP at a time;
-  // more when the sentinel after the last comes near the view, once the
-  // texts drawn so far have arrived. Only once the open card's text is in.
-  const following = useMemo(
-    () => (scrollMode && article && feedData ? followingCards(feedData, article.id, flowOpts, followCount) : []),
-    [scrollMode, article, feedData, flowOpts, followCount],
-  );
-  const moreToCome = following.length >= followCount;
-  const onFollowingLoaded = useRef(() => setFollowTick((t) => t + 1)).current;
-  useEffect(() => {
-    const el = moreRef.current;
-    const root = bodyRef.current;
-    if (!scrollMode || !el || !root || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver((entries) => {
-      if (!entries.some((en) => en.isIntersecting)) return;
-      if (root.querySelector('[data-reader-following][data-loading]')) return;
-      setFollowCount((c) => c + FOLLOW_STEP);
-    }, { root, rootMargin: '0px 0px 600px 0px' });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [scrollMode, following.length, followCount, followTick, contentHtml, article]);
 
   // Arrow keys on a keyboard: right for the next chapter, left for the one
   // before. Not while typing, and not with a modifier held.
@@ -923,7 +849,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               </div>
             </div>
           )}
-          {!scrollMode && contentHtml && navRow('bottom')}
+          {contentHtml && navRow('bottom')}
           {rights && contentHtml && (
             <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
           )}
@@ -937,22 +863,6 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               textKey={displayHtml}
               onOpenChapter={(item) => goTo(item, 'next')}
             />
-          )}
-          {scrollMode && contentHtml && following.map((item) => (
-            <FollowingCard
-              key={item.id}
-              item={item}
-              feedData={feedData}
-              settings={settings}
-              viewState={viewState}
-              cutAt={cutAt}
-              boldOn={boldOn}
-              onOpen={openFollowing}
-              onLoaded={onFollowingLoaded}
-            />
-          ))}
-          {scrollMode && contentHtml && following.length > 0 && moreToCome && (
-            <div ref={moreRef} className={styles.followingMore} aria-hidden="true" data-reader-following-more />
           )}
         </div>
       </div>
@@ -982,9 +892,8 @@ function escapeHtml(v) {
 }
 
 // The HTML the reader shows for an item, by its kind (Substrate dispatch in
-// the reader, ARCHITECTURE.md): the open card's and the cards' beneath it,
-// so theirs match. Text at hand comes back as a string; a piece's own page,
-// which has to be fetched, as a promise of one.
+// the reader, ARCHITECTURE.md). Text at hand comes back as a string; a
+// piece's own page, which has to be fetched, as a promise of one.
 function itemHtml(item, feedData) {
   const kind = item.kind || 'essay';
 
@@ -1059,104 +968,6 @@ async function fetchPage(item) {
   } catch (e) {
     return renderPlaceholder(item, 'Rendered article not yet published to GitHub Pages.');
   }
-}
-
-// One of the cards beneath the open one, in a choice that is a scroll: its
-// title (a button that opens it in the reader, whole), byline, date and
-// reading time, and source pill, as the open card's; then its text, cut at
-// about `cutAt` words (whole when cutAt is null), and "read the rest" when
-// cut, which opens it as its title does. A card that cannot be read yet
-// shows its title and status. Its text is loaded when it is drawn. The
-// whole section is no part of the open card's text: the voice reads past it
-// (data-pp-not-text), and nothing that counts the open card's paragraphs
-// looks in it.
-function FollowingCard({ item, feedData, settings, viewState, cutAt, boldOn, onOpen, onLoaded }) {
-  const readable = isReadable(item);
-  const [html, setHtml] = useState(null);
-  useEffect(() => {
-    if (!readable) return undefined;
-    let alive = true;
-    const done = (h) => { if (alive) setHtml(typeof h === 'string' ? h : ''); };
-    const out = itemHtml(item, feedData);
-    if (out && typeof out.then === 'function') out.then(done, () => done(''));
-    else done(out);
-    return () => { alive = false; };
-  }, [item, feedData, readable]);
-  useEffect(() => { if (html !== null && onLoaded) onLoaded(); }, [html]);
-
-  const excerpt = useMemo(() => (html && cutAt ? excerptHtml(html, cutAt) : null), [html, cutAt]);
-  const shown = excerpt ? excerpt.html : (html || '');
-  const display = useMemo(() => lazyImages(boldOn ? boldStartHtml(shown) : shown), [shown, boldOn]);
-  const inner = useMemo(() => ({ __html: display }), [display]);
-
-  const title = item.title || item.label;
-  if (!readable) {
-    return (
-      <section className={styles.following} data-reader-following data-pp-not-text data-reader-following-id={item.id}>
-        <h2 className={styles.followingTitle}>{title}</h2>
-        <div className={styles.navStatus} data-nav-status>{navStatus(feedData, item)}</div>
-      </section>
-    );
-  }
-
-  const header = readerHeader(settings, item);
-  const by = byline(settings, item);
-  const dateStr = item.date ? new Date(`${item.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-  const metaParts = [dateStr, item.reading_time].filter(Boolean);
-  const pill = readerSourcePill(item, viewState && viewState.state ? viewState.state.hiddenSources : null, feedData && feedData._sources, settings);
-
-  return (
-    <section
-      className={styles.following}
-      data-reader-following
-      data-pp-not-text
-      data-reader-following-id={item.id}
-      data-loading={html === null ? '' : undefined}
-    >
-      <h2 className={styles.followingTitle}>
-        <button type="button" className={styles.followingOpen} onClick={() => onOpen(item)} data-reader-following-open>
-          {title}
-        </button>
-      </h2>
-      {header.byline && by && (
-        <div className={styles.articleByline}>
-          by {by.url ? (
-            <a href={by.url} target="_blank" rel="noopener noreferrer">{by.name}</a>
-          ) : (
-            by.name
-          )}
-        </div>
-      )}
-      {metaParts.length > 0 && (
-        <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
-      )}
-      {pill && (
-        <div
-          className={styles.sourcePill}
-          data-reader-source-pill
-          data-reader-hidden-in-graph={pill.hidden ? true : undefined}
-          data-pp-not-text
-        >
-          {pill.hidden && <span className={styles.offscreen}>{HIDDEN_IN_GRAPH}</span>}
-          <FeedPill
-            source={pill.source}
-            hidden={pill.hidden}
-            onToggle={() => { if (viewState) viewState.toggleSource(pill.source.id); }}
-            viewState={viewState}
-            showCount={showContainerCount(settings && settings.graph)}
-            staleAge={!!(settings && settings.topBar && settings.topBar.staleAge === true)}
-            popoverClassName={styles.sourcePillPopover}
-          />
-        </div>
-      )}
-      <div className={styles.followingText} data-reader-following-text dangerouslySetInnerHTML={inner} />
-      {excerpt && (
-        <button type="button" className={styles.readRest} onClick={() => onOpen(item)} data-reader-rest>
-          {READ_THE_REST}
-        </button>
-      )}
-    </section>
-  );
 }
 
 // How far through the open card the reader is, 0..1 (cardProgress), given

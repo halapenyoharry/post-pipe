@@ -453,10 +453,11 @@ test('reading aids default off, persist, and keep a font name', async () => {
   assert.strictEqual(b.readerAid('font'), 'opendyslexic');
 });
 
-test("viewState's own list of word choices is readerWords' list (the page has no require, so viewState writes it out)", () => {
-  const { READER_WORDS } = require('../src/lib/viewState');
-  const { WORDS_CHOICES } = require('../src/lib/readerWords');
+test("viewState's own list of word choices is readerWords' list, and its retired values readerWords' (the page has no require, so viewState writes them out)", () => {
+  const { READER_WORDS, READER_WORDS_RETIRED } = require('../src/lib/viewState');
+  const { WORDS_CHOICES, RETIRED_WORDS } = require('../src/lib/readerWords');
   assert.deepStrictEqual(READER_WORDS, WORDS_CHOICES);
+  assert.deepStrictEqual(READER_WORDS_RETIRED, RETIRED_WORDS);
 });
 
 test('viewState.js runs as a plain script, as generate-index.js puts it in the page: no require', () => {
@@ -473,11 +474,11 @@ test("the reading aid 'words' is null until chosen, keeps a choice across visits
   assert.strictEqual(a.readerAid('words'), null);
   a.setReaderAid('words', 250);
   assert.strictEqual(a.readerAid('words'), 250);
-  a.setReaderAid('words', 'one');
+  a.setReaderAid('words', 500);
   await a.flush();
   const b = mk({ backend, corpusId: 'c' });
   await b.ready();
-  assert.strictEqual(b.readerAid('words'), 'one');
+  assert.strictEqual(b.readerAid('words'), 500);
   // Anything not a choice clears it, as null does.
   b.setReaderAid('words', 'lots');
   assert.strictEqual(b.readerAid('words'), null);
@@ -493,6 +494,20 @@ test("the reading aid 'words' is null until chosen, keeps a choice across visits
   // The other aids are as they were.
   assert.strictEqual(b.readerAid('size'), 'm');
   assert.strictEqual(b.readerAid('followAlong'), false);
+});
+
+test("a device that chose 'one', one card at a time (2026-11-10 to 2026-11-11), reads whole; 'one' given is kept as whole", async () => {
+  const fresh = mk({ backend: memoryBackend(), corpusId: 'c' });
+  await fresh.ready();
+  const stored = mk({ backend: memoryBackend({ ...fresh.state, readerAids: { words: 'one', followAlong: true } }), corpusId: 'c' });
+  await stored.ready();
+  assert.strictEqual(stored.readerAid('words'), 'whole');
+  assert.strictEqual(stored.readerAid('followAlong'), true);
+  const a = mk({ backend: memoryBackend(), corpusId: 'c' });
+  await a.ready();
+  a.setReaderAid('words', 'one');
+  assert.strictEqual(a.readerAid('words'), 'whole');
+  assert.strictEqual(a.state.readerAids.words, 'whole');
 });
 
 test('the text size and view preferences persist', async () => {

@@ -1,15 +1,16 @@
-// How much of each card the reader shows before the next (readerWords.js):
-// the choice and where it comes from, the cut at about N words on plain
-// strings, the open card's progress, and the cards beneath the open one.
+// How much of the open card the reader shows before read the rest
+// (readerWords.js): the choice and where it comes from, a retired value read
+// as the choice it now means, the cut at about N words on plain strings, and
+// the open card's progress.
 // The cut on HTML (excerptHtml) needs a DOM, which node has not; the browser
 // checks it. Plain invented sentences only.
 
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  WORDS_CHOICES, DEFAULT_WORDS, FOLLOW_STEP, isWordsChoice, siteWords, wordsChoice,
-  wordSpans, countWords, sentenceEnd, planCut, excerptText, lazyImages,
-  cardProgress, cardScrollFor, followingCards,
+  WORDS_CHOICES, DEFAULT_WORDS, RETIRED_WORDS, isWordsChoice, wordsValue, siteWords, wordsChoice,
+  wordSpans, countWords, sentenceEnd, planCut, excerptText,
+  cardProgress, cardScrollFor,
 } = require('../src/lib/readerWords');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
 
@@ -23,17 +24,30 @@ function sentences(n, per = 5) {
 // ── The choice ──────────────────────────────────────────────────────────────
 
 test('the choices, in order, and the engine default of 100', () => {
-  assert.deepStrictEqual(WORDS_CHOICES, [50, 100, 250, 500, 'whole', 'one']);
+  assert.deepStrictEqual(WORDS_CHOICES, [50, 100, 250, 500, 'whole']);
   assert.strictEqual(DEFAULT_WORDS, 100);
-  assert.strictEqual(FOLLOW_STEP, 5);
   for (const v of WORDS_CHOICES) assert.ok(isWordsChoice(v));
-  for (const v of [0, 99, '100', 'all', null, undefined, true]) assert.ok(!isWordsChoice(v));
+  for (const v of [0, 99, '100', 'all', 'one', null, undefined, true]) assert.ok(!isWordsChoice(v));
+});
+
+test("'one', one card at a time, is no longer a choice and reads as whole, from a device or a site", () => {
+  assert.deepStrictEqual(RETIRED_WORDS, { one: 'whole' });
+  assert.strictEqual(wordsValue('one'), 'whole');
+  assert.strictEqual(wordsValue(250), 250);
+  assert.strictEqual(wordsValue('whole'), 'whole');
+  for (const v of ['all', 'toString', '__proto__', 'constructor', 120, null, undefined, {}]) assert.strictEqual(wordsValue(v), null);
+  // The reader's own 'one' wins as whole, over the site's.
+  assert.strictEqual(wordsChoice({ reader: { words: 100 } }, 'one'), 'whole');
+  // A site's 'one' is whole; a reader's own choice still wins over it.
+  assert.strictEqual(siteWords({ reader: { words: 'one' } }), 'whole');
+  assert.strictEqual(wordsChoice({ reader: { words: 'one' } }, null), 'whole');
+  assert.strictEqual(wordsChoice({ reader: { words: 'one' } }, 50), 50);
 });
 
 test("the reader's choice wins, then the site's, then 100", () => {
   const site = { reader: { words: 250 } };
   assert.strictEqual(wordsChoice(site, 50), 50);
-  assert.strictEqual(wordsChoice(site, 'one'), 'one');
+  assert.strictEqual(wordsChoice(site, 'whole'), 'whole');
   assert.strictEqual(wordsChoice(site, null), 250);
   assert.strictEqual(wordsChoice({ reader: { words: 'whole' } }, undefined), 'whole');
   assert.strictEqual(wordsChoice({}, null), 100);
@@ -153,13 +167,6 @@ test('a block with no sentence end is kept whole up to its end', () => {
   assert.strictEqual(excerptText(blocks, 5), sentences(8, 100));
 });
 
-test('images in a following card load lazily, an own loading attribute kept', () => {
-  assert.strictEqual(lazyImages('<p>a</p><img src="x.png">'), '<p>a</p><img loading="lazy" src="x.png">');
-  assert.strictEqual(lazyImages('<IMG src="y.png">'), '<img loading="lazy" src="y.png">');
-  assert.strictEqual(lazyImages('<img loading="eager" src="z.png">'), '<img loading="eager" src="z.png">');
-  assert.strictEqual(lazyImages(''), '');
-});
-
 // ── The open card's progress ────────────────────────────────────────────────
 
 test("the open card's progress runs from its header's top to its text's end", () => {
@@ -168,75 +175,12 @@ test("the open card's progress runs from its header's top to its text's end", ()
   assert.strictEqual(cardProgress({ ...span, scrollTop: 40 }), 0);
   assert.strictEqual(cardProgress({ ...span, scrollTop: 790 }), 0.5);
   assert.strictEqual(cardProgress({ ...span, scrollTop: 1540 }), 1);
-  // Scrolled on into the cards beneath: still 1.
+  // Scrolled on past its text (the nav row, the rights line, Contributions): still 1.
   assert.strictEqual(cardProgress({ ...span, scrollTop: 5000 }), 1);
   // A card no taller than the view is read once shown.
   assert.strictEqual(cardProgress({ start: 40, end: 400, clientHeight: 500, scrollTop: 0 }), 1);
   assert.strictEqual(cardScrollFor(0.5, span), 790);
   assert.strictEqual(cardScrollFor(0.5, { start: 40, end: 400, clientHeight: 500 }), null);
-});
-
-// ── The cards beneath ───────────────────────────────────────────────────────
-
-const seqFeed = {
-  items: [
-    { id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }, { id: 'f' }, { id: 'g' },
-    { id: 'h', _posted: 'title' }, { id: 'i' },
-  ],
-  edges: [
-    { source: 'a', target: 'b', layer: 'sequence' },
-    { source: 'b', target: 'c', layer: 'sequence' },
-    { source: 'c', target: 'd', layer: 'sequence' },
-    { source: 'd', target: 'e', layer: 'sequence' },
-    { source: 'e', target: 'f', layer: 'sequence' },
-    { source: 'f', target: 'g', layer: 'sequence' },
-    { source: 'g', target: 'h', layer: 'sequence' },
-    { source: 'h', target: 'i', layer: 'sequence' },
-    { source: 'a', target: 'x', layer: 'tag' },
-  ],
-};
-
-test('the cards beneath are those Next visits in turn, five at a time', () => {
-  assert.deepStrictEqual(followingCards(seqFeed, 'a').map((i) => i.id), ['b', 'c', 'd', 'e', 'f']);
-  assert.deepStrictEqual(followingCards(seqFeed, 'a', undefined, 2).map((i) => i.id), ['b', 'c']);
-});
-
-test('at the end of what can be read, a card not yet readable ends the list', () => {
-  // Next from g has nowhere to go; the nav row shows h, title only.
-  assert.deepStrictEqual(followingCards(seqFeed, 'a', undefined, 10).map((i) => i.id), ['b', 'c', 'd', 'e', 'f', 'g', 'h']);
-  assert.deepStrictEqual(followingCards(seqFeed, 'g', undefined, 10).map((i) => i.id), ['h']);
-  // The last card has none.
-  assert.deepStrictEqual(followingCards(seqFeed, 'i', undefined, 10), []);
-});
-
-test('a repeat stops the list', () => {
-  const loop = {
-    items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
-    edges: [
-      { source: 'a', target: 'b', layer: 'sequence' },
-      { source: 'b', target: 'c', layer: 'sequence' },
-      { source: 'c', target: 'a', layer: 'sequence' },
-    ],
-  };
-  assert.deepStrictEqual(followingCards(loop, 'a', undefined, 10).map((i) => i.id), ['b', 'c']);
-  const self = { items: [{ id: 'a' }], edges: [{ source: 'a', target: 'a', layer: 'sequence' }] };
-  assert.deepStrictEqual(followingCards(self, 'a', undefined, 10), []);
-});
-
-test("in a flow, the cards beneath follow the order in force, passing what Next passes", () => {
-  const feed = {
-    items: [
-      { id: 'p1' }, { id: 'p2', _posted: 'title' }, { id: 'p3' }, { id: 'about' }, { id: 'p4' },
-      { id: 'link', kind: 'link', link: 'https://example.org/' }, { id: 'p5' },
-    ],
-    edges: [],
-  };
-  const opts = { order: ['p1', 'p2', 'p3', 'about', 'p4', 'link', 'p5'], skip: new Set(['about']) };
-  assert.deepStrictEqual(followingCards(feed, 'p1', opts, 10).map((i) => i.id), ['p3', 'p4', 'p5']);
-  assert.deepStrictEqual(followingCards(feed, 'p4', opts, 10).map((i) => i.id), ['p5']);
-  assert.deepStrictEqual(followingCards(feed, 'p5', opts, 10), []);
-  // A card the order does not hold has none.
-  assert.deepStrictEqual(followingCards(feed, 'nowhere', opts, 10), []);
 });
 
 // ── The reader's own choice, kept ───────────────────────────────────────────
@@ -247,8 +191,10 @@ test("the reading aid 'words' chosen in the panel wins over the site's", async (
   await vs.ready();
   const site = { reader: { words: 50 } };
   assert.strictEqual(wordsChoice(site, vs.readerAid('words')), 50);
+  vs.setReaderAid('words', 'whole');
+  assert.strictEqual(wordsChoice(site, vs.readerAid('words')), 'whole');
   vs.setReaderAid('words', 'one');
-  assert.strictEqual(wordsChoice(site, vs.readerAid('words')), 'one');
+  assert.strictEqual(wordsChoice(site, vs.readerAid('words')), 'whole');
   vs.setReaderAid('words', null);
   assert.strictEqual(wordsChoice(site, vs.readerAid('words')), 50);
   assert.strictEqual(wordsChoice({}, vs.readerAid('words')), 100);

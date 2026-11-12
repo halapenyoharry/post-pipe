@@ -50,7 +50,7 @@ A site lets its readers read its cards one after another in Flow's order (Flow i
 
 ## The reader
 
-A site's `reader` block holds the reader's switches, each with its note in `examples/site/settings.json`: `header` (a line above the title, and the byline), `progressBar`, `allowDownload`, `bookmarksList` and `fonts`. `words` (provisional, since 2026-11-10) says how much of each card the reader shows before the next as it scrolls: `50`, `100`, `250` or `500` (about that many words, to the end of a sentence, then the cards Next would visit, one under another, each cut the same way), `"whole"` (each card whole, then the next), or `"one"` (one card at a time, the reader as it was before). Absent means `100`. A visitor's own choice in the reader's panel (Reading, Words before the next, provisional) wins on their device. The details are in `ARCHITECTURE.md`, The reader as a scroll.
+A site's `reader` block holds the reader's switches, each with its note in `examples/site/settings.json`: `header` (a line above the title, and the byline), `progressBar`, `allowDownload`, `bookmarksList` and `fonts`. `words` (provisional, since 2026-11-10) says how much of the open card the reader shows at first; the reader shows one card at a time, with nothing beneath it (2026-11-11): `50`, `100`, `250` or `500` (about that many words, to the end of a sentence, with read the rest under them to show the whole card in place) or `"whole"` (the whole card). `"one"`, offered from 2026-11-10 to 2026-11-11, still works and means `"whole"`. Absent means `100`. A visitor's own choice in the reader's panel (Reading, Words before the next, provisional) wins on their device. The details are in `ARCHITECTURE.md`, The reader, one card at a time.
 
 ## Serving a build locally
 

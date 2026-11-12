@@ -103,16 +103,17 @@ const SIZES = [
   { id: 'xl', label: 'XL', title: 'Extra large text' },
 ];
 
-// How much of each card the reader shows before the next (the reading aid
-// 'words', src/lib/readerWords.js). The row's label, these labels and their
-// titles are provisional: Harold's to keep or replace.
+// How much of the open card the reader shows before read the rest (the
+// reading aid 'words', src/lib/readerWords.js). The row's label, these
+// labels and their titles are provisional: Harold's to keep or replace.
+// One at a time went on 2026-11-11, every card being one at a time now; a
+// device that chose it shows Whole pressed.
 const WORDS = [
-  { id: 50, label: '50', title: 'About 50 words of each card, then the next' },
-  { id: 100, label: '100', title: 'About 100 words of each card, then the next' },
-  { id: 250, label: '250', title: 'About 250 words of each card, then the next' },
-  { id: 500, label: '500', title: 'About 500 words of each card, then the next' },
-  { id: 'whole', label: 'Whole', title: 'Each card whole, then the next' },
-  { id: 'one', label: 'One at a time', title: 'One card at a time, as before' },
+  { id: 50, label: '50', title: 'About 50 words of the card, then read the rest' },
+  { id: 100, label: '100', title: 'About 100 words of the card, then read the rest' },
+  { id: 250, label: '250', title: 'About 250 words of the card, then read the rest' },
+  { id: 500, label: '500', title: 'About 500 words of the card, then read the rest' },
+  { id: 'whole', label: 'Whole', title: 'The whole card' },
 ];
 
 // One switch: its name, its state, and a line saying what it does.
@@ -759,7 +760,9 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
       ))}
       <Choice label="Size" name="size" options={SIZES} value={size} onChange={(v) => viewState.setReaderAid('size', v)} />
       {/* Words before the next (provisional label): the reader's own choice,
-          else the site's reader.words, else 100. */}
+          else the site's reader.words, else 100. Since 2026-11-11 nothing
+          follows the open card, so the words are those before read the
+          rest; the label is kept as it was until Harold names the row. */}
       <Choice
         label="Words before the next"
         name="words"

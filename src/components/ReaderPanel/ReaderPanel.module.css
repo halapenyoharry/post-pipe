@@ -536,15 +536,14 @@
 
 /* Pictures in the text (Harold, 2026-11-11: "They should shrink to fit
    inside the text's margins, so a reader never ends up lost in empty
-   space."). Every picture in a card's text, the open card's and the cards'
-   beneath it, sits inside the text column: never wider than the text,
-   centred, and never taller than about 55% of what the reader shows (55cqh,
-   55% of the scroll body's height, the size container above), shrunk
-   whole, never cropped. A publisher's own
+   space."). Every picture in the open card's text sits inside the text
+   column: never wider than the text, centred, and never taller than about
+   55% of what the reader shows (55cqh, 55% of the scroll body's height, the
+   size container above), shrunk whole, never cropped. A publisher's own
    margins, floats and offsets give way (inline ones too, hence !important).
    An iframe keeps its own height (it has no shape to keep), capped the same.
    The bookmark's mark, drawn into a paragraph, is no picture. */
-.body :is([data-reader-text], [data-reader-following-text]) :is(img, picture, video, iframe, svg):not(svg svg, :global(.bookmarkRibbon) svg) {
+.body [data-reader-text] :is(img, picture, video, iframe, svg):not(svg svg, :global(.bookmarkRibbon) svg) {
   display: block;
   box-sizing: border-box;
   max-width: 100%;
@@ -555,13 +554,13 @@
   inset: auto !important;
   object-fit: contain;
 }
-.body :is([data-reader-text], [data-reader-following-text]) :is(img, video, svg):not(svg svg, :global(.bookmarkRibbon) svg) {
+.body [data-reader-text] :is(img, video, svg):not(svg svg, :global(.bookmarkRibbon) svg) {
   height: auto;
 }
 /* A picture's frame: as wide as the text at most, no margin outside it
    (1em above and below, as browsers give a figure), and its caption wraps
    within the column. */
-.body :is([data-reader-text], [data-reader-following-text]) figure {
+.body [data-reader-text] figure {
   display: block;
   box-sizing: border-box;
   max-width: 100%;
@@ -569,7 +568,7 @@
   float: none !important;
   inset: auto !important;
 }
-.body :is([data-reader-text], [data-reader-following-text]) figcaption {
+.body [data-reader-text] figcaption {
   max-width: 100%;
   white-space: normal;
   overflow-wrap: break-word;
@@ -1154,11 +1153,10 @@
 .bmActions button:hover { background: color-mix(in srgb, var(--rp-accent) 12%, transparent); }
 .bmEmpty { color: var(--rp-text); opacity: 0.7; font-style: italic; }
 
-/* The reader as a scroll (Settings → Reading → Words before the next, every
-   choice but one at a time): the open card, cut at about the chosen number
-   of words with "read the rest" under it, then the cards Next would visit,
-   each under a rule, each cut the same way. The plainest look; the design is
-   Harold's to give. */
+/* The open card cut at about the chosen number of words (Settings → Reading
+   → Words before the next, provisional): "read the rest" under the excerpt
+   shows the whole card in place. The plainest look; the design is Harold's
+   to give. */
 .readRest {
   display: inline-flex;
   align-items: center;
@@ -1175,42 +1173,7 @@
   touch-action: manipulation;
 }
 .readRest:hover { background: color-mix(in srgb, var(--rp-accent) 8%, transparent); }
-.readRest:focus-visible,
-.followingOpen:focus-visible {
+.readRest:focus-visible {
   outline: 2px solid var(--rp-accent);
   outline-offset: 2px;
-}
-.following {
-  margin-top: 40px;
-  padding-top: 28px;
-  border-top: 1px solid var(--rp-border);
-}
-.body .followingTitle {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.3;
-  margin: 0 0 10px;
-  padding-bottom: 0;
-  border-bottom: none;
-  color: var(--rp-text-bright);
-}
-.followingOpen {
-  padding: 0;
-  margin: 0;
-  background: transparent;
-  border: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-.followingOpen:hover { color: var(--rp-accent); }
-.following .sourcePill { margin-bottom: 4px; }
-.followingText { margin-top: 20px; }
-.followingMore { height: 1px; }
-:global(html[data-pp-theme="sketchbook"]) .followingTitle {
-  font-family: var(--pp-title-font);
-  font-weight: 400;
-  color: var(--sk-ink);
 }
