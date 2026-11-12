@@ -508,6 +508,10 @@
   /* A word too long for the column breaks rather than running into the
      margin, under an arrow. */
   overflow-wrap: break-word;
+  /* A sideways swipe over the reader turns its card (src/lib/sideSwipe.js),
+     never the browser's own back or forward; a wide table scrolled to its
+     end does not hand its swipe on either. */
+  overscroll-behavior-x: none;
   line-height: 1.9;
   font-size: calc(15px * var(--pp-text-scale, 1));
   color: var(--rp-text);

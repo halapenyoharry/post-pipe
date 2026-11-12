@@ -23,6 +23,7 @@ import { tagReferences } from '../../lib/tagReferences';
 import { untaggedBecauseOf } from '../../lib/untaggedBecause';
 import { wrapText, provenanceLines } from '../../lib/provenance';
 import { wordsChoice, excerptHtml, cardProgress, cardScrollFor } from '../../lib/readerWords';
+import { createWheelTurn, touchIntent, touchTurn, followOffset } from '../../lib/sideSwipe';
 
 // The words of the reader's own buttons for a cut card (provisional, Harold's
 // to keep or replace).
@@ -52,6 +53,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const [copied, setCopied] = useState(false);
   const copiedTimer = useRef(null);
   const bodyRef = useRef(null);
+  // The text's own box: the scroll body and the arrows beside it.
+  const bodyWrapRef = useRef(null);
   // The chapter's own text, apart from everything drawn around it.
   const textRef = useRef(null);
   const isDraggingRef = useRef(false);
@@ -417,28 +420,47 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // The cards the two arrows beside the text go to: where Next and Previous
   // (goStep) go, null on a side with nowhere to go (src/lib/readerNav.js).
   const turns = useMemo(() => (article && feedData ? turnTargets(feedData, article.id, flowOpts) : { prev: null, next: null }), [article, feedData, flowOpts]);
+  const turnsRef = useRef(turns);
+  turnsRef.current = turns;
 
   const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Turn the page: the old chapter slides away, the new one comes in from
-  // the side it was turned toward.
-  const goTo = (item, dir) => {
+  // the side it was turned toward. fromDrag: the card is already partway
+  // off with the finger (the touch swipe, below), so it goes on the way it
+  // was going rather than turning from the middle.
+  const goTo = (item, dir, { fromDrag = false } = {}) => {
     if (!item || !onNavigate || !isReadable(item)) return;
     turnTimers.current.forEach(clearTimeout);
     turnTimers.current = [];
-    if (reduceMotion()) { onNavigate(item); return; }
-    setTurnOut(dir);
+    const el = bodyRef.current;
+    // Whatever the finger left on the card goes as the next card comes.
+    const clearDrag = () => {
+      if (!el) return;
+      el.style.transition = '';
+      el.style.transform = '';
+      el.style.opacity = '';
+    };
+    if (reduceMotion()) { clearDrag(); onNavigate(item); return; }
+    if (fromDrag && el) {
+      el.style.transition = 'transform 0.17s ease-in, opacity 0.17s ease-in';
+      el.style.transform = `translate3d(${dir === 'next' ? -100 : 100}%, 0, 0)`;
+      el.style.opacity = '0';
+    } else {
+      setTurnOut(dir);
+    }
     turnTimers.current.push(setTimeout(() => {
+      clearDrag();
       setTurnIn(dir);
       onNavigate(item);
       turnTimers.current.push(setTimeout(() => setTurnIn(null), 520));
     }, 170));
   };
-  const goStep = (dir) => {
+  const goStep = (dir, opts) => {
     if (!article || !feedData) return;
     const item = step(feedData, article.id, dir, flowOpts);
-    if (item) goTo(item, dir);
+    if (item) goTo(item, dir, opts);
   };
   const goStepRef = useRef(goStep);
   goStepRef.current = goStep;
@@ -505,46 +527,109 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     return () => window.removeEventListener('keydown', onKey);
   }, [live]);
 
-  // A horizontal swipe on a touch screen turns the page. It stands aside for
-  // text selection (a long press, or any selection made), for a mostly
-  // vertical drag (that is scrolling), and, while the follow-along
-  // highlighter is on, for a drag that starts on the text, which is the
-  // highlighter's own gesture.
+  // A sideways swipe on a touch screen turns the page, and the card follows
+  // the finger while the drag is under way: past the swipe's distance the
+  // page turns on, short of it the card eases back, and toward a side with
+  // no card it gives only a little (src/lib/sideSwipe.js). It stands aside
+  // for text selection (a long press, or any selection made), for a mostly
+  // vertical drag (that is scrolling), for a drag inside something that
+  // itself scrolls sideways (a wide table, a code block), and, while the
+  // follow-along highlighter is on, for a drag that starts on the text,
+  // which is the highlighter's own gesture. With reduced motion the card
+  // does not follow; a quick flick still turns it.
   useEffect(() => {
     const el = bodyRef.current;
     if (!live || !el) return;
     let start = null;
+    let easing = null;
+    const place = (x, ease) => {
+      clearTimeout(easing);
+      el.style.transition = ease ? 'transform 0.2s ease-out' : 'none';
+      el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
+      if (ease) easing = setTimeout(() => { el.style.transition = ''; }, 220);
+    };
+    const easeBack = () => place(0, true);
     const onStart = (e) => {
+      if (start && start.mode === 'follow') easeBack();
       if (e.touches.length !== 1) { start = null; return; }
       const t = e.touches[0];
       const onText = !!(e.target && e.target.closest && e.target.closest('p, li, blockquote'));
-      start = { x: t.clientX, y: t.clientY, t: Date.now(), onText };
+      start = { x: t.clientX, y: t.clientY, t: Date.now(), onText, aside: !!sidewaysScroller(e.target, el), mode: null };
+    };
+    const standsAside = (s0) => s0.aside || (followOn && s0.onText) || hasSelection();
+    const onMove = (e) => {
+      if (!start) return;
+      if (e.touches.length !== 1) {
+        if (start.mode === 'follow') easeBack();
+        start = null;
+        return;
+      }
+      const t = e.touches[0];
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      if (start.mode === null) {
+        const intent = touchIntent({ dx, dy, held: Date.now() - start.t });
+        if (intent === null) return;
+        start.mode = intent === 'follow' && !standsAside(start) && !reduceMotion() ? 'follow' : 'none';
+      }
+      if (start.mode !== 'follow') return;
+      place(followOffset(dx, !!turnsRef.current[dx < 0 ? 'next' : 'prev']), false);
     };
     const onEnd = (e) => {
       if (!start) return;
       const s0 = start;
       start = null;
+      const followed = s0.mode === 'follow';
       const t = e.changedTouches && e.changedTouches[0];
-      if (!t) return;
-      const dx = t.clientX - s0.x;
-      const dy = t.clientY - s0.y;
-      const dt = Date.now() - s0.t;
-      if (dt > 700 || Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.5) return;
-      const sel = window.getSelection && window.getSelection();
-      if (sel && !sel.isCollapsed && String(sel).trim()) return;
-      if (followOn && s0.onText) return;
-      goStepRef.current(dx < 0 ? 'next' : 'prev');
+      let dir = t ? touchTurn({ dx: t.clientX - s0.x, dy: t.clientY - s0.y, dt: Date.now() - s0.t, followed }) : null;
+      if (dir && (standsAside(s0) || !turnsRef.current[dir])) dir = null;
+      if (!dir) { if (followed) easeBack(); return; }
+      goStepRef.current(dir, { fromDrag: followed });
     };
-    const onCancel = () => { start = null; };
+    const onCancel = () => {
+      if (start && start.mode === 'follow') easeBack();
+      start = null;
+    };
     el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
     el.addEventListener('touchend', onEnd, { passive: true });
     el.addEventListener('touchcancel', onCancel, { passive: true });
     return () => {
+      clearTimeout(easing);
       el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
       el.removeEventListener('touchend', onEnd);
       el.removeEventListener('touchcancel', onCancel);
     };
   }, [live, followOn]);
+
+  // A two-finger sideways swipe on a trackpad over the reader turns the page
+  // once per gesture (createWheelTurn in src/lib/sideSwipe.js): wheel events
+  // whose deltaX outweighs their deltaY, added up past about 100 px; none
+  // with ctrl or meta held, and none for a gesture that starts inside
+  // something that itself scrolls sideways. The gesture's own sideways
+  // events are kept from the browser, so its back and forward swipe does not
+  // fire over the reader (the scroll body's overscroll-behavior-x: none
+  // keeps a wide table's scroll from reaching it too).
+  useEffect(() => {
+    const wrap = bodyWrapRef.current;
+    if (!live || !wrap) return;
+    const gesture = createWheelTurn();
+    const onWheel = (e) => {
+      const out = gesture.wheel({
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaMode: e.deltaMode,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        aside: !!sidewaysScroller(e.target, bodyRef.current),
+      }, e.timeStamp);
+      if (out.claim && e.cancelable) e.preventDefault();
+      if (out.turn && turnsRef.current[out.turn]) goStepRef.current(out.turn);
+    };
+    wrap.addEventListener('wheel', onWheel, { passive: false });
+    return () => wrap.removeEventListener('wheel', onWheel);
+  }, [live]);
 
   // The panel's "Mark here" acts on the open chapter.
   const toggleRef = useRef(null);
@@ -806,7 +891,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
         {/* The text's own box: the scroll body, and the arrows that stay
             beside it while it scrolls. */}
-        <div className={styles.bodyWrap}>
+        <div className={styles.bodyWrap} ref={bodyWrapRef}>
           {turnArrow('prev')}
           <div
             className={`${styles.body} ${followOn ? styles.following : ''} ${turnOut ? styles['turnOut_' + turnOut] : ''} ${turnIn ? styles['turnIn_' + turnIn] : ''}`}
@@ -1004,6 +1089,27 @@ async function fetchPage(item) {
   } catch (e) {
     return renderPlaceholder(item, 'Rendered article not yet published to GitHub Pages.');
   }
+}
+
+// Whether the reader has a selection of text made (a swipe stands aside).
+function hasSelection() {
+  const sel = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
+  return !!(sel && !sel.isCollapsed && String(sel).trim());
+}
+
+// The element between target and the reader's scroll body (body itself not
+// counted) that scrolls sideways itself, a wide table or a code block, or
+// null. A sideways swipe that starts in one is left to it. A target outside
+// the body (the arrows) has none.
+function sidewaysScroller(target, body) {
+  if (!body || !target || !body.contains(target)) return null;
+  for (let el = target.nodeType === 1 ? target : target.parentElement; el && el !== body; el = el.parentElement) {
+    if (el.scrollWidth > el.clientWidth + 1) {
+      const ox = getComputedStyle(el).overflowX;
+      if (ox === 'auto' || ox === 'scroll') return el;
+    }
+  }
+  return null;
 }
 
 // How far through the open card the reader is, 0..1 (cardProgress), given
