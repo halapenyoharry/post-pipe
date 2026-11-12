@@ -77,4 +77,14 @@ function step(feed, id, dir, opts) {
   return list.find(isReadable) || null;
 }
 
-module.exports = { neighbours, navStatus, isReadable, step };
+// The cards the reader's two arrows go to, the ones that travel with the
+// text (Harold, 2026-11-11): on each side, the card step() goes to, or null
+// where it goes nowhere. So an arrow shows only where Next or Previous has a
+// card to open, and a neighbour that cannot be read yet gets none, as the
+// nav row shows it as no button.
+function turnTargets(feed, id, opts) {
+  const { prev, next } = neighbours(feed, id, opts);
+  return { prev: prev.find(isReadable) || null, next: next.find(isReadable) || null };
+}
+
+module.exports = { neighbours, navStatus, isReadable, step, turnTargets };

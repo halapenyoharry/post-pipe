@@ -13,7 +13,7 @@ import { bookmarkTap } from '../../lib/bookmarkPlace';
 import { attachFollowAlong } from './followHighlighter';
 import { boldStartHtml } from './boldStartHtml';
 import { rightsLine } from '../../lib/rights';
-import { neighbours, navStatus, isReadable, step } from '../../lib/readerNav';
+import { neighbours, navStatus, isReadable, step, turnTargets } from '../../lib/readerNav';
 import { flowNav, readerSourcePill, HIDDEN_IN_GRAPH, PREF as READING_ORDER_PREF } from '../../lib/readingOrder';
 import { FeedPill } from '../FeedZ/FeedZ';
 import { showContainerCount } from '../GraphViewer/containerCount';
@@ -27,6 +27,10 @@ import { wordsChoice, excerptHtml, cardProgress, cardScrollFor } from '../../lib
 // The words of the reader's own buttons for a cut card (provisional, Harold's
 // to keep or replace).
 const READ_THE_REST = 'read the rest';
+// The names of the two arrows that travel with the text, said before the
+// neighbouring card's title to a screen reader and in their tooltip
+// (provisional, Harold's to keep or replace).
+const TURN_NAMES = { prev: 'Previous', next: 'Next' };
 
 
 // contributions: what readers brought (settings.contributions), already
@@ -410,6 +414,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const orderPref = viewState && viewState.preference ? viewState.preference(READING_ORDER_PREF) : null;
   const flowOpts = useMemo(() => flowNav(feedData, settings, orderPref), [feedData, settings, orderPref]);
   const nav = useMemo(() => (article && feedData ? neighbours(feedData, article.id, flowOpts) : { prev: [], next: [] }), [article, feedData, flowOpts]);
+  // The cards the two arrows beside the text go to: where Next and Previous
+  // (goStep) go, null on a side with nowhere to go (src/lib/readerNav.js).
+  const turns = useMemo(() => (article && feedData ? turnTargets(feedData, article.id, flowOpts) : { prev: null, next: null }), [article, feedData, flowOpts]);
 
   const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -586,6 +593,29 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         title={item.title}
       >
         <span className={styles.navLine}>{inner}</span>
+      </button>
+    );
+  };
+  // The arrows that travel with the text (Harold, 2026-11-11: "The next and
+  // previous arrows travel with the text, so nobody has to go to the top or
+  // bottom to find them."): one at each side of the reader, in the text's
+  // margin, halfway down what it shows, staying there while the card
+  // scrolls. Each does what Next or Previous does (goStep), and shows only
+  // where that goes somewhere; its name and tooltip give the card's title.
+  const turnArrow = (dir) => {
+    const item = turns[dir];
+    if (!item) return null;
+    const name = `${TURN_NAMES[dir]}: ${item.title || item.label || ''}`;
+    return (
+      <button
+        type="button"
+        className={`${styles.turnArrow} ${dir === 'next' ? styles.turnNext : styles.turnPrev}`}
+        onClick={() => goStep(dir)}
+        aria-label={name}
+        title={name}
+        data-reader-arrow={dir}
+      >
+        <Icon body={iconBody(dir === 'next' ? 'arrow-right' : 'arrow-left')} size={18} />
       </button>
     );
   };
@@ -774,96 +804,102 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <BookmarkList viewState={viewState} feedData={feedData} itemId={pId} />
         )}
 
-        <div
-          className={`${styles.body} ${followOn ? styles.following : ''} ${turnOut ? styles['turnOut_' + turnOut] : ''} ${turnIn ? styles['turnIn_' + turnIn] : ''}`}
-          data-tts-target
-          data-follow-along={followOn ? 'on' : 'off'}
-          ref={bodyRef}
-          onScroll={handleScroll}
-        >
-          {navRow('top')}
-          <div className={styles.articleHeader} ref={headerRef}>
-            {header.kicker && (
-              <div className={styles.articleKicker}>{header.kicker}</div>
+        {/* The text's own box: the scroll body, and the arrows that stay
+            beside it while it scrolls. */}
+        <div className={styles.bodyWrap}>
+          {turnArrow('prev')}
+          <div
+            className={`${styles.body} ${followOn ? styles.following : ''} ${turnOut ? styles['turnOut_' + turnOut] : ''} ${turnIn ? styles['turnIn_' + turnIn] : ''}`}
+            data-tts-target
+            data-follow-along={followOn ? 'on' : 'off'}
+            ref={bodyRef}
+            onScroll={handleScroll}
+          >
+            {navRow('top')}
+            <div className={styles.articleHeader} ref={headerRef}>
+              {header.kicker && (
+                <div className={styles.articleKicker}>{header.kicker}</div>
+              )}
+              <h1 className={styles.articleTitle}>{article.title || article.label}</h1>
+              {header.byline && authorName && (
+                <div className={styles.articleByline}>
+                  by {authorLink ? (
+                    <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
+                  ) : (
+                    authorName
+                  )}
+                </div>
+              )}
+              {metaParts.length > 0 && (
+                <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
+              )}
+              {sourcePill && (
+                // The top bar's own pill, its tap the same (viewState.toggleSource,
+                // as the top bar's onToggleSource). A screen reader hears "hidden
+                // in the graph" before it while the source is hidden; the voice
+                // reads past it (data-pp-not-text), as it is no part of the text.
+                <div
+                  className={styles.sourcePill}
+                  data-reader-source-pill
+                  data-reader-hidden-in-graph={sourcePill.hidden ? true : undefined}
+                  data-pp-not-text
+                >
+                  {sourcePill.hidden && <span className={styles.offscreen}>{HIDDEN_IN_GRAPH}</span>}
+                  <FeedPill
+                    source={sourcePill.source}
+                    hidden={sourcePill.hidden}
+                    onToggle={() => { if (viewState) viewState.toggleSource(sourcePill.source.id); }}
+                    viewState={viewState}
+                    showCount={showContainerCount(settings && settings.graph)}
+                    staleAge={!!(settings && settings.topBar && settings.topBar.staleAge === true)}
+                    popoverClassName={styles.sourcePillPopover}
+                  />
+                </div>
+              )}
+            </div>
+            <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
+            {cut && (
+              // The open card shows about the chosen number of words: the rest
+              // shows here, in place (provisional words). The voice reads past it.
+              <button type="button" className={styles.readRest} onClick={showWhole} data-reader-rest data-pp-not-text>
+                {READ_THE_REST}
+              </button>
             )}
-            <h1 className={styles.articleTitle}>{article.title || article.label}</h1>
-            {header.byline && authorName && (
-              <div className={styles.articleByline}>
-                by {authorLink ? (
-                  <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
-                ) : (
-                  authorName
-                )}
+            {!cut && nonTagRefs.length > 0 && contentHtml && article._posted !== 'title' && (
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--rp-border)' }} data-reader-references>
+                <div style={{ color: 'var(--rp-accent)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>references</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {nonTagRefs.map((r, i) => (
+                    <span
+                      key={`${r.type}:${r.value}:${i}`}
+                      className={styles.fmTag}
+                      data-reference-type={r.type}
+                      data-reference-weight={r.weight}
+                      title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
+                    >
+                      {r.type}: {r.label || r.value}{r.weight !== 1 ? ` (${r.weight})` : ''}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
-            {metaParts.length > 0 && (
-              <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
+            {contentHtml && navRow('bottom')}
+            {rights && contentHtml && (
+              <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
             )}
-            {sourcePill && (
-              // The top bar's own pill, its tap the same (viewState.toggleSource,
-              // as the top bar's onToggleSource). A screen reader hears "hidden
-              // in the graph" before it while the source is hidden; the voice
-              // reads past it (data-pp-not-text), as it is no part of the text.
-              <div
-                className={styles.sourcePill}
-                data-reader-source-pill
-                data-reader-hidden-in-graph={sourcePill.hidden ? true : undefined}
-                data-pp-not-text
-              >
-                {sourcePill.hidden && <span className={styles.offscreen}>{HIDDEN_IN_GRAPH}</span>}
-                <FeedPill
-                  source={sourcePill.source}
-                  hidden={sourcePill.hidden}
-                  onToggle={() => { if (viewState) viewState.toggleSource(sourcePill.source.id); }}
-                  viewState={viewState}
-                  showCount={showContainerCount(settings && settings.graph)}
-                  staleAge={!!(settings && settings.topBar && settings.topBar.staleAge === true)}
-                  popoverClassName={styles.sourcePillPopover}
-                />
-              </div>
+            {!cut && contributionsConfig && contentHtml && article._posted !== 'title' && (
+              <Contributions
+                article={article}
+                contributions={contributions || []}
+                config={contributionsConfig}
+                feedData={feedData}
+                textRef={textRef}
+                textKey={displayHtml}
+                onOpenChapter={(item) => goTo(item, 'next')}
+              />
             )}
           </div>
-          <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
-          {cut && (
-            // The open card shows about the chosen number of words: the rest
-            // shows here, in place (provisional words). The voice reads past it.
-            <button type="button" className={styles.readRest} onClick={showWhole} data-reader-rest data-pp-not-text>
-              {READ_THE_REST}
-            </button>
-          )}
-          {!cut && nonTagRefs.length > 0 && contentHtml && article._posted !== 'title' && (
-            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--rp-border)' }} data-reader-references>
-              <div style={{ color: 'var(--rp-accent)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>references</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {nonTagRefs.map((r, i) => (
-                  <span
-                    key={`${r.type}:${r.value}:${i}`}
-                    className={styles.fmTag}
-                    data-reference-type={r.type}
-                    data-reference-weight={r.weight}
-                    title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
-                  >
-                    {r.type}: {r.label || r.value}{r.weight !== 1 ? ` (${r.weight})` : ''}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {contentHtml && navRow('bottom')}
-          {rights && contentHtml && (
-            <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
-          )}
-          {!cut && contributionsConfig && contentHtml && article._posted !== 'title' && (
-            <Contributions
-              article={article}
-              contributions={contributions || []}
-              config={contributionsConfig}
-              feedData={feedData}
-              textRef={textRef}
-              textKey={displayHtml}
-              onOpenChapter={(item) => goTo(item, 'next')}
-            />
-          )}
+          {turnArrow('next')}
         </div>
       </div>
 

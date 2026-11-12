@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { neighbours, navStatus, step } = require('../src/lib/readerNav');
+const { neighbours, navStatus, step, turnTargets } = require('../src/lib/readerNav');
 
 const feed = {
   items: [
@@ -96,4 +96,26 @@ test('without a flow, Next and Previous stay on sequence edges', () => {
   assert.deepStrictEqual(ids(neighbours(flowFeed, 'b', {}).next), ['c'], 'options without an order are the sequence edges');
   assert.strictEqual(step(flowFeed, 'b', 'next'), null, 'c is title only, as before');
   assert.deepStrictEqual(neighbours(flowFeed, 'd'), { prev: [], next: [] });
+});
+
+test("the arrows that travel with the text go where step goes, and a side with nowhere to go has none", () => {
+  const t = (f, id, opts) => { const r = turnTargets(f, id, opts); return { prev: r.prev && r.prev.id, next: r.next && r.next.id }; };
+  // Along sequence edges: b's next, c, is title only, so no next arrow.
+  assert.deepStrictEqual(t(feed, 'a'), { prev: null, next: 'b' });
+  assert.deepStrictEqual(t(feed, 'b'), { prev: 'a', next: null });
+  // A card with no neighbours at all has none.
+  assert.deepStrictEqual(t({ items: [{ id: 'x' }], edges: [] }, 'x'), { prev: null, next: null });
+  // In a flow, past a card that cannot be read, a link card and a top bar page.
+  assert.deepStrictEqual(t(flowFeed, 'b', { order }), { prev: 'a', next: 'e' });
+  assert.deepStrictEqual(t(flowFeed, 'd', { order }), { prev: null, next: 'a' });
+  assert.deepStrictEqual(t(flowFeed, 'e', { order, skip: new Set(['p']) }), { prev: 'b', next: null });
+  // Always the card step() opens.
+  for (const [f, opts] of [[feed, undefined], [flowFeed, { order }], [flowFeed, undefined]]) {
+    for (const item of f.items) {
+      for (const dir of ['prev', 'next']) {
+        const s = step(f, item.id, dir, opts);
+        assert.strictEqual(turnTargets(f, item.id, opts)[dir], s, `${item.id} ${dir}`);
+      }
+    }
+  }
 });

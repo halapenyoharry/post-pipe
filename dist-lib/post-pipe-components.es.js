@@ -8423,11 +8423,19 @@ var ps = /* @__PURE__ */ _(((e, t) => {
 		let { prev: i, next: o } = s(e, t, r);
 		return (n === "prev" ? i : o).find(a) || null;
 	}
+	function u(e, t, n) {
+		let { prev: r, next: i } = s(e, t, n);
+		return {
+			prev: r.find(a) || null,
+			next: i.find(a) || null
+		};
+	}
 	t.exports = {
 		neighbours: s,
 		navStatus: o,
 		isReadable: a,
-		step: l
+		step: l,
+		turnTargets: u
 	};
 })), Qs = /* @__PURE__ */ _(((e, t) => {
 	var { siteIcon: n } = Xs(), { isLinkItem: r } = Is(), { isReadable: i } = Zs(), a = (e) => typeof e == "string" ? e.trim() : "";
@@ -11994,113 +12002,117 @@ function Qc({ feedData: e, onNodeSelect: n, hiddenSources: i, filteredArticleIds
 	});
 }
 var J = {
-	overlay: "_overlay_s6pnr_4",
-	open: "_open_s6pnr_16",
-	panel: "_panel_s6pnr_30",
-	minimized: "_minimized_s6pnr_67",
-	wide: "_wide_s6pnr_74",
-	full: "_full_s6pnr_79",
-	tb: "_tb_s6pnr_92",
-	growBtn: "_growBtn_s6pnr_92",
-	toolbar: "_toolbar_s6pnr_107",
-	dragGrip: "_dragGrip_s6pnr_124",
-	windowControls: "_windowControls_s6pnr_132",
-	restorePill: "_restorePill_s6pnr_138",
-	popIn: "_popIn_s6pnr_1",
-	pillIcon: "_pillIcon_s6pnr_167",
-	pillLabel: "_pillLabel_s6pnr_171",
-	pillTitle: "_pillTitle_s6pnr_177",
-	pillAuthor: "_pillAuthor_s6pnr_187",
-	pillAction: "_pillAction_s6pnr_193",
-	toolbarGroup: "_toolbarGroup_s6pnr_208",
-	ttsMount: "_ttsMount_s6pnr_217",
-	toolbarSeparator: "_toolbarSeparator_s6pnr_229",
-	toolbarSpacer: "_toolbarSpacer_s6pnr_236",
-	closeX: "_closeX_s6pnr_276",
-	navItem: "_navItem_s6pnr_277",
-	tbLabeled: "_tbLabeled_s6pnr_283",
-	tbText: "_tbText_s6pnr_289",
-	active: "_active_s6pnr_295",
-	copied: "_copied_s6pnr_300",
-	tbTooltip: "_tbTooltip_s6pnr_332",
-	syndLink: "_syndLink_s6pnr_354",
-	canonical: "_canonical_s6pnr_372",
-	progress: "_progress_s6pnr_388",
-	progressFill: "_progressFill_s6pnr_397",
-	progressSide: "_progressSide_s6pnr_404",
-	frontmatterPanel: "_frontmatterPanel_s6pnr_422",
-	fmRow: "_fmRow_s6pnr_436",
-	fmLabel: "_fmLabel_s6pnr_443",
-	fmValue: "_fmValue_s6pnr_452",
-	fmTag: "_fmTag_s6pnr_456",
-	fmUntagged: "_fmUntagged_s6pnr_467",
-	fmSyndLink: "_fmSyndLink_s6pnr_474",
-	body: "_body_s6pnr_484",
-	articleHeader: "_articleHeader_s6pnr_577",
-	articleKicker: "_articleKicker_s6pnr_581",
-	articleTitle: "_articleTitle_s6pnr_589",
-	articleByline: "_articleByline_s6pnr_597",
-	articleMeta: "_articleMeta_s6pnr_612",
-	sourcePill: "_sourcePill_s6pnr_620",
-	offscreen: "_offscreen_s6pnr_626",
-	sourcePillPopover: "_sourcePillPopover_s6pnr_637",
-	rightsLine: "_rightsLine_s6pnr_645",
-	copyToast: "_copyToast_s6pnr_654",
-	show: "_show_s6pnr_670",
-	bookmarkRibbon: "_bookmarkRibbon_s6pnr_546",
-	ribbonTooltip: "_ribbonTooltip_s6pnr_698",
-	inlineNoteForm: "_inlineNoteForm_s6pnr_724",
-	inlineNoteInput: "_inlineNoteInput_s6pnr_730",
-	marksPanel: "_marksPanel_s6pnr_746",
-	marksHeader: "_marksHeader_s6pnr_755",
-	marksList: "_marksList_s6pnr_767",
-	markItem: "_markItem_s6pnr_773",
-	markBody: "_markBody_s6pnr_790",
-	markQuote: "_markQuote_s6pnr_796",
-	markNote: "_markNote_s6pnr_803",
-	markNoteEmpty: "_markNoteEmpty_s6pnr_812",
-	markNoteInput: "_markNoteInput_s6pnr_817",
-	markActions: "_markActions_s6pnr_829",
-	markBtn: "_markBtn_s6pnr_836",
-	markBtnDanger: "_markBtnDanger_s6pnr_856",
-	marksListPanel: "_marksListPanel_s6pnr_862",
-	inlineNotePanel: "_inlineNotePanel_s6pnr_872",
-	noteInput: "_noteInput_s6pnr_878",
-	marksLegend: "_marksLegend_s6pnr_894",
-	markMain: "_markMain_s6pnr_906",
-	markTitle: "_markTitle_s6pnr_911",
-	noMarks: "_noMarks_s6pnr_937",
-	following: "_following_s6pnr_981",
-	navTop: "_navTop_s6pnr_1038",
-	navBottom: "_navBottom_s6pnr_1039",
-	navSide: "_navSide_s6pnr_1047",
-	navSideNext: "_navSideNext_s6pnr_1048",
-	navNext: "_navNext_s6pnr_1067",
-	navLine: "_navLine_s6pnr_1068",
-	navArrow: "_navArrow_s6pnr_1069",
-	navTitle: "_navTitle_s6pnr_1070",
-	navLocked: "_navLocked_s6pnr_1075",
-	navStatus: "_navStatus_s6pnr_1077",
-	turnOut_next: "_turnOut_next_s6pnr_1085",
-	ppTurnOutNext: "_ppTurnOutNext_s6pnr_1",
-	turnOut_prev: "_turnOut_prev_s6pnr_1086",
-	ppTurnOutPrev: "_ppTurnOutPrev_s6pnr_1",
-	turnIn_next: "_turnIn_next_s6pnr_1087",
-	ppTurnInNext: "_ppTurnInNext_s6pnr_1",
-	turnIn_prev: "_turnIn_prev_s6pnr_1088",
-	ppTurnInPrev: "_ppTurnInPrev_s6pnr_1",
-	notYet: "_notYet_s6pnr_1098",
-	notYetTitle: "_notYetTitle_s6pnr_1105",
-	notYetStatus: "_notYetStatus_s6pnr_1106",
-	bmList: "_bmList_s6pnr_1134",
-	bmRow: "_bmRow_s6pnr_1146",
-	bmMain: "_bmMain_s6pnr_1147",
-	bmTitle: "_bmTitle_s6pnr_1148",
-	bmNote: "_bmNote_s6pnr_1149",
-	bmNoteInput: "_bmNoteInput_s6pnr_1150",
-	bmActions: "_bmActions_s6pnr_1151",
-	bmEmpty: "_bmEmpty_s6pnr_1154",
-	readRest: "_readRest_s6pnr_1160"
+	overlay: "_overlay_1newn_4",
+	open: "_open_1newn_16",
+	panel: "_panel_1newn_30",
+	minimized: "_minimized_1newn_67",
+	wide: "_wide_1newn_74",
+	full: "_full_1newn_79",
+	tb: "_tb_1newn_92",
+	growBtn: "_growBtn_1newn_92",
+	toolbar: "_toolbar_1newn_107",
+	dragGrip: "_dragGrip_1newn_124",
+	windowControls: "_windowControls_1newn_132",
+	restorePill: "_restorePill_1newn_138",
+	popIn: "_popIn_1newn_1",
+	pillIcon: "_pillIcon_1newn_167",
+	pillLabel: "_pillLabel_1newn_171",
+	pillTitle: "_pillTitle_1newn_177",
+	pillAuthor: "_pillAuthor_1newn_187",
+	pillAction: "_pillAction_1newn_193",
+	toolbarGroup: "_toolbarGroup_1newn_208",
+	ttsMount: "_ttsMount_1newn_217",
+	toolbarSeparator: "_toolbarSeparator_1newn_229",
+	toolbarSpacer: "_toolbarSpacer_1newn_236",
+	closeX: "_closeX_1newn_276",
+	navItem: "_navItem_1newn_277",
+	tbLabeled: "_tbLabeled_1newn_283",
+	tbText: "_tbText_1newn_289",
+	active: "_active_1newn_295",
+	copied: "_copied_1newn_300",
+	tbTooltip: "_tbTooltip_1newn_332",
+	syndLink: "_syndLink_1newn_354",
+	canonical: "_canonical_1newn_372",
+	progress: "_progress_1newn_388",
+	progressFill: "_progressFill_1newn_397",
+	progressSide: "_progressSide_1newn_404",
+	frontmatterPanel: "_frontmatterPanel_1newn_422",
+	fmRow: "_fmRow_1newn_436",
+	fmLabel: "_fmLabel_1newn_443",
+	fmValue: "_fmValue_1newn_452",
+	fmTag: "_fmTag_1newn_456",
+	fmUntagged: "_fmUntagged_1newn_467",
+	fmSyndLink: "_fmSyndLink_1newn_474",
+	bodyWrap: "_bodyWrap_1newn_488",
+	body: "_body_1newn_488",
+	articleHeader: "_articleHeader_1newn_609",
+	articleKicker: "_articleKicker_1newn_613",
+	articleTitle: "_articleTitle_1newn_621",
+	articleByline: "_articleByline_1newn_629",
+	articleMeta: "_articleMeta_1newn_644",
+	sourcePill: "_sourcePill_1newn_652",
+	offscreen: "_offscreen_1newn_658",
+	sourcePillPopover: "_sourcePillPopover_1newn_669",
+	rightsLine: "_rightsLine_1newn_677",
+	copyToast: "_copyToast_1newn_686",
+	show: "_show_1newn_702",
+	bookmarkRibbon: "_bookmarkRibbon_1newn_567",
+	ribbonTooltip: "_ribbonTooltip_1newn_730",
+	inlineNoteForm: "_inlineNoteForm_1newn_756",
+	inlineNoteInput: "_inlineNoteInput_1newn_762",
+	marksPanel: "_marksPanel_1newn_778",
+	marksHeader: "_marksHeader_1newn_787",
+	marksList: "_marksList_1newn_799",
+	markItem: "_markItem_1newn_805",
+	markBody: "_markBody_1newn_822",
+	markQuote: "_markQuote_1newn_828",
+	markNote: "_markNote_1newn_835",
+	markNoteEmpty: "_markNoteEmpty_1newn_844",
+	markNoteInput: "_markNoteInput_1newn_849",
+	markActions: "_markActions_1newn_861",
+	markBtn: "_markBtn_1newn_868",
+	markBtnDanger: "_markBtnDanger_1newn_888",
+	marksListPanel: "_marksListPanel_1newn_894",
+	inlineNotePanel: "_inlineNotePanel_1newn_904",
+	noteInput: "_noteInput_1newn_910",
+	marksLegend: "_marksLegend_1newn_926",
+	markMain: "_markMain_1newn_938",
+	markTitle: "_markTitle_1newn_943",
+	noMarks: "_noMarks_1newn_969",
+	turnArrow: "_turnArrow_1newn_485",
+	following: "_following_1newn_1016",
+	navTop: "_navTop_1newn_1073",
+	navBottom: "_navBottom_1newn_1074",
+	navSide: "_navSide_1newn_1082",
+	navSideNext: "_navSideNext_1newn_1083",
+	navNext: "_navNext_1newn_1102",
+	navLine: "_navLine_1newn_1103",
+	navArrow: "_navArrow_1newn_1104",
+	navTitle: "_navTitle_1newn_1105",
+	navLocked: "_navLocked_1newn_1110",
+	navStatus: "_navStatus_1newn_1112",
+	turnPrev: "_turnPrev_1newn_1144",
+	turnNext: "_turnNext_1newn_1145",
+	turnOut_next: "_turnOut_next_1newn_1173",
+	ppTurnOutNext: "_ppTurnOutNext_1newn_1",
+	turnOut_prev: "_turnOut_prev_1newn_1174",
+	ppTurnOutPrev: "_ppTurnOutPrev_1newn_1",
+	turnIn_next: "_turnIn_next_1newn_1175",
+	ppTurnInNext: "_ppTurnInNext_1newn_1",
+	turnIn_prev: "_turnIn_prev_1newn_1176",
+	ppTurnInPrev: "_ppTurnInPrev_1newn_1",
+	notYet: "_notYet_1newn_1186",
+	notYetTitle: "_notYetTitle_1newn_1193",
+	notYetStatus: "_notYetStatus_1newn_1194",
+	bmList: "_bmList_1newn_1222",
+	bmRow: "_bmRow_1newn_1234",
+	bmMain: "_bmMain_1newn_1235",
+	bmTitle: "_bmTitle_1newn_1236",
+	bmNote: "_bmNote_1newn_1237",
+	bmNoteInput: "_bmNoteInput_1newn_1238",
+	bmActions: "_bmActions_1newn_1239",
+	bmEmpty: "_bmEmpty_1newn_1242",
+	readRest: "_readRest_1newn_1248"
 }, $c = /* @__PURE__ */ _(((e, t) => {
 	function n(e) {
 		return typeof e == "string" ? e.toLowerCase().replace(/[\p{P}\p{S}]/gu, "").replace(/\s+/g, " ").trim() : "";
@@ -14274,8 +14286,11 @@ var pu = /* @__PURE__ */ _(((e, t) => {
 		cardProgress: E,
 		cardScrollFor: D
 	};
-})), hu = pu(), gu = mu(), _u = "read the rest";
-function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph: s, feedData: u, onNavigate: d, contributions: f, contributionsConfig: _ }) {
+})), hu = pu(), gu = mu(), _u = "read the rest", vu = {
+	prev: "Previous",
+	next: "Next"
+};
+function yu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph: s, feedData: u, onNavigate: d, contributions: f, contributionsConfig: _ }) {
 	let [v, y] = l(!1), [b, x] = l(!1), [S, C] = l(null), [w, T] = l(!1), [E, D] = l(!1), [O, k] = l(""), [A, j] = l(0), [M, N] = l(!1), [P, ee] = l(!1), [F, I] = l(!1), te = c(null), L = c(null), R = c(null), ne = c(!1), re = c({
 		mouseX: 0,
 		mouseY: 0,
@@ -14314,18 +14329,18 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 	}, Oe = (e) => {
 		let t = (t) => {
 			fe.current = _e(e), ue(de.current), k(t);
-		}, n = bu(e, u);
+		}, n = xu(e, u);
 		n && typeof n.then == "function" ? n.then(t) : t(n);
 	}, ke = c(null), Ae = c(null), je = () => {
 		ke.current = null;
 		let e = L.current, t = Ae.current;
 		if (!e || !t || !i || !i.setReadingProgress) return;
 		let n = Ne(e);
-		pe.current || !n || i.setReadingProgress(t, Su(e, n));
+		pe.current || !n || i.setReadingProgress(t, Cu(e, n));
 	}, Me = () => {
 		let e = L.current;
 		if (!e) return;
-		let t = Su(e, Ne(e)) * 100;
+		let t = Cu(e, Ne(e)) * 100;
 		j(Math.max(0, Math.min(t, 100))), Ae.current && !pe.current && (t >= 98 ? (clearTimeout(ke.current), je()) : ke.current ||= setTimeout(je, 350));
 	}, Ne = (e) => {
 		let t = he.current, n = R.current;
@@ -14375,7 +14390,7 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 	}, Re = () => {
 		if (!e || !L.current || !(0, al.allowDownload)(n)) return;
 		let t = (n?.export?.license_header || "").replace("{{canonical_url}}", e.canonical_url || e.url);
-		pe.current && Ye();
+		pe.current && Xe();
 		let r = `${t}\n\n---\n\n${Array.from(L.current.children).filter((e) => !e.matches("[data-reader-rest], [data-reader-nav-row]")).map((e) => e.innerText).filter((e) => e && e.trim()).join("\n\n")}`, i = new Blob([r], { type: "text/markdown" }), a = document.createElement("a");
 		a.href = URL.createObjectURL(i), a.download = `${(e.id || e.url).split("/").pop().replace(".html", "") || "article"}.md`, a.click(), URL.revokeObjectURL(a.href);
 	};
@@ -14449,9 +14464,16 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 		e,
 		u,
 		He
-	]), We = () => typeof window < "u" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches, Ge = (e, t) => {
+	]), We = o(() => e && u ? (0, kl.turnTargets)(u, e.id, He) : {
+		prev: null,
+		next: null
+	}, [
+		e,
+		u,
+		He
+	]), Ge = () => typeof window < "u" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches, Ke = (e, t) => {
 		if (!(!e || !d || !(0, kl.isReadable)(e))) {
-			if (B.current.forEach(clearTimeout), B.current = [], We()) {
+			if (B.current.forEach(clearTimeout), B.current = [], Ge()) {
 				d(e);
 				return;
 			}
@@ -14459,44 +14481,44 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 				oe(t), d(e), B.current.push(setTimeout(() => oe(null), 520));
 			}, 170));
 		}
-	}, Ke = (t) => {
+	}, qe = (t) => {
 		if (!e || !u) return;
 		let n = (0, kl.step)(u, e.id, t, He);
-		n && Ge(n, t);
-	}, qe = c(Ke);
-	qe.current = Ke, r(() => () => B.current.forEach(clearTimeout), []);
-	let Je = () => {
+		n && Ke(n, t);
+	}, Je = c(qe);
+	Je.current = qe, r(() => () => B.current.forEach(clearTimeout), []);
+	let Ye = () => {
 		ge.current && (de.current = !0, !(!pe.current || fe.current !== _e(ge.current)) && (me.current = L.current ? L.current.scrollTop : null, ue(!0)));
-	}, Ye = () => {
+	}, Xe = () => {
 		try {
-			p(Je);
+			p(Ye);
 		} catch {
-			Je();
+			Ye();
 		}
-	}, Xe = c(Ye);
-	Xe.current = Ye, a(() => {
+	}, Ze = c(Xe);
+	Ze.current = Xe, a(() => {
 		me.current !== null && (L.current && (L.current.scrollTop = me.current), me.current = null, Me());
 	}, [V]), r(() => {
 		let e = (e) => {
 			let t = e && e.detail ? e.detail.container : null;
-			!t || t !== L.current || Xe.current();
+			!t || t !== L.current || Ze.current();
 		};
 		return window.addEventListener("postpipe:voice-before-play", e), () => window.removeEventListener("postpipe:voice-before-play", e);
 	}, []), r(() => {
-		!e || s == null || Je();
+		!e || s == null || Ye();
 	}, [s]);
-	let Ze = !!e && v && !b;
+	let Qe = !!e && v && !b;
 	r(() => {
-		if (!Ze) return;
+		if (!Qe) return;
 		let e = (e) => {
 			if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 			let t = e.target;
-			t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || (e.key === "ArrowRight" && (e.preventDefault(), qe.current("next")), e.key === "ArrowLeft" && (e.preventDefault(), qe.current("prev")));
+			t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || (e.key === "ArrowRight" && (e.preventDefault(), Je.current("next")), e.key === "ArrowLeft" && (e.preventDefault(), Je.current("prev")));
 		};
 		return window.addEventListener("keydown", e), () => window.removeEventListener("keydown", e);
-	}, [Ze]), r(() => {
+	}, [Qe]), r(() => {
 		let e = L.current;
-		if (!Ze || !e) return;
+		if (!Qe || !e) return;
 		let t = null, n = (e) => {
 			if (e.touches.length !== 1) {
 				t = null;
@@ -14518,24 +14540,24 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 			let i = r.clientX - n.x, a = r.clientY - n.y;
 			if (Date.now() - n.t > 700 || Math.abs(i) < 70 || Math.abs(a) > Math.abs(i) * .5) return;
 			let o = window.getSelection && window.getSelection();
-			o && !o.isCollapsed && String(o).trim() || Be && n.onText || qe.current(i < 0 ? "next" : "prev");
+			o && !o.isCollapsed && String(o).trim() || Be && n.onText || Je.current(i < 0 ? "next" : "prev");
 		}, i = () => {
 			t = null;
 		};
 		return e.addEventListener("touchstart", n, { passive: !0 }), e.addEventListener("touchend", r, { passive: !0 }), e.addEventListener("touchcancel", i, { passive: !0 }), () => {
 			e.removeEventListener("touchstart", n), e.removeEventListener("touchend", r), e.removeEventListener("touchcancel", i);
 		};
-	}, [Ze, Be]);
-	let Qe = c(null);
-	Qe.current = Pe, r(() => {
+	}, [Qe, Be]);
+	let $e = c(null);
+	$e.current = Pe, r(() => {
 		let e = () => {
-			Qe.current && Qe.current();
+			$e.current && $e.current();
 		};
 		return window.addEventListener("postpipe:reader-mark", e), () => window.removeEventListener("postpipe:reader-mark", e);
 	}, []);
-	let $e = (0, Lc.readerSourcePill)(e, i && i.state ? i.state.hiddenSources : null, u && u._sources, n);
+	let et = (0, Lc.readerSourcePill)(e, i && i.state ? i.state.hiddenSources : null, u && u._sources, n);
 	if (!e) return null;
-	let et = (e, t) => {
+	let tt = (e, t) => {
 		let n = (0, kl.navStatus)(u, e), r = /* @__PURE__ */ h(dl, {
 			body: (0, pl.iconBody)(t === "next" ? "arrow-right" : "arrow-left"),
 			size: 16,
@@ -14561,30 +14583,46 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 		}, e.id) : /* @__PURE__ */ h("button", {
 			className: `${J.navItem} ${t === "next" ? J.navNext : ""}`,
 			"data-reader-nav": t,
-			onClick: () => Ge(e, t),
+			onClick: () => Ke(e, t),
 			title: e.title,
 			children: /* @__PURE__ */ h("span", {
 				className: J.navLine,
 				children: i
 			})
 		}, e.id);
-	}, tt = (e) => (Ue.prev.length > 0 || Ue.next.length > 0) && /* @__PURE__ */ g("nav", {
+	}, nt = (e) => {
+		let t = We[e];
+		if (!t) return null;
+		let n = `${vu[e]}: ${t.title || t.label || ""}`;
+		return /* @__PURE__ */ h("button", {
+			type: "button",
+			className: `${J.turnArrow} ${e === "next" ? J.turnNext : J.turnPrev}`,
+			onClick: () => qe(e),
+			"aria-label": n,
+			title: n,
+			"data-reader-arrow": e,
+			children: /* @__PURE__ */ h(dl, {
+				body: (0, pl.iconBody)(e === "next" ? "arrow-right" : "arrow-left"),
+				size: 18
+			})
+		});
+	}, rt = (e) => (Ue.prev.length > 0 || Ue.next.length > 0) && /* @__PURE__ */ g("nav", {
 		className: e === "top" ? J.navTop : J.navBottom,
 		"aria-label": "Chapters either side",
 		"data-reader-nav-row": e,
 		...e === "bottom" ? { "data-reader-nav-bottom": "" } : {},
 		children: [/* @__PURE__ */ h("span", {
 			className: J.navSide,
-			children: Ue.prev.map((e) => et(e, "prev"))
+			children: Ue.prev.map((e) => tt(e, "prev"))
 		}), /* @__PURE__ */ h("span", {
 			className: `${J.navSide} ${J.navSideNext}`,
-			children: Ue.next.map((e) => et(e, "next"))
+			children: Ue.next.map((e) => tt(e, "next"))
 		})]
-	}), nt = [e.date ? (/* @__PURE__ */ new Date(`${e.date}T00:00:00`)).toLocaleDateString("en-US", {
+	}), it = [e.date ? (/* @__PURE__ */ new Date(`${e.date}T00:00:00`)).toLocaleDateString("en-US", {
 		year: "numeric",
 		month: "long",
 		day: "numeric"
-	}) : "", e.reading_time].filter(Boolean), rt = (0, il.byline)(n, e), it = rt ? rt.name : "", at = rt ? rt.url : null, ot = (0, Yo.readerHeader)(n, e), st = (0, al.progressBarMode)(n), ct = (0, al.allowDownload)(n), lt = (0, wc.rightsLine)(n && n.rights), ut = (0, Fc.nonTagReferences)(e);
+	}) : "", e.reading_time].filter(Boolean), at = (0, il.byline)(n, e), ot = at ? at.name : "", st = at ? at.url : null, ct = (0, Yo.readerHeader)(n, e), lt = (0, al.progressBarMode)(n), ut = (0, al.allowDownload)(n), dt = (0, wc.rightsLine)(n && n.rights), ft = (0, Fc.nonTagReferences)(e);
 	return /* @__PURE__ */ g(m, { children: [
 		/* @__PURE__ */ h("div", {
 			className: `${J.overlay} ${v && !b ? J.open : ""}`,
@@ -14595,8 +14633,8 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 			className: `${J.panel} ${v && !b ? J.open : ""} ${b ? J.minimized : ""} ${M ? J.wide : ""} ${P ? J.full : ""}`,
 			style: S ? { transform: `translate3d(${S.x}px, ${S.y}px, 0px)` } : void 0,
 			children: [
-				st !== "none" && /* @__PURE__ */ h("div", {
-					className: st === "side" ? J.progressSide : J.progress,
+				lt !== "none" && /* @__PURE__ */ h("div", {
+					className: lt === "side" ? J.progressSide : J.progress,
 					role: "progressbar",
 					"aria-label": "Reading progress",
 					"aria-valuemin": 0,
@@ -14604,7 +14642,7 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 					"aria-valuenow": Math.round(A),
 					children: /* @__PURE__ */ h("div", {
 						className: J.progressFill,
-						style: st === "side" ? { height: `${A}%` } : { width: `${A}%` }
+						style: lt === "side" ? { height: `${A}%` } : { width: `${A}%` }
 					})
 				}),
 				/* @__PURE__ */ g("div", {
@@ -14681,7 +14719,7 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 										size: 17
 									})
 								}),
-								ct && /* @__PURE__ */ h("button", {
+								ut && /* @__PURE__ */ h("button", {
 									className: J.tb,
 									onClick: Re,
 									title: "Download",
@@ -14775,7 +14813,7 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 						size: 20
 					})
 				}),
-				w && /* @__PURE__ */ h(Au, {
+				w && /* @__PURE__ */ h(ju, {
 					article: e,
 					settings: n
 				}),
@@ -14785,124 +14823,131 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 					itemId: ve
 				}),
 				/* @__PURE__ */ g("div", {
-					className: `${J.body} ${Be ? J.following : ""} ${ie ? J["turnOut_" + ie] : ""} ${ae ? J["turnIn_" + ae] : ""}`,
-					"data-tts-target": !0,
-					"data-follow-along": Be ? "on" : "off",
-					ref: L,
-					onScroll: Me,
+					className: J.bodyWrap,
 					children: [
-						tt("top"),
+						nt("prev"),
 						/* @__PURE__ */ g("div", {
-							className: J.articleHeader,
-							ref: he,
+							className: `${J.body} ${Be ? J.following : ""} ${ie ? J["turnOut_" + ie] : ""} ${ae ? J["turnIn_" + ae] : ""}`,
+							"data-tts-target": !0,
+							"data-follow-along": Be ? "on" : "off",
+							ref: L,
+							onScroll: Me,
 							children: [
-								ot.kicker && /* @__PURE__ */ h("div", {
-									className: J.articleKicker,
-									children: ot.kicker
+								rt("top"),
+								/* @__PURE__ */ g("div", {
+									className: J.articleHeader,
+									ref: he,
+									children: [
+										ct.kicker && /* @__PURE__ */ h("div", {
+											className: J.articleKicker,
+											children: ct.kicker
+										}),
+										/* @__PURE__ */ h("h1", {
+											className: J.articleTitle,
+											children: e.title || e.label
+										}),
+										ct.byline && ot && /* @__PURE__ */ g("div", {
+											className: J.articleByline,
+											children: ["by ", st ? /* @__PURE__ */ h("a", {
+												href: st,
+												target: "_blank",
+												rel: "noopener noreferrer",
+												children: ot
+											}) : ot]
+										}),
+										it.length > 0 && /* @__PURE__ */ h("div", {
+											className: J.articleMeta,
+											children: it.join(" · ")
+										}),
+										et && /* @__PURE__ */ g("div", {
+											className: J.sourcePill,
+											"data-reader-source-pill": !0,
+											"data-reader-hidden-in-graph": et.hidden ? !0 : void 0,
+											"data-pp-not-text": !0,
+											children: [et.hidden && /* @__PURE__ */ h("span", {
+												className: J.offscreen,
+												children: Lc.HIDDEN_IN_GRAPH
+											}), /* @__PURE__ */ h(Gl, {
+												source: et.source,
+												hidden: et.hidden,
+												onToggle: () => {
+													i && i.toggleSource(et.source.id);
+												},
+												viewState: i,
+												showCount: (0, sc.showContainerCount)(n && n.graph),
+												staleAge: !!(n && n.topBar && n.topBar.staleAge === !0),
+												popoverClassName: J.sourcePillPopover
+											})]
+										})
+									]
 								}),
-								/* @__PURE__ */ h("h1", {
-									className: J.articleTitle,
-									children: e.title || e.label
+								/* @__PURE__ */ h("div", {
+									ref: R,
+									"data-reader-text": !0,
+									dangerouslySetInnerHTML: we
 								}),
-								ot.byline && it && /* @__PURE__ */ g("div", {
-									className: J.articleByline,
-									children: ["by ", at ? /* @__PURE__ */ h("a", {
-										href: at,
-										target: "_blank",
-										rel: "noopener noreferrer",
-										children: it
-									}) : it]
-								}),
-								nt.length > 0 && /* @__PURE__ */ h("div", {
-									className: J.articleMeta,
-									children: nt.join(" · ")
-								}),
-								$e && /* @__PURE__ */ g("div", {
-									className: J.sourcePill,
-									"data-reader-source-pill": !0,
-									"data-reader-hidden-in-graph": $e.hidden ? !0 : void 0,
+								xe && /* @__PURE__ */ h("button", {
+									type: "button",
+									className: J.readRest,
+									onClick: Ye,
+									"data-reader-rest": !0,
 									"data-pp-not-text": !0,
-									children: [$e.hidden && /* @__PURE__ */ h("span", {
-										className: J.offscreen,
-										children: Lc.HIDDEN_IN_GRAPH
-									}), /* @__PURE__ */ h(Gl, {
-										source: $e.source,
-										hidden: $e.hidden,
-										onToggle: () => {
-											i && i.toggleSource($e.source.id);
+									children: _u
+								}),
+								!xe && ft.length > 0 && O && e._posted !== "title" && /* @__PURE__ */ g("div", {
+									style: {
+										marginTop: 24,
+										paddingTop: 16,
+										borderTop: "1px solid var(--rp-border)"
+									},
+									"data-reader-references": !0,
+									children: [/* @__PURE__ */ h("div", {
+										style: {
+											color: "var(--rp-accent)",
+											fontSize: 11,
+											textTransform: "uppercase",
+											letterSpacing: "0.05em",
+											marginBottom: 8
 										},
-										viewState: i,
-										showCount: (0, sc.showContainerCount)(n && n.graph),
-										staleAge: !!(n && n.topBar && n.topBar.staleAge === !0),
-										popoverClassName: J.sourcePillPopover
+										children: "references"
+									}), /* @__PURE__ */ h("div", {
+										style: {
+											display: "flex",
+											flexWrap: "wrap",
+											gap: 6
+										},
+										children: ft.map((e, t) => /* @__PURE__ */ g("span", {
+											className: J.fmTag,
+											"data-reference-type": e.type,
+											"data-reference-weight": e.weight,
+											title: e.why || `${e.type}: ${e.value}${e.weight === 1 ? "" : ` (${e.weight})`}`,
+											children: [
+												e.type,
+												": ",
+												e.label || e.value,
+												e.weight === 1 ? "" : ` (${e.weight})`
+											]
+										}, `${e.type}:${e.value}:${t}`))
 									})]
+								}),
+								O && rt("bottom"),
+								dt && O && /* @__PURE__ */ h("footer", {
+									className: J.rightsLine,
+									"data-reader-rights": !0,
+									children: dt
+								}),
+								!xe && _ && O && e._posted !== "title" && /* @__PURE__ */ h(uu, {
+									article: e,
+									contributions: f || [],
+									config: _,
+									feedData: u,
+									textRef: R,
+									textKey: V,
+									onOpenChapter: (e) => Ke(e, "next")
 								})
 							]
 						}),
-						/* @__PURE__ */ h("div", {
-							ref: R,
-							"data-reader-text": !0,
-							dangerouslySetInnerHTML: we
-						}),
-						xe && /* @__PURE__ */ h("button", {
-							type: "button",
-							className: J.readRest,
-							onClick: Je,
-							"data-reader-rest": !0,
-							"data-pp-not-text": !0,
-							children: _u
-						}),
-						!xe && ut.length > 0 && O && e._posted !== "title" && /* @__PURE__ */ g("div", {
-							style: {
-								marginTop: 24,
-								paddingTop: 16,
-								borderTop: "1px solid var(--rp-border)"
-							},
-							"data-reader-references": !0,
-							children: [/* @__PURE__ */ h("div", {
-								style: {
-									color: "var(--rp-accent)",
-									fontSize: 11,
-									textTransform: "uppercase",
-									letterSpacing: "0.05em",
-									marginBottom: 8
-								},
-								children: "references"
-							}), /* @__PURE__ */ h("div", {
-								style: {
-									display: "flex",
-									flexWrap: "wrap",
-									gap: 6
-								},
-								children: ut.map((e, t) => /* @__PURE__ */ g("span", {
-									className: J.fmTag,
-									"data-reference-type": e.type,
-									"data-reference-weight": e.weight,
-									title: e.why || `${e.type}: ${e.value}${e.weight === 1 ? "" : ` (${e.weight})`}`,
-									children: [
-										e.type,
-										": ",
-										e.label || e.value,
-										e.weight === 1 ? "" : ` (${e.weight})`
-									]
-								}, `${e.type}:${e.value}:${t}`))
-							})]
-						}),
-						O && tt("bottom"),
-						lt && O && /* @__PURE__ */ h("footer", {
-							className: J.rightsLine,
-							"data-reader-rights": !0,
-							children: lt
-						}),
-						!xe && _ && O && e._posted !== "title" && /* @__PURE__ */ h(uu, {
-							article: e,
-							contributions: f || [],
-							config: _,
-							feedData: u,
-							textRef: R,
-							textKey: V,
-							onOpenChapter: (e) => Ge(e, "next")
-						})
+						nt("next")
 					]
 				})
 			]
@@ -14924,9 +14969,9 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 					children: [/* @__PURE__ */ h("span", {
 						className: J.pillTitle,
 						children: e.title || e.label
-					}), it && /* @__PURE__ */ g("span", {
+					}), ot && /* @__PURE__ */ g("span", {
 						className: J.pillAuthor,
-						children: ["by ", it]
+						children: ["by ", ot]
 					})]
 				}),
 				/* @__PURE__ */ h("span", {
@@ -14937,7 +14982,7 @@ function vu({ article: e, onClose: t, settings: n, viewState: i, targetParagraph
 		})
 	] });
 }
-function yu(e) {
+function bu(e) {
 	return String(e).replace(/[&<>"']/g, (e) => ({
 		"&": "&amp;",
 		"<": "&lt;",
@@ -14946,7 +14991,7 @@ function yu(e) {
 		"'": "&#39;"
 	})[e]);
 }
-function bu(e, t) {
+function xu(e, t) {
 	let n = e.kind || "essay";
 	if (n === "placeholder" || e.substrate === "placeholder") {
 		let t = e.series_part || e.title || "";
@@ -14959,11 +15004,11 @@ function bu(e, t) {
 	}
 	if (e._posted === "title") {
 		let n = (0, kl.navStatus)(t, e) || "";
-		return `<div class="${J.notYet}" data-not-yet><div class="${J.notYetTitle}">${yu(e.title || "")}</div><div class="${J.notYetStatus}">${yu(n)}</div></div>`;
+		return `<div class="${J.notYet}" data-not-yet><div class="${J.notYetTitle}">${bu(e.title || "")}</div><div class="${J.notYetStatus}">${bu(n)}</div></div>`;
 	}
-	return wu(e) ? Eu(e) : n === "essay" || n === "multi" ? xu(e) : n === "image" ? (e.image ? `<img src="${e.image}" style="max-width:100%;height:auto;border-radius:4px;display:block;margin:0 auto;">` : "<p style=\"color:#666;\">No image resolved.</p>") + ku(e) : Du(e) + ku(e);
+	return Tu(e) ? Du(e) : n === "essay" || n === "multi" ? Su(e) : n === "image" ? (e.image ? `<img src="${e.image}" style="max-width:100%;height:auto;border-radius:4px;display:block;margin:0 auto;">` : "<p style=\"color:#666;\">No image resolved.</p>") + Au(e) : Ou(e) + Au(e);
 }
-async function xu(e) {
+async function Su(e) {
 	try {
 		let t = (e.url || "").split("/").pop(), n;
 		try {
@@ -14974,12 +15019,12 @@ async function xu(e) {
 		} catch {}
 		if ((!n || !n.ok) && t && (n = await fetch("./" + t)), !n || !n.ok) throw Error("HTTP " + (n ? n.status : "failed"));
 		let r = await n.text(), i = new DOMParser().parseFromString(r, "text/html"), a = i.querySelector("h1");
-		return a && a.remove(), i.querySelectorAll(".pp-rights").forEach((e) => e.remove()), (i.querySelector("body") ? i.querySelector("body").innerHTML : r) + Ou(e);
+		return a && a.remove(), i.querySelectorAll(".pp-rights").forEach((e) => e.remove()), (i.querySelector("body") ? i.querySelector("body").innerHTML : r) + ku(e);
 	} catch {
-		return Du(e, "Rendered article not yet published to GitHub Pages.");
+		return Ou(e, "Rendered article not yet published to GitHub Pages.");
 	}
 }
-function Su(e, t) {
+function Cu(e, t) {
 	return !e || !t ? 0 : (0, gu.cardProgress)({
 		scrollTop: e.scrollTop,
 		clientHeight: e.clientHeight,
@@ -14987,14 +15032,14 @@ function Su(e, t) {
 		end: t.end
 	});
 }
-function Cu(e) {
+function wu(e) {
 	return e._source || e.originalItem && e.originalItem._source || null;
 }
-function wu(e) {
-	let t = Cu(e);
+function Tu(e) {
+	let t = wu(e);
 	return t ? t.type !== "local" : (e.kind === "text" || e.kind === "link") && typeof e.content_html == "string";
 }
-function Tu(e) {
+function Eu(e) {
 	let t = new DOMParser().parseFromString(String(e), "text/html");
 	t.querySelectorAll("script, style, iframe, object, embed, link, meta, form, noscript").forEach((e) => e.remove()), t.querySelectorAll("*").forEach((e) => {
 		for (let t of Array.from(e.attributes)) {
@@ -15005,44 +15050,44 @@ function Tu(e) {
 	let n = t.querySelector("body");
 	return n ? n.innerHTML : "";
 }
-function Eu(e) {
+function Du(e) {
 	let t = "";
 	if (typeof e.content_html == "string" && e.content_html.trim()) {
-		let n = Tu(e.content_html);
+		let n = Eu(e.content_html);
 		t += /<(p|div|ul|ol|h[1-6]|blockquote|pre|table|figure|section|article)\b/i.test(n) ? n : `<p>${n}</p>`;
-	} else (e.tldr || e.summary) && (t += `<p>${yu(e.tldr || e.summary)}</p>`);
+	} else (e.tldr || e.summary) && (t += `<p>${bu(e.tldr || e.summary)}</p>`);
 	let n = e.canonical_url || e.url || "";
 	if (n) {
-		let r = Cu(e), i = r && r.title || "";
+		let r = wu(e), i = r && r.title || "";
 		if (!i) try {
 			i = new URL(n).hostname;
 		} catch {
 			i = "";
 		}
-		t += `<p data-reader-link-out><a href="${yu(n)}" target="_blank" rel="noopener noreferrer">Read the whole piece${i ? " at " + yu(i) : ""}</a></p>`;
+		t += `<p data-reader-link-out><a href="${bu(n)}" target="_blank" rel="noopener noreferrer">Read the whole piece${i ? " at " + bu(i) : ""}</a></p>`;
 	}
 	return t;
 }
-function Du(e, t) {
+function Ou(e, t) {
 	let n = t || `This substrate ("${e.kind || "unknown"}") is not yet renderable in the viewer.`, r = "<div style=\"padding:24px;border:1px dashed var(--rp-border);border-radius:6px;background:rgba(17,24,39,0.4);\">";
 	r += `<p style="color:var(--rp-accent);font-weight:600;margin-bottom:8px;">${n}</p>`, e.todos && e.todos.length && (r += `<p style="color:#f39c12;font-size:13px;">Pending: ${e.todos.join(", ")}</p>`);
 	let i = (e.url || e.id || "").split("/").pop().replace(".html", ""), a = e._source?.path || `chapters/${i}`;
 	return r += `<p style="color:#888;font-size:13px;margin-top:12px;">The bundle exists at <code>${a}</code>.</p>`, r += "</div>", r;
 }
-function Ou(e) {
+function ku(e) {
 	let t = e.forms && e.forms.companions || [];
 	if (!t.length) return "";
 	let n = "<div style=\"margin-top:32px;padding-top:24px;border-top:1px solid var(--rp-border);\">";
 	return n += "<div style=\"color:var(--rp-accent);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;\">also exists as</div>", n += `<div style="color:var(--rp-text);font-size:14px;">${t.map((e) => `<span class="${J.fmTag}">${e}</span>`).join(" ")}</div>`, n += "</div>", n;
 }
-function ku(e) {
+function Au(e) {
 	let t = [];
 	if (e.seed && t.push(["seed", e.seed]), e.tldr && t.push(["tldr", e.tldr]), e.topology && e.topology.length && t.push(["topology", e.topology.join(" · ")]), e.energy && t.push(["energy", e.energy]), e.note && t.push(["note", e.note]), !t.length) return "";
 	let n = "<div style=\"margin-top:32px;padding:20px;background:rgba(17,24,39,0.4);border-radius:6px;\">";
 	for (let [e, r] of t) n += `<div class="${J.fmRow}"><span class="${J.fmLabel}">${e}</span><span class="${J.fmValue}">${r}</span></div>`;
 	return n += "</div>", n;
 }
-function Au({ article: e, settings: n }) {
+function ju({ article: e, settings: n }) {
 	let r = n?.frontmatter_display || [], i = (0, Fc.nonTagReferences)(e), a = i.length && !r.includes("references") ? [...r, "references"] : r, o = !1, s = a.map((n) => {
 		let r = "";
 		switch (n) {
@@ -15189,7 +15234,7 @@ var Z = {
 	hexLabel: "_hexLabel_13aop_482",
 	forgetBlock: "_forgetBlock_13aop_496",
 	forgetConfirm: "_forgetConfirm_13aop_497"
-}, ju = /* @__PURE__ */ _(((e, t) => {
+}, Mu = /* @__PURE__ */ _(((e, t) => {
 	var n = {
 		default: {
 			id: "default",
@@ -15216,7 +15261,7 @@ var Z = {
 		themeName: r,
 		themeMode: i
 	};
-})), Mu = /* @__PURE__ */ _(((e, t) => {
+})), Nu = /* @__PURE__ */ _(((e, t) => {
 	var n = {
 		enabled: !1,
 		mode: "two-state",
@@ -15790,8 +15835,8 @@ var Z = {
 		createCover: z,
 		pageKey: ae
 	};
-})), Nu = /* @__PURE__ */ _(((e, t) => {
-	var { openingConfig: n } = Mu(), r = [
+})), Pu = /* @__PURE__ */ _(((e, t) => {
+	var { openingConfig: n } = Nu(), r = [
 		{
 			id: "look",
 			where: "graph",
@@ -15845,7 +15890,7 @@ var Z = {
 		modeInReader: s,
 		whereOf: a
 	};
-})), Pu = /* @__PURE__ */ _(((e, t) => {
+})), Fu = /* @__PURE__ */ _(((e, t) => {
 	var { resizeOn: n } = Ds(), r = [
 		"auto",
 		"day",
@@ -15940,7 +15985,7 @@ var Z = {
 		menuModel: d,
 		menuMove: f
 	};
-})), Fu = /* @__PURE__ */ _(((e, t) => {
+})), Iu = /* @__PURE__ */ _(((e, t) => {
 	var { containerHas: n } = Gs();
 	function r(e) {
 		if (!e || !Array.isArray(e.items)) return null;
@@ -15950,7 +15995,7 @@ var Z = {
 		return i;
 	}
 	t.exports = { colorKeysInUse: r };
-})), Iu = /* @__PURE__ */ _(((e, t) => {
+})), Lu = /* @__PURE__ */ _(((e, t) => {
 	var { blendColors: n } = Bs(), { clampMinPieces: r } = Hs(), i = 20;
 	function a(e, t) {
 		return (t && Array.isArray(t.visibleLayers) ? t.visibleLayers : ["sequence"]).includes("tag") ? (e && Array.isArray(e.edges) ? e.edges : []).some((e) => e && e.layer === "tag") : !1;
@@ -16026,27 +16071,27 @@ var Z = {
 		filterTagRows: s,
 		tagRowTitle: c
 	};
-})), Lu = ju(), Ru = Nu(), zu = Pu(), Bu = Fu(), Vu = Iu(), Hu = {
+})), Ru = Mu(), zu = Pu(), Bu = Fu(), Vu = Iu(), Hu = Lu(), Uu = {
 	draft: "#555555",
 	published: "#2ecc71",
 	tag: "#f39c12",
 	topology: "#9b59b6",
 	placeholder: "#7f8c8d"
 };
-function Uu() {
+function Wu() {
 	let e = typeof window < "u" && window.SETTINGS && window.SETTINGS.theme || {};
 	return {
-		...Hu,
+		...Uu,
 		...e.node_draft ? { draft: e.node_draft } : {},
 		...e.node_published ? { published: e.node_published } : {},
 		...e.tag_color ? { tag: e.tag_color } : {}
 	};
 }
-var Wu = Uu(), Gu = [
+var Gu = Wu(), Ku = [
 	{
 		id: "default",
 		label: "Default",
-		colors: Wu
+		colors: Gu
 	},
 	{
 		id: "highContrast",
@@ -16081,7 +16126,7 @@ var Wu = Uu(), Gu = [
 			placeholder: "#64748b"
 		}
 	}
-], Ku = [
+], qu = [
 	{
 		key: "draft",
 		label: "Draft"
@@ -16102,7 +16147,7 @@ var Wu = Uu(), Gu = [
 		key: "placeholder",
 		label: "Placeholder"
 	}
-], qu = [
+], Ju = [
 	{
 		id: "s",
 		label: "S",
@@ -16123,7 +16168,7 @@ var Wu = Uu(), Gu = [
 		label: "XL",
 		title: "Extra large text"
 	}
-], Ju = [
+], Yu = [
 	{
 		id: 50,
 		label: "50",
@@ -16150,7 +16195,7 @@ var Wu = Uu(), Gu = [
 		title: "The whole card"
 	}
 ];
-function Yu({ on: e, onChange: t, label: n, hint: r, ...i }) {
+function Xu({ on: e, onChange: t, label: n, hint: r, ...i }) {
 	return /* @__PURE__ */ g("button", {
 		className: `${Z.aidBtn} ${e ? Z.aidOn : ""}`,
 		role: "switch",
@@ -16169,8 +16214,8 @@ function Yu({ on: e, onChange: t, label: n, hint: r, ...i }) {
 		})]
 	});
 }
-function Xu({ viewState: e, aid: t, label: n, hint: r }) {
-	return /* @__PURE__ */ h(Yu, {
+function Zu({ viewState: e, aid: t, label: n, hint: r }) {
+	return /* @__PURE__ */ h(Xu, {
 		on: !!(e.readerAid && e.readerAid(t)),
 		label: n,
 		hint: r,
@@ -16178,7 +16223,7 @@ function Xu({ viewState: e, aid: t, label: n, hint: r }) {
 		onChange: (n) => e.setReaderAid && e.setReaderAid(t, n)
 	});
 }
-function Zu({ label: e, options: t, value: n, onChange: r, name: i }) {
+function Qu({ label: e, options: t, value: n, onChange: r, name: i }) {
 	return /* @__PURE__ */ g("div", {
 		className: Z.choiceRow,
 		role: "radiogroup",
@@ -16202,7 +16247,7 @@ function Zu({ label: e, options: t, value: n, onChange: r, name: i }) {
 		})]
 	});
 }
-function Qu({ id: e, title: t, children: n }) {
+function $u({ id: e, title: t, children: n }) {
 	return /* @__PURE__ */ g("section", {
 		className: Z.section,
 		"data-section": e,
@@ -16214,11 +16259,11 @@ function Qu({ id: e, title: t, children: n }) {
 		}), n]
 	});
 }
-var $u = (e) => window.dispatchEvent(new CustomEvent(e));
-function ed(e) {
+var ed = (e) => window.dispatchEvent(new CustomEvent(e));
+function td(e) {
 	return (e && e.graph && typeof e.graph.containersName == "string" ? e.graph.containersName.trim() : "") || "containers";
 }
-function td({ className: e, size: t = 15, ...n }) {
+function nd({ className: e, size: t = 15, ...n }) {
 	let [i, a] = l(!1);
 	return r(() => {
 		let e = (e) => a(!!(e.detail && e.detail.where === "graph" && e.detail.open));
@@ -16237,8 +16282,8 @@ function td({ className: e, size: t = 15, ...n }) {
 		})
 	});
 }
-function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "graph", ownButton: s, schemes: u }) {
-	let d = (0, Ru.whereOf)(a), [f, p] = l(!1), [_, v] = l(!1), [, y] = l(0), b = c(null), x = c(null), S = typeof window < "u" ? window.SETTINGS : null;
+function rd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "graph", ownButton: s, schemes: u }) {
+	let d = (0, zu.whereOf)(a), [f, p] = l(!1), [_, v] = l(!1), [, y] = l(0), b = c(null), x = c(null), S = typeof window < "u" ? window.SETTINGS : null;
 	r(() => {
 		if (e) return e.subscribe(() => y((e) => e + 1));
 	}, [e]);
@@ -16257,7 +16302,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 	}), r(() => {
 		let e = (e) => {
 			let t = e && e.detail || {};
-			if ((0, Ru.whereOf)(t.where) !== d) {
+			if ((0, zu.whereOf)(t.where) !== d) {
 				p(!1);
 				return;
 			}
@@ -16278,20 +16323,20 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 		}
 		return () => window.removeEventListener("keydown", e, !0);
 	}, [f]), !e) return null;
-	let D = s === void 0 ? d === "graph" && (0, zu.toolbarConfig)(S).position !== "top" : s, O = (0, al.readerFonts)(S), k = e.readerAid ? e.readerAid("font") : "default", A = e.readerAid ? e.readerAid("size") : "m", j = {
-		...Wu,
+	let D = s === void 0 ? d === "graph" && (0, Bu.toolbarConfig)(S).position !== "top" : s, O = (0, al.readerFonts)(S), k = e.readerAid ? e.readerAid("font") : "default", A = e.readerAid ? e.readerAid("size") : "m", j = {
+		...Gu,
 		...e.graphColors()
-	}, M = e.colorProfileId(), N = (0, Bu.colorKeysInUse)((0, Al.graphFeed)(t, (0, Al.topBarConfig)(S))), P = N ? Ku.filter((e) => N.has(e.key)) : Ku, ee = !!(t && Array.isArray(t.containers) && t.containers.length), F = typeof window < "u" && !!window.TTS, I = t && t.items || [], te = I.length === 0 || I.some((e) => !(0, Cc.isLinkItem)(e)), L = (0, Lu.themeName)(S, e.preference("theme")), R = Lu.THEMES[L].modes, ne = e.preference("mode"), re = (0, Ru.panelGroups)(d, {
+	}, M = e.colorProfileId(), N = (0, Vu.colorKeysInUse)((0, Al.graphFeed)(t, (0, Al.topBarConfig)(S))), P = N ? qu.filter((e) => N.has(e.key)) : qu, ee = !!(t && Array.isArray(t.containers) && t.containers.length), F = typeof window < "u" && !!window.TTS, I = t && t.items || [], te = I.length === 0 || I.some((e) => !(0, Cc.isLinkItem)(e)), L = (0, Ru.themeName)(S, e.preference("theme")), R = Ru.THEMES[L].modes, ne = e.preference("mode"), re = (0, zu.panelGroups)(d, {
 		settings: S,
 		readable: te,
 		voice: F,
 		modes: R.length
-	}), ie = (0, zu.toolbarConfig)(S), z = ed(S), ae = (0, rc.nodePalettesOf)(S && S.graph), oe = (ae.find((t) => t.id === e.preference("nodePalette")) || ae[0] || {}).id, B = Array.isArray(u) ? u : (0, Ec.schemesOf)(t), se = (B.find((e) => e.kind === "site") || { id: Ec.SITE_SCHEME }).id, ce = e.preference("conceptScheme"), le = typeof ce == "string" && B.some((e) => e.id === ce) ? ce : se, ue = Number(e.preference("broaderDepth")), de = Number.isFinite(ue) ? Math.max(0, Math.min(2, Math.round(ue))) : 0, fe = (0, kc.minPiecesSummary)(d === "graph" ? C || ((0, Vu.hasTagNodes)(t, S && S.graph) ? [...(0, kc.pieceCountsFromFeed)((0, Al.graphFeed)(t, (0, Al.topBarConfig)(S))).values()] : []) : [], e.preference(kc.PREF)), pe = E.has ? (0, Pc.clampRatio)(e.preference(Pc.PREF), E) : null, me = (t) => e.setPreference(Pc.PREF, Math.abs(t - E.bar) < 1e-9 ? null : t), he = {
+	}), ie = (0, Bu.toolbarConfig)(S), z = td(S), ae = (0, rc.nodePalettesOf)(S && S.graph), oe = (ae.find((t) => t.id === e.preference("nodePalette")) || ae[0] || {}).id, B = Array.isArray(u) ? u : (0, Ec.schemesOf)(t), se = (B.find((e) => e.kind === "site") || { id: Ec.SITE_SCHEME }).id, ce = e.preference("conceptScheme"), le = typeof ce == "string" && B.some((e) => e.id === ce) ? ce : se, ue = Number(e.preference("broaderDepth")), de = Number.isFinite(ue) ? Math.max(0, Math.min(2, Math.round(ue))) : 0, fe = (0, kc.minPiecesSummary)(d === "graph" ? C || ((0, Hu.hasTagNodes)(t, S && S.graph) ? [...(0, kc.pieceCountsFromFeed)((0, Al.graphFeed)(t, (0, Al.topBarConfig)(S))).values()] : []) : [], e.preference(kc.PREF)), pe = E.has ? (0, Pc.clampRatio)(e.preference(Pc.PREF), E) : null, me = (t) => e.setPreference(Pc.PREF, Math.abs(t - E.bar) < 1e-9 ? null : t), he = {
 		ArrowRight: 1,
 		ArrowUp: 1,
 		ArrowLeft: -1,
 		ArrowDown: -1
-	}, ge = (0, ac.normaliseEdgeWeights)(S && S.graph && S.graph.edgeWeights), _e = e.preference(ac.MODE_PREF), ve = ac.EDGE_WEIGHT_MODES.includes(_e) ? _e : ge.mode, ye = e.preference(ac.PENALTY_PREF), be = ac.DEGREE_PENALTIES.includes(ye) ? ye : ge.degreePenalty, xe = (0, Ic.showTagsChosen)(e.preference(Ic.PREF), S), Se = (0, Lc.feedFlows)(t), Ce = (0, Lc.chosenFlow)(t, e.preference(Lc.PREF)), V = R.length > 1 && /* @__PURE__ */ h(Zu, {
+	}, ge = (0, ac.normaliseEdgeWeights)(S && S.graph && S.graph.edgeWeights), _e = e.preference(ac.MODE_PREF), ve = ac.EDGE_WEIGHT_MODES.includes(_e) ? _e : ge.mode, ye = e.preference(ac.PENALTY_PREF), be = ac.DEGREE_PENALTIES.includes(ye) ? ye : ge.degreePenalty, xe = (0, Ic.showTagsChosen)(e.preference(Ic.PREF), S), Se = (0, Lc.feedFlows)(t), Ce = (0, Lc.chosenFlow)(t, e.preference(Lc.PREF)), V = R.length > 1 && /* @__PURE__ */ h(Qu, {
 		label: d === "reader" ? "Light or dark" : "Mode",
 		name: "mode",
 		options: [
@@ -16313,18 +16358,18 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 		onChange: (t) => e.setPreference("mode", t === "auto" ? null : t)
 	}), we = {
 		look: () => /* @__PURE__ */ g(m, { children: [
-			/* @__PURE__ */ h(Zu, {
+			/* @__PURE__ */ h(Qu, {
 				label: "Theme",
 				name: "theme",
-				options: Object.values(Lu.THEMES).map((e) => ({
+				options: Object.values(Ru.THEMES).map((e) => ({
 					id: e.id,
 					label: e.label
 				})),
 				value: L,
-				onChange: (t) => e.setPreference("theme", t === (0, Lu.themeName)(S, null) ? null : t)
+				onChange: (t) => e.setPreference("theme", t === (0, Ru.themeName)(S, null) ? null : t)
 			}),
-			!(0, Ru.modeInReader)(S) && V,
-			(0, xc.config)(S) && /* @__PURE__ */ h(Yu, {
+			!(0, zu.modeInReader)(S) && V,
+			(0, xc.config)(S) && /* @__PURE__ */ h(Xu, {
 				on: e.preference("timeOfDay") !== !1,
 				onChange: (t) => e.setPreference("timeOfDay", t ? null : !1),
 				label: "narrative time of day background",
@@ -16370,7 +16415,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 				}),
 				/* @__PURE__ */ h("div", {
 					className: Z.presetRow,
-					children: Gu.map((t) => /* @__PURE__ */ g("button", {
+					children: Ku.map((t) => /* @__PURE__ */ g("button", {
 						className: `${Z.presetBtn} ${M === t.id ? Z.presetActive : ""}`,
 						onClick: () => e.applyColorProfile(t.id, t.colors),
 						title: t.label,
@@ -16419,30 +16464,30 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 						className: Z.choiceBtn,
 						"data-view-action": "graph:zoom-to-fit",
 						title: "Every node on the screen, zoomed about its middle",
-						onClick: () => $u("graph:zoom-to-fit"),
+						onClick: () => ed("graph:zoom-to-fit"),
 						children: "Zoom to fit"
 					}),
 					ee && /* @__PURE__ */ g(m, { children: [/* @__PURE__ */ g("button", {
 						className: Z.choiceBtn,
 						"data-view-action": "graph:close-all-containers",
-						onClick: () => $u("graph:close-all-containers"),
+						onClick: () => ed("graph:close-all-containers"),
 						children: ["Close all ", z]
 					}), /* @__PURE__ */ g("button", {
 						className: Z.choiceBtn,
 						"data-view-action": "graph:open-all-containers",
-						onClick: () => $u("graph:open-all-containers"),
+						onClick: () => ed("graph:open-all-containers"),
 						children: ["Open all ", z]
 					})] }),
-					(0, zu.viewActionsFor)(S).filter((e) => e.event !== "graph:zoom-to-fit").map((e) => /* @__PURE__ */ h("button", {
+					(0, Bu.viewActionsFor)(S).filter((e) => e.event !== "graph:zoom-to-fit").map((e) => /* @__PURE__ */ h("button", {
 						className: Z.choiceBtn,
 						"data-view-action": e.event,
 						title: e.title,
-						onClick: () => $u(e.event),
+						onClick: () => ed(e.event),
 						children: e.label
 					}, e.event))
 				]
 			}),
-			ie.show.layout && /* @__PURE__ */ h(Zu, {
+			ie.show.layout && /* @__PURE__ */ h(Qu, {
 				label: "Layout",
 				name: "layout",
 				options: [{
@@ -16493,7 +16538,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 					]
 				})]
 			}),
-			ie.show.layout && /* @__PURE__ */ h(Zu, {
+			ie.show.layout && /* @__PURE__ */ h(Qu, {
 				label: "Edge weights",
 				name: ac.MODE_PREF,
 				options: [{
@@ -16508,7 +16553,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 				value: ve,
 				onChange: (t) => e.setPreference(ac.MODE_PREF, t === ge.mode ? null : t)
 			}),
-			ie.show.layout && ve === "weighted" && /* @__PURE__ */ h(Zu, {
+			ie.show.layout && ve === "weighted" && /* @__PURE__ */ h(Qu, {
 				label: "Degree penalty",
 				name: ac.PENALTY_PREF,
 				options: [
@@ -16531,13 +16576,13 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 				value: be,
 				onChange: (t) => e.setPreference(ac.PENALTY_PREF, t === ge.degreePenalty ? null : t)
 			}),
-			d === "graph" && (0, Vu.hasTagNodes)(t, S && S.graph) && /* @__PURE__ */ g(m, { children: [/* @__PURE__ */ h(Yu, {
+			d === "graph" && (0, Hu.hasTagNodes)(t, S && S.graph) && /* @__PURE__ */ g(m, { children: [/* @__PURE__ */ h(Xu, {
 				on: xe,
 				onChange: (t) => e.setPreference(Ic.PREF, (0, Ic.showTagsPrefFor)(t, S)),
 				label: "Show tagz on the graph",
 				hint: "Off, the cards still sit by the tagz they share.",
 				"data-pref": Ic.PREF
-			}), /* @__PURE__ */ h(Yu, {
+			}), /* @__PURE__ */ h(Xu, {
 				on: (0, Ic.showTagLabelsChosen)(e.preference(Ic.LABELS_PREF), S),
 				onChange: (t) => e.setPreference(Ic.LABELS_PREF, (0, Ic.showTagLabelsPrefFor)(t, S)),
 				label: "Show their labels",
@@ -16650,7 +16695,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 					})
 				]
 			}),
-			B.length > 1 && /* @__PURE__ */ h(Zu, {
+			B.length > 1 && /* @__PURE__ */ h(Qu, {
 				label: "Scheme",
 				name: "conceptScheme",
 				options: B.map((e) => ({
@@ -16661,7 +16706,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 				value: le,
 				onChange: (t) => e.setPreference("conceptScheme", t === se ? null : t)
 			}),
-			B.length > 1 && /* @__PURE__ */ h(Zu, {
+			B.length > 1 && /* @__PURE__ */ h(Qu, {
 				label: "Depth",
 				name: "broaderDepth",
 				options: [
@@ -16684,7 +16729,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 				value: String(de),
 				onChange: (t) => e.setPreference("broaderDepth", t === "0" ? null : Number(t))
 			}),
-			B.length > 1 && de > 0 && T && /* @__PURE__ */ h(Zu, {
+			B.length > 1 && de > 0 && T && /* @__PURE__ */ h(Qu, {
 				label: "Lines to folded tagz",
 				name: Ac.FOLDED_PREF,
 				options: [{
@@ -16699,7 +16744,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 				value: (0, Ac.foldedChoice)(e.preference(Ac.FOLDED_PREF)),
 				onChange: (t) => e.setPreference(Ac.FOLDED_PREF, t === "bubble" ? null : t)
 			}),
-			d === "graph" && Se.length > 1 && Ce && /* @__PURE__ */ g(m, { children: [/* @__PURE__ */ h(Zu, {
+			d === "graph" && Se.length > 1 && Ce && /* @__PURE__ */ g(m, { children: [/* @__PURE__ */ h(Qu, {
 				label: "Reading order",
 				name: Lc.PREF,
 				options: Se.map((e) => ({
@@ -16720,7 +16765,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 			"data-settings-reset": !0,
 			title: `Layout, zoom, rotation, open and closed containers, selection, showing tagz and their labels, ${Se.length > 1 ? "the reading order, " : ""}and colors, back to how the site starts`,
 			onClick: () => {
-				p(!1), P.length && e.applyColorProfile("default", Wu), $u("graph:reset-all");
+				p(!1), P.length && e.applyColorProfile("default", Gu), ed("graph:reset-all");
 			},
 			children: "Reset the view"
 		}), /* @__PURE__ */ g("div", {
@@ -16791,17 +16836,17 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 					"."
 				]
 			}, e.id)),
-			/* @__PURE__ */ h(Zu, {
+			/* @__PURE__ */ h(Qu, {
 				label: "Size",
 				name: "size",
-				options: qu,
+				options: Ju,
 				value: A,
 				onChange: (t) => e.setReaderAid("size", t)
 			}),
-			/* @__PURE__ */ h(Zu, {
+			/* @__PURE__ */ h(Qu, {
 				label: "Words before the next",
 				name: "words",
-				options: Ju,
+				options: Yu,
 				value: (0, gu.wordsChoice)(S, e.readerAid ? e.readerAid("words") : null),
 				onChange: (t) => e.setReaderAid && e.setReaderAid("words", t)
 			}),
@@ -16827,12 +16872,12 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 			}),
 			/* @__PURE__ */ g("div", {
 				className: Z.aidList,
-				children: [/* @__PURE__ */ h(Xu, {
+				children: [/* @__PURE__ */ h(Zu, {
 					viewState: e,
 					aid: "followAlong",
 					label: "Highlighter: follow along",
 					hint: "Tap or drag through the text to mark the sentence and word you are on."
-				}), /* @__PURE__ */ h(Xu, {
+				}), /* @__PURE__ */ h(Zu, {
 					viewState: e,
 					aid: "boldStart",
 					label: "Bold word beginnings",
@@ -16846,7 +16891,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 			children: "Play and pause are in the reader."
 		})] })
 	};
-	return /* @__PURE__ */ g(m, { children: [D && /* @__PURE__ */ h(td, {
+	return /* @__PURE__ */ g(m, { children: [D && /* @__PURE__ */ h(nd, {
 		className: Z.gearBtn,
 		size: 18,
 		"aria-expanded": f,
@@ -16857,7 +16902,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 	}), /* @__PURE__ */ g("aside", {
 		className: Z.drawer,
 		role: "dialog",
-		"aria-label": (0, Ru.panelTitle)(S, d),
+		"aria-label": (0, zu.panelTitle)(S, d),
 		ref: b,
 		"data-settings-panel": d,
 		children: [/* @__PURE__ */ g("div", {
@@ -16865,7 +16910,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 			children: [
 				/* @__PURE__ */ h("span", {
 					className: Z.title,
-					children: (0, Ru.panelTitle)(S, d)
+					children: (0, zu.panelTitle)(S, d)
 				}),
 				d === "reader" && n && /* @__PURE__ */ h("span", {
 					className: Z.subject,
@@ -16882,7 +16927,7 @@ function nd({ viewState: e, feedData: t, subject: n, readerOpen: i, where: a = "
 					})
 				})
 			]
-		}), re.map((e) => /* @__PURE__ */ h(Qu, {
+		}), re.map((e) => /* @__PURE__ */ h($u, {
 			id: e.id,
 			title: e.title,
 			children: we[e.id]()
@@ -16923,7 +16968,7 @@ var Q = {
 	toast: "_toast_1f7ti_368",
 	toastIn: "_toastIn_1f7ti_1",
 	slideUp: "_slideUp_1f7ti_1"
-}, rd = {
+}, id = {
 	readerPanel: !0,
 	tts: !0,
 	feedBar: !0,
@@ -16934,7 +16979,7 @@ var Q = {
 	colorSettings: !0,
 	configPanel: !0,
 	keyboardShortcuts: !0
-}, id = [
+}, ad = [
 	{
 		key: "readerPanel",
 		label: "Reader Panel",
@@ -16980,7 +17025,7 @@ var Q = {
 		label: "Keyboard Shortcuts",
 		sub: "Cmd+Z undo, escape to close, etc."
 	}
-], ad = [
+], od = [
 	{
 		key: "bg",
 		label: "Background"
@@ -17001,7 +17046,7 @@ var Q = {
 		key: "text_bright",
 		label: "Text Bright"
 	}
-], od = [
+], sd = [
 	{
 		value: "localStorage",
 		label: "Browser (localStorage)"
@@ -17015,7 +17060,7 @@ var Q = {
 		label: "Disabled"
 	}
 ];
-function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
+function cd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 	let [o, s] = l(!1), [u, d] = l(null), [f, p] = l(!1), _ = c(null), v = c(null), y = c(null), b = (e) => {
 		v.current = e.touches[0].clientY;
 	}, x = (e) => {
@@ -17033,7 +17078,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 		return window.addEventListener("keydown", e), () => window.removeEventListener("keydown", e);
 	}, [o]);
 	let C = {
-		...rd,
+		...id,
 		...e.features || {}
 	}, w = e.theme || {}, T = n((e, n) => {
 		t({ features: {
@@ -17050,7 +17095,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 	}, [t]), O = n((e) => {
 		t({ feed: e || void 0 });
 	}, [t]), k = n(() => {
-		let t = ud(e);
+		let t = dd(e);
 		navigator.clipboard.writeText(t).then(() => {
 			d("Copied to clipboard"), setTimeout(() => d(null), 1800);
 		}).catch(() => {
@@ -17107,7 +17152,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 					children: [/* @__PURE__ */ h("div", {
 						className: Q.sectionTitle,
 						children: "Features"
-					}), id.map((e) => /* @__PURE__ */ h(cd, {
+					}), ad.map((e) => /* @__PURE__ */ h(ld, {
 						label: e.label,
 						sub: e.sub,
 						checked: C[e.key],
@@ -17140,7 +17185,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 								className: Q.select,
 								value: e.persistence || "localStorage",
 								onChange: (e) => D(e.target.value),
-								children: od.map((e) => /* @__PURE__ */ h("option", {
+								children: sd.map((e) => /* @__PURE__ */ h("option", {
 									value: e.value,
 									children: e.label
 								}, e.value))
@@ -17153,7 +17198,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 					children: [/* @__PURE__ */ h("div", {
 						className: Q.sectionTitle,
 						children: "Theme"
-					}), ad.map((e) => /* @__PURE__ */ g("div", {
+					}), od.map((e) => /* @__PURE__ */ g("div", {
 						className: Q.colorRow,
 						children: [
 							/* @__PURE__ */ h("span", {
@@ -17163,12 +17208,12 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 							/* @__PURE__ */ h("input", {
 								type: "color",
 								className: Q.colorInput,
-								value: w[e.key] || ld(e.key),
+								value: w[e.key] || ud(e.key),
 								onChange: (t) => E(e.key, t.target.value)
 							}),
 							/* @__PURE__ */ h("span", {
 								className: Q.colorHex,
-								children: w[e.key] || ld(e.key)
+								children: w[e.key] || ud(e.key)
 							})
 						]
 					}, e.key))]
@@ -17211,7 +17256,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 							className: Q.snippet,
 							children: /* @__PURE__ */ h("code", {
 								className: Q.snippetCode,
-								children: ud(e)
+								children: dd(e)
 							})
 						}),
 						!f && /* @__PURE__ */ h("button", {
@@ -17242,7 +17287,7 @@ function sd({ config: e, onUpdate: t, onReset: i, visible: a = !0 }) {
 		})
 	] }) : null;
 }
-function cd({ label: e, sub: t, checked: n, onChange: r }) {
+function ld({ label: e, sub: t, checked: n, onChange: r }) {
 	return /* @__PURE__ */ g("div", {
 		className: Q.toggleRow,
 		children: [/* @__PURE__ */ g("span", {
@@ -17262,7 +17307,7 @@ function cd({ label: e, sub: t, checked: n, onChange: r }) {
 		})]
 	});
 }
-function ld(e) {
+function ud(e) {
 	return {
 		bg: "#1a1a2e",
 		surface: "#0a0e1a",
@@ -17271,11 +17316,11 @@ function ld(e) {
 		text_bright: "#ccd6f6"
 	}[e] || "#888888";
 }
-function ud(e) {
+function dd(e) {
 	let t = {};
 	if (e.feed && e.feed !== "./feed.json" && (t.feed = e.feed), e.persistence && e.persistence !== "localStorage" && (t.persistence = e.persistence), e.features) {
 		let n = {};
-		for (let [t, r] of Object.entries(e.features)) r !== rd[t] && (n[t] = r);
+		for (let [t, r] of Object.entries(e.features)) r !== id[t] && (n[t] = r);
 		Object.keys(n).length && (t.features = n);
 	}
 	return e.theme && Object.keys(e.theme).length && (t.theme = e.theme), [
@@ -17286,7 +17331,7 @@ function ud(e) {
 		"<\/script>"
 	].join("\n");
 }
-var dd = {
+var fd = {
 	timeOverlay: "_timeOverlay_1mhyj_1",
 	header: "_header_1mhyj_24",
 	titleGroup: "_titleGroup_1mhyj_36",
@@ -17309,7 +17354,7 @@ var dd = {
 	hasContent: "_hasContent_1mhyj_197",
 	activeWeek: "_activeWeek_1mhyj_210",
 	weekBadge: "_weekBadge_1mhyj_217"
-}, fd = [
+}, pd = [
 	"Jan",
 	"Feb",
 	"Mar",
@@ -17323,10 +17368,10 @@ var dd = {
 	"Nov",
 	"Dec"
 ];
-function pd(e) {
+function md(e) {
 	return (e.url || e.id || "").split("/").pop().replace(".html", "");
 }
-function md({ feedData: e, onFilterChange: t }) {
+function hd({ feedData: e, onFilterChange: t }) {
 	let [n, r] = l(null), i = o(() => {
 		if (!e || !e.items || !e.items.length) return {
 			months: [],
@@ -17340,7 +17385,7 @@ function md({ feedData: e, onFilterChange: t }) {
 			if (!i) return;
 			let a = new Date(i);
 			if (isNaN(a.getTime())) return;
-			let o = pd(e);
+			let o = md(e);
 			t.push({
 				item: e,
 				date: a,
@@ -17396,7 +17441,7 @@ function md({ feedData: e, onFilterChange: t }) {
 				key: r,
 				year: e,
 				monthIndex: n,
-				monthName: fd[n],
+				monthName: pd[n],
 				articleSlugs: a,
 				weeks: i
 			}), l = new Date(l.getFullYear(), l.getMonth() + 1, 1);
@@ -17415,20 +17460,20 @@ function md({ feedData: e, onFilterChange: t }) {
 		e.stopPropagation(), i.articleSlugs.length !== 0 && (n === i.id ? (r(null), t && t(null, null)) : (r(i.id), t && t(new Set(i.articleSlugs), `${a.monthName} ${i.label}`)));
 	};
 	return /* @__PURE__ */ g("div", {
-		className: dd.timeOverlay,
+		className: fd.timeOverlay,
 		children: [/* @__PURE__ */ g("div", {
-			className: dd.header,
+			className: fd.header,
 			children: [/* @__PURE__ */ g("div", {
-				className: dd.titleGroup,
+				className: fd.titleGroup,
 				children: [/* @__PURE__ */ h("span", {
-					className: dd.title,
+					className: fd.title,
 					children: "Chronology"
 				}), /* @__PURE__ */ h("span", {
-					className: dd.rangeBadge,
+					className: fd.rangeBadge,
 					children: i.minYear === i.maxYear ? i.minYear : `${i.minYear}–${i.maxYear}`
 				})]
 			}), n && /* @__PURE__ */ h("button", {
-				className: dd.clearBtn,
+				className: fd.clearBtn,
 				onClick: () => {
 					r(null), t && t(null, null);
 				},
@@ -17436,37 +17481,37 @@ function md({ feedData: e, onFilterChange: t }) {
 				children: "Reset"
 			})]
 		}), /* @__PURE__ */ h("div", {
-			className: dd.stackScroll,
+			className: fd.stackScroll,
 			children: i.months.map((e, t) => {
 				let r = n === e.key, o = e.articleSlugs.length === 0, c = i.months[t - 1], l = !c || c.year !== e.year;
 				return /* @__PURE__ */ g("div", {
-					className: `${dd.monthBox} ${o ? dd.emptyMonth : ""} ${r ? dd.activeMonth : ""}`,
+					className: `${fd.monthBox} ${o ? fd.emptyMonth : ""} ${r ? fd.activeMonth : ""}`,
 					children: [/* @__PURE__ */ g("div", {
-						className: dd.monthHeader,
+						className: fd.monthHeader,
 						onClick: () => a(e),
 						title: o ? "No articles published this month" : `Filter to ${e.monthName} ${e.year} (${e.articleSlugs.length})`,
 						children: [/* @__PURE__ */ g("div", {
-							className: dd.monthName,
+							className: fd.monthName,
 							children: [e.monthName, l && /* @__PURE__ */ h("span", {
-								className: dd.yearTag,
+								className: fd.yearTag,
 								children: e.year
 							})]
 						}), /* @__PURE__ */ h("div", {
-							className: `${dd.monthMeta} ${e.articleSlugs.length > 0 ? dd.hasItems : ""}`,
+							className: `${fd.monthMeta} ${e.articleSlugs.length > 0 ? fd.hasItems : ""}`,
 							children: e.articleSlugs.length > 0 ? `${e.articleSlugs.length} post${e.articleSlugs.length > 1 ? "s" : ""}` : "0 posts"
 						})]
 					}), /* @__PURE__ */ g("div", {
-						className: dd.branchArea,
-						children: [/* @__PURE__ */ h("div", { className: dd.branchLine }), /* @__PURE__ */ h("div", {
-							className: dd.weeksRow,
+						className: fd.branchArea,
+						children: [/* @__PURE__ */ h("div", { className: fd.branchLine }), /* @__PURE__ */ h("div", {
+							className: fd.weeksRow,
 							children: e.weeks.map((t) => {
 								let r = t.articleSlugs.length, i = n === t.id;
 								return /* @__PURE__ */ g("div", {
-									className: `${dd.weekPill} ${r > 0 ? dd.hasContent : ""} ${i ? dd.activeWeek : ""}`,
+									className: `${fd.weekPill} ${r > 0 ? fd.hasContent : ""} ${i ? fd.activeWeek : ""}`,
 									onClick: (n) => s(n, t, e),
 									title: r > 0 ? `${t.label}: ${r} post${r > 1 ? "s" : ""}` : `${t.label}: empty`,
 									children: [/* @__PURE__ */ h("span", { children: t.label }), r > 0 && /* @__PURE__ */ h("span", {
-										className: dd.weekBadge,
+										className: fd.weekBadge,
 										children: r
 									})]
 								}, t.id);
@@ -17513,7 +17558,7 @@ var $ = {
 	tagLabel: "_tagLabel_1cq89_409",
 	tagCount: "_tagCount_1cq89_416",
 	menuEmpty: "_menuEmpty_1cq89_422"
-}, hd = (/* @__PURE__ */ _(((e, t) => {
+}, gd = (/* @__PURE__ */ _(((e, t) => {
 	var n = [
 		{
 			id: "time",
@@ -17582,7 +17627,7 @@ var $ = {
 		LAYERS: r,
 		GROUP_LABEL: s
 	};
-})))(), gd = [{
+})))(), _d = [{
 	id: "force",
 	label: "cluster",
 	title: "Cluster: each container its own path"
@@ -17590,9 +17635,9 @@ var $ = {
 	id: "radial",
 	label: "ring",
 	title: "Ring: each container its own ring"
-}], _d = (e, t) => window.dispatchEvent(new CustomEvent(e, t === void 0 ? void 0 : { detail: t }));
-function vd({ viewState: e, show: t = {}, layouts: n = gd, settings: r, layers: i = [], placement: a = "bottom", feedData: o = null, hiddenSources: s = null }) {
-	return a === "top" ? /* @__PURE__ */ h(bd, {
+}], vd = (e, t) => window.dispatchEvent(new CustomEvent(e, t === void 0 ? void 0 : { detail: t }));
+function yd({ viewState: e, show: t = {}, layouts: n = _d, settings: r, layers: i = [], placement: a = "bottom", feedData: o = null, hiddenSources: s = null }) {
+	return a === "top" ? /* @__PURE__ */ h(xd, {
 		viewState: e,
 		show: t,
 		layouts: n,
@@ -17600,7 +17645,7 @@ function vd({ viewState: e, show: t = {}, layouts: n = gd, settings: r, layers: 
 		layers: i,
 		feedData: o,
 		hiddenSources: s
-	}) : /* @__PURE__ */ h(yd, {
+	}) : /* @__PURE__ */ h(bd, {
 		viewState: e,
 		show: t,
 		layouts: n,
@@ -17608,8 +17653,8 @@ function vd({ viewState: e, show: t = {}, layouts: n = gd, settings: r, layers: 
 		layers: i
 	});
 }
-function yd({ viewState: e, show: t, layouts: n, settings: i, layers: a }) {
-	let o = i || (typeof window < "u" ? window.SETTINGS : null), c = (0, hd.dimensionLabels)(o), u = (0, hd.dimensionGroupLabel)(o), d = u.charAt(0).toUpperCase() + u.slice(1), f = (0, hd.layerLabels)(o).filter((e) => a.includes(e.id)), [, p] = s((e) => e + 1, 0), [_, v] = l(!1);
+function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a }) {
+	let o = i || (typeof window < "u" ? window.SETTINGS : null), c = (0, gd.dimensionLabels)(o), u = (0, gd.dimensionGroupLabel)(o), d = u.charAt(0).toUpperCase() + u.slice(1), f = (0, gd.layerLabels)(o).filter((e) => a.includes(e.id)), [, p] = s((e) => e + 1, 0), [_, v] = l(!1);
 	if (r(() => e ? e.subscribe(p) : void 0, [e]), r(() => {
 		if (!_) return;
 		let e = (e) => {
@@ -17617,7 +17662,7 @@ function yd({ viewState: e, show: t, layouts: n, settings: i, layers: a }) {
 		};
 		return window.addEventListener("keydown", e), () => window.removeEventListener("keydown", e);
 	}, [_]), !e) return null;
-	let y = t.history !== !1, b = t.layout !== !1, x = t.dimensions !== !1, S = e.state.layout, C = e.timeAxis(), w = C.dimension || "time", T = (t) => e.setTimeAxis((0, zu.toggleDimension)(C, t)), E = () => e.setTimeAxis({ granularity: (0, zu.nextGranularity)(C.granularity) }), D = (0, zu.hasGranularity)(C), O = /* @__PURE__ */ g(m, { children: [
+	let y = t.history !== !1, b = t.layout !== !1, x = t.dimensions !== !1, S = e.state.layout, C = e.timeAxis(), w = C.dimension || "time", T = (t) => e.setTimeAxis((0, Bu.toggleDimension)(C, t)), E = () => e.setTimeAxis({ granularity: (0, Bu.nextGranularity)(C.granularity) }), D = (0, Bu.hasGranularity)(C), O = /* @__PURE__ */ g(m, { children: [
 		c.map((e) => {
 			let t = C.on && w === e.id;
 			return /* @__PURE__ */ h("button", {
@@ -17709,10 +17754,10 @@ function yd({ viewState: e, show: t, layouts: n, settings: i, layers: a }) {
 				"data-group": "view",
 				children: [/* @__PURE__ */ h("button", {
 					className: $.seg,
-					title: zu.RESET_TITLE,
+					title: Bu.RESET_TITLE,
 					"data-toolbar-reset": !0,
 					onClick: () => {
-						v(!1), _d("graph:reset-all");
+						v(!1), vd("graph:reset-all");
 					},
 					children: "Reset"
 				}), /* @__PURE__ */ g("button", {
@@ -17760,11 +17805,11 @@ function yd({ viewState: e, show: t, layouts: n, settings: i, layers: a }) {
 				children: "View"
 			}), /* @__PURE__ */ h("div", {
 				className: $.wrapRow,
-				children: (0, zu.viewActionsFor)(o).map((e) => /* @__PURE__ */ h("button", {
+				children: (0, Bu.viewActionsFor)(o).map((e) => /* @__PURE__ */ h("button", {
 					className: $.action,
 					title: e.title,
 					onClick: () => {
-						_d(e.event), v(!1);
+						vd(e.event), v(!1);
 					},
 					children: e.label
 				}, e.event))
@@ -17772,7 +17817,7 @@ function yd({ viewState: e, show: t, layouts: n, settings: i, layers: a }) {
 		})]
 	})] })] });
 }
-function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedData: o, hiddenSources: u }) {
+function xd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedData: o, hiddenSources: u }) {
 	let d = i || (typeof window < "u" ? window.SETTINGS : null), [, f] = s((e) => e + 1, 0), [p, _] = l(null), [v, y] = l(""), [b, x] = l(null), S = c(null), C = c(null), w = c(null), T = c(null);
 	r(() => e ? e.subscribe(f) : void 0, [e]), r(() => {
 		let e = (e) => x(e.detail && e.detail.id ? e.detail.id : null);
@@ -17800,17 +17845,17 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 			document.removeEventListener("pointerdown", t, !0), window.removeEventListener("keydown", n, !0);
 		};
 	}, [p]), !e) return null;
-	let A = t.history !== !1, j = (0, hd.dimensionGroupLabel)(d), M = (e) => e.charAt(0).toUpperCase() + e.slice(1), N = e.timeAxis(), P = (0, zu.menuModel)({
-		dimensions: (0, hd.dimensionLabels)(d),
-		layers: (0, hd.layerLabels)(d).filter((e) => a.includes(e.id)),
+	let A = t.history !== !1, j = (0, gd.dimensionGroupLabel)(d), M = (e) => e.charAt(0).toUpperCase() + e.slice(1), N = e.timeAxis(), P = (0, Bu.menuModel)({
+		dimensions: (0, gd.dimensionLabels)(d),
+		layers: (0, gd.layerLabels)(d).filter((e) => a.includes(e.id)),
 		axis: N,
-		preferences: Object.fromEntries((0, hd.layerLabels)(d).map((t) => [t.id, e.preference(t.id)])),
+		preferences: Object.fromEntries((0, gd.layerLabels)(d).map((t) => [t.id, e.preference(t.id)])),
 		show: t,
 		group: j
-	}), ee = P.rows.length > 0, F = M(P.heading), I = (0, Vu.hasTagNodes)(o, d && d.graph), te = [];
+	}), ee = P.rows.length > 0, F = M(P.heading), I = (0, Hu.hasTagNodes)(o, d && d.graph), te = [];
 	if (I && p === "tags") {
 		let t = typeof document < "u" ? document.querySelector("[data-graph-root]") || document.documentElement : null, n = t && typeof getComputedStyle == "function" && getComputedStyle(t).getPropertyValue("--gv-tag-color").trim() || null, r = E && Array.isArray(E.counts) ? E.counts.reduce((e, t) => Number.isFinite(Number(t)) && Number(t) > e ? Number(t) : e, -1) : -1;
-		te = (0, Vu.tagListModel)(o, {
+		te = (0, Hu.tagListModel)(o, {
 			hiddenSources: u || e.state && e.state.hiddenSources || [],
 			sourceColorOf: (t) => typeof e.sourceColor == "function" ? e.sourceColor(t) : null,
 			fallbackColor: n,
@@ -17819,7 +17864,7 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 			maxPieces: r >= 0 ? r : null
 		});
 	}
-	let L = (0, Vu.filterTagRows)(te, v), R = te.length > Vu.SEARCH_FROM, ne = () => {
+	let L = (0, Hu.filterTagRows)(te, v), R = te.length > Hu.SEARCH_FROM, ne = () => {
 		y(""), _((e) => e === "tags" ? null : "tags");
 	}, re = (e) => {
 		if (e.key === "Escape") {
@@ -17831,7 +17876,7 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 			return;
 		}
 		if (e.target && typeof e.target.matches == "function" && e.target.matches("[data-menu-search]") && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-		let t = O(), n = (0, zu.menuMove)(t.indexOf(document.activeElement), e.key, t.length);
+		let t = O(), n = (0, Bu.menuMove)(t.indexOf(document.activeElement), e.key, t.length);
 		n !== null && (e.preventDefault(), e.stopPropagation(), t[n].focus());
 	};
 	return /* @__PURE__ */ g("div", {
@@ -17869,11 +17914,11 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 			/* @__PURE__ */ h("button", {
 				type: "button",
 				className: $.topIcon,
-				title: zu.RESET_TITLE,
+				title: Bu.RESET_TITLE,
 				"aria-label": "Reset",
 				"data-toolbar-reset": !0,
 				onClick: () => {
-					_(null), _d("graph:reset-all");
+					_(null), vd("graph:reset-all");
 				},
 				children: /* @__PURE__ */ h(dl, {
 					body: (0, pl.iconBody)("rotate-ccw"),
@@ -17914,7 +17959,7 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 					children: F
 				}), P.rows.map((t, n) => {
 					if (t.kind === "dimension" || t.kind === "layer") {
-						let n = t.kind === "dimension" ? () => e.setTimeAxis((0, zu.toggleDimension)(N, t.id)) : () => e.setPreference(t.id, t.checked ? null : !0);
+						let n = t.kind === "dimension" ? () => e.setTimeAxis((0, Bu.toggleDimension)(N, t.id)) : () => e.setPreference(t.id, t.checked ? null : !0);
 						return /* @__PURE__ */ g("button", {
 							type: "button",
 							role: "menuitemcheckbox",
@@ -17941,7 +17986,7 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 						title: "Bucket size: auto, day, week, month, year",
 						"data-menu-item": !0,
 						"data-granularity": !0,
-						onClick: () => e.setTimeAxis({ granularity: (0, zu.nextGranularity)(N.granularity) }),
+						onClick: () => e.setTimeAxis({ granularity: (0, Bu.nextGranularity)(N.granularity) }),
 						children: [
 							/* @__PURE__ */ h("span", {
 								className: $.menuCheck,
@@ -18004,11 +18049,11 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 								type: "button",
 								role: "option",
 								"aria-selected": t,
-								title: (0, Vu.tagRowTitle)(e),
+								title: (0, Hu.tagRowTitle)(e),
 								className: $.menuItem,
 								"data-menu-item": !0,
 								"data-tag": e.id,
-								onClick: () => _d("graph:select-tag", { id: e.id }),
+								onClick: () => vd("graph:select-tag", { id: e.id }),
 								children: [
 									/* @__PURE__ */ h("span", {
 										className: $.menuCheck,
@@ -18041,7 +18086,7 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 					})
 				]
 			})] }),
-			/* @__PURE__ */ h(td, {
+			/* @__PURE__ */ h(nd, {
 				className: $.topIcon,
 				"data-settings-open": !0
 			})
@@ -18050,7 +18095,7 @@ function bd({ viewState: e, show: t, layouts: n, settings: i, layers: a, feedDat
 }
 //#endregion
 //#region src/components/TimeOfDay/TimeOfDay.jsx
-function xd() {
+function Sd() {
 	let e = () => typeof document < "u" && document.documentElement.getAttribute("data-pp-mode") || "dark", [t, n] = l(e);
 	return r(() => {
 		let t = new MutationObserver(() => n(e()));
@@ -18060,16 +18105,16 @@ function xd() {
 		}), () => t.disconnect();
 	}, []), t;
 }
-var Sd = {
+var Cd = {
 	position: "fixed",
 	inset: 0,
 	zIndex: -1,
 	pointerEvents: "none"
 };
-function Cd({ item: e, settings: t, viewState: n }) {
+function wd({ item: e, settings: t, viewState: n }) {
 	let i = (0, xc.config)(t), [, a] = l(0);
 	r(() => n ? n.subscribe(() => a((e) => e + 1)) : void 0, [n]);
-	let o = xd(), s = !n || !n.preference || n.preference("timeOfDay") !== !1, u = i && s ? (0, xc.ambienceFor)(e, i, o) : null, d = u ? `${u.top}|${u.bottom}` : "", [f, p] = l([null, null]), [g, _] = l(0), v = c("");
+	let o = Sd(), s = !n || !n.preference || n.preference("timeOfDay") !== !1, u = i && s ? (0, xc.ambienceFor)(e, i, o) : null, d = u ? `${u.top}|${u.bottom}` : "", [f, p] = l([null, null]), [g, _] = l(0), v = c("");
 	if (r(() => {
 		if (d === v.current) return;
 		v.current = d;
@@ -18090,7 +18135,7 @@ function Cd({ item: e, settings: t, viewState: n }) {
 		"data-tod-layer": t === g && e ? "front" : "back",
 		"data-tod-time": e ? e.time : "",
 		style: {
-			...Sd,
+			...Cd,
 			background: e ? `linear-gradient(180deg, ${e.top} 0%, ${e.bottom} 100%)` : "transparent",
 			opacity: t === g && e ? 1 : 0,
 			transition: `opacity ${y}s ease-in-out`
@@ -18099,8 +18144,8 @@ function Cd({ item: e, settings: t, viewState: n }) {
 }
 //#endregion
 //#region src/components/Theme/Theme.jsx
-var wd = Mu();
-function Td({ settings: e, viewState: t }) {
+var Td = Nu();
+function Ed({ settings: e, viewState: t }) {
 	let [, n] = l(0), i = typeof window < "u" && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null, [a, o] = l(i ? i.matches : !0);
 	r(() => t ? t.subscribe(() => n((e) => e + 1)) : void 0, [t]), r(() => {
 		if (!i) return;
@@ -18109,7 +18154,7 @@ function Td({ settings: e, viewState: t }) {
 			i.removeEventListener ? i.removeEventListener("change", e) : i.removeListener(e);
 		};
 	}, []);
-	let s = (0, Lu.themeName)(e, t && t.preference ? t.preference("theme") : null), c = e && e.theme && e.theme.mode, u = (0, Lu.themeMode)(s, t && t.preference ? t.preference("mode") : null, a, c), d = (0, wd.openingConfig)(e), f = d && d.ground === "dark" ? "dark" : u;
+	let s = (0, Ru.themeName)(e, t && t.preference ? t.preference("theme") : null), c = e && e.theme && e.theme.mode, u = (0, Ru.themeMode)(s, t && t.preference ? t.preference("mode") : null, a, c), d = (0, Td.openingConfig)(e), f = d && d.ground === "dark" ? "dark" : u;
 	return r(() => {
 		let e = document.documentElement;
 		e.getAttribute("data-pp-theme") !== s && e.setAttribute("data-pp-theme", s), e.getAttribute("data-pp-mode") !== f && e.setAttribute("data-pp-mode", f), e.getAttribute("data-pp-reader-mode") !== u && e.setAttribute("data-pp-reader-mode", u), e.style.colorScheme = f;
@@ -18119,7 +18164,7 @@ function Td({ settings: e, viewState: t }) {
 		f
 	]), null;
 }
-var Ed = {
+var Dd = {
 	cover: "_cover_1tvum_9",
 	ground: "_ground_1tvum_18",
 	groundTexture: "_groundTexture_1tvum_28",
@@ -18136,7 +18181,7 @@ var Ed = {
 	section: "_section_1tvum_225",
 	handle: "_handle_1tvum_235",
 	grip: "_grip_1tvum_232"
-}, Dd = (/* @__PURE__ */ _(((e, t) => {
+}, Od = (/* @__PURE__ */ _(((e, t) => {
 	var n = (e, t) => {
 		let n = RegExp(`\\s${t}="([^"]*)"`).exec(e);
 		return n ? n[1] : null;
@@ -18362,8 +18407,8 @@ var Ed = {
 		easeRoot: l,
 		createFollow: f
 	};
-})))(), Od = () => typeof window < "u" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-function kd(e) {
+})))(), kd = () => typeof window < "u" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function Ad(e) {
 	return new Promise((t) => {
 		if (!e) {
 			t(null);
@@ -18376,7 +18421,7 @@ function kd(e) {
 		} : null), n.onerror = () => t(null), n.src = e;
 	});
 }
-function Ad(e, t) {
+function jd(e, t) {
 	return new Promise((n) => {
 		if (!e) {
 			n(null);
@@ -18391,10 +18436,10 @@ function Ad(e, t) {
 				o.drawImage(r, 0, 0, e, i);
 				let s = o.getImageData(0, 0, e, i).data, c = t ?? 1;
 				n({
-					top: (0, wd.firstInkRow)(s, e, i),
-					bottom: (0, wd.lastInkRow)(s, e, i),
-					above: (0, wd.inkSpan)(s, e, i, 0, c),
-					below: c < 1 ? (0, wd.widestInkRow)(s, e, i, c, 1) : null
+					top: (0, Td.firstInkRow)(s, e, i),
+					bottom: (0, Td.lastInkRow)(s, e, i),
+					above: (0, Td.inkSpan)(s, e, i, 0, c),
+					below: c < 1 ? (0, Td.widestInkRow)(s, e, i, c, 1) : null
 				});
 			} catch {
 				n(null);
@@ -18402,7 +18447,7 @@ function Ad(e, t) {
 		}, r.onerror = () => n(null), r.src = e;
 	});
 }
-function jd(e) {
+function Md(e) {
 	if (typeof document > "u") return 0;
 	let t = 0;
 	for (let n of document.querySelectorAll("[data-feeds] > *, [data-top-pages], [data-settings-gear]")) {
@@ -18411,7 +18456,7 @@ function jd(e) {
 	}
 	return t;
 }
-function Md(e) {
+function Nd(e) {
 	if (typeof document > "u") return 0;
 	let t = 0;
 	for (let n of document.querySelectorAll("[data-feeds] > *:not([data-graph-intro]), [data-settings-gear]")) {
@@ -18420,7 +18465,7 @@ function Md(e) {
 	}
 	return t;
 }
-var Nd = new Set([
+var Pd = new Set([
 	"radio",
 	"slider",
 	"listbox",
@@ -18434,25 +18479,25 @@ var Nd = new Set([
 	"textbox",
 	"combobox"
 ]);
-function Pd(e) {
-	let t = e.target;
-	return !!(t && t.nodeType === 1 && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || Nd.has(t.getAttribute("role")) || t.closest("[data-reader-panel], [role=\"dialog\"], [role=\"menu\"], [data-settings-panel]") || (e.key === " " || e.key === "Spacebar") && t.closest("button, a[href], summary, [role=\"button\"]")) || typeof window < "u" && window.location.hash.startsWith("#read=") || typeof document < "u" && document.querySelector("[data-settings-panel]"));
-}
 function Fd(e) {
+	let t = e.target;
+	return !!(t && t.nodeType === 1 && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || Pd.has(t.getAttribute("role")) || t.closest("[data-reader-panel], [role=\"dialog\"], [role=\"menu\"], [data-settings-panel]") || (e.key === " " || e.key === "Spacebar") && t.closest("button, a[href], summary, [role=\"button\"]")) || typeof window < "u" && window.location.hash.startsWith("#read=") || typeof document < "u" && document.querySelector("[data-settings-panel]"));
+}
+function Id(e) {
 	let t = typeof document < "u" && document.querySelector("[data-rights]");
 	if (!t || t.getAttribute("data-rights-position") === "bottom-edge") return 0;
 	let n = t.getBoundingClientRect();
 	return n.height > 0 ? Math.max(0, e - n.top + 8) : 0;
 }
-var Id = 8, Ld = "http://www.w3.org/2000/svg";
-function Rd(e, t, { reduced: n, seed: r, skip: i = () => null }) {
+var Ld = 8, Rd = "http://www.w3.org/2000/svg";
+function zd(e, t, { reduced: n, seed: r, skip: i = () => null }) {
 	let a = /* @__PURE__ */ new Map(), o = n ? 0 : e.lagMs;
 	function s(e, n, i) {
-		let a = document.createElementNS(Ld, "g");
+		let a = document.createElementNS(Rd, "g");
 		a.setAttribute("data-reach", e), a.setAttribute("data-reach-container", n), a.setAttribute("data-reach-tip", String(i));
-		let s = document.createElementNS(Ld, "path");
+		let s = document.createElementNS(Rd, "path");
 		s.setAttribute("class", "reach-main");
-		let c = document.createElementNS(Ld, "path");
+		let c = document.createElementNS(Rd, "path");
 		return c.setAttribute("class", "reach-fine"), a.append(s, c), a.style.visibility = "hidden", t.appendChild(a), {
 			key: e,
 			g: a,
@@ -18506,14 +18551,14 @@ function Rd(e, t, { reduced: n, seed: r, skip: i = () => null }) {
 		}
 	};
 }
-function zd(e, t, n) {
+function Bd(e, t, n) {
 	let r = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Map();
 	for (let [e, r] of n) for (let n of r) for (let r of t.chains.get(n) || []) r.tip === n && i.set(r.e, e);
 	let a = document.createDocumentFragment();
 	for (let e of t.edges) {
 		let t = e.parts.map((t, n) => {
-			let r = document.createElementNS(Ld, "path");
-			return r.setAttribute("d", (0, Dd.pathD)(t.pts)), r.setAttribute("stroke", t.stroke || "#e4e1db"), r.setAttribute("stroke-width", String(t.width)), r.setAttribute("data-e", String(e.e)), r.setAttribute("data-part", String(n)), e.tip && r.setAttribute("data-tip", e.tip), i.has(e.e) && r.setAttribute("data-act-root", i.get(e.e)), a.appendChild(r), r;
+			let r = document.createElementNS(Rd, "path");
+			return r.setAttribute("d", (0, Od.pathD)(t.pts)), r.setAttribute("stroke", t.stroke || "#e4e1db"), r.setAttribute("stroke-width", String(t.width)), r.setAttribute("data-e", String(e.e)), r.setAttribute("data-part", String(n)), e.tip && r.setAttribute("data-tip", e.tip), i.has(e.e) && r.setAttribute("data-act-root", i.get(e.e)), a.appendChild(r), r;
 		});
 		r.set(e.e, t);
 	}
@@ -18524,11 +18569,11 @@ function zd(e, t, n) {
 			let i = [...e].map(([e, t]) => `${e}:${t.dx.toFixed(1)},${t.dy.toFixed(1)}`).join("|");
 			if (i === o) return;
 			o = i;
-			let a = (0, Dd.bentRoots)(t, n, e);
+			let a = (0, Od.bentRoots)(t, n, e);
 			for (let [e, t] of a) {
 				let n = r.get(e);
 				n && t.forEach((e, t) => {
-					n[t] && n[t].setAttribute("d", (0, Dd.pathD)(e));
+					n[t] && n[t].setAttribute("d", (0, Od.pathD)(e));
 				});
 			}
 		},
@@ -18538,8 +18583,8 @@ function zd(e, t, n) {
 		}
 	};
 }
-function Bd({ layout: e, size: t, which: n, opacity: r }) {
-	let i = (0, wd.titleLayout)(e, {
+function Vd({ layout: e, size: t, which: n, opacity: r }) {
+	let i = (0, Td.titleLayout)(e, {
 		left: 0,
 		top: 0,
 		width: t.w,
@@ -18568,7 +18613,7 @@ function Bd({ layout: e, size: t, which: n, opacity: r }) {
 		})
 	}) : null;
 }
-function Vd(e, t) {
+function Hd(e, t) {
 	if (!(e > 0)) return;
 	let n = Math.max(0, e * 100 - 1.5), r = Math.min(100, e * 100 + 1.5), i = t === "above" ? `linear-gradient(to bottom, #000 0%, #000 ${n}%, transparent ${r}%)` : `linear-gradient(to bottom, transparent 0%, transparent ${n}%, #000 ${r}%)`;
 	return {
@@ -18580,7 +18625,7 @@ function Vd(e, t) {
 		maskRepeat: "no-repeat"
 	};
 }
-function Hd(e) {
+function Ud(e) {
 	if (!e) return;
 	let t = e.bottom || "var(--sk-paper, var(--bg, #2a2a2e))";
 	return {
@@ -18588,16 +18633,16 @@ function Hd(e) {
 		backgroundImage: `linear-gradient(to bottom, ${e.top} 0%, ${e.top} ${(e.colorFrom * 100).toFixed(1)}%, ${t} 100%)`
 	};
 }
-function Ud(e) {
+function Wd(e) {
 	let t = `linear-gradient(to bottom, transparent 0%, transparent ${(e * 100).toFixed(1)}%, #000 100%)`;
 	return {
 		WebkitMaskImage: t,
 		maskImage: t
 	};
 }
-function Wd({ title: e, size: t, start: n, refs: r }) {
+function Gd({ title: e, size: t, start: n, refs: r }) {
 	return !e || !t ? null : /* @__PURE__ */ g("svg", {
-		className: Ed.title,
+		className: Dd.title,
 		viewBox: `0 0 ${t.w} ${t.h}`,
 		preserveAspectRatio: "none",
 		role: "heading",
@@ -18611,7 +18656,7 @@ function Wd({ title: e, size: t, start: n, refs: r }) {
 		},
 		children: [/* @__PURE__ */ h("g", {
 			ref: r.art,
-			children: /* @__PURE__ */ h(Bd, {
+			children: /* @__PURE__ */ h(Vd, {
 				layout: e.art,
 				size: t,
 				which: "art",
@@ -18619,7 +18664,7 @@ function Wd({ title: e, size: t, start: n, refs: r }) {
 			})
 		}), /* @__PURE__ */ h("g", {
 			ref: r.graph,
-			children: /* @__PURE__ */ h(Bd, {
+			children: /* @__PURE__ */ h(Vd, {
 				layout: e.graph,
 				size: t,
 				which: "graph",
@@ -18628,11 +18673,11 @@ function Wd({ title: e, size: t, start: n, refs: r }) {
 		})]
 	});
 }
-function Gd({ config: e, viewState: t, children: n }) {
-	let i = c(null), s = c(null), u = c(null), d = c(null), f = c(null), p = c(null), _ = c(null), v = c(null), y = c(null), b = c(null), x = c(null), S = c(null), C = c(null), w = c(null), T = c(0), E = c(null), D = c(null), O = c(null), k = c(null), A = c(null), j = c(null), M = c(null), N = c(null), P = c(null), ee = c(() => !1), [F, I] = l(null), te = c(null), L = c(0), R = o(Od, []), ne = o(() => (0, wd.startState)(e, {
+function Kd({ config: e, viewState: t, children: n }) {
+	let i = c(null), s = c(null), u = c(null), d = c(null), f = c(null), p = c(null), _ = c(null), v = c(null), y = c(null), b = c(null), x = c(null), S = c(null), C = c(null), w = c(null), T = c(0), E = c(null), D = c(null), O = c(null), k = c(null), A = c(null), j = c(null), M = c(null), N = c(null), P = c(null), ee = c(() => !1), [F, I] = l(null), te = c(null), L = c(0), R = o(kd, []), ne = o(() => (0, Td.startState)(e, {
 		stored: t && t.openingState ? t.openingState() : null,
 		hash: typeof window < "u" ? window.location.hash : ""
-	}), [e, t]), re = !!(e.graph && e.graph.hiddenUntilMove) && ne === "art", ie = c({ at: null }), z = () => (0, wd.revealFactor)(re, ie.current.at, performance.now()), ae = () => {
+	}), [e, t]), re = !!(e.graph && e.graph.hiddenUntilMove) && ne === "art", ie = c({ at: null }), z = () => (0, Td.revealFactor)(re, ie.current.at, performance.now()), ae = () => {
 		if (!re || ie.current.at !== null) return;
 		ie.current.at = performance.now(), document.documentElement.setAttribute("data-pp-cover-acts", "shown");
 		let e = () => {
@@ -18641,8 +18686,8 @@ function Gd({ config: e, viewState: t, children: n }) {
 		requestAnimationFrame(e);
 	}, oe = c(!1), B = c(ae);
 	B.current = ae, r(() => {
-		let t = !0, n = e.top || e.fit === "width" || e.graph.rootsFit === "width" ? Promise.all([Ad(e.art.artState, e.crownY), Ad(e.art.graphState || e.art.artState, e.crownY)]) : Promise.resolve([null, null]);
-		return Promise.all([kd(e.art.artState), n]).then(([e, [n, r]]) => {
+		let t = !0, n = e.top || e.fit === "width" || e.graph.rootsFit === "width" ? Promise.all([jd(e.art.artState, e.crownY), jd(e.art.graphState || e.art.artState, e.crownY)]) : Promise.resolve([null, null]);
+		return Promise.all([Ad(e.art.artState), n]).then(([e, [n, r]]) => {
 			t && (te.current = {
 				art: n ? n.top : null,
 				graph: r ? r.top : null,
@@ -18661,7 +18706,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 	le.current = se;
 	let ue = c(null), de = (t) => {
 		let n = window.innerWidth, r = window.innerHeight;
-		return (0, wd.coverGeometry)(le.current === e.title ? e : {
+		return (0, Td.coverGeometry)(le.current === e.title ? e : {
 			...e,
 			title: le.current
 		}, {
@@ -18671,7 +18716,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 				w: 1,
 				h: 2
 			},
-			bottom: Fd(r),
+			bottom: Id(r),
 			zoom: C.current,
 			controls: L.current,
 			ink: te.current,
@@ -18695,7 +18740,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 				dx: e.drift.x * t.homeK * r,
 				dy: e.drift.y * t.homeK * r
 			});
-			S.current ||= (0, Dd.createFollow)(R ? 0 : e.art.rootsFollowMs);
+			S.current ||= (0, Od.createFollow)(R ? 0 : e.art.rootsFollowMs);
 			let o = S.current;
 			i.draw.bend(o.step(a, performance.now())), (!o.settled() || t.moving) && pe();
 		}
@@ -18717,14 +18762,14 @@ function Gd({ config: e, viewState: t, children: n }) {
 	}, me = c(fe);
 	me.current = fe;
 	let he = (t) => {
-		let n = p.current, r = (0, wd.rootsBrightnessAt)(e, t.p), i = r === 1 ? "" : `brightness(${r.toFixed(3)})`;
+		let n = p.current, r = (0, Td.rootsBrightnessAt)(e, t.p), i = r === 1 ? "" : `brightness(${r.toFixed(3)})`;
 		b.current && b.current.style.filter !== i && (b.current.style.filter = i), n && n.style.filter !== i && (n.style.filter = i), x.current && b.current ? (b.current.style.opacity = String(t.fade.graph * t.roots), n && (n.style.opacity = "0")) : n ? n.style.opacity = String(t.fade.graph * t.roots) : f.current && (f.current.style.opacity = String(t.roots)), _.current && (_.current.style.opacity = String(t.fade.graph));
 	}, ge = () => {
-		let t = Md(window.innerHeight), n = M.current;
+		let t = Nd(window.innerHeight), n = M.current;
 		n && (n.style.height = `calc(env(safe-area-inset-top, 0px) + ${Math.ceil(t + 8)}px)`);
 		let r = j.current;
 		if (!r) return;
-		let i = `calc(env(safe-area-inset-top, 0px) + ${(0, wd.gripHeight)(t, e.grip)}px)`;
+		let i = `calc(env(safe-area-inset-top, 0px) + ${(0, Td.gripHeight)(t, e.grip)}px)`;
 		if (e.returnAbove === "crown" && P.current) {
 			let t = de(1), n = t.art.top + e.crownY * t.art.height;
 			r.style.height = `max(${i}, ${Math.max(0, Math.round(n))}px)`, r.setAttribute("data-cover-handle-to", "crown");
@@ -18733,7 +18778,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 	_e.current = ge;
 	let ve = () => {
 		let e = M.current, t = e ? e.getBoundingClientRect().bottom : 0;
-		return Math.max(jd(window.innerHeight), t);
+		return Math.max(Md(window.innerHeight), t);
 	}, ye = () => {
 		if (!P.current) return;
 		ge();
@@ -18822,7 +18867,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 			}
 		}) : [], r = () => {
 			if (!t) return;
-			ce((e) => (0, wd.fitTitle)(e, {
+			ce((e) => (0, Td.fitTitle)(e, {
 				art: n(D),
 				graph: n(O)
 			}, F.w));
@@ -18856,10 +18901,10 @@ function Gd({ config: e, viewState: t, children: n }) {
 		if (!t || !F || typeof fetch > "u") return;
 		let n = !0, r = null;
 		return fetch(t).then((e) => e.ok ? e.text() : "").then((t) => {
-			let i = b.current, a = (0, Dd.rootsModel)((0, Dd.parseRoots)(t));
+			let i = b.current, a = (0, Od.rootsModel)((0, Od.parseRoots)(t));
 			if (!n || !i || !a) return;
-			let o = (0, Dd.actRoots)(a, e.acts);
-			r = zd(i, a, o), x.current = {
+			let o = (0, Od.actRoots)(a, e.acts);
+			r = Bd(i, a, o), x.current = {
 				draw: r,
 				acts: new Set(o.keys())
 			}, i.setAttribute("data-roots-vector", "ready");
@@ -18869,7 +18914,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 			n = !1, r && r.dispose(), x.current = null;
 		};
 	}, [e, F]), r(() => {
-		e.reach && v.current && (y.current = Rd(e.reach, v.current, {
+		e.reach && v.current && (y.current = zd(e.reach, v.current, {
 			reduced: R,
 			seed: e.art.graphState || e.art.artState,
 			skip: () => x.current ? x.current.acts : null
@@ -18882,7 +18927,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 			window.removeEventListener("graph:world", t), E.current && cancelAnimationFrame(E.current), E.current = null, y.current && y.current.dispose(), y.current = null, window.PostPipeCoverFrame && delete window.PostPipeCoverFrame;
 		};
 	}, [e, R]), a(() => {
-		let n = null, r = (0, wd.createCover)(e, {
+		let n = null, r = (0, Td.createCover)(e, {
 			start: ne,
 			reducedMotion: R,
 			travel: de(0).travel,
@@ -18890,7 +18935,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 			cancelFrame: (e) => cancelAnimationFrame(e),
 			onChange(e, t) {
 				if ((e > 0 || t && t.swap) && B.current(), t && t.swap) {
-					let r = Math.round((t.ms || wd.TUNING.reducedFadeMs) / 2);
+					let r = Math.round((t.ms || Td.TUNING.reducedFadeMs) / 2);
 					oe.current = !0;
 					let a = [i.current, A.current].filter(Boolean);
 					for (let e of a) e.style.transition = `opacity ${r}ms linear`, e.style.opacity = "0";
@@ -18944,9 +18989,9 @@ function Gd({ config: e, viewState: t, children: n }) {
 			let t = e.target;
 			return !t || !t.closest ? null : d && d.contains(t) ? "edge" : l && l.contains(t) ? "stage" : k.current && k.current.contains(t) ? r.p < 1 || r.moving ? "stage" : "graph" : !c || !c.contains(t) ? null : r.moving || r.p < 1 ? "stage" : e.clientY <= p() ? "edge" : "graph";
 		}, p = () => {
-			if (e.returnAbove !== "crown" || !P.current) return wd.TUNING.edgePx;
+			if (e.returnAbove !== "crown" || !P.current) return Td.TUNING.edgePx;
 			let t = de(1);
-			return Math.max(wd.TUNING.edgePx, t.art.top + e.crownY * t.art.height);
+			return Math.max(Td.TUNING.edgePx, t.art.top + e.crownY * t.art.height);
 		}, m = (e) => {
 			if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
 			let t = f(e);
@@ -18975,8 +19020,8 @@ function Gd({ config: e, viewState: t, children: n }) {
 			passive: !0
 		}), document.documentElement.setAttribute("data-pp-cover-acts", "hidden"));
 		let y = (e) => {
-			let t = (0, wd.pageKey)(e);
-			!t || e.defaultPrevented || Pd(e) || r.key(t) && e.preventDefault();
+			let t = (0, Td.pageKey)(e);
+			!t || e.defaultPrevented || Fd(e) || r.key(t) && e.preventDefault();
 		};
 		window.addEventListener("keydown", y);
 		let b = () => {
@@ -18993,7 +19038,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 		}, w = (e) => {
 			x && (e.preventDefault(), x.moved = Math.max(x.moved, Math.abs(e.touches[0].clientY - x.y)), r.touchMove(e.touches[0].clientY, e.timeStamp || Date.now()));
 		}, E = (e) => {
-			x && (x.moved >= Id && (S = Date.now()), x = null, r.touchEnd(e.timeStamp || Date.now()));
+			x && (x.moved >= Ld && (S = Date.now()), x = null, r.touchEnd(e.timeStamp || Date.now()));
 		}, D = null, O = (e) => {
 			if (!(e.pointerType !== "mouse" || e.button !== 0)) {
 				D = {
@@ -19006,9 +19051,9 @@ function Gd({ config: e, viewState: t, children: n }) {
 				r.touchStart(e.clientY, e.timeStamp || Date.now());
 			}
 		}, M = (e) => {
-			D && (D.moved = Math.max(D.moved, Math.abs(e.clientY - D.y)), D.moved >= Id && r.touchMove(e.clientY, e.timeStamp || Date.now()));
+			D && (D.moved = Math.max(D.moved, Math.abs(e.clientY - D.y)), D.moved >= Ld && r.touchMove(e.clientY, e.timeStamp || Date.now()));
 		}, F = (e) => {
-			D && (D.moved >= Id && (S = Date.now()), D = null, r.touchEnd(e.timeStamp || Date.now()));
+			D && (D.moved >= Ld && (S = Date.now()), D = null, r.touchEnd(e.timeStamp || Date.now()));
 		};
 		d && (d.addEventListener("pointerdown", O), d.addEventListener("pointermove", M), d.addEventListener("pointerup", F), d.addEventListener("pointercancel", F));
 		let I = [l, d].filter(Boolean);
@@ -19031,31 +19076,31 @@ function Gd({ config: e, viewState: t, children: n }) {
 	return /* @__PURE__ */ g(m, { children: [
 		/* @__PURE__ */ g("div", {
 			ref: i,
-			className: Ed.cover,
+			className: Dd.cover,
 			"data-cover": !0,
 			"data-ground": e.ground,
 			children: [
 				/* @__PURE__ */ h("div", {
 					ref: s,
-					className: Ed.ground,
+					className: Dd.ground,
 					"data-cover-ground": !0,
 					"data-sky": e.sky ? "" : void 0,
 					style: {
 						opacity: +!!Te,
-						...Hd(e.sky)
+						...Ud(e.sky)
 					},
 					children: e.sky && e.sky.texture > 0 && /* @__PURE__ */ h("div", {
-						className: Ed.groundTexture,
+						className: Dd.groundTexture,
 						"data-cover-ground-texture": !0,
 						style: {
 							opacity: e.sky.texture,
-							...Ud(e.sky.textureFrom)
+							...Wd(e.sky.textureFrom)
 						}
 					})
 				}),
 				/* @__PURE__ */ g("div", {
 					ref: u,
-					className: Ed.stage,
+					className: Dd.stage,
 					role: "button",
 					tabIndex: Te ? 0 : -1,
 					"aria-label": "Show the graph",
@@ -19069,13 +19114,13 @@ function Gd({ config: e, viewState: t, children: n }) {
 					},
 					children: [/* @__PURE__ */ g("div", {
 						ref: d,
-						className: Ed.art,
+						className: Dd.art,
 						"data-cover-art": !0,
 						style: { opacity: 0 },
 						children: [
 							/* @__PURE__ */ h("img", {
 								ref: f,
-								className: Ed.image,
+								className: Dd.image,
 								src: e.art.artState,
 								alt: "",
 								draggable: "false",
@@ -19084,41 +19129,41 @@ function Gd({ config: e, viewState: t, children: n }) {
 							}),
 							e.art.graphState && /* @__PURE__ */ h("img", {
 								ref: p,
-								className: Ed.image,
+								className: Dd.image,
 								src: e.art.graphState,
 								alt: "",
 								draggable: "false",
 								"data-cover-image": "graph",
 								style: {
 									opacity: Te ? 0 : e.backdrop.opacity,
-									...Vd(e.backdrop.keepAbove, "below")
+									...Hd(e.backdrop.keepAbove, "below")
 								}
 							}),
 							e.art.graphState && e.backdrop.keepAbove > 0 && /* @__PURE__ */ h("img", {
 								ref: _,
-								className: Ed.image,
+								className: Dd.image,
 								src: e.art.graphState,
 								alt: "",
 								draggable: "false",
 								"data-cover-image": "graph-keep",
 								style: {
 									opacity: +!Te,
-									...Vd(e.backdrop.keepAbove, "above")
+									...Hd(e.backdrop.keepAbove, "above")
 								}
 							}),
 							e.art.rootsVector && /* @__PURE__ */ h("svg", {
 								ref: b,
-								className: Ed.roots,
+								className: Dd.roots,
 								"aria-hidden": "true",
 								"data-roots-vector": "loading",
 								preserveAspectRatio: "none",
 								viewBox: F ? `0 0 ${F.w} ${F.h}` : void 0,
 								style: {
 									opacity: 0,
-									...Vd(e.backdrop.keepAbove, "below")
+									...Hd(e.backdrop.keepAbove, "below")
 								}
 							}),
-							/* @__PURE__ */ h(Wd, {
+							/* @__PURE__ */ h(Gd, {
 								title: se,
 								size: F,
 								start: ne,
@@ -19129,7 +19174,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 							})
 						]
 					}), e.alt && /* @__PURE__ */ h("span", {
-						className: Ed.alt,
+						className: Dd.alt,
 						role: "img",
 						"aria-label": e.alt,
 						"data-cover-alt": !0
@@ -19137,7 +19182,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 				}),
 				e.reach && /* @__PURE__ */ h("svg", {
 					ref: v,
-					className: Ed.reach,
+					className: Dd.reach,
 					"aria-hidden": "true",
 					"data-cover-reach": !0,
 					style: { opacity: 0 }
@@ -19146,14 +19191,14 @@ function Gd({ config: e, viewState: t, children: n }) {
 		}),
 		/* @__PURE__ */ g("div", {
 			ref: A,
-			className: Ed.section,
+			className: Dd.section,
 			"data-cover-section": !0,
 			style: Te ? { pointerEvents: "none" } : void 0,
 			children: [
 				n,
 				e.band && /* @__PURE__ */ h("div", {
 					ref: M,
-					className: Ed.band,
+					className: Dd.band,
 					"data-top-band": !0,
 					"aria-hidden": "true",
 					style: { background: e.band.color }
@@ -19161,7 +19206,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 				/* @__PURE__ */ h("button", {
 					ref: j,
 					type: "button",
-					className: Ed.handle,
+					className: Dd.handle,
 					"aria-label": "Show the cover",
 					title: "Show the cover",
 					"data-cover-handle": !0,
@@ -19172,7 +19217,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 					},
 					onClick: () => we("art"),
 					children: /* @__PURE__ */ h("span", {
-						className: Ed.grip,
+						className: Dd.grip,
 						"aria-hidden": "true"
 					})
 				})
@@ -19180,7 +19225,7 @@ function Gd({ config: e, viewState: t, children: n }) {
 		}),
 		e.byline.text && /* @__PURE__ */ h("a", {
 			ref: k,
-			className: `${Ed.byline} ${e.title ? Ed.bylineTitle : ""}`,
+			className: `${Dd.byline} ${e.title ? Dd.bylineTitle : ""}`,
 			href: e.byline.href || void 0,
 			"data-cover-byline": e.title ? "title" : "art",
 			style: {
@@ -19191,13 +19236,13 @@ function Gd({ config: e, viewState: t, children: n }) {
 				} : null
 			},
 			onClick: (e) => e.stopPropagation(),
-			children: (0, wd.bylineText)(e.byline)
+			children: (0, Td.bylineText)(e.byline)
 		})
 	] });
 }
-function Kd({ settings: e, viewState: t, children: n }) {
-	let r = o(() => (0, wd.openingConfig)(e), [e]);
-	return r ? /* @__PURE__ */ h(Gd, {
+function qd({ settings: e, viewState: t, children: n }) {
+	let r = o(() => (0, Td.openingConfig)(e), [e]);
+	return r ? /* @__PURE__ */ h(Kd, {
 		config: r,
 		viewState: t,
 		children: n
@@ -19205,7 +19250,7 @@ function Kd({ settings: e, viewState: t, children: n }) {
 }
 //#endregion
 //#region src/components/Contributions/useContributions.js
-function qd(e, t) {
+function Jd(e, t) {
 	let n = JSON.stringify(e && e.contributions || null), i = o(() => (0, Sc.contributionsConfig)(e), [n]), [a, s] = l(null);
 	r(() => {
 		if (!i) return;
@@ -19234,7 +19279,7 @@ function qd(e, t) {
 }
 //#endregion
 //#region src/views/index.js
-var Jd = (/* @__PURE__ */ _(((e, t) => {
+var Yd = (/* @__PURE__ */ _(((e, t) => {
 	var n = ["cluster"], r = (e) => typeof e == "string" ? e.trim() : "";
 	function i(e, t) {
 		let n = Array.isArray(e) ? e : [], i = r(t);
@@ -19280,7 +19325,7 @@ var Jd = (/* @__PURE__ */ _(((e, t) => {
 		viewFromSearch: s,
 		currentView: c
 	};
-})))(), Yd = [{
+})))(), Xd = [{
 	id: "cluster",
 	label: "cluster",
 	component: Qc,
@@ -19291,9 +19336,9 @@ var Jd = (/* @__PURE__ */ _(((e, t) => {
 	component: Qc,
 	props: { layout: "radial" }
 }];
-function Xd(e, t = Yd, n) {
-	return (0, Jd.siteViews)(e, t, n);
+function Zd(e, t = Xd, n) {
+	return (0, Yd.siteViews)(e, t, n);
 }
 //#endregion
-var Zd = Lc.PREF, Qd = Lc.chosenOrder, $d = Jd.currentView, ef = Cc.followLink, tf = Al.graphFeed, nf = Cc.isLinkItem, rf = Cc.linkOf, af = Al.resolvePages, of = Al.resumeTarget, sf = zu.toolbarConfig, cf = Al.topBarConfig, lf = Al.topBarOrder, uf = Jd.viewById, df = Jd.viewFromSearch, ff = Jd.viewLayout;
-export { sd as ConfigPanel, Bl as FeedZ, Qc as GraphViewer, Kd as Opening, Zd as READING_ORDER_PREF, e as React, u as ReactDOM, vu as ReaderPanel, nd as Settings, $o as TTS, Td as Theme, Cd as TimeOfDay, md as TimeOverlay, vd as Toolbar, Yd as VIEWS, Qd as chosenOrder, $d as currentView, ef as followLink, tf as graphFeed, nf as isLinkItem, rf as linkOf, af as resolvePages, of as resumeTarget, Xd as siteViews, sf as toolbarConfig, cf as topBarConfig, lf as topBarOrder, qd as useContributions, uf as viewById, df as viewFromSearch, ff as viewLayout };
+var Qd = Lc.PREF, $d = Lc.chosenOrder, ef = Yd.currentView, tf = Cc.followLink, nf = Al.graphFeed, rf = Cc.isLinkItem, af = Cc.linkOf, of = Al.resolvePages, sf = Al.resumeTarget, cf = Bu.toolbarConfig, lf = Al.topBarConfig, uf = Al.topBarOrder, df = Yd.viewById, ff = Yd.viewFromSearch, pf = Yd.viewLayout;
+export { cd as ConfigPanel, Bl as FeedZ, Qc as GraphViewer, qd as Opening, Qd as READING_ORDER_PREF, e as React, u as ReactDOM, yu as ReaderPanel, rd as Settings, $o as TTS, Ed as Theme, wd as TimeOfDay, hd as TimeOverlay, yd as Toolbar, Xd as VIEWS, $d as chosenOrder, ef as currentView, tf as followLink, nf as graphFeed, rf as isLinkItem, af as linkOf, of as resolvePages, sf as resumeTarget, Zd as siteViews, cf as toolbarConfig, lf as topBarConfig, uf as topBarOrder, Jd as useContributions, df as viewById, ff as viewFromSearch, pf as viewLayout };

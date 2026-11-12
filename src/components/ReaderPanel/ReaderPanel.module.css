@@ -481,12 +481,33 @@
   text-decoration: underline;
 }
 
+/* The text's own box: the scroll body, with the two arrows that travel with
+   the text pinned at its sides (.turnArrow, below). The arrows' size and
+   place set the body's side padding, so they sit in the text's margin and
+   never over a word. */
+.bodyWrap {
+  --rp-arrow-size: 36px;
+  --rp-arrow-inset: 5px;
+  --rp-arrow-gap: 5px;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
-  padding: 32px 40px 48px;
+  /* The sides: room for an arrow and a little air before the text (46px;
+     40px before the arrows, 2026-11-11). */
+  padding: 32px calc(var(--rp-arrow-inset) + var(--rp-arrow-size) + var(--rp-arrow-gap)) 48px;
+  /* A word too long for the column breaks rather than running into the
+     margin, under an arrow. */
+  overflow-wrap: break-word;
   line-height: 1.9;
   font-size: calc(15px * var(--pp-text-scale, 1));
   color: var(--rp-text);
@@ -572,6 +593,17 @@
   max-width: 100%;
   white-space: normal;
   overflow-wrap: break-word;
+}
+/* A code block or a table wider than the text scrolls sideways inside the
+   column, so nothing runs into the margins where the arrows are. */
+.body [data-reader-text] pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.body [data-reader-text] table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .articleHeader {
@@ -941,8 +973,11 @@
 }
 
 @media print {
-  .overlay, .toolbar, .progress, .progressSide, .frontmatterPanel, .marksPanel, .copyToast {
+  .overlay, .toolbar, .progress, .progressSide, .frontmatterPanel, .marksPanel, .copyToast, .turnArrow {
     display: none !important;
+  }
+  .bodyWrap {
+    display: block;
   }
   .panel {
     position: static !important;
@@ -1078,6 +1113,59 @@
   font-size: 12px;
   font-style: italic;
   color: var(--rp-accent);
+}
+
+/* The arrows that travel with the text (Harold, 2026-11-11: "The next and
+   previous arrows travel with the text, so nobody has to go to the top or
+   bottom to find them."): a quiet round button at each side of the text's
+   box, halfway down what the reader shows, in the text's margin, raised on
+   hover and focus. The same beside the graph, wide, filling the window and
+   on a phone. The plainest look; the design is Harold's to give. */
+.turnArrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: var(--rp-arrow-size);
+  height: var(--rp-arrow-size);
+  margin-top: calc(var(--rp-arrow-size) / -2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--rp-border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--rp-surface) 85%, transparent);
+  color: var(--rp-accent);
+  cursor: pointer;
+  opacity: 0.8;
+  touch-action: manipulation;
+  transition: opacity 0.2s, background 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.turnPrev { left: var(--rp-arrow-inset); }
+.turnNext { right: var(--rp-arrow-inset); }
+.turnArrow :global(svg) {
+  width: 18px;
+  height: 18px;
+}
+.turnArrow:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--rp-accent) 14%, var(--rp-surface));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transform: translateY(-1px);
+  outline: 2px solid var(--rp-accent);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .turnArrow:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--rp-accent) 14%, var(--rp-surface));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    transform: translateY(-1px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turnArrow { transition: none; }
+  .turnArrow:hover, .turnArrow:focus-visible { transform: none; }
 }
 
 /* A page turn: the chapter leaves toward the side it was turned to and the
