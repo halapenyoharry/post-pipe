@@ -84,7 +84,8 @@ const BLOCKED_HELP = 'Cloudflare blocked the page. Medium does this to headless 
 async function readPage(page) {
   const title = await page.title().catch(() => '');
   const bodyText = await page.evaluate(() => (document.body && document.body.innerText) || '').catch(() => '');
-  const signInVisible = await page.locator('[data-testid="headerSignInButton"]').first().isVisible().catch(() => false);
+  // Medium renders the header twice (wide and narrow layouts); one copy is hidden.
+  const signInVisible = (await page.locator('[data-testid="headerSignInButton"]:visible').count().catch(() => 0)) > 0;
   return { title, url: page.url(), bodyText, signInVisible };
 }
 
