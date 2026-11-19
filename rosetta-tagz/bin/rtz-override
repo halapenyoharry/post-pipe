@@ -35,6 +35,7 @@ switch (verb) {
   case 'show':
     process.stdout.write(JSON.stringify(data, null, 2) + '\n');
     process.exit(0);
+    break;
   case 'same':
     if (args.length < 2) die('same needs at least two labels');
     push('same', args);
