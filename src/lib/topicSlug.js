@@ -80,7 +80,8 @@
 const { slugify } = require('./cardSlug');
 
 // The issue's stop words, as it gave them.
-const STOP = new Set(`a about above across after again against all almost alone along already also although always
+const STOP = new Set(
+  `a about above across after again against all almost alone along already also although always
 am among amongst an and another any anybody anyone anything anywhere apart appear appearing appears around as ask
 asking asks at atop back be became because become becomes becoming been before began begin beginning begins behind
 being below beneath beside besides between beyond both bring bringing brings brought build building builds built
@@ -115,18 +116,67 @@ turning turns two typical typically under underneath unless unlike until unto up
 usually various very via virtually want wanted wanting wants was way ways we week weeks well were what whatever
 when whenever where whereas wherever whether which while whilst who whoever whole wholly whom whomever whose why
 will with within without word words work worked working works would write writes writing written year years yet
-you your yours yourself yourselves`.split(/\s+/));
+you your yours yourself yourselves`.split(/\s+/),
+);
 
 // Generic document/archive meta-words that describe form rather than topic.
 const ARCHIVE_META = new Set([
-  'paper', 'papers', 'zpaper', 'zpapers', 'whitepaper', 'whitepapers',
-  'article', 'articles', 'essay', 'essays', 'post', 'posts', 'chapter', 'chapters',
-  'section', 'sections', 'figure', 'figures', 'table', 'tables',
-  'model', 'models', 'system', 'systems', 'human', 'humans', 'machine', 'machines',
-  'collaboration', 'argument', 'analysis', 'theory', 'theories',
-  'book', 'books', 'press', 'university', 'edition', 'volume',
-  'living', 'document', 'documents', 'version', 'versions', 'draft',
-  'http', 'https', 'www', 'org', 'com', 'edu', 'net', 'html', 'htm', 'pdf', 'svg',
+  'paper',
+  'papers',
+  'zpaper',
+  'zpapers',
+  'whitepaper',
+  'whitepapers',
+  'article',
+  'articles',
+  'essay',
+  'essays',
+  'post',
+  'posts',
+  'chapter',
+  'chapters',
+  'section',
+  'sections',
+  'figure',
+  'figures',
+  'table',
+  'tables',
+  'model',
+  'models',
+  'system',
+  'systems',
+  'human',
+  'humans',
+  'machine',
+  'machines',
+  'collaboration',
+  'argument',
+  'analysis',
+  'theory',
+  'theories',
+  'book',
+  'books',
+  'press',
+  'university',
+  'edition',
+  'volume',
+  'living',
+  'document',
+  'documents',
+  'version',
+  'versions',
+  'draft',
+  'http',
+  'https',
+  'www',
+  'org',
+  'com',
+  'edu',
+  'net',
+  'html',
+  'htm',
+  'pdf',
+  'svg',
 ]);
 
 // (b) Common English verbs in their forms, beside those STOP holds. A verb
@@ -134,7 +184,8 @@ const ARCHIVE_META = new Set([
 // play, power, support, test, vote), or only the forms that rarely do are
 // in (acting, covered, feared, tested): a verb missed here costs a weaker
 // pair, a subject wrongly here costs the subject.
-const VERBS = new Set(`accept accepted accepting accepts according achieve achieved achieves achieving acted acting add added
+const VERBS = new Set(
+  `accept accepted accepting accepts according achieve achieved achieves achieving acted acting add added
 adding adds affect affected affecting affects agree agreed agreeing agrees allow allowed allowing allows analyse
 analysed analysing analyze analyzed analyzes analyzing announce announced announces announcing appeared apply applied
 applies applying argue argued argues arguing arrive arrived arrives arriving asked associated assume assumed assumes
@@ -174,12 +225,14 @@ speaking speaks spend spends spent spoke spoken stand standing stands stood stop
 studying succeed succeeded succeeding succeeds talk talked talking talks tend tended tending tends tested thought told
 trigger triggered triggering triggers uncover uncovered uncovering uncovers understand understanding understands
 understood unlock unlocked unlocking unlocks wait waited waiting waits warn warned warning warns went win winning wins
-won wonder wondered wondering wonders wrote`.split(/\s+/));
+won wonder wondered wondering wonders wrote`.split(/\s+/),
+);
 
 // (b) Words that frame a claim, a study or a story rather than name what it
 // is about: its findings, limits and evidence, who found them, how striking
 // they are, how many and how long.
-const FRAMING = new Set(`abilities ability able actually advance advances alarming approach approaches area areas aspect
+const FRAMING = new Set(
+  `abilities ability able actually advance advances alarming approach approaches area areas aspect
 aspects assumption assumptions astonishing author authors bad best better billion billions breakthrough breakthroughs
 capabilities capability challenge challenges clear clearly clue clues common commonly concept concepts conclusion
 conclusions consequence consequences critical crucial currently day days decade decades detail details difference
@@ -196,31 +249,81 @@ researchers researching role roles scientist scientists sense seven shocking sit
 sorts specific startling statement statements step steps stories story striking strong stronger strongest stunning
 sudden suddenly surprise surprised surprises surprising surprisingly team teams ten thirty thousand thousands tiny
 topic topics trillion troubling twenty twist twists type types unable unexpected unexpectedly unique unprecedented
-vast vital weak weaker weakest widely worse worst`.split(/\s+/));
+vast vital weak weaker weakest widely worse worst`.split(/\s+/),
+);
 
 // (b) What a contraction leaves when its apostrophe splits it: doesn't is
 // doesn and t, and t is too short to be a word anyway.
 const CONTRACTION_STUBS = new Set([
-  'ain', 'aren', 'couldn', 'didn', 'doesn', 'don', 'hadn', 'hasn', 'haven', 'isn',
-  'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn', 'weren', 'won', 'wouldn',
+  'ain',
+  'aren',
+  'couldn',
+  'didn',
+  'doesn',
+  'don',
+  'hadn',
+  'hasn',
+  'haven',
+  'isn',
+  'mightn',
+  'mustn',
+  'needn',
+  'shan',
+  'shouldn',
+  'wasn',
+  'weren',
+  'won',
+  'wouldn',
 ]);
 
 // (b) Function words the issue's list does not hold.
-const FUNCTION_WORDS = new Set(['ago', 'amid', 'amidst', 'away', 'despite', 'hence', 'not', 'thereby', 'versus', 'yes']);
+const FUNCTION_WORDS = new Set([
+  'ago',
+  'amid',
+  'amidst',
+  'away',
+  'despite',
+  'hence',
+  'not',
+  'thereby',
+  'versus',
+  'yes',
+]);
 
 // The stop words change b adds.
 const isAddedStop = (w) => VERBS.has(w) || FRAMING.has(w) || CONTRACTION_STUBS.has(w) || FUNCTION_WORDS.has(w);
 const isStop = (w) => STOP.has(w) || ARCHIVE_META.has(w) || isAddedStop(w);
 
 const IRREGULAR = new Map([
-  ['people', 'person'], ['children', 'child'], ['men', 'man'], ['women', 'woman'],
-  ['analyses', 'analysis'], ['theses', 'thesis'], ['phenomena', 'phenomenon'],
-  ['criteria', 'criterion'], ['lives', 'life'], ['knives', 'knife'],
+  ['people', 'person'],
+  ['children', 'child'],
+  ['men', 'man'],
+  ['women', 'woman'],
+  ['analyses', 'analysis'],
+  ['theses', 'thesis'],
+  ['phenomena', 'phenomenon'],
+  ['criteria', 'criterion'],
+  ['lives', 'life'],
+  ['knives', 'knife'],
 ]);
 
 const KEEP_FINAL_S = new Set([
-  'news', 'series', 'species', 'lens', 'chaos', 'bias', 'canvas', 'atlas',
-  'texas', 'ethics', 'mathematics', 'physics', 'economics', 'politics', 'dynamics', 'thermodynamics',
+  'news',
+  'series',
+  'species',
+  'lens',
+  'chaos',
+  'bias',
+  'canvas',
+  'atlas',
+  'texas',
+  'ethics',
+  'mathematics',
+  'physics',
+  'economics',
+  'politics',
+  'dynamics',
+  'thermodynamics',
 ]);
 
 function undouble(w) {
@@ -258,10 +361,12 @@ function decodeEntities(s) {
 }
 
 function stripMarkup(raw) {
-  return decodeEntities(String(raw ?? '')
-    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, ' ')
-    .replace(/<(svg|script|style)[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<[^>]+>/g, ' '))
+  return decodeEntities(
+    String(raw ?? '')
+      .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, ' ')
+      .replace(/<(svg|script|style)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, ' '),
+  )
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
@@ -323,7 +428,11 @@ function tagsOf(it, foundTags = 'text') {
     }
   }
   const have = new Set(tags.map((t) => t.trim()));
-  for (const v of origins.keys()) if (!have.has(v)) { have.add(v); tags.push(v); }
+  for (const v of origins.keys())
+    if (!have.has(v)) {
+      have.add(v);
+      tags.push(v);
+    }
   if (foundTags === 'tags') return tags;
   const found = (t) => {
     const o = origins.get(t.trim());
@@ -395,8 +504,8 @@ function extractZones(item, foundTags = 'text') {
   // Subject set: prefer explicit subject metadata (subtitle, tags, topology,
   // summary). Fall back to title + body when metadata is absent (metadata is
   // a gradient, not a gate).
-  const hasExplicitSubject = words.subtitle.length + words.tags.length + words.topology.length
-    + tagPhrases.filter(isWholeTag).length > 0;
+  const hasExplicitSubject =
+    words.subtitle.length + words.tags.length + words.topology.length + tagPhrases.filter(isWholeTag).length > 0;
   const subjectSeq = hasExplicitSubject
     ? [...words.subtitle, ...words.tags, ...words.topology, ...words.summary]
     : [...words.title, ...words.summary, ...words.body.slice(0, 100)];
@@ -406,9 +515,11 @@ function extractZones(item, foundTags = 'text') {
   // no body, all it carries, as the issue counts a word.
   const countStems = words.body.length
     ? stems.body
-    : joined(hasExplicitSubject
-      ? [stems.subtitle, stems.tags, stems.topology, stems.summary, stems.title, stems.body]
-      : [stems.title, stems.summary, stems.title, stems.body]);
+    : joined(
+        hasExplicitSubject
+          ? [stems.subtitle, stems.tags, stems.topology, stems.summary, stems.title, stems.body]
+          : [stems.title, stems.summary, stems.title, stems.body],
+      );
   // Everything the card carries, for the corpus count.
   const docStems = joined(ZONES.map((zone) => stems[zone]));
 
@@ -482,7 +593,7 @@ function rank(z, corpusStats) {
   const N = corpusStats && corpusStats.N ? corpusStats.N : 1;
   const df = corpusStats && corpusStats.df ? corpusStats.df : null;
   const idfOf = (key) => {
-    const docFreq = df ? (df.get(key) || 1) : 1;
+    const docFreq = df ? df.get(key) || 1 : 1;
     return { docFreq, idf: df && N > 1 ? Math.log((N + 1) / (docFreq + 0.5)) + 1 : 1 };
   };
 
@@ -530,14 +641,21 @@ function rank(z, corpusStats) {
     if (has('title')) inZones.push('title');
     inZones.push('body');
 
-    const boost = 2.2
-      * (has('subtitle') ? 2.0 : 1.0)
-      * (has('topology') ? 1.4 : 1.0)
-      * (has('summary') ? 1.3 : 1.0);
+    const boost = 2.2 * (has('subtitle') ? 2.0 : 1.0) * (has('topology') ? 1.4 : 1.0) * (has('summary') ? 1.3 : 1.0);
 
     const score = Number(((1 + Math.log(tf)) * idf * boost).toFixed(2));
     const orders = [at, ...t.stems.filter((s) => subjectOrder.has(s)).map((s) => subjectOrder.get(s))];
-    wholes.push({ key: t.key, stems: t.stems, word: t.text, score, tf, df: docFreq, order: Math.min(...orders), in: inZones, whole: true });
+    wholes.push({
+      key: t.key,
+      stems: t.stems,
+      word: t.text,
+      score,
+      tf,
+      df: docFreq,
+      order: Math.min(...orders),
+      in: inZones,
+      whole: true,
+    });
   }
 
   // (a) Each word of a whole tag is that tag's (the best-scoring one holding
@@ -568,10 +686,11 @@ function rank(z, corpusStats) {
     if (titleSet.has(s)) inZones.push('title');
     if (bodyTf.has(s)) inZones.push('body');
 
-    const boost = (tagSet.has(s) ? 2.2 : 1.0)
-      * (subSet.has(s) ? 2.0 : 1.0)
-      * (topoSet.has(s) ? 1.4 : 1.0)
-      * (sumSet.has(s) ? 1.3 : 1.0);
+    const boost =
+      (tagSet.has(s) ? 2.2 : 1.0) *
+      (subSet.has(s) ? 2.0 : 1.0) *
+      (topoSet.has(s) ? 1.4 : 1.0) *
+      (sumSet.has(s) ? 1.3 : 1.0);
 
     const score = Number(((1 + Math.log(tf)) * idf * boost).toFixed(2));
     const owner = ownerOf.get(s);
@@ -580,7 +699,17 @@ function rank(z, corpusStats) {
       return;
     }
     const order = subjectOrder.has(s) ? subjectOrder.get(s) : 10000 + idx;
-    candidates.push({ key: s, stems: [s], word: surface.get(s) || s, score, tf, df: docFreq, order, in: inZones, whole: false });
+    candidates.push({
+      key: s,
+      stems: [s],
+      word: surface.get(s) || s,
+      score,
+      tf,
+      df: docFreq,
+      order,
+      in: inZones,
+      whole: false,
+    });
   });
 
   return [...candidates, ...wholes].sort((a, b) => b.score - a.score || a.order - b.order);
@@ -629,7 +758,8 @@ function slugOf(pair, z) {
   return { words, slug: slugify(words.join('-')) || 'untitled' };
 }
 
-const shown = (ranked) => ranked.slice(0, 8).map(({ word, score, tf, df: d, in: z }) => ({ word, score, tf, df: d, in: z }));
+const shown = (ranked) =>
+  ranked.slice(0, 8).map(({ word, score, tf, df: d, in: z }) => ({ word, score, tf, df: d, in: z }));
 
 function topicSlug(item, corpusStats = null, options = {}) {
   const z = extractZones(item, foundTagsOf(options));

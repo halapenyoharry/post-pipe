@@ -45,12 +45,15 @@ function actsApart(acts, { gap = 16 } = {}) {
     const step = Math.max(1, size / 32);
     let d = 0;
     for (let guard = 0; guard < 4096 && hit(d); guard++) d += step;
-    let lo = Math.max(0, d - step), hi = d;
+    let lo = Math.max(0, d - step),
+      hi = d;
     for (let i = 0; i < 24; i++) {
       const mid = (lo + hi) / 2;
-      if (hit(mid)) lo = mid; else hi = mid;
+      if (hit(mid)) lo = mid;
+      else hi = mid;
     }
-    const dx = ux * hi, dy = uy * hi;
+    const dx = ux * hi,
+      dy = uy * hi;
     a.box = shifted(a.box, dx, dy);
     out.set(a.id, { dx, dy });
   }

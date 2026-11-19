@@ -17,7 +17,10 @@ test('text: names every card, writes the top terms, the tagz with concept, weigh
   assert.match(text, /^flow test-by-weight: 6 cards, mode score, \d+ seams/);
   assert.match(text, /weights: tag\.site 1 · degree 1 · recency 1 · source 1 \(every source\)/);
   assert.match(text, /tag alpha \(c_alpha\) weight 1 explicit · also #\d+ Card (one|two)/);
-  assert.match(text, /tag beta \(c_beta\) weight 0\.5 discovered · why: recurs in 2 of 6 items; 3× here · also #\d+ Card three/);
+  assert.match(
+    text,
+    /tag beta \(c_beta\) weight 0\.5 discovered · why: recurs in 2 of 6 items; 3× here · also #\d+ Card three/,
+  );
   assert.match(text, /-- seam: not reachable from #\d+ in the subfield --\n#\d+ {2}\d\.\d{3} {2}Card six/);
   assert.match(text, /untagged: only tagz under the 1\.6× source coherence bar: omega 1\.2/);
   // Each full card's second line is its top three terms in words.
@@ -32,7 +35,12 @@ test('text: beyond --full a card is one line with rank, score, title and tag lab
   const light = text.split('\n').filter((l) => /^#[3-6] {2}/.test(l));
   assert.equal(light.length, 4);
   for (const l of light) assert.match(l, /^#\d {2}\d\.\d{3} {2}Card \w+ {2}\[.*\]$/);
-  assert.equal(renderText(flow, { full: 0 }).split('\n').filter((l) => l.startsWith('    tag ')).length, 0);
+  assert.equal(
+    renderText(flow, { full: 0 })
+      .split('\n')
+      .filter((l) => l.startsWith('    tag ')).length,
+    0,
+  );
 });
 
 test('text: header line names the start card when walk rule is not heaviest', () => {
@@ -41,10 +49,16 @@ test('text: header line names the start card when walk rule is not heaviest', ()
   assert.match(renderText(heaviest, { full: 1 }), /^flow test-by-neighbourhood: 6 cards, mode walk, \d+ seams/);
 
   const newest = orderFlow(scored, { mode: 'walk', walkStart: 'newest' });
-  assert.match(renderText(newest, { full: 1 }), /^flow test-by-neighbourhood: 6 cards, mode walk, start Card one \(newest\), \d+ seams/);
+  assert.match(
+    renderText(newest, { full: 1 }),
+    /^flow test-by-neighbourhood: 6 cards, mode walk, start Card one \(newest\), \d+ seams/,
+  );
 
   const explicit = orderFlow(scored, { mode: 'walk', start: 'https://example.test/c5' });
-  assert.match(renderText(explicit, { full: 1 }), /^flow test-by-neighbourhood: 6 cards, mode walk, start Card five \(explicit\), \d+ seams/);
+  assert.match(
+    renderText(explicit, { full: 1 }),
+    /^flow test-by-neighbourhood: 6 cards, mode walk, start Card five \(explicit\), \d+ seams/,
+  );
 });
 
 test('path: an SVG the size of the viewport with one segment per step, seams dashed, a mark per card, a legend naming the preset', () => {

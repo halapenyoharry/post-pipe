@@ -6,11 +6,27 @@ import { fromPairs } from './pairs.js';
 import { fromFrontmatterDir, fromMarkdownDir } from './folders.js';
 
 export const ADAPTERS = {
-  jsonfeed: { input: 'file', run: (p, o) => fromJsonFeed(fs.readFileSync(p, 'utf8'), o), about: 'JSON Feed 1.1 / post-pipe feed.json' },
-  pairs: { input: 'file', run: (p, o) => fromPairs(fs.readFileSync(p, 'utf8'), o), about: 'TSV: item<TAB>tag[<TAB>title<TAB>url]' },
+  jsonfeed: {
+    input: 'file',
+    run: (p, o) => fromJsonFeed(fs.readFileSync(p, 'utf8'), o),
+    about: 'JSON Feed 1.1 / post-pipe feed.json',
+  },
+  pairs: {
+    input: 'file',
+    run: (p, o) => fromPairs(fs.readFileSync(p, 'utf8'), o),
+    about: 'TSV: item<TAB>tag[<TAB>title<TAB>url]',
+  },
   frontmatter: { input: 'dir', run: fromFrontmatterDir, about: 'folder of <piece>/frontmatter.json (post-pipe Gen-2)' },
-  markdown: { input: 'dir', run: fromMarkdownDir, about: 'folder of .md with YAML tags (Obsidian); --inline adds #hashtags' },
-  jsonl: { input: 'file', run: (p) => parseJSONL(fs.readFileSync(p, 'utf8'), p), about: 'already in rosetta-tagz record format' },
+  markdown: {
+    input: 'dir',
+    run: fromMarkdownDir,
+    about: 'folder of .md with YAML tags (Obsidian); --inline adds #hashtags',
+  },
+  jsonl: {
+    input: 'file',
+    run: (p) => parseJSONL(fs.readFileSync(p, 'utf8'), p),
+    about: 'already in rosetta-tagz record format',
+  },
 };
 
 export function runAdapter(name, target, opts = {}) {

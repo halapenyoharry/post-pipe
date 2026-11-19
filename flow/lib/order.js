@@ -63,7 +63,12 @@ function tagzOf(card) {
     const id = hyperedgeId(ref);
     if (seen.has(id)) continue;
     seen.add(id);
-    const t = { id, label: ref.value, weight: Number.isFinite(Number(ref.weight)) ? Number(ref.weight) : 1, origin: ref.origin ?? null };
+    const t = {
+      id,
+      label: ref.value,
+      weight: Number.isFinite(Number(ref.weight)) ? Number(ref.weight) : 1,
+      origin: ref.origin ?? null,
+    };
     if (typeof ref.why === 'string' && ref.why) t.why = ref.why;
     out.push(t);
   }
@@ -141,14 +146,18 @@ function walk(cards, scored, hops, startCard) {
  */
 export function orderFlow(scored, options = {}) {
   if (!scored || !Array.isArray(scored.cards)) throw new Error('scored input has no cards array');
-  if (!scored.preset || !scored.preset.switches) throw new Error('scored input carries no preset; run flow-score first');
+  if (!scored.preset || !scored.preset.switches)
+    throw new Error('scored input carries no preset; run flow-score first');
   const sw = scored.preset.switches;
   const mode = options.mode || sw.orderMode || 'score';
   const walkStart = options.walkStart || sw.walkStart || 'heaviest';
   if (!WALK_STARTS.includes(walkStart)) throw new Error(`unknown walkStart ${walkStart}; use heaviest or newest`);
-  const walkStartSource = options.walkStartSource !== undefined
-    ? (options.walkStartSource || null)
-    : (options.startSource !== undefined ? (options.startSource || null) : (sw.walkStartSource ?? null));
+  const walkStartSource =
+    options.walkStartSource !== undefined
+      ? options.walkStartSource || null
+      : options.startSource !== undefined
+        ? options.startSource || null
+        : (sw.walkStartSource ?? null);
   const seam = Number.isFinite(options.seam) ? options.seam : Number(sw.seam);
   const stability = Number.isFinite(options.stability) ? options.stability : Number(sw.stability);
   const cards = scored.cards.filter((c) => Number.isFinite(c.score));

@@ -142,7 +142,10 @@ function planCut(segments, n) {
   const runs = [];
   segments.forEach((seg, i) => {
     if (i === 0 || seg.block !== segments[i - 1].block) {
-      if (runs.length) { runs[runs.length - 1].end = text.length; text += '\n'; }
+      if (runs.length) {
+        runs[runs.length - 1].end = text.length;
+        text += '\n';
+      }
       runs.push({ start: text.length, end: text.length });
     }
     starts.push(text.length);
@@ -184,9 +187,44 @@ function excerptText(text, n) {
 // ── The cut on HTML ─────────────────────────────────────────────────────────
 
 const BLOCK_TAGS = new Set([
-  'P', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'FIGCAPTION', 'DT', 'DD', 'TD', 'TH',
-  'DIV', 'SECTION', 'ARTICLE', 'ASIDE', 'HEADER', 'FOOTER', 'MAIN', 'NAV', 'FIGURE', 'UL', 'OL', 'DL',
-  'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'CAPTION', 'DETAILS', 'SUMMARY', 'ADDRESS', 'FORM', 'FIELDSET',
+  'P',
+  'LI',
+  'BLOCKQUOTE',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'PRE',
+  'FIGCAPTION',
+  'DT',
+  'DD',
+  'TD',
+  'TH',
+  'DIV',
+  'SECTION',
+  'ARTICLE',
+  'ASIDE',
+  'HEADER',
+  'FOOTER',
+  'MAIN',
+  'NAV',
+  'FIGURE',
+  'UL',
+  'OL',
+  'DL',
+  'TABLE',
+  'THEAD',
+  'TBODY',
+  'TFOOT',
+  'TR',
+  'CAPTION',
+  'DETAILS',
+  'SUMMARY',
+  'ADDRESS',
+  'FORM',
+  'FIELDSET',
 ]);
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'SVG', 'MATH']);
 
@@ -210,11 +248,18 @@ function cutElement(root, n) {
   const walk = (el) => {
     for (let c = el.firstChild; c; c = c.nextSibling) {
       if (c.nodeType === 3) {
-        if (c.nodeValue) { nodes.push(c); segments.push({ text: c.nodeValue, block: blockOf(c, root) }); }
+        if (c.nodeValue) {
+          nodes.push(c);
+          segments.push({ text: c.nodeValue, block: blockOf(c, root) });
+        }
       } else if (c.nodeType === 1) {
         const tag = String(c.tagName).toUpperCase();
         // A line break parts two words, as the voice reads it.
-        if (tag === 'BR') { nodes.push(c); segments.push({ text: ' ', block: blockOf(c, root) }); continue; }
+        if (tag === 'BR') {
+          nodes.push(c);
+          segments.push({ text: ' ', block: blockOf(c, root) });
+          continue;
+        }
         if (SKIP_TAGS.has(tag) || c.hasAttribute('data-reader-link-out')) continue;
         walk(c);
       }
@@ -228,8 +273,7 @@ function cutElement(root, n) {
   range.setStart(root, 0);
   const at = nodes[plan.seg];
   const block = segments[plan.seg].block;
-  const lastOfBlock = plan.runEnd && block !== root
-    && !nodes.slice(plan.seg + 1).some((nd) => block.contains(nd));
+  const lastOfBlock = plan.runEnd && block !== root && !nodes.slice(plan.seg + 1).some((nd) => block.contains(nd));
   if (lastOfBlock) range.setEndAfter(block);
   else if (at.nodeType === 1) range.setEndAfter(at);
   else range.setEnd(at, plan.offset);
@@ -265,7 +309,7 @@ function excerptHtml(html, n, doc) {
 // anything else drawn around the text count for nothing: 0 at its top, 1
 // once its end is in view, 1 for a card shorter than the view.
 function cardProgress({ scrollTop, clientHeight, start, end }) {
-  const room = (end - start) - clientHeight;
+  const room = end - start - clientHeight;
   if (!(room > 0)) return 1;
   return Math.max(0, Math.min(1, (scrollTop - start) / room));
 }
@@ -273,15 +317,26 @@ function cardProgress({ scrollTop, clientHeight, start, end }) {
 // The scroll that puts the reader back at a fraction of the open card, or
 // null when the card is no taller than the view.
 function cardScrollFor(at, { clientHeight, start, end }) {
-  const room = (end - start) - clientHeight;
+  const room = end - start - clientHeight;
   if (!(room > 0)) return null;
   return start + at * room;
 }
 
 module.exports = {
-  WORDS_CHOICES, DEFAULT_WORDS, RETIRED_WORDS,
-  isWordsChoice, wordsValue, siteWords, wordsChoice,
-  wordSpans, countWords, sentenceEnd, planCut, excerptText,
-  cutElement, excerptHtml,
-  cardProgress, cardScrollFor,
+  WORDS_CHOICES,
+  DEFAULT_WORDS,
+  RETIRED_WORDS,
+  isWordsChoice,
+  wordsValue,
+  siteWords,
+  wordsChoice,
+  wordSpans,
+  countWords,
+  sentenceEnd,
+  planCut,
+  excerptText,
+  cutElement,
+  excerptHtml,
+  cardProgress,
+  cardScrollFor,
 };

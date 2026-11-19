@@ -51,15 +51,15 @@ import './themes/sketchbook.css';
 // ── Default settings (mirrors settings.json structure) ───────────────────────
 
 const DEFAULT_THEME = {
-  bg:           '#1a1a2e',
-  surface:      '#0a0e1a',
-  accent:       '#64ffda',
-  text:         '#a8b2d1',
-  text_bright:  '#ccd6f6',
-  border:       'rgba(100, 255, 218, 0.2)',
+  bg: '#1a1a2e',
+  surface: '#0a0e1a',
+  accent: '#64ffda',
+  text: '#a8b2d1',
+  text_bright: '#ccd6f6',
+  border: 'rgba(100, 255, 218, 0.2)',
   node_published: '#3498db',
-  node_draft:   '#7f8c8d',
-  tag_color:    '#f39c12',
+  node_draft: '#7f8c8d',
+  tag_color: '#f39c12',
 };
 
 const DEFAULT_SETTINGS = {
@@ -88,28 +88,46 @@ const DEFAULT_SETTINGS = {
   },
   graph: {
     card: {
-      width: 180, height: 140,
-      hoverWidth: 200, hoverHeight: 160,
-      pinnedWidth: 230, pinnedHeight: 190,
-      minWidth: 110, minHeight: 80,
-      maxWidth: 620, maxHeight: 520,
-      cornerRadius: 10, glowPadding: 16,
-      labelMinFontSize: 14, labelMaxFontSize: 26,
+      width: 180,
+      height: 140,
+      hoverWidth: 200,
+      hoverHeight: 160,
+      pinnedWidth: 230,
+      pinnedHeight: 190,
+      minWidth: 110,
+      minHeight: 80,
+      maxWidth: 620,
+      maxHeight: 520,
+      cornerRadius: 10,
+      glowPadding: 16,
+      labelMinFontSize: 14,
+      labelMaxFontSize: 26,
       imageMarkSize: 22,
     },
     tag: {
-      fontSize: 22, padding: 11,
-      maxWidth: 150, maxLines: 3,
-      cornerRadius: 9, opacity: 0.7,
+      fontSize: 22,
+      padding: 11,
+      maxWidth: 150,
+      maxLines: 3,
+      cornerRadius: 9,
+      opacity: 0.7,
     },
     timeAxis: {
-      dock: 'left', inset: 54, endPadding: 70,
-      connectorOpacity: 0.45, connectorWidth: 1.6,
-      spineOpacity: 0.55, spineWidth: 3, tickFontSize: 13,
+      dock: 'left',
+      inset: 54,
+      endPadding: 70,
+      connectorOpacity: 0.45,
+      connectorWidth: 1.6,
+      spineOpacity: 0.55,
+      spineWidth: 3,
+      tickFontSize: 13,
     },
     simulation: {
-      linkDistance: 160, chargeStrength: -500,
-      collidePadding: 10, velocityDecay: 0.7, alphaDecay: 0.028,
+      linkDistance: 160,
+      chargeStrength: -500,
+      collidePadding: 10,
+      velocityDecay: 0.7,
+      alphaDecay: 0.028,
     },
   },
 };
@@ -122,8 +140,12 @@ function createMemoryBackend() {
   let saved = null;
   return {
     id: 'memory',
-    async load() { return saved ? JSON.parse(JSON.stringify(saved)) : null; },
-    async save(state) { saved = JSON.parse(JSON.stringify(state)); },
+    async load() {
+      return saved ? JSON.parse(JSON.stringify(saved)) : null;
+    },
+    async save(state) {
+      saved = JSON.parse(JSON.stringify(state));
+    },
   };
 }
 
@@ -136,11 +158,17 @@ function createLocalStorageBackend(key) {
       try {
         const raw = store.getItem(key);
         return raw ? JSON.parse(raw) : null;
-      } catch (_) { return null; }
+      } catch (_) {
+        return null;
+      }
     },
     async save(state) {
       if (!store) return;
-      try { store.setItem(key, JSON.stringify(state)); } catch (_) { /* quota */ }
+      try {
+        store.setItem(key, JSON.stringify(state));
+      } catch (_) {
+        /* quota */
+      }
     },
   };
 }
@@ -160,8 +188,12 @@ function deepMerge(target, source) {
   const out = { ...target };
   for (const key of Object.keys(source)) {
     if (
-      source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) &&
-      target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])
+      source[key] &&
+      typeof source[key] === 'object' &&
+      !Array.isArray(source[key]) &&
+      target[key] &&
+      typeof target[key] === 'object' &&
+      !Array.isArray(target[key])
     ) {
       out[key] = deepMerge(target[key], source[key]);
     } else {
@@ -237,7 +269,8 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
       }
       if (vs.state.layout === 'timeline') vs.setLayout('force');
       // ?view=<id> in the address picks one of the site's views.
-      const fromAddress = hasViews && typeof window !== 'undefined' ? viewFromSearch(window.location.search, siteViewList) : null;
+      const fromAddress =
+        hasViews && typeof window !== 'undefined' ? viewFromSearch(window.location.search, siteViewList) : null;
       if (fromAddress) vs.setView(fromAddress.id, fromAddress.props && fromAddress.props.layout, { silent: true });
       setViewState(vs);
       setHydrated(true);
@@ -268,66 +301,80 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
   const [selectedArticle, setSelectedArticle] = React.useState(null);
 
   const [focusedItem, setFocusedItem] = React.useState(null);
-      const [targetParagraph, setTargetParagraph] = React.useState(null);
+  const [targetParagraph, setTargetParagraph] = React.useState(null);
 
   // Computed derived state
-  
-      React.useEffect(function () {
-        function onHashChange() {
-          const hash = window.location.hash;
-          if (hash.startsWith('#read=')) {
-            const parts = hash.substring(6).split('&p=');
-            const id = parts[0];
-            const p = parts[1] ? parseInt(parts[1], 10) : null;
-            const items = typeof feed !== 'undefined' ? (feed.items || []) : (typeof feedData !== 'undefined' ? (feedData.items || []) : []);
-            const item = items.find(i => (i.id === decodeURIComponent(id)) || (i.url === decodeURIComponent(id)));
-            if (item) {
-              if (viewState) viewState.markSeen(item.id);
-              setSelectedArticle(item);
-              setTargetParagraph(p !== null && !isNaN(p) ? p : null);
-            }
-          } else {
-            setSelectedArticle(null);
-            setTargetParagraph(null);
+
+  React.useEffect(
+    function () {
+      function onHashChange() {
+        const hash = window.location.hash;
+        if (hash.startsWith('#read=')) {
+          const parts = hash.substring(6).split('&p=');
+          const id = parts[0];
+          const p = parts[1] ? parseInt(parts[1], 10) : null;
+          const items =
+            typeof feed !== 'undefined'
+              ? feed.items || []
+              : typeof feedData !== 'undefined'
+                ? feedData.items || []
+                : [];
+          const item = items.find((i) => i.id === decodeURIComponent(id) || i.url === decodeURIComponent(id));
+          if (item) {
+            if (viewState) viewState.markSeen(item.id);
+            setSelectedArticle(item);
+            setTargetParagraph(p !== null && !isNaN(p) ? p : null);
           }
+        } else {
+          setSelectedArticle(null);
+          setTargetParagraph(null);
         }
-        window.addEventListener('hashchange', onHashChange);
-        onHashChange();
-        
-        const onKeyDown = (e) => {
-          if (e.key === 'Escape') {
-             history.replaceState(null, '', window.location.pathname + window.location.search);
-             window.dispatchEvent(new Event('hashchange'));
-          }
-        };
-        window.addEventListener('keydown', onKeyDown);
-        const onResetLayout = () => {
-             history.replaceState(null, '', window.location.pathname + window.location.search);
-             window.dispatchEvent(new Event('hashchange'));
-        };
-        window.addEventListener('graph:reset-layout', onResetLayout);
-        
-        return function () { 
-          window.removeEventListener('hashchange', onHashChange);
-          window.removeEventListener('keydown', onKeyDown);
-          window.removeEventListener('graph:reset-layout', onResetLayout);
-        };
-      }, [typeof feed !== 'undefined' ? feed : feedData, viewState]);
-  
-      const hiddenSources = React.useMemo(() => {
+      }
+      window.addEventListener('hashchange', onHashChange);
+      onHashChange();
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+          window.dispatchEvent(new Event('hashchange'));
+        }
+      };
+      window.addEventListener('keydown', onKeyDown);
+      const onResetLayout = () => {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        window.dispatchEvent(new Event('hashchange'));
+      };
+      window.addEventListener('graph:reset-layout', onResetLayout);
+
+      return function () {
+        window.removeEventListener('hashchange', onHashChange);
+        window.removeEventListener('keydown', onKeyDown);
+        window.removeEventListener('graph:reset-layout', onResetLayout);
+      };
+    },
+    [typeof feed !== 'undefined' ? feed : feedData, viewState],
+  );
+
+  const hiddenSources = React.useMemo(() => {
     return viewState ? new Set(viewState.state.hiddenSources) : new Set();
   }, [viewState?.state?.hiddenSources]);
 
-  const toggleSource = React.useCallback((sourceId) => {
-    if (viewState) viewState.toggleSource(sourceId);
-  }, [viewState]);
+  const toggleSource = React.useCallback(
+    (sourceId) => {
+      if (viewState) viewState.toggleSource(sourceId);
+    },
+    [viewState],
+  );
 
   const colorOverrides = React.useMemo(() => {
     if (!viewState) return {};
     const graphColors = viewState.graphColors();
     const keyToVar = {
-      draft: '--nv-draft', published: '--nv-published', tag: '--gv-tag-color',
-      topology: '--gv-topology-color', placeholder: '--gv-placeholder-color',
+      draft: '--nv-draft',
+      published: '--nv-published',
+      tag: '--gv-tag-color',
+      topology: '--gv-topology-color',
+      placeholder: '--gv-placeholder-color',
     };
     const out = {};
     for (const key of Object.keys(keyToVar)) {
@@ -384,17 +431,18 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
   const toolbar = toolbarConfig(settings, features);
   const atTop = toolbar.position === 'top' && !!features.feedBar;
   const anyControls = features.layoutControls || features.dimensions || features.undoRedo;
-  const graphControls = viewState && anyControls ? (
-    <Toolbar
-      viewState={viewState}
-      settings={settings}
-      layers={readers.layers}
-      feedData={feedData}
-      hiddenSources={hiddenSources}
-      show={toolbar.show}
-      placement={atTop ? 'top' : 'bottom'}
-    />
-  ) : null;
+  const graphControls =
+    viewState && anyControls ? (
+      <Toolbar
+        viewState={viewState}
+        settings={settings}
+        layers={readers.layers}
+        feedData={feedData}
+        hiddenSources={hiddenSources}
+        show={toolbar.show}
+        placement={atTop ? 'top' : 'bottom'}
+      />
+    ) : null;
 
   return (
     <>
@@ -415,17 +463,17 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         onNodeSelect={(article) => {
           if (!features.readerPanel) return;
           if (!article) {
-             history.replaceState(null, '', window.location.pathname + window.location.search);
-             window.dispatchEvent(new Event('hashchange'));
-             return;
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            window.dispatchEvent(new Event('hashchange'));
+            return;
           }
           if (article && article.originalItem) {
             if (viewState) viewState.markSeen(article.originalItem.id);
             const id = encodeURIComponent(article.originalItem.id);
             if (window.location.hash === '#read=' + id) {
-               history.replaceState(null, '', window.location.pathname + window.location.search);
+              history.replaceState(null, '', window.location.pathname + window.location.search);
             } else {
-               history.pushState(null, '', '#read=' + id);
+              history.pushState(null, '', '#read=' + id);
             }
             window.dispatchEvent(new Event('hashchange'));
           }
@@ -466,32 +514,30 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
       {!atTop && graphControls}
 
       {/* Color settings */}
-      {features.colorSettings && viewState && (<>
-        <Settings
-          where="graph"
-          viewState={viewState}
-          feedData={feedData}
-          schemes={schemesOf(feedData)}
-          subject={selectedArticle || focusedItem}
-          readerOpen={selectedArticle ? selectedArticle.id : null}
-        />
-        <Settings
-          where="reader"
-          viewState={viewState}
-          feedData={feedData}
-          schemes={schemesOf(feedData)}
-          subject={selectedArticle || focusedItem}
-          readerOpen={selectedArticle ? selectedArticle.id : null}
-        />
-      </>)}
+      {features.colorSettings && viewState && (
+        <>
+          <Settings
+            where="graph"
+            viewState={viewState}
+            feedData={feedData}
+            schemes={schemesOf(feedData)}
+            subject={selectedArticle || focusedItem}
+            readerOpen={selectedArticle ? selectedArticle.id : null}
+          />
+          <Settings
+            where="reader"
+            viewState={viewState}
+            feedData={feedData}
+            schemes={schemesOf(feedData)}
+            subject={selectedArticle || focusedItem}
+            readerOpen={selectedArticle ? selectedArticle.id : null}
+          />
+        </>
+      )}
 
       {/* Config panel */}
       {features.configPanel && (
-        <ConfigPanel
-          config={config}
-          onUpdate={handleConfigUpdate}
-          onReset={handleConfigReset}
-        />
+        <ConfigPanel config={config} onUpdate={handleConfigUpdate} onReset={handleConfigReset} />
       )}
 
       {/* Reader panel */}
@@ -539,9 +585,7 @@ const PostPipe = {
    * @returns {Promise<{ unmount: Function }>}
    */
   async init(selector, config = {}) {
-    const container = typeof selector === 'string'
-      ? document.querySelector(selector)
-      : selector;
+    const container = typeof selector === 'string' ? document.querySelector(selector) : selector;
 
     if (!container) {
       throw new Error(`[PostPipe] Container not found: ${selector}`);
@@ -557,8 +601,9 @@ const PostPipe = {
     container.style.background = (config.theme && config.theme.bg) || DEFAULT_THEME.bg;
 
     // Set up TTS config on window (for tts.js which reads it)
-    const browserTts = (config.settings && config.settings.tts && config.settings.tts.engines
-      && config.settings.tts.engines.browser) || {};
+    const browserTts =
+      (config.settings && config.settings.tts && config.settings.tts.engines && config.settings.tts.engines.browser) ||
+      {};
     window.TTS_CONFIG = window.TTS_CONFIG || {
       exposedEngines: ['browser'],
       defaultEngine: 'browser',
@@ -580,10 +625,13 @@ const PostPipe = {
         initialConfig: { ...config, feed: feedUrl },
         feedData,
         graphApiRef,
-      })
+      }),
     );
 
-    const call = (name) => (...args) => (graphApiRef.current ? graphApiRef.current[name](...args) : undefined);
+    const call =
+      (name) =>
+      (...args) =>
+        graphApiRef.current ? graphApiRef.current[name](...args) : undefined;
     return {
       unmount() {
         root.unmount();

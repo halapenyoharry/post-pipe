@@ -4,7 +4,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  RELATION_LAYERS, STRONGEST, isRelationEdge, relativesOf, relationLabel, wrapText,
+  RELATION_LAYERS,
+  STRONGEST,
+  isRelationEdge,
+  relativesOf,
+  relationLabel,
+  wrapText,
 } = require('../src/lib/tagNetwork');
 const { relationEdges } = require('../src/corpus/relationEdges');
 
@@ -18,7 +23,14 @@ const rel = (source, target, layer, weight, why) => ({
 });
 
 test('the relation layers are the SKOS names rosetta-tagz writes, and five show at first', () => {
-  assert.deepStrictEqual(RELATION_LAYERS.slice().sort(), ['broadMatch', 'broader', 'closeMatch', 'exactMatch', 'related', 'relatedMatch']);
+  assert.deepStrictEqual(RELATION_LAYERS.slice().sort(), [
+    'broadMatch',
+    'broader',
+    'closeMatch',
+    'exactMatch',
+    'related',
+    'relatedMatch',
+  ]);
   assert.strictEqual(STRONGEST, 5);
 });
 
@@ -35,9 +47,21 @@ test('a relation edge joins two tags on a relation layer; nothing else is one', 
 
 test('every edge relationEdges writes is a relation edge', () => {
   const items = [
-    { id: 'i1', tags: ['Alpha', 'Beta'], _references: [{ type: 'tag', value: 'Alpha', concept: 'c_a' }, { type: 'tag', value: 'Beta', concept: 'c_b' }] },
+    {
+      id: 'i1',
+      tags: ['Alpha', 'Beta'],
+      _references: [
+        { type: 'tag', value: 'Alpha', concept: 'c_a' },
+        { type: 'tag', value: 'Beta', concept: 'c_b' },
+      ],
+    },
   ];
-  const rtagz = { relationList: [{ a: 'c_a', b: 'c_b', type: 'broader', weight: 1 }, { a: 'c_a', b: 'c_b', type: 'related', weight: 0.3 }] };
+  const rtagz = {
+    relationList: [
+      { a: 'c_a', b: 'c_b', type: 'broader', weight: 1 },
+      { a: 'c_a', b: 'c_b', type: 'related', weight: 0.3 },
+    ],
+  };
   const edges = relationEdges(rtagz, items);
   assert.strictEqual(edges.length, 2);
   for (const e of edges) assert.ok(isRelationEdge(e), e.layer);
@@ -55,11 +79,17 @@ test('the strongest relatives first, five of them, the rest counted', () => {
     rel('q', 'r', 'related', 1),
   ];
   const net = relativesOf(relations, 'tag:x');
-  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:b', 'tag:e', 'tag:g', 'tag:c', 'tag:d']);
+  assert.deepStrictEqual(
+    net.relatives.map((r) => r.id),
+    ['tag:b', 'tag:e', 'tag:g', 'tag:c', 'tag:d'],
+  );
   assert.strictEqual(net.total, 7);
   assert.strictEqual(net.more, 2);
   const all = relativesOf(relations, 'tag:x', { limit: Infinity });
-  assert.deepStrictEqual(all.relatives.map((r) => r.id), ['tag:b', 'tag:e', 'tag:g', 'tag:c', 'tag:d', 'tag:f', 'tag:a']);
+  assert.deepStrictEqual(
+    all.relatives.map((r) => r.id),
+    ['tag:b', 'tag:e', 'tag:g', 'tag:c', 'tag:d', 'tag:f', 'tag:a'],
+  );
   assert.strictEqual(all.more, 0);
 });
 
@@ -67,7 +97,10 @@ test('a relative not drawn is left out before counting, so the five are five dra
   const relations = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((t, i) => rel('x', t, 'related', 1 - i / 10));
   const hidden = new Set(['tag:a', 'tag:c']);
   const net = relativesOf(relations, 'tag:x', { visible: (id) => !hidden.has(id) });
-  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:b', 'tag:d', 'tag:e', 'tag:f', 'tag:g']);
+  assert.deepStrictEqual(
+    net.relatives.map((r) => r.id),
+    ['tag:b', 'tag:d', 'tag:e', 'tag:f', 'tag:g'],
+  );
   assert.strictEqual(net.total, 5);
   assert.strictEqual(net.more, 0);
 });
@@ -77,10 +110,13 @@ test('two relations between one pair are one relative, at the stronger weight, s
   const net = relativesOf(relations, 'tag:x');
   assert.strictEqual(net.relatives.length, 1);
   assert.strictEqual(net.relatives[0].weight, 1);
-  assert.deepStrictEqual(net.relatives[0].relations.map((r) => r.layer), ['broader', 'related']);
+  assert.deepStrictEqual(
+    net.relatives[0].relations.map((r) => r.layer),
+    ['broader', 'related'],
+  );
 });
 
-test('broader and broadMatch name the broader end: the edge\'s target', () => {
+test("broader and broadMatch name the broader end: the edge's target", () => {
   const up = relativesOf([rel('x', 'a', 'broader', 1)], 'tag:x');
   assert.strictEqual(up.relatives[0].broader, 'tag:a', 'x is narrower than a: the arrow points at a');
   const down = relativesOf([rel('a', 'x', 'broadMatch', 1)], 'tag:x');
@@ -90,9 +126,17 @@ test('broader and broadMatch name the broader end: the edge\'s target', () => {
 });
 
 test('without a weight a relation comes after every weighted one; ties go by id, nothing else', () => {
-  const relations = [rel('x', 'z', 'related'), rel('x', 'c', 'related', 0.5), rel('x', 'b', 'related', 0.5), rel('x', 'a', 'related')];
+  const relations = [
+    rel('x', 'z', 'related'),
+    rel('x', 'c', 'related', 0.5),
+    rel('x', 'b', 'related', 0.5),
+    rel('x', 'a', 'related'),
+  ];
   const net = relativesOf(relations, 'tag:x', { limit: Infinity });
-  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:b', 'tag:c', 'tag:a', 'tag:z']);
+  assert.deepStrictEqual(
+    net.relatives.map((r) => r.id),
+    ['tag:b', 'tag:c', 'tag:a', 'tag:z'],
+  );
   assert.strictEqual(net.relatives[2].weight, null);
 });
 
@@ -111,7 +155,10 @@ test('where a tag came from does not order its relatives', () => {
 
 test('ends already bound to nodes are read through their ids; no relations, no tag, no relatives', () => {
   const r = { source: { id: 'tag:x' }, target: { id: 'tag:a' }, layer: 'related', attrs: { weight: 0.2 } };
-  assert.deepStrictEqual(relativesOf([r], 'tag:x').relatives.map((e) => e.id), ['tag:a']);
+  assert.deepStrictEqual(
+    relativesOf([r], 'tag:x').relatives.map((e) => e.id),
+    ['tag:a'],
+  );
   assert.deepStrictEqual(relativesOf([], 'tag:x'), { relatives: [], total: 0, more: 0 });
   assert.deepStrictEqual(relativesOf(undefined, 'tag:x'), { relatives: [], total: 0, more: 0 });
   assert.deepStrictEqual(relativesOf([r], null), { relatives: [], total: 0, more: 0 });
@@ -120,7 +167,10 @@ test('ends already bound to nodes are read through their ids; no relations, no t
 
 test('the hover label: type and weight, then the why, for each relation', () => {
   const why = '"active" and "carrying" share 2 of their 6 and 5 items, more than chance predicts (NPMI 0.48)';
-  const label = relationLabel([rel('active', 'carrying', 'related', 0.3206, why), rel('active', 'carrying', 'broader')]);
+  const label = relationLabel([
+    rel('active', 'carrying', 'related', 0.3206, why),
+    rel('active', 'carrying', 'broader'),
+  ]);
   const lines = label.split('\n');
   assert.strictEqual(lines[0], 'related · weight 0.3206');
   assert.strictEqual(lines.slice(1, -1).join(' '), why);
@@ -138,9 +188,7 @@ test('text wraps at spaces; a long word keeps a line of its own', () => {
 
 // ── Relatives folded into other tags' bubbles (the depth chosen) ─────────
 
-const {
-  FOLDED_PREF, FOLDED_CHOICES, foldedChoice, drawnRelativesOf, relativeLabel,
-} = require('../src/lib/tagNetwork');
+const { FOLDED_PREF, FOLDED_CHOICES, foldedChoice, drawnRelativesOf, relativeLabel } = require('../src/lib/tagNetwork');
 
 // bubbleOf from a plain map of folded tag -> the tag whose bubble shows it.
 const foldedInto = (map) => (id) => map[id];
@@ -155,7 +203,7 @@ test('the folded choice has a plain key; anything but omit is the default, the b
   assert.strictEqual(foldedChoice('omit'), 'omit');
 });
 
-test('with nothing folded the drawn relatives are relativesOf\'s, unchanged, and so are their labels', () => {
+test("with nothing folded the drawn relatives are relativesOf's, unchanged, and so are their labels", () => {
   const relations = [
     rel('x', 'a', 'related', 0.1, 'x and a'),
     rel('b', 'x', 'related', 0.9),
@@ -168,12 +216,7 @@ test('with nothing folded the drawn relatives are relativesOf\'s, unchanged, and
     rel('q', 'r', 'related', 1),
   ];
   const hidden = new Set(['tag:c']);
-  const cases = [
-    {},
-    { limit: Infinity },
-    { limit: 2 },
-    { visible: (id) => !hidden.has(id) },
-  ];
+  const cases = [{}, { limit: Infinity }, { limit: 2 }, { visible: (id) => !hidden.has(id) }];
   for (const opts of cases) {
     const plain = relativesOf(relations, 'tag:x', opts);
     for (const extra of [{}, { bubbleOf: () => undefined }, { bubbleOf: (id) => id }, { folded: 'omit' }]) {
@@ -203,14 +246,28 @@ test('several relatives folded into one bubble draw one line to it, at the stron
   const bubbleOf = foldedInto({ 'tag:jazz': 'tag:music', 'tag:blues': 'tag:music', 'tag:soul': 'tag:music' });
   const net = drawnRelativesOf(relations, 'tag:x', { bubbleOf });
   assert.strictEqual(net.from, 'tag:x');
-  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:e', 'tag:music', 'tag:d'], 'the bubble sits among the strongest at its strongest member\'s weight');
+  assert.deepStrictEqual(
+    net.relatives.map((r) => r.id),
+    ['tag:e', 'tag:music', 'tag:d'],
+    "the bubble sits among the strongest at its strongest member's weight",
+  );
   assert.strictEqual(net.total, 3, 'one bubble counts once');
   assert.strictEqual(net.more, 0);
   const music = net.relatives[1];
   assert.strictEqual(music.weight, 0.6);
-  assert.deepStrictEqual(music.members.map((m) => m.id), ['tag:blues', 'tag:jazz', 'tag:soul'], 'the members strongest first, the unweighted last');
-  assert.deepStrictEqual(music.members.map((m) => m.weight), [0.6, 0.2, null]);
-  assert.deepStrictEqual(music.relations.map((r) => r.layer), ['related', 'related', 'relatedMatch']);
+  assert.deepStrictEqual(
+    music.members.map((m) => m.id),
+    ['tag:blues', 'tag:jazz', 'tag:soul'],
+    'the members strongest first, the unweighted last',
+  );
+  assert.deepStrictEqual(
+    music.members.map((m) => m.weight),
+    [0.6, 0.2, null],
+  );
+  assert.deepStrictEqual(
+    music.relations.map((r) => r.layer),
+    ['related', 'related', 'relatedMatch'],
+  );
   assert.strictEqual(music.broader, null, 'no directed relation, no arrow');
 
   // The hover label names each folded relative, with its type, weight and why.
@@ -222,8 +279,12 @@ test('several relatives folded into one bubble draw one line to it, at the stron
     'x and jazz share pieces',
     'soul · relatedMatch',
   ]);
-  for (const l of relativeLabel(music, { width: 20 }).split('\n')) assert.ok(l.length <= 20 || !l.includes(' '), `wrapped: ${l}`);
-  assert.strictEqual(relativeLabel(music, { nameOf: (id) => id.toUpperCase() }).split('\n')[0], 'TAG:BLUES · related · weight 0.6');
+  for (const l of relativeLabel(music, { width: 20 }).split('\n'))
+    assert.ok(l.length <= 20 || !l.includes(' '), `wrapped: ${l}`);
+  assert.strictEqual(
+    relativeLabel(music, { nameOf: (id) => id.toUpperCase() }).split('\n')[0],
+    'TAG:BLUES · related · weight 0.6',
+  );
 });
 
 test('a bubble whose own tag is a relative lists it with the relatives folded into it', () => {
@@ -232,9 +293,15 @@ test('a bubble whose own tag is a relative lists it with the relatives folded in
   assert.strictEqual(net.relatives.length, 1);
   assert.strictEqual(net.relatives[0].id, 'tag:music');
   assert.strictEqual(net.relatives[0].weight, 0.5);
-  assert.deepStrictEqual(net.relatives[0].members.map((m) => m.id), ['tag:jazz', 'tag:music']);
+  assert.deepStrictEqual(
+    net.relatives[0].members.map((m) => m.id),
+    ['tag:jazz', 'tag:music'],
+  );
   assert.deepStrictEqual(relativeLabel(net.relatives[0]).split('\n'), [
-    'jazz · related · weight 0.5', 'x and jazz', 'music · related · weight 0.3', 'x and music',
+    'jazz · related · weight 0.5',
+    'x and jazz',
+    'music · related · weight 0.3',
+    'x and music',
   ]);
 });
 
@@ -247,14 +314,23 @@ test('the omit choice leaves folded relatives out before counting; relatives in 
   ];
   const bubbleOf = foldedInto({ 'tag:jazz': 'tag:music', 'tag:blues': 'tag:music' });
   const omitted = drawnRelativesOf(relations, 'tag:x', { bubbleOf, folded: 'omit' });
-  assert.deepStrictEqual(omitted.relatives.map((r) => r.id), ['tag:a', 'tag:b', 'tag:c', 'tag:d', 'tag:e']);
+  assert.deepStrictEqual(
+    omitted.relatives.map((r) => r.id),
+    ['tag:a', 'tag:b', 'tag:c', 'tag:d', 'tag:e'],
+  );
   assert.strictEqual(omitted.total, 7, 'six own bubbles and music, which is a relative itself');
   assert.strictEqual(omitted.more, 2);
-  const music = drawnRelativesOf(relations, 'tag:x', { bubbleOf, folded: 'omit', limit: Infinity }).relatives.find((r) => r.id === 'tag:music');
+  const music = drawnRelativesOf(relations, 'tag:x', { bubbleOf, folded: 'omit', limit: Infinity }).relatives.find(
+    (r) => r.id === 'tag:music',
+  );
   assert.strictEqual(music.members, undefined, 'music is drawn for its own relation alone');
   assert.strictEqual(music.weight, 0.1);
   const drawn = drawnRelativesOf(relations, 'tag:x', { bubbleOf });
-  assert.deepStrictEqual(drawn.relatives.map((r) => r.id), ['tag:music', 'tag:a', 'tag:b', 'tag:c', 'tag:d'], 'by default the bubble leads, at 0.95');
+  assert.deepStrictEqual(
+    drawn.relatives.map((r) => r.id),
+    ['tag:music', 'tag:a', 'tag:b', 'tag:c', 'tag:d'],
+    'by default the bubble leads, at 0.95',
+  );
   assert.strictEqual(drawn.total, 7);
 });
 
@@ -270,9 +346,17 @@ test('a selected tag folded into a bubble draws from that bubble; a relative in 
   for (const folded of FOLDED_CHOICES) {
     const net = drawnRelativesOf(relations, 'tag:jazz', { bubbleOf, folded, limit: Infinity });
     assert.strictEqual(net.from, 'tag:music', folded);
-    assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:swing', 'tag:improv', 'tag:art'], `${folded}: music (its own bubble) and blues (folded into it too) draw nothing`);
+    assert.deepStrictEqual(
+      net.relatives.map((r) => r.id),
+      ['tag:swing', 'tag:improv', 'tag:art'],
+      `${folded}: music (its own bubble) and blues (folded into it too) draw nothing`,
+    );
     const byId = new Map(net.relatives.map((r) => [r.id, r]));
-    assert.strictEqual(byId.get('tag:swing').broader, 'tag:music', 'jazz is the broader end: the arrow lands on the bubble showing it');
+    assert.strictEqual(
+      byId.get('tag:swing').broader,
+      'tag:music',
+      'jazz is the broader end: the arrow lands on the bubble showing it',
+    );
     assert.strictEqual(byId.get('tag:art').broader, 'tag:art');
     assert.strictEqual(byId.get('tag:improv').broader, null);
     assert.strictEqual(byId.get('tag:improv').members, undefined);
@@ -294,22 +378,36 @@ test('a folded relative whose bubble is not drawn is left out, as a hidden relat
   const bubbleOf = foldedInto({ 'tag:jazz': 'tag:music' });
   const visibleIds = new Set(['tag:x', 'tag:a', 'tag:jazz']);
   const net = drawnRelativesOf(relations, 'tag:x', { bubbleOf, visible: (id) => visibleIds.has(id) });
-  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:a'], 'visible is asked of the bubble, not of the folded tag');
+  assert.deepStrictEqual(
+    net.relatives.map((r) => r.id),
+    ['tag:a'],
+    'visible is asked of the bubble, not of the folded tag',
+  );
   assert.strictEqual(net.total, 1);
 });
 
-test('a bubble\'s arrow points where its members\' directed relations agree, and nowhere when they disagree', () => {
+test("a bubble's arrow points where its members' directed relations agree, and nowhere when they disagree", () => {
   const bubbleOf = foldedInto({ 'tag:jazz': 'tag:music', 'tag:blues': 'tag:music' });
-  const up = drawnRelativesOf([rel('x', 'jazz', 'broader', 0.5), rel('x', 'blues', 'related', 0.4)], 'tag:x', { bubbleOf });
+  const up = drawnRelativesOf([rel('x', 'jazz', 'broader', 0.5), rel('x', 'blues', 'related', 0.4)], 'tag:x', {
+    bubbleOf,
+  });
   assert.strictEqual(up.relatives[0].broader, 'tag:music', 'x is narrower than jazz: the arrow lands on the bubble');
-  const down = drawnRelativesOf([rel('jazz', 'x', 'broadMatch', 0.5), rel('blues', 'x', 'broader', 0.4)], 'tag:x', { bubbleOf });
+  const down = drawnRelativesOf([rel('jazz', 'x', 'broadMatch', 0.5), rel('blues', 'x', 'broader', 0.4)], 'tag:x', {
+    bubbleOf,
+  });
   assert.strictEqual(down.relatives[0].broader, 'tag:x', 'both are narrower than x: the arrow lands on x');
-  const both = drawnRelativesOf([rel('x', 'jazz', 'broader', 0.5), rel('blues', 'x', 'broader', 0.4)], 'tag:x', { bubbleOf });
+  const both = drawnRelativesOf([rel('x', 'jazz', 'broader', 0.5), rel('blues', 'x', 'broader', 0.4)], 'tag:x', {
+    bubbleOf,
+  });
   assert.strictEqual(both.relatives[0].broader, null);
-  assert.deepStrictEqual(relativeLabel(both.relatives[0]).split('\n'), ['jazz · broader · weight 0.5', 'blues · broader · weight 0.4'], 'the label still says each');
+  assert.deepStrictEqual(
+    relativeLabel(both.relatives[0]).split('\n'),
+    ['jazz · broader · weight 0.5', 'blues · broader · weight 0.4'],
+    'the label still says each',
+  );
 });
 
-test('a tag that is not present (the panel\'s source coherence ratio hides it) draws no line, folded or not, and has none of its own', () => {
+test("a tag that is not present (the panel's source coherence ratio hides it) draws no line, folded or not, and has none of its own", () => {
   const relations = [
     rel('x', 'jazz', 'related', 0.9),
     rel('x', 'blues', 'related', 0.8),
@@ -320,11 +418,26 @@ test('a tag that is not present (the panel\'s source coherence ratio hides it) d
   const gone = new Set(['tag:jazz', 'tag:a']);
   const present = (id) => !gone.has(id);
   const net = drawnRelativesOf(relations, 'tag:x', { bubbleOf, present, limit: Infinity });
-  assert.deepStrictEqual(net.relatives.map((r) => r.id), ['tag:music', 'tag:b']);
-  assert.deepStrictEqual(net.relatives[0].members.map((m) => m.id), ['tag:blues'], 'the bubble stands only for the folded tag that is present');
+  assert.deepStrictEqual(
+    net.relatives.map((r) => r.id),
+    ['tag:music', 'tag:b'],
+  );
+  assert.deepStrictEqual(
+    net.relatives[0].members.map((m) => m.id),
+    ['tag:blues'],
+    'the bubble stands only for the folded tag that is present',
+  );
   assert.strictEqual(net.relatives[0].weight, 0.8);
   assert.strictEqual(net.total, 2);
   const none = drawnRelativesOf(relations, 'tag:jazz', { bubbleOf, present });
-  assert.deepStrictEqual(none, { from: null, relatives: [], total: 0, more: 0 }, 'a selected tag not present has no lines');
-  assert.deepStrictEqual(drawnRelativesOf(relations, 'tag:x', { bubbleOf, present: () => true }), drawnRelativesOf(relations, 'tag:x', { bubbleOf }), 'everything present is as without it');
+  assert.deepStrictEqual(
+    none,
+    { from: null, relatives: [], total: 0, more: 0 },
+    'a selected tag not present has no lines',
+  );
+  assert.deepStrictEqual(
+    drawnRelativesOf(relations, 'tag:x', { bubbleOf, present: () => true }),
+    drawnRelativesOf(relations, 'tag:x', { bubbleOf }),
+    'everything present is as without it',
+  );
 });

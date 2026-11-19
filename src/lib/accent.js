@@ -24,7 +24,13 @@ const SKETCHBOOK = {
 function parseHex(color) {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color || '').trim());
   if (!m) return null;
-  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  const h =
+    m[1].length === 3
+      ? m[1]
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : m[1];
   return '#' + h.toLowerCase();
 }
 

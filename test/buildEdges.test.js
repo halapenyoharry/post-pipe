@@ -61,16 +61,16 @@ test('a series becomes an ordered path, not a cluster', () => {
   assert.ok(seq.every((e) => e.directed && e.role === 'next'));
   assert.deepStrictEqual(
     seq.map((e) => [e.attrs.from_part, e.attrs.to_part]),
-    [[1, 2], [2, 3]],
+    [
+      [1, 2],
+      [2, 3],
+    ],
     'ordered by series_part regardless of corpus order',
   );
 });
 
 test('two series do not link into each other', () => {
-  const items = [
-    item('a1', { series: 'one', series_part: 1 }),
-    item('b1', { series: 'two', series_part: 1 }),
-  ];
+  const items = [item('a1', { series: 'one', series_part: 1 }), item('b1', { series: 'two', series_part: 1 })];
   assert.strictEqual(buildEdges(items).filter((e) => e.layer === 'sequence').length, 0);
 });
 
@@ -90,28 +90,23 @@ test('hierarchical containment connects parent to child and eliminates radial ta
     { id: 'container:epic', label: 'The Epic', parent: null, tag: 'epic' },
     { id: 'container:act-1', label: 'Act 1', parent: 'container:epic', tag: 'act-1' },
   ];
-  const items = [
-    item('ch1', { tags: ['epic', 'act-1', 'philosophy'] }),
-    item('ch2', { tags: ['epic', 'act-1'] }),
-  ];
+  const items = [item('ch1', { tags: ['epic', 'act-1', 'philosophy'] }), item('ch2', { tags: ['epic', 'act-1'] })];
 
   const edges = buildEdges(items, { containment });
   const containmentEdges = edges.filter((e) => e.layer === 'containment');
   const tagEdges = edges.filter((e) => e.layer === 'tag');
 
   // Hierarchy edge: Epic contains Act 1
-  const hierarchyEdge = containmentEdges.find(
-    (e) => e.source === 'container:epic' && e.target === 'container:act-1'
-  );
+  const hierarchyEdge = containmentEdges.find((e) => e.source === 'container:epic' && e.target === 'container:act-1');
   assert.ok(hierarchyEdge, 'Epic must contain Act 1');
   assert.strictEqual(hierarchyEdge.role, 'contains');
 
   // Member edges: Act 1 contains each chapter
   const ch1Edge = containmentEdges.find(
-    (e) => e.source === 'container:act-1' && e.target === 'https://example.test/ch1.html'
+    (e) => e.source === 'container:act-1' && e.target === 'https://example.test/ch1.html',
   );
   const ch2Edge = containmentEdges.find(
-    (e) => e.source === 'container:act-1' && e.target === 'https://example.test/ch2.html'
+    (e) => e.source === 'container:act-1' && e.target === 'https://example.test/ch2.html',
   );
   assert.ok(ch1Edge, 'Act 1 contains ch1');
   assert.ok(ch2Edge, 'Act 1 contains ch2');
@@ -124,13 +119,15 @@ test('hierarchical containment connects parent to child and eliminates radial ta
   assert.strictEqual(tagEdges.filter((e) => e.target === 'tag:philosophy').length, 1);
 });
 
-
 test('connected_to between series neighbours folds into the one next edge', () => {
   // prev/next written as connected_to both ways: three edges per pair before.
-  const items = Array.from({ length: 11 }, (_, i) => item('ch' + (i + 1), {
-    series: 'act', series_part: i + 1,
-    connected_to: [i > 0 ? 'ch' + i : null, i < 10 ? 'ch' + (i + 2) : null].filter(Boolean),
-  }));
+  const items = Array.from({ length: 11 }, (_, i) =>
+    item('ch' + (i + 1), {
+      series: 'act',
+      series_part: i + 1,
+      connected_to: [i > 0 ? 'ch' + i : null, i < 10 ? 'ch' + (i + 2) : null].filter(Boolean),
+    }),
+  );
   const edges = buildEdges(items);
   assert.strictEqual(edges.length, 10, 'eleven chapters, ten next edges, nothing else');
   assert.ok(edges.every((e) => e.layer === 'sequence' && e.role === 'next'));
@@ -154,9 +151,7 @@ test('tag edges carry concept, weight, and origin attrs from _references when pr
   const items = [
     item('a', {
       tags: ['Artificial Intelligence'],
-      _references: [
-        { type: 'tag', value: 'Artificial Intelligence', concept: 'c_ai', weight: 1, origin: 'explicit' },
-      ],
+      _references: [{ type: 'tag', value: 'Artificial Intelligence', concept: 'c_ai', weight: 1, origin: 'explicit' }],
     }),
   ];
   const [edge] = buildEdges(items);
@@ -176,9 +171,7 @@ test('non-tag _references emit reference edges with types and weights while keep
     }),
     item('b', {
       tags: ['History'],
-      _references: [
-        { type: 'image', value: 'covers/shared.png', weight: 0.5 },
-      ],
+      _references: [{ type: 'image', value: 'covers/shared.png', weight: 0.5 }],
     }),
   ];
 
@@ -229,63 +222,113 @@ test('non-tag _references emit reference edges with types and weights while keep
 
 // The tag references are the source of the tag edges (src/lib/tagReferences.js);
 // item.tags stands in only when the item has none.
-test('tag references with an empty tags list still make the tag edges, in the references\' order, with their attrs', () => {
+test("tag references with an empty tags list still make the tag edges, in the references' order, with their attrs", () => {
   const containment = [{ id: 'container:act-1', tag: 'act-1', concept: 'c_act_1' }];
-  const items = [item('a', {
-    tags: [],
-    _references: [
-      { type: 'tag', value: 'Beta', concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2' },
-      { type: 'untagged', why: ['under the bar'], reason: 'underBar' },
-      { type: 'tag', value: 'Act One', concept: 'c_act_1', weight: 1, origin: 'explicit', why: null },
-      { type: 'tag', value: 'Alpha', concept: 'c_alpha', weight: 1, origin: 'explicit', why: null },
-    ],
-  })];
+  const items = [
+    item('a', {
+      tags: [],
+      _references: [
+        {
+          type: 'tag',
+          value: 'Beta',
+          concept: 'c_beta',
+          weight: 0.7,
+          origin: 'emergent',
+          why: 'text mentions "beta" ×2',
+        },
+        { type: 'untagged', why: ['under the bar'], reason: 'underBar' },
+        { type: 'tag', value: 'Act One', concept: 'c_act_1', weight: 1, origin: 'explicit', why: null },
+        { type: 'tag', value: 'Alpha', concept: 'c_alpha', weight: 1, origin: 'explicit', why: null },
+      ],
+    }),
+  ];
   const edges = buildEdges(items, { containment });
-  assert.deepStrictEqual(edges.filter((e) => e.layer === 'tag').map((e) => [e.target, e.attrs]), [
-    ['tag:Beta', { concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2' }],
-    ['tag:Alpha', { concept: 'c_alpha', weight: 1, origin: 'explicit' }],
-  ]);
+  assert.deepStrictEqual(
+    edges.filter((e) => e.layer === 'tag').map((e) => [e.target, e.attrs]),
+    [
+      ['tag:Beta', { concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2' }],
+      ['tag:Alpha', { concept: 'c_alpha', weight: 1, origin: 'explicit' }],
+    ],
+  );
   // The reference naming the container's concept is containment, as it is from item.tags.
   assert.deepStrictEqual(
     edges.filter((e) => e.layer === 'containment').map((e) => [e.source, e.target]),
-    [['container:act-1', items[0].id]]
+    [['container:act-1', items[0].id]],
   );
   // The same with no tags list at all, and an adapter's reference without rosetta-tagz's fields.
   const noList = buildEdges([item('b', { _references: [{ type: 'tag', value: 'Alpha' }] })]);
-  assert.deepStrictEqual(noList.map((e) => e.target), ['tag:Alpha']);
+  assert.deepStrictEqual(
+    noList.map((e) => e.target),
+    ['tag:Alpha'],
+  );
   assert.ok(!('attrs' in noList[0]));
 });
 
 test('tags with no references still make the tag edges (the fallback), as before', () => {
   const containment = [{ id: 'container:act-1', tag: 'act-1' }];
   const edges = buildEdges([item('a', { tags: ['Gamma', 'act-1', 'Alpha'] })], { containment });
-  assert.deepStrictEqual(edges.map((e) => [e.layer, e.target]), [
-    ['tag', 'tag:Gamma'],
-    ['tag', 'tag:Alpha'],
-    ['containment', 'https://example.test/a.html'],
-  ]);
+  assert.deepStrictEqual(
+    edges.map((e) => [e.layer, e.target]),
+    [
+      ['tag', 'tag:Gamma'],
+      ['tag', 'tag:Alpha'],
+      ['containment', 'https://example.test/a.html'],
+    ],
+  );
   assert.ok(edges.filter((e) => e.layer === 'tag').every((e) => !('attrs' in e)));
   // References of other types do not stop the fallback.
-  const withImage = buildEdges([item('b', { tags: ['Alpha'], _references: [{ type: 'image', value: 'covers/b.png' }] })]);
-  assert.deepStrictEqual(withImage.map((e) => [e.layer, e.target]), [['tag', 'tag:Alpha'], ['reference', 'image:covers/b.png']]);
+  const withImage = buildEdges([
+    item('b', { tags: ['Alpha'], _references: [{ type: 'image', value: 'covers/b.png' }] }),
+  ]);
+  assert.deepStrictEqual(
+    withImage.map((e) => [e.layer, e.target]),
+    [
+      ['tag', 'tag:Alpha'],
+      ['reference', 'image:covers/b.png'],
+    ],
+  );
 });
 
 test('an item with both gets the same edges, in the same order, as its tags gave before', () => {
   const refs = [
     { type: 'tag', value: 'Alpha', concept: 'c_alpha', weight: 1, origin: 'explicit', why: null },
-    { type: 'tag', value: 'Beta', concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2', sourceRatio: 2.1 },
-    { type: 'tag', value: 'Gamma', concept: 'c_gamma', weight: 0.5, origin: 'discovered', why: 'recurs in 2 of 4 items' },
+    {
+      type: 'tag',
+      value: 'Beta',
+      concept: 'c_beta',
+      weight: 0.7,
+      origin: 'emergent',
+      why: 'text mentions "beta" ×2',
+      sourceRatio: 2.1,
+    },
+    {
+      type: 'tag',
+      value: 'Gamma',
+      concept: 'c_gamma',
+      weight: 0.5,
+      origin: 'discovered',
+      why: 'recurs in 2 of 4 items',
+    },
   ];
   const both = item('a', { tags: ['Alpha', 'Beta', 'Gamma'], _references: refs, topology: ['loop'] });
   const edges = buildEdges([both]);
-  assert.deepStrictEqual(edges.map((e) => [e.layer, e.target]), [
-    ['tag', 'tag:Alpha'], ['tag', 'tag:Beta'], ['tag', 'tag:Gamma'], ['topology', 'topology:loop'],
-  ]);
-  assert.deepStrictEqual(edges.slice(0, 3).map((e) => e.attrs), [
-    { concept: 'c_alpha', weight: 1, origin: 'explicit' },
-    { concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2', sourceRatio: 2.1 },
-    { concept: 'c_gamma', weight: 0.5, origin: 'discovered', why: 'recurs in 2 of 4 items' },
-  ]);
+  assert.deepStrictEqual(
+    edges.map((e) => [e.layer, e.target]),
+    [
+      ['tag', 'tag:Alpha'],
+      ['tag', 'tag:Beta'],
+      ['tag', 'tag:Gamma'],
+      ['topology', 'topology:loop'],
+    ],
+  );
+  assert.deepStrictEqual(
+    edges.slice(0, 3).map((e) => e.attrs),
+    [
+      { concept: 'c_alpha', weight: 1, origin: 'explicit' },
+      { concept: 'c_beta', weight: 0.7, origin: 'emergent', why: 'text mentions "beta" ×2', sourceRatio: 2.1 },
+      { concept: 'c_gamma', weight: 0.5, origin: 'discovered', why: 'recurs in 2 of 4 items' },
+    ],
+  );
   // The same item with its tags list emptied, or without one, gives the same edges.
   assert.deepStrictEqual(buildEdges([{ ...both, tags: [] }]), edges);
   const { tags, ...noList } = both;
@@ -295,11 +338,22 @@ test('an item with both gets the same edges, in the same order, as its tags gave
 test('a tag written as a number still makes its edge, as it did before the helper', () => {
   // gray-matter reads `tags: [2024, ai]` as a number and a string, and the
   // adapter writes a reference for each; the number's edge is tag:2024.
-  const edges = buildEdges([item('a', {
-    tags: [2024, 'ai'],
-    _references: [{ type: 'tag', value: 2024 }, { type: 'tag', value: 'ai' }],
-  })]);
-  assert.deepStrictEqual(edges.map((e) => [e.layer, e.target]), [['tag', 'tag:2024'], ['tag', 'tag:ai']]);
+  const edges = buildEdges([
+    item('a', {
+      tags: [2024, 'ai'],
+      _references: [
+        { type: 'tag', value: 2024 },
+        { type: 'tag', value: 'ai' },
+      ],
+    }),
+  ]);
+  assert.deepStrictEqual(
+    edges.map((e) => [e.layer, e.target]),
+    [
+      ['tag', 'tag:2024'],
+      ['tag', 'tag:ai'],
+    ],
+  );
   // With no references at all (an older feed), from item.tags.
   const [edge] = buildEdges([item('b', { tags: [2024] })]);
   assert.strictEqual(edge.layer, 'tag');

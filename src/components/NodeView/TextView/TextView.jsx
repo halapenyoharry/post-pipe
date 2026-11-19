@@ -43,7 +43,17 @@ import { CardListen } from '../../TTS/TTS';
  *   theme: optional { accent, publishedColor, draftColor } overrides; falls
  *     back to CSS-variable defaults declared in the module
  */
-export function TextView({ article, width, height, viewState, fullContent, onResize, cardSettings, sourceColor: feedColor, listen = true }) {
+export function TextView({
+  article,
+  width,
+  height,
+  viewState,
+  fullContent,
+  onResize,
+  cardSettings,
+  sourceColor: feedColor,
+  listen = true,
+}) {
   const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
@@ -64,12 +74,21 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
   // resolved by the GraphViewer; a host without it falls to the piece's
   // own _source.color); else the theme's published or draft colour, as a
   // card glowed before any feed had a colour.
-  const sourceColor = article.containerColor || feedColor || (article._source && article._source.color)
-    || (isDraft ? 'var(--nv-draft)' : 'var(--nv-published)');
+  const sourceColor =
+    article.containerColor ||
+    feedColor ||
+    (article._source && article._source.color) ||
+    (isDraft ? 'var(--nv-draft)' : 'var(--nv-published)');
   // Readers' contributions attached to this piece (settings.contributions):
   // a quiet count, apart from the reader's own bookmarks.
   const contributionCount = viewState?.contributionCount || 0;
-  const bookmarkCount = viewState?.bookmarkCount ?? (Array.isArray(viewState?.bookmarks) ? viewState.bookmarks.length : (Array.isArray(article?.bookmarks) ? article.bookmarks.length : 0));
+  const bookmarkCount =
+    viewState?.bookmarkCount ??
+    (Array.isArray(viewState?.bookmarks)
+      ? viewState.bookmarks.length
+      : Array.isArray(article?.bookmarks)
+        ? article.bookmarks.length
+        : 0);
 
   // A link node: its title, subtitle and blurb, and a ↗ for where it goes.
   // It never expands into text: a tap follows the link (GraphViewer).
@@ -100,19 +119,33 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
   // Before, `published` meant blue and everything else meant dark — so the
   // eighty subscribed items and eight of your own drafts rendered identically,
   // and your own unfinished work disappeared into somebody else's news.
-  const prominence = (article._source && article._source.prominence)
-    || (article.originalItem && article.originalItem._source && article.originalItem._source.prominence)
-    || 'secondary';
+  const prominence =
+    (article._source && article._source.prominence) ||
+    (article.originalItem && article.originalItem._source && article.originalItem._source.prominence) ||
+    'secondary';
   const isPrimary = prominence === 'primary';
 
   const bgColor = isPrimary
-    ? (isDraft ? '#24304a' : '#1e3a5f')   // yours: finished, and still in progress
-    : '#23232f';                          // subscribed: present, quieter
+    ? isDraft
+      ? '#24304a'
+      : '#1e3a5f' // yours: finished, and still in progress
+    : '#23232f'; // subscribed: present, quieter
 
   // A link node: its title, subtitle and blurb, and a ↗ for where it goes.
   // It never expands into text: a tap follows the link (GraphViewer).
   if (article.kind === 'link' && article.link) {
-    return <LinkCard article={article} width={width} height={height} viewState={viewState} cardSettings={cardSettings} sourceColor={sourceColor} isDraft={isDraft} bgColor={bgColor} />;
+    return (
+      <LinkCard
+        article={article}
+        width={width}
+        height={height}
+        viewState={viewState}
+        cardSettings={cardSettings}
+        sourceColor={sourceColor}
+        isDraft={isDraft}
+        bgColor={bgColor}
+      />
+    );
   }
 
   // A cover is worth knowing about at a glance and not worth a third of the
@@ -136,7 +169,9 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
     expanded && styles.expanded,
     pinned && styles.pinned,
     listening && styles.listening,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   // The sketchbook theme's pencil outline: generated per card and size, so it
   // is the same on every frame; hidden by CSS in any other theme.
@@ -164,26 +199,28 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         ...(sourceColor && !pinned ? { '--nv-src': sourceColor } : {}),
         // A card inside a container takes the node colour the reader chose
         // (graph.nodePalettes; --pp-node-color on the graph) for its outline.
-        ...(sourceColor && !pinned && article.containerColor ? { '--nv-outline': `var(--pp-node-color, ${sourceColor})` } : {}),
+        ...(sourceColor && !pinned && article.containerColor
+          ? { '--nv-outline': `var(--pp-node-color, ${sourceColor})` }
+          : {}),
       }}
     >
       {sketch && (
-        <svg className={styles.sketchBorder} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+        <svg
+          className={styles.sketchBorder}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
           <path className={styles.sketchGhost} d={sketch.ghost} />
           <path className={styles.sketchMain} d={sketch.main} />
         </svg>
       )}
       {bookmarkCount > 0 && (
-        <div
-          className={styles.bookmarkMark}
-          title={bookmarkCount === 1 ? '1 bookmark' : `${bookmarkCount} bookmarks`}
-        >
+        <div className={styles.bookmarkMark} title={bookmarkCount === 1 ? '1 bookmark' : `${bookmarkCount} bookmarks`}>
           <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
             <path d="M3 2v12l5-3 5 3V2z" />
           </svg>
-          {bookmarkCount > 1 && (
-            <span className={styles.bookmarkCount}>{bookmarkCount}</span>
-          )}
+          {bookmarkCount > 1 && <span className={styles.bookmarkCount}>{bookmarkCount}</span>}
         </div>
       )}
       {contributionCount > 0 && (
@@ -193,7 +230,15 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
           aria-label={contributionCount === 1 ? '1 from readers' : `${contributionCount} from readers`}
           data-contrib-count={contributionCount}
         >
-          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <svg
+            viewBox="0 0 16 16"
+            width="11"
+            height="11"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            aria-hidden="true"
+          >
             <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" />
           </svg>
           <span>{contributionCount}</span>
@@ -204,7 +249,9 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
           className={styles.imageMark}
           style={{
             backgroundImage: `url('${article.image}')`,
-            ...(cardSettings?.imageMarkSize ? { width: cardSettings.imageMarkSize, height: cardSettings.imageMarkSize } : {}),
+            ...(cardSettings?.imageMarkSize
+              ? { width: cardSettings.imageMarkSize, height: cardSettings.imageMarkSize }
+              : {}),
           }}
           title="has an image"
         />
@@ -235,17 +282,12 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
         </div>
       )}
       {readDone && (
-        <div className={styles.readMark} title="Read to the end" aria-hidden="true">✓</div>
+        <div className={styles.readMark} title="Read to the end" aria-hidden="true">
+          ✓
+        </div>
       )}
       {pinned && <PopoutButton />}
-      {onResize && (
-        <ResizeHandles
-          width={width}
-          height={height}
-          zoomScale={zoomScale}
-          onResize={onResize}
-        />
-      )}
+      {onResize && <ResizeHandles width={width} height={height} zoomScale={zoomScale} onResize={onResize} />}
     </div>
   );
 }
@@ -263,10 +305,11 @@ export function TextView({ article, width, height, viewState, fullContent, onRes
 // rather than measured — a measurement would need a layout pass per node per
 // zoom change, and being a few percent conservative costs nothing here.
 function fitFontSize(text, width, height, opts = {}) {
-  const {
-    min = 14, max = 36, lineHeight = 1.22, charRatio = 0.52, pad = 10, maxLines = 4,
-  } = opts;
-  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const { min = 14, max = 36, lineHeight = 1.22, charRatio = 0.52, pad = 10, maxLines = 4 } = opts;
+  const words = String(text || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (!words.length || !width || !height) return min;
 
   const boxW = Math.max(width - pad * 2, 8);
@@ -294,11 +337,22 @@ const COMPACT_HEIGHT = 260;
 
 // English number words from 0 to 99, shared with the reader's header line.
 
-function CardContent({ article, width, height, bandHeight = 0, viewState, expanded, useFullArticle, fullContent, cardSettings, listening = false }) {
+function CardContent({
+  article,
+  width,
+  height,
+  bandHeight = 0,
+  viewState,
+  expanded,
+  useFullArticle,
+  fullContent,
+  cardSettings,
+  listening = false,
+}) {
   // Expanded (hover or pin): title + scrollable body. Pin upgrades to the
   // full fetched article when available; otherwise we show the summary.
   if (expanded) {
-    const body = useFullArticle ? fullContent : (article.description || '');
+    const body = useFullArticle ? fullContent : article.description || '';
     const title = article.title || article.label;
 
     // In a small card the title scrolls away with the text instead of holding
@@ -311,7 +365,9 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
         <>
           {listening && <CardListen />}
           <div className={`${styles.scroll} ${styles.scrollFull} ${useFullArticle ? styles.full : ''} rp-scroll`}>
-            <div className={styles.titleScrolling} data-card-title>{title}</div>
+            <div className={styles.titleScrolling} data-card-title>
+              {title}
+            </div>
             {body && <div dangerouslySetInnerHTML={{ __html: body }} />}
           </div>
         </>
@@ -338,21 +394,21 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
   // description text). Show the title large and bold, and under it a subtitle
   // in a smaller, lighter weight, with tight spacing between them (line-height
   // about 1.05, 2–4px gap), centered in the card.
-  const subtitleTemplate = cardSettings?.subtitle || (typeof window !== 'undefined' && window.SETTINGS?.graph?.card?.subtitle);
+  const subtitleTemplate =
+    cardSettings?.subtitle || (typeof window !== 'undefined' && window.SETTINGS?.graph?.card?.subtitle);
   let subtitle = null;
   if (subtitleTemplate && article.series_part != null && article.series_part !== '') {
     const n = article.series_part;
     const n_words = numberToLowercaseWords(n);
-    subtitle = subtitleTemplate
-      .replace(/\{n\}/g, String(n))
-      .replace(/\{n_words\}/g, n_words);
+    subtitle = subtitleTemplate.replace(/\{n\}/g, String(n)).replace(/\{n_words\}/g, n_words);
   }
 
-  const title = (viewState.lod === 'slug')
-    ? (article.label || article.labelMedium || article.title || '')
-    : (article.title || article.label);
+  const title =
+    viewState.lod === 'slug'
+      ? article.label || article.labelMedium || article.title || ''
+      : article.title || article.label;
 
-  const titleFontSize = fitFontSize(title, width, subtitle ? (height - 30) : height, {
+  const titleFontSize = fitFontSize(title, width, subtitle ? height - 30 : height, {
     min: cardSettings?.labelMinFontSize ?? 14,
     max: cardSettings?.labelMaxFontSize ?? 26,
     lineHeight: 1.05,
@@ -362,18 +418,11 @@ function CardContent({ article, width, height, bandHeight = 0, viewState, expand
 
   return (
     <div className={styles.cardCenter}>
-      <div
-        className={styles.cardTitle}
-        style={{ fontSize: `${titleFontSize}px` }}
-        data-card-title
-      >
+      <div className={styles.cardTitle} style={{ fontSize: `${titleFontSize}px` }} data-card-title>
         {title}
       </div>
       {subtitle && (
-        <div
-          className={styles.cardSubtitle}
-          style={{ fontSize: `${subtitleFontSize}px` }}
-        >
+        <div className={styles.cardSubtitle} style={{ fontSize: `${subtitleFontSize}px` }}>
           {subtitle}
         </div>
       )}
@@ -402,7 +451,9 @@ function LinkCard({ article, width, height, viewState, cardSettings, sourceColor
     styles.linkCard,
     sourceColor && styles.glow,
     viewState.hovered && styles.linkHover,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
   return (
     <div
       className={className}
@@ -417,45 +468,52 @@ function LinkCard({ article, width, height, viewState, cardSettings, sourceColor
       }}
     >
       {sketch && (
-        <svg className={styles.sketchBorder} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+        <svg
+          className={styles.sketchBorder}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
           <path className={styles.sketchGhost} d={sketch.ghost} />
           <path className={styles.sketchMain} d={sketch.main} />
         </svg>
       )}
-      <div className={styles.linkTitle} style={{ fontSize: `${titleFontSize}px` }} data-link-title>{title}</div>
-      {subtitle && <div className={styles.linkSubtitle} data-link-subtitle>{subtitle}</div>}
-      {blurb && <div className={styles.linkBlurb} data-link-blurb>{blurb}</div>}
-      <span className={styles.linkOut} data-link-out aria-hidden="true">↗</span>
+      <div className={styles.linkTitle} style={{ fontSize: `${titleFontSize}px` }} data-link-title>
+        {title}
+      </div>
+      {subtitle && (
+        <div className={styles.linkSubtitle} data-link-subtitle>
+          {subtitle}
+        </div>
+      )}
+      {blurb && (
+        <div className={styles.linkBlurb} data-link-blurb>
+          {blurb}
+        </div>
+      )}
+      <span className={styles.linkOut} data-link-out aria-hidden="true">
+        ↗
+      </span>
     </div>
   );
 }
 
 function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale, bookmarkCount = 0, onResize }) {
   // Photo-on-top, caption-below. Hover/pin slightly enlarges.
-  const cardClassNames = [
-    styles.imageCard,
-    isDraft ? styles.draft : styles.published,
-    pinned && styles.pinned
-  ].filter(Boolean).join(' ');
+  const cardClassNames = [styles.imageCard, isDraft ? styles.draft : styles.published, pinned && styles.pinned]
+    .filter(Boolean)
+    .join(' ');
 
   const imgH = pinned ? height - 24 : hovered ? height - 24 : height - 24;
 
   return (
-    <div
-      className={cardClassNames}
-      style={{ width, height }}
-    >
+    <div className={cardClassNames} style={{ width, height }}>
       {bookmarkCount > 0 && (
-        <div
-          className={styles.bookmarkMark}
-          title={bookmarkCount === 1 ? '1 bookmark' : `${bookmarkCount} bookmarks`}
-        >
+        <div className={styles.bookmarkMark} title={bookmarkCount === 1 ? '1 bookmark' : `${bookmarkCount} bookmarks`}>
           <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
             <path d="M3 2v12l5-3 5 3V2z" />
           </svg>
-          {bookmarkCount > 1 && (
-            <span className={styles.bookmarkCount}>{bookmarkCount}</span>
-          )}
+          {bookmarkCount > 1 && <span className={styles.bookmarkCount}>{bookmarkCount}</span>}
         </div>
       )}
       <div
@@ -463,32 +521,21 @@ function ImageCard({ article, width, height, pinned, hovered, isDraft, zoomScale
         style={{
           width,
           height: imgH,
-          backgroundImage: `url('${article.image}')`
+          backgroundImage: `url('${article.image}')`,
         }}
       />
       <div className={styles.imageCaption} data-card-title>
         {article.short_title || article.title || article.label}
       </div>
       {pinned && <PopoutButton />}
-      {onResize && (
-        <ResizeHandles
-          width={width}
-          height={height}
-          zoomScale={zoomScale}
-          onResize={onResize}
-        />
-      )}
+      {onResize && <ResizeHandles width={width} height={height} zoomScale={zoomScale} onResize={onResize} />}
     </div>
   );
 }
 
 function PopoutButton() {
   return (
-    <div
-      data-popout="1"
-      title="Open in reader"
-      className={styles.popout}
-    >
+    <div data-popout="1" title="Open in reader" className={styles.popout}>
       <svg
         data-popout="1"
         viewBox="0 0 24 24"

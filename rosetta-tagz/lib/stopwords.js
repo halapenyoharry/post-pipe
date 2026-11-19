@@ -56,7 +56,10 @@ comprising relating referring representing requiring ensuring maintaining obtain
 reaching carrying occurring existing lacking owing given`;
 
 export const FUNCTION_WORDS = new Set(
-  [PREPOSITIONS, CONJUNCTIONS, DETERMINERS, PRONOUNS, AUXILIARIES, ADVERBS, PARTICIPLES].join(' ').split(/\s+/).filter(Boolean),
+  [PREPOSITIONS, CONJUNCTIONS, DETERMINERS, PRONOUNS, AUXILIARIES, ADVERBS, PARTICIPLES]
+    .join(' ')
+    .split(/\s+/)
+    .filter(Boolean),
 );
 
 // Whether a word, as `words()` in lib/text.js reads it (lower case, no punctuation), is a function word.
@@ -64,4 +67,7 @@ export const isFunctionWord = (w) => FUNCTION_WORDS.has(w);
 
 // Whether a phrase, one or more such words separated by spaces, holds a function word anywhere: "onto
 // surfaces" and "roughly half" are refused with "onto" and "roughly".
-export const hasFunctionWord = (phrase) => String(phrase ?? '').split(' ').some(isFunctionWord);
+export const hasFunctionWord = (phrase) =>
+  String(phrase ?? '')
+    .split(' ')
+    .some(isFunctionWord);

@@ -13,7 +13,11 @@ const DIMENSIONS = [
 // Dimensions that lay an edge layer over the graph rather than a rail beside
 // it. Each turns on and off by itself, and is off until the reader turns it on.
 const LAYERS = [
-  { id: 'readers', label: 'readers', title: "Readers' connections: links readers drew between chapters (not the book's own)" },
+  {
+    id: 'readers',
+    label: 'readers',
+    title: "Readers' connections: links readers drew between chapters (not the book's own)",
+  },
 ];
 
 // The tooltip a renamed dimension gets when only its name was given.

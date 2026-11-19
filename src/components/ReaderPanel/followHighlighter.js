@@ -115,7 +115,10 @@ export function attachFollowAlong(body) {
   let tracking = false;
   let frame = 0;
   let last = null;
-  const paint = () => { frame = 0; if (last) followAt(body, last.x, last.y); };
+  const paint = () => {
+    frame = 0;
+    if (last) followAt(body, last.x, last.y);
+  };
   const queue = (e) => {
     last = { x: e.clientX, y: e.clientY };
     if (!frame) frame = requestAnimationFrame(paint);
@@ -126,8 +129,12 @@ export function attachFollowAlong(body) {
     tracking = true;
     queue(e);
   };
-  const move = (e) => { if (tracking) queue(e); };
-  const up = () => { tracking = false; };
+  const move = (e) => {
+    if (tracking) queue(e);
+  };
+  const up = () => {
+    tracking = false;
+  };
   body.addEventListener('pointerdown', down);
   body.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);

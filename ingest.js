@@ -3,8 +3,8 @@
 // metadata-graceful. Each folder becomes one Content object regardless of how
 // much metadata is filled in.
 
-const fs     = require('fs');
-const path   = require('path');
+const fs = require('fs');
+const path = require('path');
 const matter = require('gray-matter');
 const { sceneFrom } = require('./src/lib/scene');
 const { splitFrontMatter } = require('./src/lib/frontMatter');
@@ -13,31 +13,43 @@ const { linkFromFrontMatter, blurbFromFrontMatter, isLinkContent } = require('./
 const AUDIO_EXTS = new Set(['.m4a', '.mp3', '.wav', '.ogg', '.flac', '.aac']);
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm', '.mkv', '.avi']);
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']);
-const TEXT_EXTS  = new Set(['.md', '.qmd']);
+const TEXT_EXTS = new Set(['.md', '.qmd']);
 
 // Folders in the content root that should never be treated as content.
 const SKIP_FOLDERS = new Set(['authors', 'node_modules', '.git']);
 
 // ─── Substrate detection ────────────────────────────────────────────────────
 
-function ext(f)        { return path.extname(f).toLowerCase(); }
-function isAudio(f)    { return AUDIO_EXTS.has(ext(f)); }
-function isVideo(f)    { return VIDEO_EXTS.has(ext(f)); }
-function isImage(f)    { return IMAGE_EXTS.has(ext(f)); }
-function isText(f)     { return TEXT_EXTS.has(ext(f)); }
-function isTodo(f)     { return f.startsWith('_TODO') || f === '_MIGRATE.md'; }
+function ext(f) {
+  return path.extname(f).toLowerCase();
+}
+function isAudio(f) {
+  return AUDIO_EXTS.has(ext(f));
+}
+function isVideo(f) {
+  return VIDEO_EXTS.has(ext(f));
+}
+function isImage(f) {
+  return IMAGE_EXTS.has(ext(f));
+}
+function isText(f) {
+  return TEXT_EXTS.has(ext(f));
+}
+function isTodo(f) {
+  return f.startsWith('_TODO') || f === '_MIGRATE.md';
+}
 
 function detectSubstrate(files, explicit) {
   if (explicit) return explicit;
   const audible = files.some(isAudio);
   const watchable = files.some(isVideo);
-  const readable = files.some(f => isText(f) && !isTodo(f)) || files.includes('index.html');
+  const readable = files.some((f) => isText(f) && !isTodo(f)) || files.includes('index.html');
   const viewable = files.some(isImage);
   const substrates = [
-    audible   && 'podcast-episode',
+    audible && 'podcast-episode',
     watchable && 'video',
-    readable  && 'essay',
-    viewable  && 'image',
+    readable && 'essay',
+    viewable && 'image',
   ].filter(Boolean);
   if (substrates.length === 0) return 'fragment';
   if (substrates.length === 1) return substrates[0];
@@ -49,22 +61,33 @@ function detectSubstrate(files, explicit) {
 function readFrontmatterJson(dir) {
   const p = path.join(dir, 'frontmatter.json');
   if (!fs.existsSync(p)) return null;
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
-  catch (err) { console.warn(`[ingest] malformed JSON: ${p} — ${err.message}`); return null; }
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (err) {
+    console.warn(`[ingest] malformed JSON: ${p} — ${err.message}`);
+    return null;
+  }
 }
 
 function readQmdFrontmatter(dir) {
   const p = path.join(dir, 'index.qmd');
   if (!fs.existsSync(p)) return null;
-  try { return matter(fs.readFileSync(p, 'utf8')).data; }
-  catch (err) { console.warn(`[ingest] couldn't parse ${p} — ${err.message}`); return null; }
+  try {
+    return matter(fs.readFileSync(p, 'utf8')).data;
+  } catch (err) {
+    console.warn(`[ingest] couldn't parse ${p} — ${err.message}`);
+    return null;
+  }
 }
 
 // The front matter of a piece's own text file, if it has any.
 function readBodyFrontMatter(dir, body) {
   if (!body || body.format !== 'md') return null;
-  try { return splitFrontMatter(fs.readFileSync(path.join(dir, body.file), 'utf8')).data; }
-  catch (_) { return null; }
+  try {
+    return splitFrontMatter(fs.readFileSync(path.join(dir, body.file), 'utf8')).data;
+  } catch (_) {
+    return null;
+  }
 }
 
 // The front matter and the text of a piece's own markdown file.
@@ -73,7 +96,9 @@ function readBodyParts(dir, body) {
   try {
     const parts = splitFrontMatter(fs.readFileSync(path.join(dir, body.file), 'utf8'));
     return { data: parts.data, body: parts.body };
-  } catch (_) { return { data: null, body: null }; }
+  } catch (_) {
+    return { data: null, body: null };
+  }
 }
 
 // A piece whose front matter (frontmatter.json, or its own text file's)
@@ -108,9 +133,9 @@ function findBody(dir, files, explicitFile) {
     if (files.includes(name)) return { file: name, format };
   }
   // Fallback: any .md that isn't a TODO, or any .html archive
-  const md = files.find(f => ext(f) === '.md' && !isTodo(f));
+  const md = files.find((f) => ext(f) === '.md' && !isTodo(f));
   if (md) return { file: md, format: 'md' };
-  const html = files.find(f => ext(f) === '.html');
+  const html = files.find((f) => ext(f) === '.html');
   if (html) return { file: html, format: 'html' };
   return null;
 }
@@ -120,11 +145,18 @@ function findCover(dir, files, legacyCoverImage) {
     const p = path.join(dir, legacyCoverImage);
     if (fs.existsSync(p)) return legacyCoverImage;
   }
-  for (const candidate of ['cover.jpg', 'cover.png', 'cover.jpeg', 'cover.webp',
-                           'images/cover.jpg', 'images/cover.png', 'images/cover.jpeg']) {
+  for (const candidate of [
+    'cover.jpg',
+    'cover.png',
+    'cover.jpeg',
+    'cover.webp',
+    'images/cover.jpg',
+    'images/cover.png',
+    'images/cover.jpeg',
+  ]) {
     if (fs.existsSync(path.join(dir, candidate))) return candidate;
   }
-  const art = files.find(f => (f.startsWith('art-') || f.startsWith('cover-')) && isImage(f));
+  const art = files.find((f) => (f.startsWith('art-') || f.startsWith('cover-')) && isImage(f));
   if (art) return art;
   // Unstructured image-only folders: the image IS the cover.
   //
@@ -135,7 +167,7 @@ function findCover(dir, files, legacyCoverImage) {
   // when something names it one: frontmatter cover_image, a cover.* filename,
   // or a cover-/art- prefix. Never by being the only file that happens to be
   // an image.
-  const soleImage = files.filter(f => isImage(f) && ext(f) !== '.svg');
+  const soleImage = files.filter((f) => isImage(f) && ext(f) !== '.svg');
   if (soleImage.length === 1) return soleImage[0];
   return null;
 }
@@ -146,9 +178,9 @@ function findMedia(dir, files) {
   const video = files.find(isVideo);
   if (audio) {
     const base = path.basename(audio, path.extname(audio));
-    const srt     = files.find(f => f === `${base}.srt`);
-    const txt     = files.find(f => f === `${base}.txt`);
-    const timings = files.find(f => f === `${base}.json`);
+    const srt = files.find((f) => f === `${base}.srt`);
+    const txt = files.find((f) => f === `${base}.txt`);
+    const timings = files.find((f) => f === `${base}.json`);
     media.audio = {
       file: audio,
       srt: srt || null,
@@ -157,13 +189,15 @@ function findMedia(dir, files) {
     };
   }
   if (video) media.video = { file: video };
-  return (audio || video) ? media : null;
+  return audio || video ? media : null;
 }
 
 // ─── Content builders ───────────────────────────────────────────────────────
 
 function cleanAuthor(a) {
-  return String(a || '').trim().toLowerCase();
+  return String(a || '')
+    .trim()
+    .toLowerCase();
 }
 
 function siteAuthor(settings) {
@@ -176,123 +210,127 @@ function buildFromFrontmatterJson(id, fm, files, dir, defaultAuthor = '') {
   return {
     id,
     kind: substrate,
-    title:          fm.title || id,
-    short_title:    fm.short_title || null,
-    summary:        fm.idea?.tldr || fm.idea?.seed || '',
-    seed:           fm.idea?.seed || null,
-    topology:       fm.idea?.topology || [],
-    energy:         fm.idea?.energy || null,
+    title: fm.title || id,
+    short_title: fm.short_title || null,
+    summary: fm.idea?.tldr || fm.idea?.seed || '',
+    seed: fm.idea?.seed || null,
+    topology: fm.idea?.topology || [],
+    energy: fm.idea?.energy || null,
     substrate,
-    status:         fm.meta?.status || 'scattered',
-    written:        fm.meta?.written || null,
-    updated:        fm.meta?.updated || null,
-    reading_time:   fm.meta?.reading_time || null,
-    author:         cleanAuthor(fm.meta?.author) || defaultAuthor,
-    tags:           fm.tags || [],
-    references:     Array.isArray(fm._references) ? fm._references : (Array.isArray(fm.references) ? fm.references : []),
-    series:         fm.series || null,
-    series_part:    fm.series_part ?? null,
-    timeline:       fm.timeline || null,
-    scene:          sceneFrom(readBodyFrontMatter(dir, body), fm),
-    license:        fm.meta?.license || null,
-    forms_current:  fm.forms?.current || substrate,
+    status: fm.meta?.status || 'scattered',
+    written: fm.meta?.written || null,
+    updated: fm.meta?.updated || null,
+    reading_time: fm.meta?.reading_time || null,
+    author: cleanAuthor(fm.meta?.author) || defaultAuthor,
+    tags: fm.tags || [],
+    references: Array.isArray(fm._references) ? fm._references : Array.isArray(fm.references) ? fm.references : [],
+    series: fm.series || null,
+    series_part: fm.series_part ?? null,
+    timeline: fm.timeline || null,
+    scene: sceneFrom(readBodyFrontMatter(dir, body), fm),
+    license: fm.meta?.license || null,
+    forms_current: fm.forms?.current || substrate,
     forms_potential: fm.forms?.potential || [],
     forms_companions: fm.forms?.companions || [],
-    syndication:    fm.syndication || {},
-    connected_to:   fm.connected_to || [],
-    note:           fm.note || null,
-    cover:          findCover(dir, files, null),
+    syndication: fm.syndication || {},
+    connected_to: fm.connected_to || [],
+    note: fm.note || null,
+    cover: findCover(dir, files, null),
     body,
-    media:          findMedia(dir, files),
-    todos:          files.filter(isTodo),
-    commit_times:   Array.isArray(fm.commit_times) ? fm.commit_times : null,
-    commits:        Array.isArray(fm.commits) ? fm.commits : null,
-    version:        fm.version || null,
-    version_maps:   fm.version_maps || null,
-    source:         'local',
-    schema:         'gen2',
-    posted:         fm.posted !== undefined ? fm.posted : null,
+    media: findMedia(dir, files),
+    todos: files.filter(isTodo),
+    commit_times: Array.isArray(fm.commit_times) ? fm.commit_times : null,
+    commits: Array.isArray(fm.commits) ? fm.commits : null,
+    version: fm.version || null,
+    version_maps: fm.version_maps || null,
+    source: 'local',
+    schema: 'gen2',
+    posted: fm.posted !== undefined ? fm.posted : null,
   };
 }
 
 function buildFromQmd(id, yaml, files, dir, defaultAuthor = '') {
   return {
     id,
-    kind:           'essay',
-    title:          yaml.title || id,
-    short_title:    yaml.short_title || null,
-    summary:        yaml.tldr || yaml.description || '',
-    seed:           null,
-    topology:       [],
-    energy:         null,
-    substrate:      'essay',
-    status:         yaml.status === 'published' ? 'published' : 'drafted',
-    written:        yaml.publish_date || null,
-    updated:        yaml.updated_date || null,
-    reading_time:   yaml.reading_time || null,
-    author:         cleanAuthor(yaml.author) || defaultAuthor,
-    tags:           yaml.tags || [],
-    references:     Array.isArray(yaml._references) ? yaml._references : (Array.isArray(yaml.references) ? yaml.references : []),
-    series:         yaml.series || null,
-    series_part:    yaml.series_part ?? null,
-    timeline:       null,
-    scene:          sceneFrom(yaml),
-    license:        yaml.license || null,
-    forms_current:  'essay',
+    kind: 'essay',
+    title: yaml.title || id,
+    short_title: yaml.short_title || null,
+    summary: yaml.tldr || yaml.description || '',
+    seed: null,
+    topology: [],
+    energy: null,
+    substrate: 'essay',
+    status: yaml.status === 'published' ? 'published' : 'drafted',
+    written: yaml.publish_date || null,
+    updated: yaml.updated_date || null,
+    reading_time: yaml.reading_time || null,
+    author: cleanAuthor(yaml.author) || defaultAuthor,
+    tags: yaml.tags || [],
+    references: Array.isArray(yaml._references)
+      ? yaml._references
+      : Array.isArray(yaml.references)
+        ? yaml.references
+        : [],
+    series: yaml.series || null,
+    series_part: yaml.series_part ?? null,
+    timeline: null,
+    scene: sceneFrom(yaml),
+    license: yaml.license || null,
+    forms_current: 'essay',
     forms_potential: [],
     forms_companions: [],
     syndication: {
       canonical: yaml.canonical_url || null,
       ...(yaml.syndication || {}),
     },
-    connected_to:   [],
-    note:           null,
-    cover:          findCover(dir, files, yaml.cover_image),
-    body:           { file: 'index.qmd', format: 'qmd' },
-    media:          findMedia(dir, files),
-    todos:          files.filter(isTodo),
-    source:         'local',
-    schema:         'legacy-qmd',
-    posted:         yaml.posted !== undefined ? yaml.posted : null,
+    connected_to: [],
+    note: null,
+    cover: findCover(dir, files, yaml.cover_image),
+    body: { file: 'index.qmd', format: 'qmd' },
+    media: findMedia(dir, files),
+    todos: files.filter(isTodo),
+    source: 'local',
+    schema: 'legacy-qmd',
+    posted: yaml.posted !== undefined ? yaml.posted : null,
   };
 }
 
 function buildFromUnstructured(id, files, dir, defaultAuthor = '') {
   const substrate = detectSubstrate(files, null);
-  const title = id.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const title = id.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return {
     id,
-    kind:           substrate,
+    kind: substrate,
     title,
-    short_title:    null,
-    summary:        '',
-    seed:           null,
-    topology:       [],
-    energy:         null,
+    short_title: null,
+    summary: '',
+    seed: null,
+    topology: [],
+    energy: null,
     substrate,
-    status:         'scattered',
-    written:        null,
-    updated:        null,
-    reading_time:   null,
-    author:         defaultAuthor,
-    tags:           [],
-    series:         null,
-    series_part:    null,
-    timeline:       null,
-    license:        null,
-    forms_current:  substrate,
+    status: 'scattered',
+    written: null,
+    updated: null,
+    reading_time: null,
+    author: defaultAuthor,
+    tags: [],
+    series: null,
+    series_part: null,
+    timeline: null,
+    license: null,
+    forms_current: substrate,
     forms_potential: [],
     forms_companions: [],
-    syndication:    {},
-    connected_to:   [],
-    note:           null,
-    cover:          findCover(dir, files, null),
-    body:           findBody(dir, files, null),
-    media:          findMedia(dir, files),
-    todos:          files.filter(isTodo),
-    source:         'local',
-    schema:         'unstructured',
-    posted:         null,
+    syndication: {},
+    connected_to: [],
+    note: null,
+    cover: findCover(dir, files, null),
+    body: findBody(dir, files, null),
+    media: findMedia(dir, files),
+    todos: files.filter(isTodo),
+    source: 'local',
+    schema: 'unstructured',
+    posted: null,
   };
 }
 
@@ -320,12 +358,8 @@ function withFrontMatter(c, data) {
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 function ingestFolder(rootPath, options = {}) {
-  const defaultAuthor = options.author !== undefined
-    ? cleanAuthor(options.author)
-    : siteAuthor(options.settings);
-  const resolved = rootPath.startsWith('~')
-    ? path.join(process.env.HOME, rootPath.slice(1))
-    : path.resolve(rootPath);
+  const defaultAuthor = options.author !== undefined ? cleanAuthor(options.author) : siteAuthor(options.settings);
+  const resolved = rootPath.startsWith('~') ? path.join(process.env.HOME, rootPath.slice(1)) : path.resolve(rootPath);
   if (!fs.existsSync(resolved)) {
     throw new Error(`ingest: root does not exist: ${resolved}`);
   }
@@ -337,7 +371,7 @@ function ingestFolder(rootPath, options = {}) {
     if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
     if (SKIP_FOLDERS.has(entry.name)) continue;
 
-    const dir   = path.join(resolved, entry.name);
+    const dir = path.join(resolved, entry.name);
     const files = fs.readdirSync(dir);
 
     const fm = readFrontmatterJson(dir);
@@ -349,7 +383,10 @@ function ingestFolder(rootPath, options = {}) {
     }
 
     const yaml = readQmdFrontmatter(dir);
-    if (yaml) { contents.push(buildFromQmd(entry.name, yaml, files, dir, defaultAuthor)); continue; }
+    if (yaml) {
+      contents.push(buildFromQmd(entry.name, yaml, files, dir, defaultAuthor));
+      continue;
+    }
 
     const c = buildFromUnstructured(entry.name, files, dir, defaultAuthor);
     const own = readBodyParts(dir, c.body);

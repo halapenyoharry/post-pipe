@@ -7,10 +7,20 @@ import { spawnSync } from 'node:child_process';
 import { ROOT, SYN, tmpDir } from './helpers.js';
 
 const run = (bin, args = [], { input, cwd } = {}) => {
-  const r = spawnSync(process.execPath, [`${ROOT}bin/${bin}`, ...args], { input, cwd, encoding: 'utf8', maxBuffer: 1 << 28 });
+  const r = spawnSync(process.execPath, [`${ROOT}bin/${bin}`, ...args], {
+    input,
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 1 << 28,
+  });
   return { out: r.stdout, err: r.stderr, status: r.status };
 };
-const lines = (s) => s.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+const lines = (s) =>
+  s
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
 
 const dir = tmpDir();
 const records = [
@@ -50,14 +60,24 @@ test('the fully piped form (rtz-pairs | rtz-stone --no-builtin) equals the built
   const pairRows = lines(pairs.out);
   assert.ok(pairRows.length > 50 && pairRows.every((p) => p.a < p.b && typeof p.score === 'number' && p.signal));
   fs.writeFileSync(path.join(dir, 'pairs.jsonl'), pairs.out);
-  const piped = JSON.parse(run('rtz-stone', ['--no-builtin', '--no-seed', '--pairs', path.join(dir, 'pairs.jsonl'), '-q'], { input: records }).out);
+  const piped = JSON.parse(
+    run('rtz-stone', ['--no-builtin', '--no-seed', '--pairs', path.join(dir, 'pairs.jsonl'), '-q'], { input: records })
+      .out,
+  );
   const direct = JSON.parse(run('rtz-stone', ['--no-seed', '-q'], { input: records }).out);
   const shape = (s) => s.concepts.map((c) => c.variants.map((v) => v.norm).join('|')).sort();
   assert.deepEqual(shape(piped), shape(direct));
 });
 
 test('an external scorer can force a merge by emitting the same pair format', () => {
-  const external = JSON.stringify({ a: 'courts', b: 'criminal justice', signal: 'embedding', score: 0.95, why: 'cosine 0.95 from some model' }) + '\n';
+  const external =
+    JSON.stringify({
+      a: 'courts',
+      b: 'criminal justice',
+      signal: 'embedding',
+      score: 0.95,
+      why: 'cosine 0.95 from some model',
+    }) + '\n';
   fs.writeFileSync(path.join(dir, 'ext.jsonl'), external);
   const s = JSON.parse(run('rtz-stone', ['--pairs', path.join(dir, 'ext.jsonl'), '-q'], { input: records }).out);
   const c = s.concepts.find((x) => x.variants.some((v) => v.norm === 'courts'));
@@ -81,12 +101,27 @@ test('rtz-translate rewrites known, stems unseen, and flags the unmapped', () =>
     { type: 'tag', source: 'New', item: '1', label: 'A.I.' },
     { type: 'tag', source: 'New', item: '1', label: 'Systems-Thinkings' },
     { type: 'tag', source: 'New', item: '1', label: 'quantum gravity' },
-  ].map((r) => JSON.stringify(r)).join('\n');
+  ]
+    .map((r) => JSON.stringify(r))
+    .join('\n');
   const t = lines(run('rtz-translate', [stoneFile], { input }).out);
-  assert.deepEqual(t.map((x) => [x.canonical, x.via]), [['AI', 'known'], ['Systems Thinking', 'stem'], ['quantum gravity', 'unmapped']]);
-  assert.ok(t.every((x, i) => x.label === ['A.I.', 'Systems-Thinkings', 'quantum gravity'][i]), 'original label untouched');
+  assert.deepEqual(
+    t.map((x) => [x.canonical, x.via]),
+    [
+      ['AI', 'known'],
+      ['Systems Thinking', 'stem'],
+      ['quantum gravity', 'unmapped'],
+    ],
+  );
+  assert.ok(
+    t.every((x, i) => x.label === ['A.I.', 'Systems-Thinkings', 'quantum gravity'][i]),
+    'original label untouched',
+  );
   const todo = lines(run('rtz-translate', [stoneFile, '--only-unmapped'], { input }).out);
-  assert.deepEqual(todo.map((x) => x.label), ['quantum gravity']);
+  assert.deepEqual(
+    todo.map((x) => x.label),
+    ['quantum gravity'],
+  );
 });
 
 test('rtz-lookup: concept card explains the name; review queue prints the accept command', () => {
@@ -132,12 +167,21 @@ test('emerge -> universe -> graph (focus by any spelling) -> view', () => {
   const html = path.join(dir, 'view.html');
   assert.equal(run('rtz-view', [uni, '-o', html]).status, 0);
   const text = fs.readFileSync(html, 'utf8');
-  for (const token of ['/*__LIB__*/', '/*__CANON__*/', '/*__GRAPH__*/', '/*__UNIVERSE__*/']) assert.ok(!text.includes(token), token);
+  for (const token of ['/*__LIB__*/', '/*__CANON__*/', '/*__GRAPH__*/', '/*__UNIVERSE__*/'])
+    assert.ok(!text.includes(token), token);
   for (const m of text.matchAll(/<script>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
   assert.ok(!/(src|href)=["']https?:/i.test(text), 'viewer must not reference the network');
   // script 0 is the vendored 3D library (it contains loaders the viewer never calls); 1..3 are ours
-  const ours = [...text.matchAll(/<script>([\s\S]*?)<\/script>/g)].slice(1).map((m) => m[1]).join('\n');
-  assert.ok(!/\bfetch\(|XMLHttpRequest|WebSocket\(|sendBeacon|importScripts|https?:\/\//.test(ours.replace(/const U = [\s\S]*?;\n\(function/, '(function')), 'viewer code makes no network calls');
+  const ours = [...text.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+    .slice(1)
+    .map((m) => m[1])
+    .join('\n');
+  assert.ok(
+    !/\bfetch\(|XMLHttpRequest|WebSocket\(|sendBeacon|importScripts|https?:\/\//.test(
+      ours.replace(/const U = [\s\S]*?;\n\(function/, '(function'),
+    ),
+    'viewer code makes no network calls',
+  );
 });
 
 test('the viewer survives hostile text in tags, titles and excerpts', () => {
@@ -146,7 +190,9 @@ test('the viewer survives hostile text in tags, titles and excerpts', () => {
     { type: 'item', source: 'X', id: '1', title: evil, text: evil, url: '', date: '', kind: '' },
     { type: 'tag', source: 'X', item: '1', label: evil, weight: 1 },
     { type: 'tag', source: 'X', item: '1', label: 'normal', weight: 1 },
-  ].map((r) => JSON.stringify(r)).join('\n');
+  ]
+    .map((r) => JSON.stringify(r))
+    .join('\n');
   const s = run('rtz-stone', ['-q'], { input: hostile }).out;
   const sf = path.join(dir, 'evil-stone.json');
   fs.writeFileSync(sf, s);
@@ -161,16 +207,51 @@ test('the viewer survives hostile text in tags, titles and excerpts', () => {
 test('rtz build runs the whole pipeline from a config file', () => {
   const out = path.join(tmpDir(), 'build');
   const cfg = path.join(tmpDir(), 'rtz.config.json');
-  fs.writeFileSync(cfg, JSON.stringify({ out, sources: [{ adapter: 'jsonfeed', path: `${SYN}wire.feed.json` }, { adapter: 'pairs', path: `${SYN}archive.tsv`, source: 'Archive' }] }));
+  fs.writeFileSync(
+    cfg,
+    JSON.stringify({
+      out,
+      sources: [
+        { adapter: 'jsonfeed', path: `${SYN}wire.feed.json` },
+        { adapter: 'pairs', path: `${SYN}archive.tsv`, source: 'Archive' },
+      ],
+    }),
+  );
   const r = run('rtz', ['build', '--config', cfg]);
   assert.equal(r.status, 0, r.err);
-  for (const f of ['records.jsonl', 'stone.json', 'records.all.jsonl', 'universe.json', 'skos.jsonld', 'skos.ttl', 'view.html', 'build.json', 'ledger.json']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  for (const f of [
+    'records.jsonl',
+    'stone.json',
+    'records.all.jsonl',
+    'universe.json',
+    'skos.jsonld',
+    'skos.ttl',
+    'view.html',
+    'build.json',
+    'ledger.json',
+  ])
+    assert.ok(fs.existsSync(path.join(out, f)), f);
   const build = JSON.parse(fs.readFileSync(path.join(out, 'build.json'), 'utf8'));
-  assert.deepEqual(build.stages.map((s) => s.name), ['ingest jsonfeed', 'ingest pairs', 'stone', 'emerge', 'universe', 'skos', 'view']);
+  assert.deepEqual(
+    build.stages.map((s) => s.name),
+    ['ingest jsonfeed', 'ingest pairs', 'stone', 'emerge', 'universe', 'skos', 'view'],
+  );
   const stone = JSON.parse(fs.readFileSync(path.join(out, 'stone.json'), 'utf8'));
-  assert.deepEqual(build.ledger, { path: path.join(out, 'ledger.json'), minted: stone.concepts.length, reused: 0, retired: 0, splits: 0, merges: 0, events: [] });
+  assert.deepEqual(build.ledger, {
+    path: path.join(out, 'ledger.json'),
+    minted: stone.concepts.length,
+    reused: 0,
+    retired: 0,
+    splits: 0,
+    merges: 0,
+    events: [],
+  });
   const universe = JSON.parse(fs.readFileSync(path.join(out, 'universe.json'), 'utf8'));
-  assert.ok(universe.concepts.filter((c) => !c.unmapped).every((c) => c.ledger && c.ledger.event === 'minted' && typeof c.ledger.since === 'string'));
+  assert.ok(
+    universe.concepts
+      .filter((c) => !c.unmapped)
+      .every((c) => c.ledger && c.ledger.event === 'minted' && typeof c.ledger.since === 'string'),
+  );
   assert.ok(universe.concepts.filter((c) => c.unmapped).every((c) => c.ledger === undefined));
   assert.equal(run('rtz', ['build', '--config', path.join(out, 'nope.json')]).status, 1);
 });
@@ -186,7 +267,10 @@ test('rtz-stone with an unreadable ledger: one warning, ids as a first build, th
   assert.equal(fs.readFileSync(file, 'utf8'), before, 'the unreadable file is not overwritten');
   assert.ok(!fs.existsSync(`${file}.tmp`));
   const s = JSON.parse(r.out);
-  assert.deepEqual(s.concepts.map((c) => c.id), plain.concepts.map((c) => c.id));
+  assert.deepEqual(
+    s.concepts.map((c) => c.id),
+    plain.concepts.map((c) => c.id),
+  );
   assert.equal(s.ledger.minted, s.concepts.length);
   assert.equal(s.ledger.reused, 0);
   // a readable ledger is read and rewritten
@@ -205,11 +289,17 @@ test('rtz-stone with a ledger path that cannot be written: stone.json is complet
   const plain = JSON.parse(run('rtz-stone', ['-q'], { input: records }).out);
   const r = run('rtz-stone', ['-q', '--ledger', file], { input: records });
   assert.equal(r.status, 0, r.err);
-  assert.match(r.err.trim(), new RegExp(`^rtz-stone: ledger not written at ${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: .+$`));
+  assert.match(
+    r.err.trim(),
+    new RegExp(`^rtz-stone: ledger not written at ${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: .+$`),
+  );
   assert.equal(r.err.trim().split('\n').length, 1, 'one line');
   assert.ok(!fs.existsSync(file) && !fs.existsSync(`${file}.tmp`));
   const s = JSON.parse(r.out);
-  assert.deepEqual(s.concepts.map((c) => c.id), plain.concepts.map((c) => c.id));
+  assert.deepEqual(
+    s.concepts.map((c) => c.id),
+    plain.concepts.map((c) => c.id),
+  );
   assert.equal(s.ledger.minted, s.concepts.length);
 });
 

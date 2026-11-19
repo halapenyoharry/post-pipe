@@ -28,7 +28,13 @@ test('groupByFolderEnabled defaults to false and turns on only when true', () =>
 test('groupSourcesByFolder groups sources in first-seen folder order and sums item counts', () => {
   const groups = groupSourcesByFolder(SOURCES);
   assert.deepStrictEqual(
-    groups.map((g) => ({ folder: g.folder, label: g.label, depth: g.depth, count: g.sources.length, items: g.itemCount })),
+    groups.map((g) => ({
+      folder: g.folder,
+      label: g.label,
+      depth: g.depth,
+      count: g.sources.length,
+      items: g.itemCount,
+    })),
     [
       { folder: '', label: '', depth: 0, count: 1, items: 5 },
       { folder: 'Science/Biology', label: 'Biology', depth: 2, count: 2, items: 14 },

@@ -18,7 +18,10 @@ const BIN = (name) => path.join(ROOT, 'flow', 'bin', name);
 const PRESET = (name) => path.join(ROOT, 'flow', 'presets', `${name}.json`);
 
 test('flow.presets: the names listed, trimmed; absent, empty or not a list is none', () => {
-  assert.deepStrictEqual(flowPresetList({ flow: { presets: [' by-weight ', '', 7, 'mine.json'] } }), ['by-weight', 'mine.json']);
+  assert.deepStrictEqual(flowPresetList({ flow: { presets: [' by-weight ', '', 7, 'mine.json'] } }), [
+    'by-weight',
+    'mine.json',
+  ]);
   assert.deepStrictEqual(flowPresetList({}), []);
   assert.deepStrictEqual(flowPresetList(null), []);
   assert.deepStrictEqual(flowPresetList({ flow: { presets: [] } }), []);
@@ -44,7 +47,10 @@ test('runFlows: nothing listed runs nothing; a list that is not one, or missing 
   assert.match(said[0], /^flow: flow\.presets is not a list/);
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-flow-nobin-'));
   try {
-    assert.strictEqual(await runFlows({ items: [] }, { flow: { presets: ['by-weight'] } }, { warn, flowDir: empty }), null);
+    assert.strictEqual(
+      await runFlows({ items: [] }, { flow: { presets: ['by-weight'] } }, { warn, flowDir: empty }),
+      null,
+    );
     assert.strictEqual(said.length, 2);
     assert.match(said[1], /^flow: flow-select not found/);
   } finally {
@@ -70,19 +76,30 @@ function makeSite(prefix) {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), text);
   };
-  put('feeds.opml', '<?xml version="1.0"?><opml version="2.0"><head><title>t</title></head><body>'
-    + '<outline text="Pieces" title="Pieces" type="local" xmlUrl="local://pieces" customColor="#336699"/></body></opml>');
+  put(
+    'feeds.opml',
+    '<?xml version="1.0"?><opml version="2.0"><head><title>t</title></head><body>' +
+      '<outline text="Pieces" title="Pieces" type="local" xmlUrl="local://pieces" customColor="#336699"/></body></opml>',
+  );
   for (const [slug, title, tags, written] of PIECES) {
     put(`pieces/${slug}/frontmatter.json`, JSON.stringify({ title, tags, meta: { written } }));
     put(`pieces/${slug}/index.md`, `${title}, a short piece.\n`);
   }
-  const settings = (flow) => put('settings.json', JSON.stringify({
-    site: { title: 'Flow test', base_url: 'https://flow.test' },
-    theme: {},
-    ...(flow === undefined ? {} : { flow }),
-  }));
+  const settings = (flow) =>
+    put(
+      'settings.json',
+      JSON.stringify({
+        site: { title: 'Flow test', base_url: 'https://flow.test' },
+        theme: {},
+        ...(flow === undefined ? {} : { flow }),
+      }),
+    );
   const build = () => {
-    const r = spawnSync(process.execPath, [GENERATE], { cwd: root, env: { ...process.env, POSTPIPE_SITE: root }, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [GENERATE], {
+      cwd: root,
+      env: { ...process.env, POSTPIPE_SITE: root },
+      encoding: 'utf8',
+    });
     assert.strictEqual(r.status, 0, r.stderr || r.stdout);
     const text = fs.readFileSync(path.join(root, '_site', 'feed.json'), 'utf8');
     return { out: r.stdout, err: r.stderr, text, feed: JSON.parse(text) };
@@ -107,14 +124,27 @@ test('the build: one order per listed preset, as the three programs give on the 
     const ids = feed.items.map((it) => it.id);
     assert.strictEqual(ids.length, PIECES.length);
     assert.ok(Array.isArray(feed.flows), 'feed.json carries flows');
-    assert.deepStrictEqual(feed.flows.map((f) => f.name), ['by-weight', 'by-neighbourhood']);
-    assert.deepStrictEqual(feed.flows.map((f) => Object.keys(f)), [['name', 'description', 'mode', 'order'], ['name', 'description', 'mode', 'order']]);
+    assert.deepStrictEqual(
+      feed.flows.map((f) => f.name),
+      ['by-weight', 'by-neighbourhood'],
+    );
+    assert.deepStrictEqual(
+      feed.flows.map((f) => Object.keys(f)),
+      [
+        ['name', 'description', 'mode', 'order'],
+        ['name', 'description', 'mode', 'order'],
+      ],
+    );
     assert.match(first.out, /flow: 2 orders \(by-weight, 6 cards; by-neighbourhood, 6 cards\)/);
 
     for (const written of feed.flows) {
       const preset = JSON.parse(fs.readFileSync(PRESET(written.name), 'utf8'));
       const flow = byHand(first.text, PRESET(written.name));
-      assert.deepStrictEqual(written.order, flow.items.map((it) => it.id), `${written.name}: the order the programs give`);
+      assert.deepStrictEqual(
+        written.order,
+        flow.items.map((it) => it.id),
+        `${written.name}: the order the programs give`,
+      );
       assert.strictEqual(written.mode, flow.summary.mode);
       assert.strictEqual(written.description, preset.description);
       // The ids are the feed's item ids, every card once.
@@ -145,16 +175,32 @@ test('a preset that fails is one logged line and no order; a site preset by path
   const site = makeSite('pp-flow-fail-');
   try {
     site.put('mine.json', JSON.stringify({ name: 'mine' }));
-    site.put('presets/quiet.json', JSON.stringify({ ...JSON.parse(fs.readFileSync(PRESET('by-weight'), 'utf8')), name: 'quiet', description: 'A quiet copy.' }));
+    site.put(
+      'presets/quiet.json',
+      JSON.stringify({
+        ...JSON.parse(fs.readFileSync(PRESET('by-weight'), 'utf8')),
+        name: 'quiet',
+        description: 'A quiet copy.',
+      }),
+    );
     site.settings({ presets: ['by-weight', 'no-such-preset', 'mine.json', 'presets/quiet.json', 'by-weight'] });
     const r = site.build();
-    assert.deepStrictEqual(r.feed.flows.map((f) => f.name), ['by-weight', 'quiet']);
+    assert.deepStrictEqual(
+      r.feed.flows.map((f) => f.name),
+      ['by-weight', 'quiet'],
+    );
     assert.strictEqual(r.feed.flows[1].description, 'A quiet copy.');
     const lines = r.err.split('\n').filter((l) => l.startsWith('flow:'));
     assert.strictEqual(lines.length, 3, r.err);
     assert.match(lines[0], /^flow: preset no-such-preset not found .*; built on without that order$/);
-    assert.match(lines[1], /^flow: mine\.json: flow-score failed \(exit 1 \(preset has no weights object\)\); built on without that order$/);
-    assert.match(lines[2], /^flow: by-weight: another listed preset is already named by-weight; built on without this one$/);
+    assert.match(
+      lines[1],
+      /^flow: mine\.json: flow-score failed \(exit 1 \(preset has no weights object\)\); built on without that order$/,
+    );
+    assert.match(
+      lines[2],
+      /^flow: by-weight: another listed preset is already named by-weight; built on without this one$/,
+    );
 
     // Every listed preset failing: no flows key, and the build goes on.
     site.settings({ presets: ['no-such-preset'] });

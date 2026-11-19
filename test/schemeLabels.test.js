@@ -67,14 +67,20 @@ function rtagzFromUniverse() {
 const rtagz = rtagzFromUniverse();
 const feed = { items: [], edges: [], _rtagz: rtagz };
 
-test('schemesOf: the rtagz summary\'s schemes, each with an id; nothing without one', () => {
-  assert.deepStrictEqual(schemesOf(feed).map((s) => s.id), ['site', 'Posts', 'ScienceWire', 'Journal', 'discovered', 'iptc-mediatopics']);
+test("schemesOf: the rtagz summary's schemes, each with an id; nothing without one", () => {
+  assert.deepStrictEqual(
+    schemesOf(feed).map((s) => s.id),
+    ['site', 'Posts', 'ScienceWire', 'Journal', 'discovered', 'iptc-mediatopics'],
+  );
   assert.deepStrictEqual(schemesOf({ items: [], edges: [] }), []);
   assert.deepStrictEqual(schemesOf(null), []);
-  assert.deepStrictEqual(schemesOf({ _rtagz: { schemes: [{ id: 'a' }, { label: 'no id' }, null] } }).map((s) => s.id), ['a']);
+  assert.deepStrictEqual(
+    schemesOf({ _rtagz: { schemes: [{ id: 'a' }, { label: 'no id' }, null] } }).map((s) => s.id),
+    ['a'],
+  );
 });
 
-test('the site scheme at depth 0 is today\'s label for every concept', () => {
+test("the site scheme at depth 0 is today's label for every concept", () => {
   for (const c of rtagz.concepts) {
     const r = labelFor(rtagz, c.id, {});
     assert.strictEqual(r.label, c.canonical, c.id);
@@ -86,13 +92,23 @@ test('the site scheme at depth 0 is today\'s label for every concept', () => {
   assert.strictEqual(labelFor(feed, 'c_ai', { scheme: null, depth: null }).label, 'Artificial Intelligence');
 });
 
-test('a system scheme shows that system\'s own spelling', () => {
-  assert.deepStrictEqual(labelFor(rtagz, 'c_ai', { scheme: 'Journal' }), { label: 'AI', scheme: 'Journal', fallback: false, groupId: 'c_ai' });
-  assert.deepStrictEqual(labelFor(rtagz, 'c_machine_learning', { scheme: 'Posts' }), { label: 'machine-learning', scheme: 'Posts', fallback: false, groupId: 'c_machine_learning' });
+test("a system scheme shows that system's own spelling", () => {
+  assert.deepStrictEqual(labelFor(rtagz, 'c_ai', { scheme: 'Journal' }), {
+    label: 'AI',
+    scheme: 'Journal',
+    fallback: false,
+    groupId: 'c_ai',
+  });
+  assert.deepStrictEqual(labelFor(rtagz, 'c_machine_learning', { scheme: 'Posts' }), {
+    label: 'machine-learning',
+    scheme: 'Posts',
+    fallback: false,
+    groupId: 'c_machine_learning',
+  });
   assert.strictEqual(labelFor(rtagz, 'c_ai', { scheme: 'ScienceWire' }).label, 'A.I.');
 });
 
-test('fallback order: the chosen scheme, then the site\'s, then the majority system, then discovered', () => {
+test("fallback order: the chosen scheme, then the site's, then the majority system, then discovered", () => {
   // act-1 is only in Posts: in the Journal scheme the site's label stands in.
   const r = labelFor(rtagz, 'c_act_1', { scheme: 'Journal' });
   assert.deepStrictEqual(r, { label: 'act-1', scheme: 'site', fallback: true, groupId: 'c_act_1' });
@@ -104,27 +120,41 @@ test('fallback order: the chosen scheme, then the site\'s, then the majority sys
     schemes: rtagz.schemes,
     systems: rtagz.systems,
   };
-  assert.deepStrictEqual(
-    labelFor(bare, 'c_x', { scheme: 'ScienceWire', systems: ['journal', 'journal', 'posts'] }),
-    { label: 'X Journal', scheme: 'Journal', fallback: true, groupId: 'c_x' },
-  );
+  assert.deepStrictEqual(labelFor(bare, 'c_x', { scheme: 'ScienceWire', systems: ['journal', 'journal', 'posts'] }), {
+    label: 'X Journal',
+    scheme: 'Journal',
+    fallback: true,
+    groupId: 'c_x',
+  });
   // Then the discovered scheme.
   const disc = {
     concepts: [{ id: 'c_y', inScheme: ['discovered'], prefLabel: { discovered: 'neural hardware' } }],
     schemes: rtagz.schemes,
   };
-  assert.deepStrictEqual(
-    labelFor(disc, 'c_y', { scheme: 'Posts' }),
-    { label: 'neural hardware', scheme: 'discovered', fallback: true, groupId: 'c_y' },
-  );
+  assert.deepStrictEqual(labelFor(disc, 'c_y', { scheme: 'Posts' }), {
+    label: 'neural hardware',
+    scheme: 'discovered',
+    fallback: true,
+    groupId: 'c_y',
+  });
   // The majority system is never counted as a fallback when it is the chosen scheme.
   assert.strictEqual(labelFor(bare, 'c_x', { scheme: 'Posts', systems: ['posts'] }).fallback, false);
 });
 
 test('a concept rosetta-tagz does not know keeps its label (null), and so does a missing summary', () => {
-  assert.deepStrictEqual(labelFor(rtagz, 'c_nobody', {}), { label: null, scheme: null, fallback: false, groupId: 'c_nobody' });
+  assert.deepStrictEqual(labelFor(rtagz, 'c_nobody', {}), {
+    label: null,
+    scheme: null,
+    fallback: false,
+    groupId: 'c_nobody',
+  });
   assert.deepStrictEqual(labelFor(null, 'c_ai', {}), { label: null, scheme: null, fallback: false, groupId: 'c_ai' });
-  assert.deepStrictEqual(labelFor({ items: [] }, 'c_ai', {}), { label: null, scheme: null, fallback: false, groupId: 'c_ai' });
+  assert.deepStrictEqual(labelFor({ items: [] }, 'c_ai', {}), {
+    label: null,
+    scheme: null,
+    fallback: false,
+    groupId: 'c_ai',
+  });
 });
 
 test('depth walks up skos:broader within the scheme and stops at a top concept', () => {
@@ -136,7 +166,12 @@ test('depth walks up skos:broader within the scheme and stops at a top concept',
   assert.deepStrictEqual(two, one);
   assert.strictEqual(labelFor(rtagz, 'c_ai', { depth: 2 }).groupId, 'c_ai');
   // Read in another scheme, the broader concept's spelling there.
-  assert.deepStrictEqual(labelFor(rtagz, 'u_neural_hardware', { scheme: 'Journal', depth: 1 }), { label: 'AI', scheme: 'Journal', fallback: false, groupId: 'c_ai' });
+  assert.deepStrictEqual(labelFor(rtagz, 'u_neural_hardware', { scheme: 'Journal', depth: 1 }), {
+    label: 'AI',
+    scheme: 'Journal',
+    fallback: false,
+    groupId: 'c_ai',
+  });
   // A broader concept not in the chosen scheme is not climbed to: the walk
   // stays where it is and the fallback applies.
   const narrow = {
@@ -146,34 +181,65 @@ test('depth walks up skos:broader within the scheme and stops at a top concept',
     ],
     schemes: rtagz.schemes,
   };
-  assert.deepStrictEqual(labelFor(narrow, 'c_leaf', { scheme: 'Journal', depth: 1 }), { label: 'Leaf', scheme: 'Journal', fallback: false, groupId: 'c_leaf' });
-  assert.deepStrictEqual(labelFor(narrow, 'c_leaf', { scheme: 'Posts', depth: 1 }), { label: 'Top', scheme: 'Posts', fallback: false, groupId: 'c_top' });
+  assert.deepStrictEqual(labelFor(narrow, 'c_leaf', { scheme: 'Journal', depth: 1 }), {
+    label: 'Leaf',
+    scheme: 'Journal',
+    fallback: false,
+    groupId: 'c_leaf',
+  });
+  assert.deepStrictEqual(labelFor(narrow, 'c_leaf', { scheme: 'Posts', depth: 1 }), {
+    label: 'Top',
+    scheme: 'Posts',
+    fallback: false,
+    groupId: 'c_top',
+  });
 });
 
 test('an external scheme is reached through exactMatch, then broadMatch, and climbs the vocabulary', () => {
   const ext = 'iptc-mediatopics';
   assert.deepStrictEqual(labelFor(rtagz, 'c_ai', { scheme: ext }), {
-    label: 'artificial intelligence', scheme: ext, fallback: false, groupId: 'iptc-mediatopics:20000763',
+    label: 'artificial intelligence',
+    scheme: ext,
+    fallback: false,
+    groupId: 'iptc-mediatopics:20000763',
   });
   // Machine Learning has only a broadMatch there: the same target.
   assert.deepStrictEqual(labelFor(rtagz, 'c_machine_learning', { scheme: ext }), {
-    label: 'artificial intelligence', scheme: ext, fallback: false, groupId: 'iptc-mediatopics:20000763',
+    label: 'artificial intelligence',
+    scheme: ext,
+    fallback: false,
+    groupId: 'iptc-mediatopics:20000763',
   });
   // Depth climbs the vocabulary's own broader chain (_rtagz.external).
   assert.deepStrictEqual(labelFor(rtagz, 'c_ai', { scheme: ext, depth: 1 }), {
-    label: 'technology and engineering', scheme: ext, fallback: false, groupId: 'iptc-mediatopics:20000756',
+    label: 'technology and engineering',
+    scheme: ext,
+    fallback: false,
+    groupId: 'iptc-mediatopics:20000756',
   });
   assert.strictEqual(labelFor(rtagz, 'c_ai', { scheme: ext, depth: 2 }).label, 'science and technology');
   // and stops at the top.
   assert.strictEqual(labelFor(rtagz, 'c_ai', { scheme: ext, depth: 5 }).groupId, 'iptc-mediatopics:13000000');
   // A concept with no mapping into the vocabulary falls back to the site's label.
-  assert.deepStrictEqual(labelFor(rtagz, 'c_act_1', { scheme: ext }), { label: 'act-1', scheme: 'site', fallback: true, groupId: 'c_act_1' });
+  assert.deepStrictEqual(labelFor(rtagz, 'c_act_1', { scheme: ext }), {
+    label: 'act-1',
+    scheme: 'site',
+    fallback: true,
+    groupId: 'c_act_1',
+  });
   // exactMatch wins over broadMatch when a concept has both.
   const both = {
-    concepts: [{ id: 'c_b', canonical: 'B', prefLabel: { site: 'B' }, mappings: [
-      { type: 'broadMatch', target: 'iptc-mediatopics:20000756' },
-      { type: 'exactMatch', target: 'iptc-mediatopics:20000763' },
-    ] }],
+    concepts: [
+      {
+        id: 'c_b',
+        canonical: 'B',
+        prefLabel: { site: 'B' },
+        mappings: [
+          { type: 'broadMatch', target: 'iptc-mediatopics:20000756' },
+          { type: 'exactMatch', target: 'iptc-mediatopics:20000763' },
+        ],
+      },
+    ],
     schemes: rtagz.schemes,
     external: rtagz.external,
   };
@@ -183,7 +249,10 @@ test('an external scheme is reached through exactMatch, then broadMatch, and cli
 test('groupsFor: which tags fall together at a scheme and depth', () => {
   const ids = ['c_ai', 'c_machine_learning', 'u_neural_hardware', 'c_act_1', 'c_nobody'];
   const flat = groupsFor(rtagz, ids, {});
-  assert.deepStrictEqual([...flat.entries()], ids.map((id) => [id, id]));
+  assert.deepStrictEqual(
+    [...flat.entries()],
+    ids.map((id) => [id, id]),
+  );
   const up = groupsFor(rtagz, ids, { depth: 1 });
   assert.strictEqual(up.get('u_neural_hardware'), 'c_ai');
   assert.strictEqual(up.get('c_ai'), 'c_ai');
@@ -194,10 +263,16 @@ test('groupsFor: which tags fall together at a scheme and depth', () => {
   assert.strictEqual(ext.get('c_act_1'), 'c_act_1');
 });
 
-test('migrationPairs: label keys to concept keys, bare and under each layout, from today\'s label and the ledger\'s', () => {
+test("migrationPairs: label keys to concept keys, bare and under each layout, from today's label and the ledger's", () => {
   const placeOf = (layout) => `${layout}@h::`;
   const nodes = [
-    { id: 'tag:Machine Learning', label: 'Machine Learning', type: 'tag', concept: 'c_machine_learning', previousLabel: 'machine learning' },
+    {
+      id: 'tag:Machine Learning',
+      label: 'Machine Learning',
+      type: 'tag',
+      concept: 'c_machine_learning',
+      previousLabel: 'machine learning',
+    },
     { id: 'tag:plain', label: 'plain', type: 'tag' },
     { id: 'piece-1', type: 'article', originalItem: { id: 'https://x/1' } },
   ];
@@ -216,7 +291,11 @@ test('migrationPairs: label keys to concept keys, bare and under each layout, fr
     ['tag:Machine Learning', 'concept:c_machine_learning'],
     ['tag:machine learning', 'concept:c_machine_learning'],
   ]);
-  assert.deepStrictEqual(migrationPairs([{ id: 'tag:plain', label: 'plain', type: 'tag' }], placeOf), [], 'no rosetta-tagz, no pairs');
+  assert.deepStrictEqual(
+    migrationPairs([{ id: 'tag:plain', label: 'plain', type: 'tag' }], placeOf),
+    [],
+    'no rosetta-tagz, no pairs',
+  );
 });
 
 // Through post-pipe's own code: the fixture corpus and universe run through
@@ -237,7 +316,15 @@ test('labelFor reads the _rtagz the build writes: the default is every canonical
   }));
   const containment = [{ id: 'container:act-1', tag: 'act-1' }];
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(overrides, containment));
-  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, { built: 'x', stages: [] }, { siteTitle: 'Fixture Site' });
+  const { summary } = applyUniverse(
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
+    universe,
+    { built: 'x', stages: [] },
+    { siteTitle: 'Fixture Site' },
+  );
 
   assert.ok(summary.concepts.length > 0);
   for (const c of summary.concepts) {
@@ -250,9 +337,18 @@ test('labelFor reads the _rtagz the build writes: the default is every canonical
   // piece's _source.id is one of them.
   const systemSchemes = summary.schemes.filter((s) => s.kind === 'system');
   assert.ok(systemSchemes.length > 0);
-  const sourceIds = new Set(results.flatMap((r) => r.items).map((it) => it._source && it._source.id).filter(Boolean));
+  const sourceIds = new Set(
+    results
+      .flatMap((r) => r.items)
+      .map((it) => it._source && it._source.id)
+      .filter(Boolean),
+  );
   for (const s of systemSchemes) assert.ok(typeof s.sourceId === 'string' && s.sourceId, s.id);
-  assert.ok(systemSchemes.some((s) => sourceIds.has(s.sourceId) || Object.values(summary.systems).some((info) => info.sourceId === s.sourceId)));
+  assert.ok(
+    systemSchemes.some(
+      (s) => sourceIds.has(s.sourceId) || Object.values(summary.systems).some((info) => info.sourceId === s.sourceId),
+    ),
+  );
   // A system scheme's spelling, read through the build's shape, and the
   // same walk up broader as the hand-made summary gives.
   const ai = summary.concepts.find((c) => c.id === 'c_ai');

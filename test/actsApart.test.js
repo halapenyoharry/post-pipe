@@ -6,10 +6,13 @@ const assert = require('node:assert');
 const { actsApart, boxesMeet } = require('../src/components/GraphViewer/actsApart');
 
 const box = (cx, cy, w, h) => ({ x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 });
-const apply = (acts, moved) => acts.map((a) => {
-  const m = moved.get(a.id);
-  return m ? { ...a, box: { x0: a.box.x0 + m.dx, y0: a.box.y0 + m.dy, x1: a.box.x1 + m.dx, y1: a.box.y1 + m.dy } } : a;
-});
+const apply = (acts, moved) =>
+  acts.map((a) => {
+    const m = moved.get(a.id);
+    return m
+      ? { ...a, box: { x0: a.box.x0 + m.dx, y0: a.box.y0 + m.dy, x1: a.box.x1 + m.dx, y1: a.box.y1 + m.dy } }
+      : a;
+  });
 const anyMeet = (acts, gap) => acts.some((a, i) => acts.some((b, j) => j > i && boxesMeet(a.box, b.box, gap)));
 
 test('three acts open at once, each over its neighbours, come apart with 16 between, each along its own way', () => {

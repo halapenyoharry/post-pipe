@@ -14,9 +14,26 @@
 // {book} settings.site.title, {author} the author's display name, {title}.
 
 const ONES = [
-  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
-  'seventeen', 'eighteen', 'nineteen',
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
 ];
 const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
 
@@ -49,7 +66,10 @@ function fillPart(part, tokens) {
   let missing = false;
   const out = String(part).replace(/\{(\w+)\}/g, (_, key) => {
     const v = tokens[key];
-    if (v == null || v === '') { missing = true; return ''; }
+    if (v == null || v === '') {
+      missing = true;
+      return '';
+    }
     return v;
   });
   return missing ? null : out.trim();

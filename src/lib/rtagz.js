@@ -5,9 +5,9 @@
 // rosetta-tagz/lib/. Pure functions handle records, overrides, HTML reduction,
 // the canonical URL fold, the container guard, and write-back onto items.
 
-const fs     = require('fs');
-const os     = require('os');
-const path   = require('path');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
@@ -20,9 +20,9 @@ const POSTPIPE_ROOT = path.resolve(__dirname, '../..');
 const SKOS_FILES = ['skos.jsonld', 'skos.ttl'];
 
 const NAMED_ENTITIES = {
-  amp:  '&',
-  lt:   '<',
-  gt:   '>',
+  amp: '&',
+  lt: '<',
+  gt: '>',
   quot: '"',
   apos: "'",
   nbsp: ' ',
@@ -78,12 +78,19 @@ function canonicalUrl(url) {
 }
 
 function foldTitle(raw) {
-  let s = String(raw ?? '').normalize('NFKC').trim().replace(/^#+/, '');
+  let s = String(raw ?? '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/^#+/, '');
   s = s.replace(/\b(?:\p{L}\.){2,}/gu, (m) => m.replace(/\./g, ''));
   s = s.replace(/c\+\+/gi, ' cpp ').replace(/c#/gi, ' csharp ').replace(/f#/gi, ' fsharp ').replace(/&/g, ' and ');
   s = s.normalize('NFD').replace(/\p{M}+/gu, '');
   s = s.replace(/([a-z])([A-Z])/g, '$1 $2');
-  return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+  return s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 }
 
 // The folder a site's rosetta-tagz run works in is .feed-cache/rtagz/
@@ -227,7 +234,13 @@ function buildConfig({ emerge = true, discover = false, queue, conceptSchemes, l
 
 function buildRecords(results, overrides = {}) {
   const ignoreSet = new Set(
-    (overrides.ignore || []).map((t) => String(t ?? '').trim().toLowerCase()).filter(Boolean)
+    (overrides.ignore || [])
+      .map((t) =>
+        String(t ?? '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
   );
   const records = [];
   const systems = {};
@@ -338,8 +351,17 @@ function resolveContainerConcepts(universe, containment = []) {
   for (const c of containment || []) {
     if (!c || typeof c.tag !== 'string' || !c.tag || out[c.tag]) continue;
     const tag = c.tag;
-    const hit = concepts.find((k) => k && k.canonical === tag && typeof k.id === 'string')
-      || concepts.find((k) => k && typeof k.id === 'string' && Array.isArray(k.variants) && k.variants.some((v) => v && (v.label === tag || (v.forms && Object.prototype.hasOwnProperty.call(v.forms, tag)))));
+    const hit =
+      concepts.find((k) => k && k.canonical === tag && typeof k.id === 'string') ||
+      concepts.find(
+        (k) =>
+          k &&
+          typeof k.id === 'string' &&
+          Array.isArray(k.variants) &&
+          k.variants.some(
+            (v) => v && (v.label === tag || (v.forms && Object.prototype.hasOwnProperty.call(v.forms, tag))),
+          ),
+      );
     if (hit) out[tag] = hit.id;
   }
   return out;
@@ -363,13 +385,14 @@ const DIRECTED_TYPES = new Set(['broader', 'broadMatch']);
 // mappings[] or broader[] wins over what the relations say; an empty list is
 // no answer and the relations are read.
 function indexSkos(universe, conceptById) {
-  const external = universe.external && typeof universe.external === 'object' && !Array.isArray(universe.external)
-    ? universe.external
-    : null;
-  const isExternalId = (id) => typeof id === 'string' && id !== '' && (
-    (external && Object.prototype.hasOwnProperty.call(external, id))
-    || (!conceptById.has(id) && id.includes(':'))
-  );
+  const external =
+    universe.external && typeof universe.external === 'object' && !Array.isArray(universe.external)
+      ? universe.external
+      : null;
+  const isExternalId = (id) =>
+    typeof id === 'string' &&
+    id !== '' &&
+    ((external && Object.prototype.hasOwnProperty.call(external, id)) || (!conceptById.has(id) && id.includes(':')));
 
   const relationCounts = {};
   const mappingCounts = {};
@@ -539,7 +562,7 @@ function buildSchemes(universe, systems, siteTitle) {
     push({ id: name, label: name, kind: 'system', sourceId: info ? info.sourceId : undefined });
   }
   const anyDiscovered = (universe.concepts || []).some(
-    (c) => c && ((Array.isArray(c.inScheme) && c.inScheme.includes('discovered')) || c.discovered === true)
+    (c) => c && ((Array.isArray(c.inScheme) && c.inScheme.includes('discovered')) || c.discovered === true),
   );
   if (anyDiscovered) push({ id: 'discovered', label: 'discovered', kind: 'discovered' });
   return out;
@@ -664,7 +687,7 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
           systems: sysList,
           forms,
           via: t.via || 'known',
-          why: origin === 'explicit' ? null : (t.why !== undefined ? t.why : null),
+          why: origin === 'explicit' ? null : t.why !== undefined ? t.why : null,
           rawLabels: rawList.map((x) => x.l),
           // SKOS and PROV, only when the universe carries them.
           prefLabel: skos.referencePrefLabel(concept),
@@ -689,8 +712,12 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
         }
       }
 
-      explicitEntries.sort((a, b) => a.firstPos - b.firstPos || (a.canonical < b.canonical ? -1 : a.canonical > b.canonical ? 1 : 0));
-      earnedEntries.sort((a, b) => b.weight - a.weight || (a.canonical < b.canonical ? -1 : a.canonical > b.canonical ? 1 : 0));
+      explicitEntries.sort(
+        (a, b) => a.firstPos - b.firstPos || (a.canonical < b.canonical ? -1 : a.canonical > b.canonical ? 1 : 0),
+      );
+      earnedEntries.sort(
+        (a, b) => b.weight - a.weight || (a.canonical < b.canonical ? -1 : a.canonical > b.canonical ? 1 : 0),
+      );
 
       const ordered = [...explicitEntries, ...earnedEntries];
       const newTags = [];
@@ -840,23 +867,32 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
   // one line from the entry's reason codes, its queued candidates and the
   // site's discover and emerge switches (src/lib/untaggedBecause.js), for the
   // reader panel to show where the tag chips would be.
-  const report = buildManifest && buildManifest.untagged && typeof buildManifest.untagged === 'object'
-    && !Array.isArray(buildManifest.untagged) && Array.isArray(buildManifest.untagged.items)
-    ? buildManifest.untagged
-    : null;
+  const report =
+    buildManifest &&
+    buildManifest.untagged &&
+    typeof buildManifest.untagged === 'object' &&
+    !Array.isArray(buildManifest.untagged) &&
+    Array.isArray(buildManifest.untagged.items)
+      ? buildManifest.untagged
+      : null;
   const untaggedList = Array.isArray(universe.untagged)
     ? universe.untagged
-    : (report ? report.items : (buildManifest && Array.isArray(buildManifest.untagged) ? buildManifest.untagged : null));
+    : report
+      ? report.items
+      : buildManifest && Array.isArray(buildManifest.untagged)
+        ? buildManifest.untagged
+        : null;
   if (untaggedList && untaggedList.length) {
     const items = [];
     for (const u of untaggedList) {
       if (!u || typeof u !== 'object') continue;
-      const key = typeof u.key === 'string'
-        ? u.key
-        : (u.source !== undefined && u.id !== undefined ? `${u.source}::${u.id}` : '');
+      const key =
+        typeof u.key === 'string' ? u.key : u.source !== undefined && u.id !== undefined ? `${u.source}::${u.id}` : '';
       const why = Array.isArray(u.why)
         ? u.why.filter((w) => typeof w === 'string' && w)
-        : (typeof u.why === 'string' && u.why ? [u.why] : []);
+        : typeof u.why === 'string' && u.why
+          ? [u.why]
+          : [];
       const extra = untaggedExtra(u);
       const joined = joinedByKey.get(key);
       if (joined && joined.length) {
@@ -868,21 +904,25 @@ function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, uni
             delete ref.candidates; // the full candidate lists stay in feed._rtagz.untagged
             j.item._references = [...refs, ref];
             if (!Array.isArray(j.item.tags) || j.item.tags.length === 0) {
-              j.item.untaggedBecause = untaggedBecause(u, { discover: options.discover, emerge: options.emerge !== false });
+              j.item.untaggedBecause = untaggedBecause(u, {
+                discover: options.discover,
+                emerge: options.emerge !== false,
+              });
             }
           }
         }
       } else {
         const sep = key.indexOf('::');
-        const id = u.id !== undefined && u.id !== null ? String(u.id) : (sep >= 0 ? key.slice(sep + 2) : key);
-        const source = typeof u.source === 'string' ? u.source : (sep >= 0 ? key.slice(0, sep) : '');
+        const id = u.id !== undefined && u.id !== null ? String(u.id) : sep >= 0 ? key.slice(sep + 2) : key;
+        const source = typeof u.source === 'string' ? u.source : sep >= 0 ? key.slice(0, sep) : '';
         items.push({ id, source, why, ...extra });
       }
     }
     if (items.length) {
       summary.untagged = { count: items.length, items };
       if (report) {
-        if (typeof report.bar === 'number' || report.bar === null) summary.untagged = { bar: report.bar, ...summary.untagged };
+        if (typeof report.bar === 'number' || report.bar === null)
+          summary.untagged = { bar: report.bar, ...summary.untagged };
         summary.untagged.none = items.filter((x) => !Array.isArray(x.under) || x.under.length === 0).length;
       }
     }
@@ -925,14 +965,18 @@ function runRtzBuild(engineBin, configPath, cwd, timeoutMs) {
 
     let stderr = '';
     if (child.stderr) {
-      child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
     }
 
     const timer = setTimeout(() => {
       try {
         process.kill(-child.pid, 'SIGKILL');
       } catch (_) {
-        try { child.kill('SIGKILL'); } catch (__) {}
+        try {
+          child.kill('SIGKILL');
+        } catch (__) {}
       }
       finish({ ok: false, timedOut: true, reason: `timed out after ${timeoutMs}ms` });
     }, timeoutMs);
@@ -964,9 +1008,7 @@ async function runRtagzPhase(results, options = {}) {
     const siteRoot = options.siteRoot ? path.resolve(options.siteRoot) : POSTPIPE_ROOT;
     const postpipeRoot = options.postpipeRoot ? path.resolve(options.postpipeRoot) : POSTPIPE_ROOT;
     const engineSetting = rtagzCfg.engine || 'rosetta-tagz';
-    const engineDir = path.isAbsolute(engineSetting)
-      ? engineSetting
-      : path.resolve(postpipeRoot, engineSetting);
+    const engineDir = path.isAbsolute(engineSetting) ? engineSetting : path.resolve(postpipeRoot, engineSetting);
     const engineBin = path.join(engineDir, 'bin', 'rtz-build');
 
     if (!fs.existsSync(engineBin)) {
@@ -975,7 +1017,9 @@ async function runRtagzPhase(results, options = {}) {
     }
 
     const overridesPath = rtagzCfg.overrides
-      ? (path.isAbsolute(rtagzCfg.overrides) ? rtagzCfg.overrides : path.resolve(siteRoot, rtagzCfg.overrides))
+      ? path.isAbsolute(rtagzCfg.overrides)
+        ? rtagzCfg.overrides
+        : path.resolve(siteRoot, rtagzCfg.overrides)
       : defaultSiteFile(OVERRIDES_FILE, siteRoot);
     let siteOverrides = {};
     if (fs.existsSync(overridesPath)) {
@@ -985,9 +1029,7 @@ async function runRtagzPhase(results, options = {}) {
     const mergedOverrides = mergeOverrides(siteOverrides, options.containment || []);
     const { records, systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergedOverrides);
 
-    const cacheDir = options.cacheDir
-      ? path.resolve(options.cacheDir)
-      : path.resolve(cacheDirForSite(siteRoot));
+    const cacheDir = options.cacheDir ? path.resolve(options.cacheDir) : path.resolve(cacheDirForSite(siteRoot));
     fs.mkdirSync(cacheDir, { recursive: true });
     // rtz-build writes its SKOS files only when that stage runs and succeeds,
     // and never clears its out folder, so last build's are removed first: a
@@ -1009,9 +1051,8 @@ async function runRtagzPhase(results, options = {}) {
     // "queue" the queue file goes beside the site's overrides file, named
     // rtagz-queue.json, when a site root is known.
     const discoverMode = rtagzCfg.discover === 'queue' ? 'queue' : Boolean(rtagzCfg.discover);
-    const queuePath = discoverMode === 'queue' && options.siteRoot
-      ? path.join(path.dirname(overridesPath), QUEUE_FILE)
-      : undefined;
+    const queuePath =
+      discoverMode === 'queue' && options.siteRoot ? path.join(path.dirname(overridesPath), QUEUE_FILE) : undefined;
     const rtzConfig = buildConfig({
       emerge: rtagzCfg.emerge !== false,
       discover: discoverMode,
@@ -1023,9 +1064,10 @@ async function runRtagzPhase(results, options = {}) {
     });
     fs.writeFileSync(configPath, JSON.stringify(rtzConfig, null, 2) + '\n', 'utf8');
 
-    const timeoutMs = Number.isFinite(Number(rtagzCfg.timeoutMs)) && Number(rtagzCfg.timeoutMs) > 0
-      ? Number(rtagzCfg.timeoutMs)
-      : 120000;
+    const timeoutMs =
+      Number.isFinite(Number(rtagzCfg.timeoutMs)) && Number(rtagzCfg.timeoutMs) > 0
+        ? Number(rtagzCfg.timeoutMs)
+        : 120000;
 
     const runRes = await runRtzBuild(engineBin, configPath, cacheDir, timeoutMs);
     if (!runRes.ok) {
@@ -1059,7 +1101,8 @@ async function runRtagzPhase(results, options = {}) {
     if (buildManifest && buildManifest.queue && typeof buildManifest.queue === 'object') {
       const q = {};
       if (typeof buildManifest.queue.path === 'string' && buildManifest.queue.path) q.path = buildManifest.queue.path;
-      if (typeof buildManifest.queue.candidates === 'number' && Number.isFinite(buildManifest.queue.candidates)) q.candidates = buildManifest.queue.candidates;
+      if (typeof buildManifest.queue.candidates === 'number' && Number.isFinite(buildManifest.queue.candidates))
+        q.candidates = buildManifest.queue.candidates;
       if (Object.keys(q).length) summary.queue = q;
     }
     // The container tags as concept ids, for containment by concept

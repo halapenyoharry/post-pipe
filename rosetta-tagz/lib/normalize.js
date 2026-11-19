@@ -4,13 +4,35 @@
 // acronyms) is derived from it.
 
 export const STOP = new Set([
-  'a', 'an', 'the', 'of', 'and', 'or', 'in', 'on', 'for', 'to', 'with', 'as', 'at', 'by', 'vs', 'is',
+  'a',
+  'an',
+  'the',
+  'of',
+  'and',
+  'or',
+  'in',
+  'on',
+  'for',
+  'to',
+  'with',
+  'as',
+  'at',
+  'by',
+  'vs',
+  'is',
 ]);
 
 const IRREGULAR = new Map([
-  ['people', 'person'], ['children', 'child'], ['men', 'man'], ['women', 'woman'],
-  ['analyses', 'analysis'], ['theses', 'thesis'], ['phenomena', 'phenomenon'],
-  ['criteria', 'criterion'], ['lives', 'life'], ['knives', 'knife'],
+  ['people', 'person'],
+  ['children', 'child'],
+  ['men', 'man'],
+  ['women', 'woman'],
+  ['analyses', 'analysis'],
+  ['theses', 'thesis'],
+  ['phenomena', 'phenomenon'],
+  ['criteria', 'criterion'],
+  ['lives', 'life'],
+  ['knives', 'knife'],
 ]);
 
 const KEEP_FINAL_S = new Set(['news', 'series', 'species', 'lens', 'chaos', 'bias', 'canvas', 'atlas']);
@@ -58,12 +80,19 @@ function collapseDottedInitialisms(s) {
 }
 
 export function normalizeLabel(raw) {
-  let s = String(raw ?? '').normalize('NFKC').trim().replace(/^#+/, '');
+  let s = String(raw ?? '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/^#+/, '');
   s = collapseDottedInitialisms(s);
   for (const [re, rep] of SYMBOL_WORDS) s = s.replace(re, rep);
   s = foldDiacritics(s);
   s = s.replace(/([a-z])([A-Z])/g, '$1 $2'); // camelCase -> camel Case
-  s = s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+  s = s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
   const tokens = s ? s.split(' ') : [];
   const content = tokens.filter((t) => !STOP.has(t));
   const base = content.length ? content : tokens;

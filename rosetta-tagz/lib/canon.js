@@ -65,7 +65,12 @@ export function scoreVariants(variants, canon = DEFAULT_CANON, sourceWeights = {
       trust: [...sources].reduce((a, s) => a + sw(s) * ((v.bySource[s] || 0) / sourceTotal[s]), 0) / swSum,
       quality: 0.5 * lengthPreference(v, prefer) + 0.5 * cleanliness(v.label),
     };
-    const score = (weights.freq * parts.freq + weights.cover * parts.cover + weights.trust * parts.trust + weights.quality * parts.quality) / wsum;
+    const score =
+      (weights.freq * parts.freq +
+        weights.cover * parts.cover +
+        weights.trust * parts.trust +
+        weights.quality * parts.quality) /
+      wsum;
     return { norm: v.norm, label: v.label, score, parts };
   });
   ranked.sort((a, b) => b.score - a.score || (a.label < b.label ? -1 : 1));

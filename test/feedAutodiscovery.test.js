@@ -1,10 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const {
-  autodiscoverEnabled,
-  parseAlternateFeedLink,
-  discoverFeedUrl,
-} = require('../src/lib/feedAutodiscovery');
+const { autodiscoverEnabled, parseAlternateFeedLink, discoverFeedUrl } = require('../src/lib/feedAutodiscovery');
 
 test('autodiscoverEnabled defaults to true and turns off when topBar.autodiscover is false', () => {
   assert.strictEqual(autodiscoverEnabled({}), true);
@@ -56,7 +52,8 @@ test('discoverFeedUrl resolves the feed href when enabled and skips fetching whe
     return {
       ok: true,
       url: 'https://example.org/blog/',
-      text: async () => `<!doctype html><html><head><link rel="alternate" type="application/atom+xml" href="feed.atom"></head></html>`,
+      text: async () =>
+        `<!doctype html><html><head><link rel="alternate" type="application/atom+xml" href="feed.atom"></head></html>`,
     };
   };
 
@@ -76,14 +73,20 @@ test('discoverFeedUrl resolves the feed href when enabled and skips fetching whe
 
   const failing = await discoverFeedUrl('https://example.org/blog/', {
     autodiscover: true,
-    fetchImpl: async () => { throw new Error('CORS blocked'); },
+    fetchImpl: async () => {
+      throw new Error('CORS blocked');
+    },
   });
   assert.strictEqual(failing, 'https://example.org/blog/', 'falls back to original URL on fetch failure');
 });
 
 test('discoverSource tells a feed, a page with no feed, and nothing readable apart', async () => {
   const { discoverSource, parsePageTitle } = require('../src/lib/feedAutodiscovery');
-  const page = (head) => ({ ok: true, url: 'https://example.org/essays/kettle/', text: async () => `<!doctype html><html><head>${head}</head><body><p>text</p></body></html>` });
+  const page = (head) => ({
+    ok: true,
+    url: 'https://example.org/essays/kettle/',
+    text: async () => `<!doctype html><html><head>${head}</head><body><p>text</p></body></html>`,
+  });
 
   const feed = await discoverSource('https://example.org/essays/kettle/', {
     fetchImpl: async () => page('<link rel="alternate" type="application/rss+xml" href="/feed.xml">'),
@@ -91,20 +94,33 @@ test('discoverSource tells a feed, a page with no feed, and nothing readable apa
   assert.deepStrictEqual(feed, { url: 'https://example.org/feed.xml', kind: 'feed', title: '' });
 
   const noFeed = await discoverSource('https://example.org/essays/kettle/', {
-    fetchImpl: async () => page('<title>Kettle &amp; switch – The Quiet Kitchen</title><meta property="og:title" content="Kettle &amp; switch">'),
+    fetchImpl: async () =>
+      page(
+        '<title>Kettle &amp; switch – The Quiet Kitchen</title><meta property="og:title" content="Kettle &amp; switch">',
+      ),
   });
   assert.deepStrictEqual(noFeed, { url: 'https://example.org/essays/kettle/', kind: 'page', title: 'Kettle & switch' });
 
-  const titleOnly = await discoverSource('https://example.org/p', { fetchImpl: async () => page('<title>  Just the\n title </title>') });
+  const titleOnly = await discoverSource('https://example.org/p', {
+    fetchImpl: async () => page('<title>  Just the\n title </title>'),
+  });
   assert.strictEqual(titleOnly.kind, 'page');
   assert.strictEqual(titleOnly.title, 'Just the title');
 
   const isFeed = await discoverSource('https://example.org/rss.xml', {
     fetchImpl: async () => '<?xml version="1.0"?><rss version="2.0"><channel><title>x</title></channel></rss>',
   });
-  assert.deepStrictEqual(isFeed, { url: 'https://example.org/rss.xml', kind: 'unknown', title: '' }, 'a feed itself is not a page; the feed route stands');
+  assert.deepStrictEqual(
+    isFeed,
+    { url: 'https://example.org/rss.xml', kind: 'unknown', title: '' },
+    'a feed itself is not a page; the feed route stands',
+  );
 
-  const failing = await discoverSource('https://example.org/p', { fetchImpl: async () => { throw new Error('CORS blocked'); } });
+  const failing = await discoverSource('https://example.org/p', {
+    fetchImpl: async () => {
+      throw new Error('CORS blocked');
+    },
+  });
   assert.deepStrictEqual(failing, { url: 'https://example.org/p', kind: 'unknown', title: '' });
 
   const off = await discoverSource('https://example.org/p', { autodiscover: false, fetchImpl: async () => page('') });

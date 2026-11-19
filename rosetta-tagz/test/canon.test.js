@@ -24,14 +24,18 @@ test('parts are in 0..1 and the winner has the highest score', () => {
 test('frequency alone picks the most used spelling', () => {
   const r = scoreVariants([ai, full], { weights: { freq: 1, cover: 0, trust: 0, quality: 0 } });
   assert.equal(r[0].label, 'AI'); // 6 uses vs 6 uses: tie broken by label order, AI < Artificial
-  const r2 = scoreVariants([v('x', 'X', { A: 9 }), v('y', 'Y', { A: 2 })], { weights: { freq: 1, cover: 0, trust: 0, quality: 0 } });
+  const r2 = scoreVariants([v('x', 'X', { A: 9 }), v('y', 'Y', { A: 2 })], {
+    weights: { freq: 1, cover: 0, trust: 0, quality: 0 },
+  });
   assert.equal(r2[0].label, 'X');
 });
 
 test('coverage alone picks the spelling used by the most tag-systems', () => {
   const tie = scoreVariants([ai, full], { weights: { freq: 0, cover: 1, trust: 0, quality: 0 } });
   assert.equal(tie[0].score, tie[1].score); // both span two systems: equal, broken by label order, never by accident
-  const wide = scoreVariants([v('a', 'A', { S1: 1 }), v('b', 'B', { S1: 1, S2: 1, S3: 1 })], { weights: { freq: 0, cover: 1, trust: 0, quality: 0 } });
+  const wide = scoreVariants([v('a', 'A', { S1: 1 }), v('b', 'B', { S1: 1, S2: 1, S3: 1 })], {
+    weights: { freq: 0, cover: 1, trust: 0, quality: 0 },
+  });
   assert.equal(wide[0].label, 'B');
 });
 
@@ -53,7 +57,10 @@ test('prefer: expanded vs short vs neutral changes the quality part only', () =>
 });
 
 test('slug artifacts are penalised as display labels', () => {
-  const r = scoreVariants([v('a b', 'a-b', { S: 1 }), v('a c', 'a c', { S: 1 })], { weights: { freq: 0, cover: 0, trust: 0, quality: 1 }, prefer: 'neutral' });
+  const r = scoreVariants([v('a b', 'a-b', { S: 1 }), v('a c', 'a c', { S: 1 })], {
+    weights: { freq: 0, cover: 0, trust: 0, quality: 1 },
+    prefer: 'neutral',
+  });
   assert.equal(r[0].label, 'a c');
 });
 

@@ -12,7 +12,10 @@ test('the feed line is unchanged: no type attribute, the host as its name', () =
     '<outline text="example.org" title="example.org" xmlUrl="https://www.example.org/feed.xml"/>',
   );
   assert.strictEqual(buildCommand('https://example.org/feed.xml'), "node add-feed.js 'https://example.org/feed.xml'");
-  assert.strictEqual(buildCommand('https://example.org/feed.xml', 'feed', 'ignored for a feed'), "node add-feed.js 'https://example.org/feed.xml'");
+  assert.strictEqual(
+    buildCommand('https://example.org/feed.xml', 'feed', 'ignored for a feed'),
+    "node add-feed.js 'https://example.org/feed.xml'",
+  );
 });
 
 test('the page line names type="page" and takes the page\'s own title when it has one', () => {
@@ -37,7 +40,10 @@ test('the page command adds --type=page and the title, shell-quoted', () => {
     buildCommand('https://example.org/essays/kettle/', 'page', "A kettle's click"),
     "node add-feed.js 'https://example.org/essays/kettle/' --type=page --title='A kettle'\\''s click'",
   );
-  assert.strictEqual(buildCommand('https://example.org/p', 'page'), "node add-feed.js 'https://example.org/p' --type=page");
+  assert.strictEqual(
+    buildCommand('https://example.org/p', 'page'),
+    "node add-feed.js 'https://example.org/p' --type=page",
+  );
 });
 
 test('the helpers behind both lines', () => {

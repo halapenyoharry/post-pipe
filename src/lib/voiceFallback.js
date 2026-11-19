@@ -29,7 +29,9 @@ function fallbackMode(v) {
 }
 
 function langCode(lang) {
-  return String(lang || '').toLowerCase().split(/[-_]/)[0];
+  return String(lang || '')
+    .toLowerCase()
+    .split(/[-_]/)[0];
 }
 
 // Another voice of the failing one's engine: the engine's default when that
@@ -59,7 +61,16 @@ function otherVoice(voice, voices, engineDefault) {
 //   engineFailed   true when the engine itself would not start: its other
 //                  voices are not tried
 //   skip           [{ engine, voice }] already found failing this chapter
-function fallbackPlan({ mode, engine, voice = null, voices = [], engineDefault = null, browser = null, engineFailed = false, skip = [] } = {}) {
+function fallbackPlan({
+  mode,
+  engine,
+  voice = null,
+  voices = [],
+  engineDefault = null,
+  browser = null,
+  engineFailed = false,
+  skip = [],
+} = {}) {
   const m = fallbackMode(mode);
   if (m === 'off') return [];
   const key = (e, v) => `${e}\u0000${v || ''}`;
@@ -110,7 +121,7 @@ async function speakWithFallback({ text, current, plan, speak }) {
     if (isInterruption(first)) throw first;
     const tried = [current];
     let last = first;
-    const list = typeof plan === 'function' ? plan(first) : (plan || []);
+    const list = typeof plan === 'function' ? plan(first) : plan || [];
     for (const next of list) {
       try {
         await speak(next.engine, next.voice, text);
@@ -134,7 +145,7 @@ async function speakWithFallback({ text, current, plan, speak }) {
 function fallbackNote(fb, { label, engineLabel } = {}) {
   if (!fb || !fb.from || !fb.to) return '';
   const name = (e, v) => {
-    if (!v) return e === 'browser' ? "this device's own voice" : ((engineLabel && engineLabel(e)) || e);
+    if (!v) return e === 'browser' ? "this device's own voice" : (engineLabel && engineLabel(e)) || e;
     return (label && label(e, v)) || v;
   };
   const crossed = fb.from.engine !== fb.to.engine;
@@ -149,4 +160,14 @@ function fallbackNote(fb, { label, engineLabel } = {}) {
   return `${fromName}${fromTag} did not work; reading with ${toName}${toTag}.`;
 }
 
-module.exports = { FALLBACK_MODES, DEFAULT_FALLBACK, fallbackMode, otherVoice, fallbackPlan, isInterruption, errorText, speakWithFallback, fallbackNote };
+module.exports = {
+  FALLBACK_MODES,
+  DEFAULT_FALLBACK,
+  fallbackMode,
+  otherVoice,
+  fallbackPlan,
+  isInterruption,
+  errorText,
+  speakWithFallback,
+  fallbackNote,
+};

@@ -5,7 +5,7 @@ const RAD = Math.PI / 180;
 
 // (-180, 180]
 function normalizeAngle(a) {
-  let x = ((a + 180) % 360 + 360) % 360 - 180;
+  let x = ((((a + 180) % 360) + 360) % 360) - 180;
   if (x === -180) x = 180;
   return x;
 }
@@ -22,22 +22,28 @@ function angleDelta(a, b) {
 function rotatedView(t, gesture, rotation) {
   if (!gesture || rotation === gesture.theta0) return { x: t.x, y: t.y, k: t.k };
   const d = (rotation - gesture.theta0) * RAD;
-  const c = Math.cos(d), s = Math.sin(d);
-  const ux = gesture.mx - t.x, uy = gesture.my - t.y;
+  const c = Math.cos(d),
+    s = Math.sin(d);
+  const ux = gesture.mx - t.x,
+    uy = gesture.my - t.y;
   return { x: gesture.mx - (c * ux - s * uy), y: gesture.my - (s * ux + c * uy), k: t.k };
 }
 
 function viewToScreen(view, rotation, x, y) {
   const r = rotation * RAD;
-  const c = Math.cos(r), s = Math.sin(r);
-  const px = x * view.k, py = y * view.k;
+  const c = Math.cos(r),
+    s = Math.sin(r);
+  const px = x * view.k,
+    py = y * view.k;
   return [view.x + c * px - s * py, view.y + s * px + c * py];
 }
 
 function screenToView(view, rotation, sx, sy) {
   const r = -rotation * RAD;
-  const c = Math.cos(r), s = Math.sin(r);
-  const ux = (sx - view.x) / view.k, uy = (sy - view.y) / view.k;
+  const c = Math.cos(r),
+    s = Math.sin(r);
+  const ux = (sx - view.x) / view.k,
+    uy = (sy - view.y) / view.k;
   return [c * ux - s * uy, s * ux + c * uy];
 }
 

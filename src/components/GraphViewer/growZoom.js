@@ -67,20 +67,26 @@ function growCap(acts, { gap = 16, homeK = 1, floor = 1 } = {}) {
   const list = (acts || []).filter((a) => a && a.centre && a.box);
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
-      const a = list[i], b = list[j];
+      const a = list[i],
+        b = list[j];
       const along = (lo, hi, aLo, aHi, bLo, bHi) => {
         // a before b along this axis: a's far side (aHi) and b's near side (bLo).
-        const reach = (aHi - lo) + (hi - bLo);
+        const reach = aHi - lo + (hi - bLo);
         const room = hi - lo - g;
         return reach > 1e-9 ? room / reach : -Infinity;
       };
-      const ax = a.centre.x, bx = b.centre.x, ay = a.centre.y, by = b.centre.y;
-      const rx = ax <= bx
-        ? along(ax, bx, a.box.x0, a.box.x1, b.box.x0, b.box.x1)
-        : along(bx, ax, b.box.x0, b.box.x1, a.box.x0, a.box.x1);
-      const ry = ay <= by
-        ? along(ay, by, a.box.y0, a.box.y1, b.box.y0, b.box.y1)
-        : along(by, ay, b.box.y0, b.box.y1, a.box.y0, a.box.y1);
+      const ax = a.centre.x,
+        bx = b.centre.x,
+        ay = a.centre.y,
+        by = b.centre.y;
+      const rx =
+        ax <= bx
+          ? along(ax, bx, a.box.x0, a.box.x1, b.box.x0, b.box.x1)
+          : along(bx, ax, b.box.x0, b.box.x1, a.box.x0, a.box.x1);
+      const ry =
+        ay <= by
+          ? along(ay, by, a.box.y0, a.box.y1, b.box.y0, b.box.y1)
+          : along(by, ay, b.box.y0, b.box.y1, a.box.y0, a.box.y1);
       cap = Math.min(cap, Math.max(rx, ry));
     }
   }

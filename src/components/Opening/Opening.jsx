@@ -1,6 +1,23 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styles from './Opening.module.css';
-import { openingConfig, startState, coverGeometry, createCover, pageKey, titleLayout, firstInkRow, lastInkRow, inkSpan, widestInkRow, fitTitle, bylineText, gripHeight, TUNING, revealFactor, rootsBrightnessAt } from '../../lib/opening';
+import {
+  openingConfig,
+  startState,
+  coverGeometry,
+  createCover,
+  pageKey,
+  titleLayout,
+  firstInkRow,
+  lastInkRow,
+  inkSpan,
+  widestInkRow,
+  fitTitle,
+  bylineText,
+  gripHeight,
+  TUNING,
+  revealFactor,
+  rootsBrightnessAt,
+} from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 import { parseRoots, rootsModel, actRoots, bentRoots, pathD, createFollow } from '../../lib/rootsVector';
 
@@ -42,12 +59,15 @@ import { parseRoots, rootsModel, actRoots, bentRoots, pathD, createFollow } from
  * Without settings.opening the children render as they are.
  */
 
-const reducedMotionNow = () => typeof window !== 'undefined' && window.matchMedia
-  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reducedMotionNow = () =>
+  typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function loadSize(src) {
   return new Promise((resolve) => {
-    if (!src) { resolve(null); return; }
+    if (!src) {
+      resolve(null);
+      return;
+    }
     const img = new Image();
     img.onload = () => resolve(img.naturalWidth > 0 ? { w: img.naturalWidth, h: img.naturalHeight } : null);
     img.onerror = () => resolve(null);
@@ -62,13 +82,18 @@ function loadSize(src) {
 // roots), { l, r } as shares of its width. null when it cannot be read.
 function loadInk(src, crown) {
   return new Promise((resolve) => {
-    if (!src) { resolve(null); return; }
+    if (!src) {
+      resolve(null);
+      return;
+    }
     const img = new Image();
     img.onload = () => {
       try {
-        const w = Math.min(2048, img.naturalWidth), h = Math.max(1, Math.round((img.naturalHeight * w) / img.naturalWidth));
+        const w = Math.min(2048, img.naturalWidth),
+          h = Math.max(1, Math.round((img.naturalHeight * w) / img.naturalWidth));
         const c = document.createElement('canvas');
-        c.width = w; c.height = h;
+        c.width = w;
+        c.height = h;
         const ctx = c.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
         const data = ctx.getImageData(0, 0, w, h).data;
@@ -79,7 +104,9 @@ function loadInk(src, crown) {
           above: inkSpan(data, w, h, 0, at),
           below: at < 1 ? widestInkRow(data, w, h, at, 1) : null,
         });
-      } catch (e) { resolve(null); }
+      } catch (e) {
+        resolve(null);
+      }
     };
     img.onerror = () => resolve(null);
     img.src = src;
@@ -108,7 +135,13 @@ function topRowBottom(vh) {
   let bottom = 0;
   for (const el of document.querySelectorAll('[data-feeds] > *:not([data-graph-intro]), [data-settings-gear]')) {
     const r = el.getBoundingClientRect();
-    if (!r.width || !r.height || r.top > vh * 0.2 || getComputedStyle(el).position === 'fixed' && !el.matches('[data-settings-gear]')) continue;
+    if (
+      !r.width ||
+      !r.height ||
+      r.top > vh * 0.2 ||
+      (getComputedStyle(el).position === 'fixed' && !el.matches('[data-settings-gear]'))
+    )
+      continue;
     bottom = Math.max(bottom, r.bottom);
   }
   return bottom;
@@ -116,7 +149,20 @@ function topRowBottom(vh) {
 
 // Keys belong to whatever is being typed in, and to the reader or a dialog
 // when one has focus or is open over the page.
-const KEYED_ROLES = new Set(['radio', 'slider', 'listbox', 'option', 'menu', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'spinbutton', 'textbox', 'combobox']);
+const KEYED_ROLES = new Set([
+  'radio',
+  'slider',
+  'listbox',
+  'option',
+  'menu',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'tab',
+  'spinbutton',
+  'textbox',
+  'combobox',
+]);
 function keysBelongElsewhere(e) {
   const t = e.target;
   if (t && t.nodeType === 1) {
@@ -170,13 +216,25 @@ function createReach(cfg, layer, { reduced, seed, skip = () => null }) {
     g.append(main, fine);
     g.style.visibility = 'hidden';
     layer.appendChild(g);
-    return { key, g, main, fine, shape: reachShape(`${seed}|${key}`), lag: createLag(lagMs), state: 'new', timer: null };
+    return {
+      key,
+      g,
+      main,
+      fine,
+      shape: reachShape(`${seed}|${key}`),
+      lag: createLag(lagMs),
+      state: 'new',
+      timer: null,
+    };
   }
 
   function drawIn(r) {
     r.state = 'drawn';
     r.g.style.visibility = '';
-    if (reduced || !cfg.drawMs) { r.g.setAttribute('data-drawn', 'drawn'); return; }
+    if (reduced || !cfg.drawMs) {
+      r.g.setAttribute('data-drawn', 'drawn');
+      return;
+    }
     r.g.setAttribute('data-drawn', 'drawing');
     for (const el of [r.main, r.fine]) {
       el.setAttribute('pathLength', '1');
@@ -221,7 +279,10 @@ function createReach(cfg, layer, { reduced, seed, skip = () => null }) {
         const key = `${c.id}|${i}`;
         seen.add(key);
         let r = rootlets.get(key);
-        if (!r) { r = make(key, c.id, i); rootlets.set(key, r); }
+        if (!r) {
+          r = make(key, c.id, i);
+          rootlets.set(key, r);
+        }
         // While the cover itself moves, the ends ride with it.
         if (r.state === 'new' || !settledCover) r.lag.jump(hit.end);
         else r.lag.to(hit.end, now);
@@ -235,13 +296,20 @@ function createReach(cfg, layer, { reduced, seed, skip = () => null }) {
         if (r.state === 'new' && opacity > 0.05) drawIn(r);
       }
     }
-    for (const [key, r] of rootlets) if (!seen.has(key)) { remove(r); rootlets.delete(key); }
+    for (const [key, r] of rootlets)
+      if (!seen.has(key)) {
+        remove(r);
+        rootlets.delete(key);
+      }
     return moving;
   }
 
   return {
     draw,
-    dispose() { for (const r of rootlets.values()) remove(r); rootlets.clear(); },
+    dispose() {
+      for (const r of rootlets.values()) remove(r);
+      rootlets.clear();
+    },
   };
 }
 
@@ -283,10 +351,15 @@ function createRootsVector(svg, model, roots) {
       for (const [e, parts] of bent) {
         const list = els.get(e);
         if (!list) continue;
-        parts.forEach((pts, i) => { if (list[i]) list[i].setAttribute('d', pathD(pts)); });
+        parts.forEach((pts, i) => {
+          if (list[i]) list[i].setAttribute('d', pathD(pts));
+        });
       }
     },
-    dispose() { for (const list of els.values()) for (const el of list) el.remove(); els.clear(); },
+    dispose() {
+      for (const list of els.values()) for (const el of list) el.remove();
+      els.clear();
+    },
   };
 }
 
@@ -307,7 +380,9 @@ function TitleLayout({ layout, size, which, opacity }) {
               const dy = lifted - sp.rise;
               lifted = sp.rise;
               return (
-                <tspan key={k} fontSize={sp.size} dy={dy || undefined} data-cover-title-span={k}>{sp.text}</tspan>
+                <tspan key={k} fontSize={sp.size} dy={dy || undefined} data-cover-title-span={k}>
+                  {sp.text}
+                </tspan>
               );
             })}
           </text>
@@ -322,11 +397,20 @@ function TitleLayout({ layout, size, which, opacity }) {
 // short soft seam between them.
 function keepMask(keepAbove, part) {
   if (!(keepAbove > 0)) return undefined;
-  const a = Math.max(0, keepAbove * 100 - 1.5), b = Math.min(100, keepAbove * 100 + 1.5);
-  const img = part === 'above'
-    ? `linear-gradient(to bottom, #000 0%, #000 ${a}%, transparent ${b}%)`
-    : `linear-gradient(to bottom, transparent 0%, transparent ${a}%, #000 ${b}%)`;
-  return { WebkitMaskImage: img, maskImage: img, WebkitMaskSize: '100% 100%', maskSize: '100% 100%', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat' };
+  const a = Math.max(0, keepAbove * 100 - 1.5),
+    b = Math.min(100, keepAbove * 100 + 1.5);
+  const img =
+    part === 'above'
+      ? `linear-gradient(to bottom, #000 0%, #000 ${a}%, transparent ${b}%)`
+      : `linear-gradient(to bottom, transparent 0%, transparent ${a}%, #000 ${b}%)`;
+  return {
+    WebkitMaskImage: img,
+    maskImage: img,
+    WebkitMaskSize: '100% 100%',
+    maskSize: '100% 100%',
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+  };
 }
 
 // The art state's ground as a night sky (opening.ground as an object): the
@@ -384,12 +468,12 @@ function Cover({ config, viewState, children }) {
   const graphKeepRef = useRef(null);
   const reachLayerRef = useRef(null);
   const reachRef = useRef(null);
-  const vectorRef = useRef(null);      // the roots' SVG (rootsVector)
-  const rootsRef = useRef(null);       // { draw, acts: Set } once it has loaded
-  const followRef = useRef(null);      // the roots following their acts (rootsFollowMs)
-  const zoomRef = useRef(null);       // { k, homeK }: the graph's zoom, from its world
-  const geomRef = useRef(null);       // the last painted geometry
-  const shiftRef = useRef(0);         // how far below its rest the graph layer is drawn
+  const vectorRef = useRef(null); // the roots' SVG (rootsVector)
+  const rootsRef = useRef(null); // { draw, acts: Set } once it has loaded
+  const followRef = useRef(null); // the roots following their acts (rootsFollowMs)
+  const zoomRef = useRef(null); // { k, homeK }: the graph's zoom, from its world
+  const geomRef = useRef(null); // the last painted geometry
+  const shiftRef = useRef(0); // how far below its rest the graph layer is drawn
   const frameRef = useRef(null);
   const titleArtRef = useRef(null);
   const titleGraphRef = useRef(null);
@@ -401,13 +485,17 @@ function Cover({ config, viewState, children }) {
   const sizeRef = useRef(null);
   const dragRef = useRef(() => false);
   const [art, setArt] = useState(null); // { w, h }: the canvas
-  const inkRef = useRef(null);         // { art, graph }: where each image's plant starts
-  const controlsRef = useRef(0);       // the top controls' bottom edge, px
+  const inkRef = useRef(null); // { art, graph }: where each image's plant starts
+  const controlsRef = useRef(0); // the top controls' bottom edge, px
   const reduced = useMemo(reducedMotionNow, []);
-  const start = useMemo(() => startState(config, {
-    stored: viewState && viewState.openingState ? viewState.openingState() : null,
-    hash: typeof window !== 'undefined' ? window.location.hash : '',
-  }), [config, viewState]);
+  const start = useMemo(
+    () =>
+      startState(config, {
+        stored: viewState && viewState.openingState ? viewState.openingState() : null,
+        hash: typeof window !== 'undefined' ? window.location.hash : '',
+      }),
+    [config, viewState],
+  );
   // opening.graph.hiddenUntilMove: on a load that starts on the art, the
   // graph and the rootlets wait for the reader's first move, then fade in
   // (revealFactor) and stay. revealRef.current.at: when they began to.
@@ -436,7 +524,10 @@ function Cover({ config, viewState, children }) {
     let live = true;
     const wanted = config.top || config.fit === 'width' || config.graph.rootsFit === 'width';
     const inks = wanted
-      ? Promise.all([loadInk(config.art.artState, config.crownY), loadInk(config.art.graphState || config.art.artState, config.crownY)])
+      ? Promise.all([
+          loadInk(config.art.artState, config.crownY),
+          loadInk(config.art.graphState || config.art.artState, config.crownY),
+        ])
       : Promise.resolve([null, null]);
     Promise.all([loadSize(config.art.artState), inks]).then(([s, [a, g]]) => {
       if (!live) return;
@@ -449,7 +540,9 @@ function Cover({ config, viewState, children }) {
       };
       setArt(s || { w: 1, h: 2 });
     });
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [config]);
 
   // The title as drawn: with title.fit 'width', each line set to its width
@@ -461,11 +554,22 @@ function Cover({ config, viewState, children }) {
   const perPxRef = useRef(null);
 
   const geometry = (p) => {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    return coverGeometry(titleRef.current === config.title ? config : { ...config, title: titleRef.current }, {
-      vw, vh, art: sizeRef.current || { w: 1, h: 2 }, bottom: bottomInset(vh), zoom: zoomRef.current,
-      controls: controlsRef.current, ink: inkRef.current, perPx: perPxRef.current,
-    }, p);
+    const vw = window.innerWidth,
+      vh = window.innerHeight;
+    return coverGeometry(
+      titleRef.current === config.title ? config : { ...config, title: titleRef.current },
+      {
+        vw,
+        vh,
+        art: sizeRef.current || { w: 1, h: 2 },
+        bottom: bottomInset(vh),
+        zoom: zoomRef.current,
+        controls: controlsRef.current,
+        ink: inkRef.current,
+        perPx: perPxRef.current,
+      },
+      p,
+    );
   };
 
   // The backdrop's strength (it follows the graph's zoom) and the rootlets:
@@ -489,7 +593,8 @@ function Cover({ config, viewState, children }) {
       const perPx = sizeRef.current.w / Math.max(1, g1.art.width);
       const drifts = new Map();
       for (const c of world.containers) {
-        if (c.drift && rv.acts.has(c.id)) drifts.set(c.id, { dx: c.drift.x * world.homeK * perPx, dy: c.drift.y * world.homeK * perPx });
+        if (c.drift && rv.acts.has(c.id))
+          drifts.set(c.id, { dx: c.drift.x * world.homeK * perPx, dy: c.drift.y * world.homeK * perPx });
       }
       if (!followRef.current) followRef.current = createFollow(reduced ? 0 : config.art.rootsFollowMs);
       const follow = followRef.current;
@@ -499,10 +604,18 @@ function Cover({ config, viewState, children }) {
     const reach = reachRef.current;
     if (!reach || !sizeRef.current) return;
     // The graph is not drawn: nor are the rootlets, which keep their state.
-    if (graphHiddenRef.current) { if (reachLayerRef.current) reachLayerRef.current.style.opacity = '0'; return; }
-    const zoomed = zoomRef.current ? backdropOpacity(config.backdrop, zoomRef.current.k, zoomRef.current.homeK) : config.backdrop.opacity;
+    if (graphHiddenRef.current) {
+      if (reachLayerRef.current) reachLayerRef.current.style.opacity = '0';
+      return;
+    }
+    const zoomed = zoomRef.current
+      ? backdropOpacity(config.backdrop, zoomRef.current.k, zoomRef.current.homeK)
+      : config.backdrop.opacity;
     const moving = reach.draw(performance.now(), {
-      box: g.art, world, opacity: g.layer.opacity * zoomed * revealNow(), settledCover: m.p >= 1 && !m.moving,
+      box: g.art,
+      world,
+      opacity: g.layer.opacity * zoomed * revealNow(),
+      settledCover: m.p >= 1 && !m.moving,
     });
     if (moving) requestFrame();
   };
@@ -586,7 +699,7 @@ function Cover({ config, viewState, children }) {
   const paint = (p) => {
     const g = geometry(p);
     const m = machineRef.current;
-    const label = m && m.moving ? 'moving' : (p >= 1 ? 'graph' : p <= 0 ? 'art' : 'moving');
+    const label = m && m.moving ? 'moving' : p >= 1 ? 'graph' : p <= 0 ? 'art' : 'moving';
     const root = document.documentElement;
     root.style.setProperty('--pp-cover-p', String(g.p));
     root.setAttribute('data-pp-cover', label);
@@ -620,7 +733,7 @@ function Cover({ config, viewState, children }) {
       // title) it gives way as the page moves to the graph.
       const live = g.byline.under === 'title' ? label !== 'moving' : g.byline.opacity > 0.5;
       by.style.pointerEvents = live ? 'auto' : 'none';
-      by.tabIndex = g.byline.under === 'title' ? (live ? 0 : -1) : (label === 'art' ? 0 : -1);
+      by.tabIndex = g.byline.under === 'title' ? (live ? 0 : -1) : label === 'art' ? 0 : -1;
     }
     const stage = stageRef.current;
     if (stage) {
@@ -643,10 +756,13 @@ function Cover({ config, viewState, children }) {
         const graph = el.matches('[data-graph-root]');
         if (graph) hideGraph(el, label, g);
         const shown = graph ? revealNow() : 1;
-        el.style.opacity = atRest && shown >= 1 ? '' : String(atRest ? shown : (graph ? g.layer.opacity * shown : g.graph.opacity));
-        el.style.transform = atRest ? '' : (graph
-          ? `translate3d(0, ${g.layer.follow}px, 0)`
-          : `translate3d(0, ${g.graph.shift}px, 0)`);
+        el.style.opacity =
+          atRest && shown >= 1 ? '' : String(atRest ? shown : graph ? g.layer.opacity * shown : g.graph.opacity);
+        el.style.transform = atRest
+          ? ''
+          : graph
+            ? `translate3d(0, ${g.layer.follow}px, 0)`
+            : `translate3d(0, ${g.graph.shift}px, 0)`;
         el.inert = label === 'art';
         if (label === 'art') el.setAttribute('aria-hidden', 'true');
         else el.removeAttribute('aria-hidden');
@@ -710,11 +826,16 @@ function Cover({ config, viewState, children }) {
         if (!live || Math.abs(c - controlsRef.current) < 0.5) return;
         controlsRef.current = c;
         const mm = machineRef.current;
-        if (mm) { mm.resize(geometry(0).travel); paintRef.current(mm.p); }
+        if (mm) {
+          mm.resize(geometry(0).travel);
+          paintRef.current(mm.p);
+        }
         publishFrameRef.current();
       });
     }
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [art]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // title.fit 'width': once the title's face has loaded, each line is
@@ -723,9 +844,16 @@ function Cover({ config, viewState, children }) {
   useEffect(() => {
     if (!art || !config.title || config.title.fit !== 'width') return undefined;
     let live = true;
-    const lengths = (ref) => (ref.current
-      ? [...ref.current.querySelectorAll('[data-cover-title-line]')].map((t) => { try { return t.getComputedTextLength(); } catch (e) { return 0; } })
-      : []);
+    const lengths = (ref) =>
+      ref.current
+        ? [...ref.current.querySelectorAll('[data-cover-title-line]')].map((t) => {
+            try {
+              return t.getComputedTextLength();
+            } catch (e) {
+              return 0;
+            }
+          })
+        : [];
     const measure = () => {
       if (!live) return;
       setTitle((t) => fitTitle(t, { art: lengths(titleArtRef), graph: lengths(titleGraphRef) }, art.w));
@@ -735,8 +863,15 @@ function Cover({ config, viewState, children }) {
         const cs = getComputedStyle(by);
         probe.textContent = by.textContent;
         Object.assign(probe.style, {
-          position: 'absolute', left: '-10000px', top: '0', visibility: 'hidden', whiteSpace: 'nowrap',
-          fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, letterSpacing: cs.letterSpacing, fontSize: '100px',
+          position: 'absolute',
+          left: '-10000px',
+          top: '0',
+          visibility: 'hidden',
+          whiteSpace: 'nowrap',
+          fontFamily: cs.fontFamily,
+          fontWeight: cs.fontWeight,
+          letterSpacing: cs.letterSpacing,
+          fontSize: '100px',
         });
         document.body.appendChild(probe);
         const w = probe.getBoundingClientRect().width;
@@ -746,7 +881,9 @@ function Cover({ config, viewState, children }) {
     };
     const ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     ready.then(() => requestAnimationFrame(measure));
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [art, config]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The fitted title: paint again with its sizes, and say where the art is.
@@ -764,17 +901,20 @@ function Cover({ config, viewState, children }) {
     if (!src || !art || typeof fetch === 'undefined') return undefined;
     let live = true;
     let built = null;
-    fetch(src).then((r) => (r.ok ? r.text() : '')).then((text) => {
-      const svg = vectorRef.current;
-      const model = rootsModel(parseRoots(text));
-      if (!live || !svg || !model) return;
-      const roots = actRoots(model, config.acts);
-      built = createRootsVector(svg, model, roots);
-      rootsRef.current = { draw: built, acts: new Set(roots.keys()) };
-      svg.setAttribute('data-roots-vector', 'ready');
-      const m = machineRef.current;
-      if (m) paintRef.current(m.p);
-    }).catch(() => {});
+    fetch(src)
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((text) => {
+        const svg = vectorRef.current;
+        const model = rootsModel(parseRoots(text));
+        if (!live || !svg || !model) return;
+        const roots = actRoots(model, config.acts);
+        built = createRootsVector(svg, model, roots);
+        rootsRef.current = { draw: built, acts: new Set(roots.keys()) };
+        svg.setAttribute('data-roots-vector', 'ready');
+        const m = machineRef.current;
+        if (m) paintRef.current(m.p);
+      })
+      .catch(() => {});
     return () => {
       live = false;
       if (built) built.dispose();
@@ -786,7 +926,8 @@ function Cover({ config, viewState, children }) {
   useEffect(() => {
     if (config.reach && reachLayerRef.current) {
       reachRef.current = createReach(config.reach, reachLayerRef.current, {
-        reduced, seed: config.art.graphState || config.art.artState,
+        reduced,
+        seed: config.art.graphState || config.art.artState,
         skip: () => (rootsRef.current ? rootsRef.current.acts : null),
       });
     }
@@ -825,7 +966,10 @@ function Cover({ config, viewState, children }) {
           const half = Math.round((info.ms || TUNING.reducedFadeMs) / 2);
           swapRef.current = true;
           const els = [coverRef.current, sectionRef.current].filter(Boolean);
-          for (const el of els) { el.style.transition = `opacity ${half}ms linear`; el.style.opacity = '0'; }
+          for (const el of els) {
+            el.style.transition = `opacity ${half}ms linear`;
+            el.style.opacity = '0';
+          }
           if (fadeTimer) clearTimeout(fadeTimer);
           // The new state is painted once the cover is out of sight, not
           // merely when the fade should have ended: a slow first frame (a
@@ -834,7 +978,10 @@ function Cover({ config, viewState, children }) {
           const outOfSight = () => {
             const el = coverRef.current;
             const o = el ? Number(getComputedStyle(el).opacity) : 0;
-            if (o > 0.02 && Date.now() - t0 < half * 4) { fadeTimer = setTimeout(outOfSight, 16); return; }
+            if (o > 0.02 && Date.now() - t0 < half * 4) {
+              fadeTimer = setTimeout(outOfSight, 16);
+              return;
+            }
             swapRef.current = false;
             paintRef.current(p);
             for (const x of els) x.style.opacity = '1';
@@ -867,11 +1014,19 @@ function Cover({ config, viewState, children }) {
     if (viewState && viewState.setOpeningState) viewState.setOpeningState(machine.rest);
     // Test and page hook: where the page is.
     window.PostPipeCover = {
-      get state() { return machine.moving ? 'moving' : machine.rest; },
-      get p() { return machine.p; },
-      get shift() { return shiftRef.current; },
+      get state() {
+        return machine.moving ? 'moving' : machine.rest;
+      },
+      get p() {
+        return machine.p;
+      },
+      get shift() {
+        return shiftRef.current;
+      },
       // How far the graph is shown, 0 to 1 (opening.graph.hiddenUntilMove).
-      get acts() { return revealNow(); },
+      get acts() {
+        return revealNow();
+      },
       go: (s, o) => machine.go(s, o),
     };
 
@@ -899,7 +1054,8 @@ function Cover({ config, viewState, children }) {
       if (!t || !t.closest) return null;
       if (handle && handle.contains(t)) return 'edge';
       if (stage && stage.contains(t)) return 'stage';
-      if (bylineRef.current && bylineRef.current.contains(t)) return machine.p < 1 || machine.moving ? 'stage' : 'graph';
+      if (bylineRef.current && bylineRef.current.contains(t))
+        return machine.p < 1 || machine.moving ? 'stage' : 'graph';
       if (!sec || !sec.contains(t)) return null;
       if (machine.moving || machine.p < 1) return 'stage';
       return e.clientY <= edgeY() ? 'edge' : 'graph';
@@ -925,10 +1081,22 @@ function Cover({ config, viewState, children }) {
 
     // The first move shows the graph (opening.graph.hiddenUntilMove): a
     // scroll or swipe down, a drag, or a tap anywhere but on a top-bar control.
-    const topControl = (t) => !!(t && t.closest && t.closest('[data-feeds], [data-top-bar]') && t.closest('button, a, input, select, [role="button"], [role="menu"], [role="menuitem"], [role="menuitemcheckbox"]'));
-    const onFirstWheel = (e) => { if (e.deltaY > 0) revealRef2.current(); };
+    const topControl = (t) =>
+      !!(
+        t &&
+        t.closest &&
+        t.closest('[data-feeds], [data-top-bar]') &&
+        t.closest(
+          'button, a, input, select, [role="button"], [role="menu"], [role="menuitem"], [role="menuitemcheckbox"]',
+        )
+      );
+    const onFirstWheel = (e) => {
+      if (e.deltaY > 0) revealRef2.current();
+    };
     const onFirstTouchMove = () => revealRef2.current();
-    const onFirstDown = (e) => { if (!topControl(e.target)) revealRef2.current(); };
+    const onFirstDown = (e) => {
+      if (!topControl(e.target)) revealRef2.current();
+    };
     if (hideUntilMove) {
       window.addEventListener('wheel', onFirstWheel, { capture: true, passive: true });
       window.addEventListener('touchmove', onFirstTouchMove, { capture: true, passive: true });
@@ -944,7 +1112,9 @@ function Cover({ config, viewState, children }) {
     window.addEventListener('keydown', onKey);
 
     // A link straight to a chapter goes to the graph.
-    const onHash = () => { if (window.location.hash.startsWith('#read=')) machine.go('graph'); };
+    const onHash = () => {
+      if (window.location.hash.startsWith('#read=')) machine.go('graph');
+    };
     window.addEventListener('hashchange', onHash);
 
     // A drag on the art, or on the handle, scrubs. A tap that ends a drag
@@ -975,7 +1145,11 @@ function Cover({ config, viewState, children }) {
     const onPointerDown = (e) => {
       if (e.pointerType !== 'mouse' || e.button !== 0) return;
       mouse = { y: e.clientY, moved: 0 };
-      try { handle.setPointerCapture(e.pointerId); } catch (_) { /* not captured */ }
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch (_) {
+        /* not captured */
+      }
       machine.touchStart(e.clientY, e.timeStamp || Date.now());
     };
     const onPointerMove = (e) => {
@@ -1037,17 +1211,27 @@ function Cover({ config, viewState, children }) {
   const tap = (to) => {
     const m = machineRef.current;
     if (!m || dragRef.current()) return;
-    if (to === 'graph') m.tapArt(); else m.tapTop();
+    if (to === 'graph') m.tapArt();
+    else m.tapTop();
   };
 
   const startArt = start === 'art';
   return (
     <>
       <div ref={coverRef} className={styles.cover} data-cover data-ground={config.ground}>
-        <div ref={groundRef} className={styles.ground} data-cover-ground data-sky={config.sky ? '' : undefined}
-          style={{ opacity: startArt ? 1 : 0, ...skyStyle(config.sky) }}>
+        <div
+          ref={groundRef}
+          className={styles.ground}
+          data-cover-ground
+          data-sky={config.sky ? '' : undefined}
+          style={{ opacity: startArt ? 1 : 0, ...skyStyle(config.sky) }}
+        >
           {config.sky && config.sky.texture > 0 && (
-            <div className={styles.groundTexture} data-cover-ground-texture style={{ opacity: config.sky.texture, ...fromMask(config.sky.textureFrom) }} />
+            <div
+              className={styles.groundTexture}
+              data-cover-ground-texture
+              style={{ opacity: config.sky.texture, ...fromMask(config.sky.textureFrom) }}
+            />
           )}
         </div>
         <div
@@ -1072,26 +1256,64 @@ function Cover({ config, viewState, children }) {
           }}
         >
           <div ref={artRef} className={styles.art} data-cover-art style={{ opacity: 0 }}>
-            <img ref={artStateRef} className={styles.image} src={config.art.artState} alt="" draggable="false"
-              data-cover-image="art" style={config.art.graphState ? { opacity: startArt ? 1 : 0 } : undefined} />
+            <img
+              ref={artStateRef}
+              className={styles.image}
+              src={config.art.artState}
+              alt=""
+              draggable="false"
+              data-cover-image="art"
+              style={config.art.graphState ? { opacity: startArt ? 1 : 0 } : undefined}
+            />
             {config.art.graphState && (
-              <img ref={graphStateRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
-                data-cover-image="graph" style={{ opacity: startArt ? 0 : config.backdrop.opacity, ...keepMask(config.backdrop.keepAbove, 'below') }} />
+              <img
+                ref={graphStateRef}
+                className={styles.image}
+                src={config.art.graphState}
+                alt=""
+                draggable="false"
+                data-cover-image="graph"
+                style={{
+                  opacity: startArt ? 0 : config.backdrop.opacity,
+                  ...keepMask(config.backdrop.keepAbove, 'below'),
+                }}
+              />
             )}
             {config.art.graphState && config.backdrop.keepAbove > 0 && (
-              <img ref={graphKeepRef} className={styles.image} src={config.art.graphState} alt="" draggable="false"
-                data-cover-image="graph-keep" style={{ opacity: startArt ? 0 : 1, ...keepMask(config.backdrop.keepAbove, 'above') }} />
+              <img
+                ref={graphKeepRef}
+                className={styles.image}
+                src={config.art.graphState}
+                alt=""
+                draggable="false"
+                data-cover-image="graph-keep"
+                style={{ opacity: startArt ? 0 : 1, ...keepMask(config.backdrop.keepAbove, 'above') }}
+              />
             )}
             {config.art.rootsVector && (
-              <svg ref={vectorRef} className={styles.roots} aria-hidden="true" data-roots-vector="loading"
-                preserveAspectRatio="none" viewBox={art ? `0 0 ${art.w} ${art.h}` : undefined}
-                style={{ opacity: 0, ...keepMask(config.backdrop.keepAbove, 'below') }} />
+              <svg
+                ref={vectorRef}
+                className={styles.roots}
+                aria-hidden="true"
+                data-roots-vector="loading"
+                preserveAspectRatio="none"
+                viewBox={art ? `0 0 ${art.w} ${art.h}` : undefined}
+                style={{ opacity: 0, ...keepMask(config.backdrop.keepAbove, 'below') }}
+              />
             )}
             <CoverTitle title={title} size={art} start={start} refs={{ art: titleArtRef, graph: titleGraphRef }} />
           </div>
           {config.alt && <span className={styles.alt} role="img" aria-label={config.alt} data-cover-alt />}
         </div>
-        {config.reach && <svg ref={reachLayerRef} className={styles.reach} aria-hidden="true" data-cover-reach style={{ opacity: 0 }} />}
+        {config.reach && (
+          <svg
+            ref={reachLayerRef}
+            className={styles.reach}
+            aria-hidden="true"
+            data-cover-reach
+            style={{ opacity: 0 }}
+          />
+        )}
       </div>
       <div
         ref={sectionRef}
@@ -1101,7 +1323,13 @@ function Cover({ config, viewState, children }) {
       >
         {children}
         {config.band && (
-          <div ref={bandRef} className={styles.band} data-top-band aria-hidden="true" style={{ background: config.band.color }} />
+          <div
+            ref={bandRef}
+            className={styles.band}
+            data-top-band
+            aria-hidden="true"
+            style={{ background: config.band.color }}
+          />
         )}
         {/* The grip: the whole top strip, under the top bar's controls (they
             keep their taps) and over the graph; the mark is the hint. */}
@@ -1142,5 +1370,9 @@ function Cover({ config, viewState, children }) {
 export function Opening({ settings, viewState, children }) {
   const config = useMemo(() => openingConfig(settings), [settings]);
   if (!config) return <>{children}</>;
-  return <Cover config={config} viewState={viewState}>{children}</Cover>;
+  return (
+    <Cover config={config} viewState={viewState}>
+      {children}
+    </Cover>
+  );
 }

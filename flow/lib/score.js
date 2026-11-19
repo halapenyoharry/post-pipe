@@ -37,7 +37,12 @@ export function featureNames(sub, preset) {
     ...schemes.map((s) => `tag.${s}`),
     'tag.shared',
     ...relTypes.map((t) => `rel.${t}`),
-    'degree', 'recency', 'source', 'read', 'pin', 'distance',
+    'degree',
+    'recency',
+    'source',
+    'read',
+    'pin',
+    'distance',
   ];
 }
 
@@ -50,7 +55,7 @@ function readStateOf(state, card) {
   const r = reading[card.id] || (slug && reading[slug]) || null;
   const n = nodes[card.id] || (slug && nodes[slug]) || null;
   // unread 0, seen 0.5 (a seenAt), done 1 (read to the end): viewState.reading.
-  const read = r ? (r.done === true ? 1 : (r.seenAt ? 0.5 : 0)) : 0;
+  const read = r ? (r.done === true ? 1 : r.seenAt ? 0.5 : 0) : 0;
   const pin = n && n.pinned === true ? 1 : 0;
   return { read, pin };
 }
@@ -119,9 +124,10 @@ export function scoreSubfield(sub, preset, { state = null, switches } = {}) {
       x.recency = n > 1 ? 1 - sessionRank.get(card.id) / (n - 1) : 1;
     } else {
       const t = card.date ? Date.parse(card.date) : NaN;
-      x.recency = Number.isFinite(t) && newest !== null
-        ? Math.pow(0.5, Math.max(0, newest - t) / DAY_MS / sw.recencyHalfLifeDays)
-        : 0;
+      x.recency =
+        Number.isFinite(t) && newest !== null
+          ? Math.pow(0.5, Math.max(0, newest - t) / DAY_MS / sw.recencyHalfLifeDays)
+          : 0;
     }
     x.source = 1;
     const rs = readStateOf(state, card);
@@ -138,7 +144,9 @@ export function scoreSubfield(sub, preset, { state = null, switches } = {}) {
       terms[name] = { x: xi, w, term };
       score += term;
     }
-    const top = [...names].sort((a, b) => Math.abs(terms[b].term) - Math.abs(terms[a].term) || (a < b ? -1 : a > b ? 1 : 0));
+    const top = [...names].sort(
+      (a, b) => Math.abs(terms[b].term) - Math.abs(terms[a].term) || (a < b ? -1 : a > b ? 1 : 0),
+    );
     return { ...card, score, terms, top };
   });
 

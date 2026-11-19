@@ -5,13 +5,13 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   define: {
-    'process.env.NODE_ENV': JSON.stringify('production')
+    'process.env.NODE_ENV': JSON.stringify('production'),
   },
   build: {
     lib: {
       entry: path.resolve(__dirname, 'src/index.jsx'),
       name: 'PostPipeComponents',
-      fileName: (format) => `post-pipe-components.${format}.js`
-    }
-  }
+      fileName: (format) => `post-pipe-components.${format}.js`,
+    },
+  },
 });

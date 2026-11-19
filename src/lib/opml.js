@@ -122,7 +122,7 @@ function detectType(typeAttr, xmlUrl) {
   // listing addresses one per line. Neither is inferred: a plain address
   // without a type is a feed, as ever.
   if (t === 'rss' || t === 'atom' || t === 'json' || t === 'local' || t === 'page' || t === 'pages') return t;
-  if (xmlUrl.startsWith('local://'))           return 'local';
+  if (xmlUrl.startsWith('local://')) return 'local';
   if (xmlUrl.endsWith('.json') || xmlUrl.includes('feed.json')) return 'json';
   // Default to RSS — most readers leave type=rss off for plain feeds.
   return 'rss';

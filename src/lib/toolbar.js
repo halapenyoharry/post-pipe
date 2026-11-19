@@ -29,13 +29,14 @@ function viewActionsFor(settings) {
   return VIEW_ACTIONS.filter((a) => a.event !== 'graph:reset-sizes' || resizeOn(graph));
 }
 
-const RESET_TITLE = 'Reset: layout, zoom, rotation, open and closed containers, and selection, back to how the site starts (Undo brings the arrangement back)';
+const RESET_TITLE =
+  'Reset: layout, zoom, rotation, open and closed containers, and selection, back to how the site starts (Undo brings the arrangement back)';
 
 // settings.toolbar with its defaults. features (the embed's switches), when
 // given, can turn a group off too.
 function toolbarConfig(settings, features) {
-  const t = (settings && settings.toolbar && typeof settings.toolbar === 'object') ? settings.toolbar : {};
-  const s = (t.show && typeof t.show === 'object') ? t.show : {};
+  const t = settings && settings.toolbar && typeof settings.toolbar === 'object' ? settings.toolbar : {};
+  const s = t.show && typeof t.show === 'object' ? t.show : {};
   const f = features || {};
   return {
     position: t.position === 'bottom' ? 'bottom' : 'top',
@@ -48,7 +49,8 @@ function toolbarConfig(settings, features) {
 }
 
 // The dimensions with a bucket size.
-const hasGranularity = (axis) => !!(axis && axis.on && (axis.dimension === 'chronology' || axis.dimension === 'commits'));
+const hasGranularity = (axis) =>
+  !!(axis && axis.on && (axis.dimension === 'chronology' || axis.dimension === 'commits'));
 
 // What a tap on a dimension does to the time axis: on, or off when it is the
 // one already on (one at a time).
@@ -75,8 +77,16 @@ function menuModel({ dimensions = [], layers = [], axis = {}, preferences = {}, 
   const rows = [];
   const current = axis.dimension || 'time';
   if (show.dimensions !== false) {
-    for (const d of dimensions) rows.push({ kind: 'dimension', id: d.id, label: d.label, title: d.title, checked: !!axis.on && current === d.id });
-    for (const d of layers) rows.push({ kind: 'layer', id: d.id, label: d.label, title: d.title, checked: preferences[d.id] === true });
+    for (const d of dimensions)
+      rows.push({
+        kind: 'dimension',
+        id: d.id,
+        label: d.label,
+        title: d.title,
+        checked: !!axis.on && current === d.id,
+      });
+    for (const d of layers)
+      rows.push({ kind: 'layer', id: d.id, label: d.label, title: d.title, checked: preferences[d.id] === true });
     if (hasGranularity(axis)) rows.push({ kind: 'granularity', value: axis.granularity || 'auto' });
   }
   return { heading: group, rows };
@@ -94,4 +104,15 @@ function menuMove(index, key, count) {
   return null;
 }
 
-module.exports = { GRANULARITIES, VIEW_ACTIONS, viewActionsFor, RESET_TITLE, toolbarConfig, hasGranularity, toggleDimension, nextGranularity, menuModel, menuMove };
+module.exports = {
+  GRANULARITIES,
+  VIEW_ACTIONS,
+  viewActionsFor,
+  RESET_TITLE,
+  toolbarConfig,
+  hasGranularity,
+  toggleDimension,
+  nextGranularity,
+  menuModel,
+  menuMove,
+};

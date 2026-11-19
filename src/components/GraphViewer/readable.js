@@ -32,8 +32,11 @@ function readableZoom(k, nowPx, want, kMax = Infinity) {
 // its half width and height on the screen after; finger: where the finger
 // was. The point of the card that was under the finger is put back under it.
 function keepUnderFinger({ finger, before, after, ratio, half, area }) {
-  const inside = after.x - half.w >= area.x0 && after.x + half.w <= area.x1
-    && after.y - half.h >= area.y0 && after.y + half.h <= area.y1;
+  const inside =
+    after.x - half.w >= area.x0 &&
+    after.x + half.w <= area.x1 &&
+    after.y - half.h >= area.y0 &&
+    after.y + half.h <= area.y1;
   if (inside || !finger || !before) return { x: 0, y: 0 };
   const r = ratio > 0 ? ratio : 1;
   return {

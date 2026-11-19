@@ -8,9 +8,20 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  WORDS_CHOICES, DEFAULT_WORDS, RETIRED_WORDS, isWordsChoice, wordsValue, siteWords, wordsChoice,
-  wordSpans, countWords, sentenceEnd, planCut, excerptText,
-  cardProgress, cardScrollFor,
+  WORDS_CHOICES,
+  DEFAULT_WORDS,
+  RETIRED_WORDS,
+  isWordsChoice,
+  wordsValue,
+  siteWords,
+  wordsChoice,
+  wordSpans,
+  countWords,
+  sentenceEnd,
+  planCut,
+  excerptText,
+  cardProgress,
+  cardScrollFor,
 } = require('../src/lib/readerWords');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
 
@@ -35,7 +46,8 @@ test("'one', one card at a time, is no longer a choice and reads as whole, from 
   assert.strictEqual(wordsValue('one'), 'whole');
   assert.strictEqual(wordsValue(250), 250);
   assert.strictEqual(wordsValue('whole'), 'whole');
-  for (const v of ['all', 'toString', '__proto__', 'constructor', 120, null, undefined, {}]) assert.strictEqual(wordsValue(v), null);
+  for (const v of ['all', 'toString', '__proto__', 'constructor', 120, null, undefined, {}])
+    assert.strictEqual(wordsValue(v), null);
   // The reader's own 'one' wins as whole, over the site's.
   assert.strictEqual(wordsChoice({ reader: { words: 100 } }, 'one'), 'whole');
   // A site's 'one' is whole; a reader's own choice still wins over it.
@@ -70,7 +82,10 @@ test('a word is a run of non-space characters holding a letter or a digit', () =
   assert.strictEqual(countWords('The cat — sat, on 2 mats.'), 6);
   assert.strictEqual(countWords('  ... -- !! '), 0);
   assert.strictEqual(countWords(''), 0);
-  assert.deepStrictEqual(wordSpans('ab  cd'), [[0, 2], [4, 6]]);
+  assert.deepStrictEqual(wordSpans('ab  cd'), [
+    [0, 2],
+    [4, 6],
+  ]);
 });
 
 // ── Sentence ends ───────────────────────────────────────────────────────────
@@ -124,15 +139,25 @@ test('the cut never runs past the end of the block that holds the Nth word', () 
   const blocks = ['one two three four five six seven', sentences(40)];
   // The 3rd word's block ends before any sentence does.
   assert.strictEqual(excerptText(blocks, 3), 'one two three four five six seven');
-  const plan = planCut(blocks.map((t, i) => ({ text: t, block: i })), 3);
-  assert.deepStrictEqual({ seg: plan.seg, offset: plan.offset, runEnd: plan.runEnd }, { seg: 0, offset: blocks[0].length, runEnd: true });
+  const plan = planCut(
+    blocks.map((t, i) => ({ text: t, block: i })),
+    3,
+  );
+  assert.deepStrictEqual(
+    { seg: plan.seg, offset: plan.offset, runEnd: plan.runEnd },
+    { seg: 0, offset: blocks[0].length, runEnd: true },
+  );
   assert.strictEqual(plan.kept, 7);
   assert.strictEqual(plan.left, 40);
 });
 
 test('a word drawn in two text nodes of one block counts once', () => {
   // As in <p>un<em>usual</em> words ...</p>: three nodes, one block.
-  const segs = [{ text: 'un', block: 'p' }, { text: 'usual', block: 'p' }, { text: ' words here. ' + sentences(40), block: 'p' }];
+  const segs = [
+    { text: 'un', block: 'p' },
+    { text: 'usual', block: 'p' },
+    { text: ' words here. ' + sentences(40), block: 'p' },
+  ];
   const plan = planCut(segs, 2);
   assert.strictEqual(plan.seg, 2);
   assert.strictEqual(plan.offset, ' words here.'.length);
@@ -140,7 +165,10 @@ test('a word drawn in two text nodes of one block counts once', () => {
 });
 
 test('two blocks part two words even with no space between them', () => {
-  const segs = [{ text: 'alpha', block: 1 }, { text: 'beta. ' + sentences(40), block: 2 }];
+  const segs = [
+    { text: 'alpha', block: 1 },
+    { text: 'beta. ' + sentences(40), block: 2 },
+  ];
   assert.strictEqual(planCut(segs, 2).kept, 2);
 });
 

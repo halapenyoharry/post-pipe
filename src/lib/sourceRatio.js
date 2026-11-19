@@ -164,10 +164,22 @@ function positionOf(ratio, range) {
 }
 
 // What the slider shows as its value: tenths, always with the decimal.
-const ratioText = (v) => (v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v).toFixed(1) : '');
+const ratioText = (v) =>
+  v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v).toFixed(1) : '';
 
 module.exports = {
-  PREF, DEFAULT_BAR, LOWEST, STEP,
-  ratioOf, ratioRange, clampRatio, ratioShows, shownAt, pairKey, ratioText,
-  travelLength, ratioAt, positionOf,
+  PREF,
+  DEFAULT_BAR,
+  LOWEST,
+  STEP,
+  ratioOf,
+  ratioRange,
+  clampRatio,
+  ratioShows,
+  shownAt,
+  pairKey,
+  ratioText,
+  travelLength,
+  ratioAt,
+  positionOf,
 };

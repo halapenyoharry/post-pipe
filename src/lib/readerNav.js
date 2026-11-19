@@ -30,10 +30,16 @@ function navStatus(feed, item, fallback = 'not yet published') {
   if (isReadable(item)) return null;
   const containers = (feed && feed.containers) || [];
   const byId = new Map(containers.map((c) => [c.id, c]));
-  const depth = (c) => { let n = 0; let p = c.parent; while (p && byId.has(p) && n < 20) { n++; p = byId.get(p).parent; } return n; };
-  const mine = containers
-    .filter((c) => c.tag && containerHas(c, item))
-    .sort((a, b) => depth(b) - depth(a));
+  const depth = (c) => {
+    let n = 0;
+    let p = c.parent;
+    while (p && byId.has(p) && n < 20) {
+      n++;
+      p = byId.get(p).parent;
+    }
+    return n;
+  };
+  const mine = containers.filter((c) => c.tag && containerHas(c, item)).sort((a, b) => depth(b) - depth(a));
   const withStatus = mine.find((c) => c.status);
   return withStatus ? String(withStatus.status) : fallback;
 }

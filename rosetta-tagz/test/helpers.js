@@ -38,7 +38,16 @@ export function rec(source, items, extra = {}) {
   const out = [];
   for (const [id, labels] of Object.entries(items)) {
     const meta = extra[id] ?? {};
-    out.push({ type: 'item', source, id, title: meta.title ?? id, text: meta.text ?? '', url: meta.url ?? '', date: '', kind: '' });
+    out.push({
+      type: 'item',
+      source,
+      id,
+      title: meta.title ?? id,
+      text: meta.text ?? '',
+      url: meta.url ?? '',
+      date: '',
+      kind: '',
+    });
     for (const label of labels) out.push({ type: 'tag', source, item: id, label, weight: 1, origin: 'explicit' });
   }
   return out;
@@ -46,7 +55,12 @@ export function rec(source, items, extra = {}) {
 
 // earned tag records (what rtz-discover / rtz-emerge write), one per item:
 //   earned('Wire', ['w1','w2'], 'processing') -> two discovered tag rows
-export function earned(source, itemIds, label, { origin = 'discovered', weight = 0.4, why = `recurs in ${itemIds.length} items`, ...rest } = {}) {
+export function earned(
+  source,
+  itemIds,
+  label,
+  { origin = 'discovered', weight = 0.4, why = `recurs in ${itemIds.length} items`, ...rest } = {},
+) {
   return itemIds.map((item) => ({ type: 'tag', source, item, label, weight, origin, why, ...rest }));
 }
 

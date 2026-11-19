@@ -23,7 +23,13 @@ export function textSignals(corpus, caps, { minCosine = 0.2 } = {}) {
     if (n < 2) continue; // a tag seen on one item has no distribution, only that item's text
     const shrink = (n - 1) / (n + 1); // 2 items: 0.33, 5: 0.67, 10: 0.82
     const [a, b] = orderPair(x, y);
-    out.push({ a, b, signal: 'text', score: Math.min(caps.text, c * shrink), why: `used on similar texts (cosine ${c.toFixed(2)}, support ${n})` });
+    out.push({
+      a,
+      b,
+      signal: 'text',
+      score: Math.min(caps.text, c * shrink),
+      why: `used on similar texts (cosine ${c.toFixed(2)}, support ${n})`,
+    });
   }
   return out;
 }

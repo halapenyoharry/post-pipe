@@ -91,7 +91,8 @@ export function parseArgs(argv, spec, usage = '') {
     }
   }
   for (const [name, s] of Object.entries(spec)) {
-    if (s.required && (out[name] === undefined || out[name] === null || out[name] === '')) return fail(`--${name} is required`);
+    if (s.required && (out[name] === undefined || out[name] === null || out[name] === ''))
+      return fail(`--${name} is required`);
     if (s.oneOf && out[name] !== undefined && out[name] !== null && !s.oneOf.includes(out[name])) {
       return fail(`--${name} must be one of ${s.oneOf.join(', ')}, got "${out[name]}"`);
     }

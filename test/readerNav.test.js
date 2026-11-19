@@ -24,8 +24,14 @@ const feed = {
 
 test('neighbours follow sequence edges both ways', () => {
   const n = neighbours(feed, 'b');
-  assert.deepStrictEqual(n.prev.map((i) => i.id), ['a']);
-  assert.deepStrictEqual(n.next.map((i) => i.id), ['c']);
+  assert.deepStrictEqual(
+    n.prev.map((i) => i.id),
+    ['a'],
+  );
+  assert.deepStrictEqual(
+    n.next.map((i) => i.id),
+    ['c'],
+  );
   assert.deepStrictEqual(neighbours(feed, 'a').prev, []);
 });
 
@@ -45,7 +51,8 @@ test('a swipe or arrow only goes to a readable neighbour', () => {
 // order the reader chose, its nearest openable card either side.
 const flowFeed = {
   items: [
-    { id: 'a' }, { id: 'b' },
+    { id: 'a' },
+    { id: 'b' },
     { id: 'c', _posted: 'title' },
     { id: 'd' },
     { id: 'l', kind: 'link', link: 'https://example.org' },
@@ -83,23 +90,34 @@ test('with a flow, the arrow keys and swipes go where Next and Previous go', () 
   assert.strictEqual(step(flowFeed, 'p', 'next', { order }), null);
 });
 
-test('with a flow, the top bar\'s own pages are no card of it', () => {
+test("with a flow, the top bar's own pages are no card of it", () => {
   const skip = new Set(['p']);
   assert.deepStrictEqual(neighbours(flowFeed, 'e', { order, skip }).next, [], 'p, a top bar page, is passed over');
-  assert.deepStrictEqual(neighbours(flowFeed, 'p', { order, skip }), { prev: [], next: [] }, 'a page opened from its button has none');
+  assert.deepStrictEqual(
+    neighbours(flowFeed, 'p', { order, skip }),
+    { prev: [], next: [] },
+    'a page opened from its button has none',
+  );
   assert.deepStrictEqual(ids(neighbours(flowFeed, 'e', { order, skip: ['p'] }).prev), ['b'], 'skip may be a list');
 });
 
 test('without a flow, Next and Previous stay on sequence edges', () => {
   assert.deepStrictEqual(ids(neighbours(flowFeed, 'a').next), ['b']);
   assert.deepStrictEqual(ids(neighbours(flowFeed, 'a', undefined).next), ['b']);
-  assert.deepStrictEqual(ids(neighbours(flowFeed, 'b', {}).next), ['c'], 'options without an order are the sequence edges');
+  assert.deepStrictEqual(
+    ids(neighbours(flowFeed, 'b', {}).next),
+    ['c'],
+    'options without an order are the sequence edges',
+  );
   assert.strictEqual(step(flowFeed, 'b', 'next'), null, 'c is title only, as before');
   assert.deepStrictEqual(neighbours(flowFeed, 'd'), { prev: [], next: [] });
 });
 
-test("the arrows that travel with the text go where step goes, and a side with nowhere to go has none", () => {
-  const t = (f, id, opts) => { const r = turnTargets(f, id, opts); return { prev: r.prev && r.prev.id, next: r.next && r.next.id }; };
+test('the arrows that travel with the text go where step goes, and a side with nowhere to go has none', () => {
+  const t = (f, id, opts) => {
+    const r = turnTargets(f, id, opts);
+    return { prev: r.prev && r.prev.id, next: r.next && r.next.id };
+  };
   // Along sequence edges: b's next, c, is title only, so no next arrow.
   assert.deepStrictEqual(t(feed, 'a'), { prev: null, next: 'b' });
   assert.deepStrictEqual(t(feed, 'b'), { prev: 'a', next: null });
@@ -110,7 +128,11 @@ test("the arrows that travel with the text go where step goes, and a side with n
   assert.deepStrictEqual(t(flowFeed, 'd', { order }), { prev: null, next: 'a' });
   assert.deepStrictEqual(t(flowFeed, 'e', { order, skip: new Set(['p']) }), { prev: 'b', next: null });
   // Always the card step() opens.
-  for (const [f, opts] of [[feed, undefined], [flowFeed, { order }], [flowFeed, undefined]]) {
+  for (const [f, opts] of [
+    [feed, undefined],
+    [flowFeed, { order }],
+    [flowFeed, undefined],
+  ]) {
     for (const item of f.items) {
       for (const dir of ['prev', 'next']) {
         const s = step(f, item.id, dir, opts);

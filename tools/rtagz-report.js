@@ -62,17 +62,32 @@ function whyCheck(items, edges, shows = () => true) {
   // are checked.
   const tags = new Map();
   const tagOf = (label) => {
-    if (!tags.has(label)) tags.set(label, { Ns: new Set(), Ms: new Set(), refItems: new Set(), hiddenRefs: 0, edgeItems: new Set(), allItems: new Set(), origins: new Set() });
+    if (!tags.has(label))
+      tags.set(label, {
+        Ns: new Set(),
+        Ms: new Set(),
+        refItems: new Set(),
+        hiddenRefs: 0,
+        edgeItems: new Set(),
+        allItems: new Set(),
+        origins: new Set(),
+      });
     return tags.get(label);
   };
   for (const it of items || []) {
     for (const r of it._references || []) {
       if (!r || r.type !== 'tag' || r.origin !== 'discovered') continue;
       const t = tagOf(String(r.value));
-      if (!shows(r.sourceRatio)) { t.hiddenRefs++; continue; }
+      if (!shows(r.sourceRatio)) {
+        t.hiddenRefs++;
+        continue;
+      }
       t.refItems.add(it.id);
       const m = WHY_RE.exec(String(r.why || ''));
-      if (m) { t.Ns.add(+m[1]); t.Ms.add(+m[2]); }
+      if (m) {
+        t.Ns.add(+m[1]);
+        t.Ms.add(+m[2]);
+      }
     }
   }
   // Whether the feed's tag edges say their origin at all (a feed built
@@ -80,7 +95,7 @@ function whyCheck(items, edges, shows = () => true) {
   let edgesKnown = false;
   for (const e of edges || []) {
     if (!e || e.layer !== 'tag') continue;
-    const t0 = isTag(e.target) ? e.target : (isTag(e.source) ? e.source : null);
+    const t0 = isTag(e.target) ? e.target : isTag(e.source) ? e.source : null;
     if (!t0) continue;
     const pid = t0 === e.target ? e.source : e.target;
     if (!ids.has(pid)) continue;
@@ -95,9 +110,15 @@ function whyCheck(items, edges, shows = () => true) {
 
   const rows = [];
   const edgeRows = [];
-  let checked = 0, withN = 0, agree = 0, leftOut = 0;
+  let checked = 0,
+    withN = 0,
+    agree = 0,
+    leftOut = 0;
   for (const [label, t] of tags) {
-    if (!t.refItems.size && !t.edgeItems.size) { if (t.hiddenRefs) leftOut++; continue; }
+    if (!t.refItems.size && !t.edgeItems.size) {
+      if (t.hiddenRefs) leftOut++;
+      continue;
+    }
     checked++;
     if (edgesKnown && t.edgeItems.size !== t.refItems.size) {
       edgeRows.push({ label, discoveredAssertions: t.refItems.size, discoveredEdges: t.edgeItems.size });
@@ -105,7 +126,10 @@ function whyCheck(items, edges, shows = () => true) {
     const Ns = [...t.Ns];
     if (!Ns.length) continue;
     withN++;
-    if (Ns.every((N) => N === t.refItems.size)) { agree++; continue; }
+    if (Ns.every((N) => N === t.refItems.size)) {
+      agree++;
+      continue;
+    }
     rows.push({
       label,
       N: Ns.join('/'),
@@ -118,7 +142,16 @@ function whyCheck(items, edges, shows = () => true) {
   }
   const gap = (r) => Math.abs(+String(r.N).split('/')[0] - r.discoveredAssertions);
   rows.sort((a, b) => gap(b) - gap(a) || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
-  return { checked, withN, agree, mismatches: rows, edgesKnown, edgesDisagree: edgeRows.length, edgeMismatches: edgeRows, leftOut };
+  return {
+    checked,
+    withN,
+    agree,
+    mismatches: rows,
+    edgesKnown,
+    edgesDisagree: edgeRows.length,
+    edgeMismatches: edgeRows,
+    leftOut,
+  };
 }
 
 function run(argv, log = console.log) {
@@ -133,7 +166,7 @@ function run(argv, log = console.log) {
   const items = f.items || [];
   const n = items.length;
   const C2 = (k) => (k * (k - 1)) / 2;
-  const pct = (a, b) => (b ? (100 * a / b).toFixed(1) + '%' : 'n/a');
+  const pct = (a, b) => (b ? ((100 * a) / b).toFixed(1) + '%' : 'n/a');
   const srcOf = (it) => (it._source && (it._source.id || it._source.title)) || '(none)';
   const srcName = new Map();
   for (const it of items) srcName.set(srcOf(it), (it._source && it._source.title) || srcOf(it));
@@ -141,7 +174,7 @@ function run(argv, log = console.log) {
   // rosetta-tagz's summary: feed._rtagz, or feed._stone in a feed built before
   // the rename of 2026-10-31.
   const rtz = f._rtagz || f._stone || null;
-  const rtzKey = f._rtagz ? '_rtagz' : (f._stone ? '_stone' : null);
+  const rtzKey = f._rtagz ? '_rtagz' : f._stone ? '_stone' : null;
   // The ratio filter: what the viewer shows at --ratio V, else everything.
   const shows = (ratio) => opt.ratio === null || ratioShows(ratio, opt.ratio);
 
@@ -149,7 +182,11 @@ function run(argv, log = console.log) {
   let keyOf = (tagId, edge) => tagId;
   if (opt.scheme || opt.depth) {
     let schemeLabels = null;
-    try { schemeLabels = require('../src/lib/schemeLabels'); } catch (_) { schemeLabels = null; }
+    try {
+      schemeLabels = require('../src/lib/schemeLabels');
+    } catch (_) {
+      schemeLabels = null;
+    }
     if (!schemeLabels || !rtz) {
       log('note: --scheme/--depth ignored (no src/lib/schemeLabels.js or no feed._rtagz)');
     } else {
@@ -157,7 +194,7 @@ function run(argv, log = console.log) {
         const c = edge && edge.attrs && edge.attrs.concept;
         if (!c) return tagId;
         const r = schemeLabels.labelFor(rtz, c, { scheme: opt.scheme || 'site', depth: opt.depth });
-        return r && r.groupId ? 'concept:' + r.groupId : (r && r.label ? 'tag:' + r.label : tagId);
+        return r && r.groupId ? 'concept:' + r.groupId : r && r.label ? 'tag:' + r.label : tagId;
       };
     }
   }
@@ -171,10 +208,13 @@ function run(argv, log = console.log) {
   let danglingEdges = 0;
   const edgeOrigins = {};
   for (const e of tagEdges) {
-    const t0 = isTag(e.target) ? e.target : (isTag(e.source) ? e.source : null);
+    const t0 = isTag(e.target) ? e.target : isTag(e.source) ? e.source : null;
     if (!t0) continue;
     const pid = t0 === e.target ? e.source : e.target;
-    if (!ids.has(pid)) { danglingEdges++; continue; }
+    if (!ids.has(pid)) {
+      danglingEdges++;
+      continue;
+    }
     const t = keyOf(t0, e);
     const o = (e.attrs && e.attrs.origin) || '(no attrs)';
     edgeOrigins[o] = (edgeOrigins[o] || 0) + 1;
@@ -198,7 +238,7 @@ function run(argv, log = console.log) {
     const nodesAll = new Set();
     const nodesShown = new Set();
     for (const e of allTagEdges) {
-      const t0 = isTag(e.target) ? e.target : (isTag(e.source) ? e.source : null);
+      const t0 = isTag(e.target) ? e.target : isTag(e.source) ? e.source : null;
       if (!t0 || !ids.has(t0 === e.target ? e.source : e.target)) continue;
       nodesAll.add(t0);
       if (shows(e.attrs ? e.attrs.sourceRatio : undefined)) nodesShown.add(t0);
@@ -208,40 +248,80 @@ function run(argv, log = console.log) {
       log('source coherence ratio:', String(opt.ratio), ' no tag edge carries a sourceRatio (n/a): nothing left out');
     } else {
       const outside = opt.ratio < range.lo - 1e-9 || opt.ratio > range.hi + 1e-9;
-      log('source coherence ratio:', String(opt.ratio), ' tag edges left out (sourceRatio under it):', allTagEdges.length - tagEdges.length, 'of', allTagEdges.length,
-        ' tag nodes left out:', nodesAll.size - nodesShown.size, 'of', nodesAll.size,
-        ` the viewer's slider runs ${ratioText(range.lo)} to ${ratioText(range.hi)}, the build's bar ${ratioText(range.bar)}` + (outside ? `; ${opt.ratio} is outside it` : ''));
+      log(
+        'source coherence ratio:',
+        String(opt.ratio),
+        ' tag edges left out (sourceRatio under it):',
+        allTagEdges.length - tagEdges.length,
+        'of',
+        allTagEdges.length,
+        ' tag nodes left out:',
+        nodesAll.size - nodesShown.size,
+        'of',
+        nodesAll.size,
+        ` the viewer's slider runs ${ratioText(range.lo)} to ${ratioText(range.hi)}, the build's bar ${ratioText(range.bar)}` +
+          (outside ? `; ${opt.ratio} is outside it` : ''),
+      );
     }
   }
   log('items:', n);
-  log('tag edges (layer tag):', tagEdges.length, ' by attrs.origin:', JSON.stringify(edgeOrigins), ' dangling:', danglingEdges);
+  log(
+    'tag edges (layer tag):',
+    tagEdges.length,
+    ' by attrs.origin:',
+    JSON.stringify(edgeOrigins),
+    ' dangling:',
+    danglingEdges,
+  );
   log('distinct tag nodes:', tagCount, ' distinct attrs.concept:', concepts.size);
   log('tags on exactly one item:', singletons, '(' + pct(singletons, tagCount) + ' of tags)');
   log('items with no tag edge:', untagged.length, '(' + pct(untagged.length, n) + ')');
   const untaggedBySrc = {};
-  for (const it of untagged) { const k = srcName.get(srcOf(it)); untaggedBySrc[k] = (untaggedBySrc[k] || 0) + 1; }
+  for (const it of untagged) {
+    const k = srcName.get(srcOf(it));
+    untaggedBySrc[k] = (untaggedBySrc[k] || 0) + 1;
+  }
   log('  untagged by source:', JSON.stringify(untaggedBySrc));
 
-  const shares = (a, b) => { const A = itemTags.get(a.id), B = itemTags.get(b.id); for (const t of A) if (B.has(t)) return true; return false; };
+  const shares = (a, b) => {
+    const A = itemTags.get(a.id),
+      B = itemTags.get(b.id);
+    for (const t of A) if (B.has(t)) return true;
+    return false;
+  };
   let sharing = 0;
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (shares(items[i], items[j])) sharing++;
   log('item pairs sharing >=1 tag:', sharing, 'of', C2(n), '(' + pct(sharing, C2(n)) + ')');
 
   const bySrc = new Map();
-  for (const it of items) { const k = srcOf(it); if (!bySrc.has(k)) bySrc.set(k, []); bySrc.get(k).push(it); }
+  for (const it of items) {
+    const k = srcOf(it);
+    if (!bySrc.has(k)) bySrc.set(k, []);
+    bySrc.get(k).push(it);
+  }
   const srcKeys = [...bySrc.keys()];
   log('within source:');
   for (const k of srcKeys) {
-    const L = bySrc.get(k); let s = 0;
+    const L = bySrc.get(k);
+    let s = 0;
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) if (shares(L[i], L[j])) s++;
     log('  ' + srcName.get(k) + ' (n=' + L.length + '):', s, 'of', C2(L.length), '(' + pct(s, C2(L.length)) + ')');
   }
   log('across sources:');
-  for (let a = 0; a < srcKeys.length; a++) for (let b = a + 1; b < srcKeys.length; b++) {
-    const A = bySrc.get(srcKeys[a]), B = bySrc.get(srcKeys[b]); let s = 0;
-    for (const x of A) for (const y of B) if (shares(x, y)) s++;
-    log('  ' + srcName.get(srcKeys[a]) + ' x ' + srcName.get(srcKeys[b]) + ':', s, 'of', A.length * B.length, '(' + pct(s, A.length * B.length) + ')');
-  }
+  for (let a = 0; a < srcKeys.length; a++)
+    for (let b = a + 1; b < srcKeys.length; b++) {
+      const A = bySrc.get(srcKeys[a]),
+        B = bySrc.get(srcKeys[b]);
+      let s = 0;
+      for (const x of A) for (const y of B) if (shares(x, y)) s++;
+      log(
+        '  ' + srcName.get(srcKeys[a]) + ' x ' + srcName.get(srcKeys[b]) + ':',
+        s,
+        'of',
+        A.length * B.length,
+        '(' + pct(s, A.length * B.length) + ')',
+      );
+    }
 
   // Discovered tags: the N in "recurs in N of M items" against the items carrying the tag.
   const disc = new Map();
@@ -254,8 +334,12 @@ function run(argv, log = console.log) {
       disc.get(r.value).claims.push({ item: it.id, N: m ? +m[1] : null, M: m ? +m[2] : null });
     }
   }
-  for (const [t, bo] of tagItemsByOrigin) if (bo.has('discovered') && !disc.has(t.slice(4))) disc.set(t.slice(4), { claims: [] });
-  let disagree = 0, noClaim = 0, varies = 0, Mmismatch = 0;
+  for (const [t, bo] of tagItemsByOrigin)
+    if (bo.has('discovered') && !disc.has(t.slice(4))) disc.set(t.slice(4), { claims: [] });
+  let disagree = 0,
+    noClaim = 0,
+    varies = 0,
+    Mmismatch = 0;
   const rows = [];
   for (const [label, d] of disc) {
     const all = tagItems.get('tag:' + label) || new Set();
@@ -264,16 +348,41 @@ function run(argv, log = console.log) {
     const Ns = [...new Set(d.claims.map((c) => c.N).filter((x) => x !== null))];
     const Ms = [...new Set(d.claims.map((c) => c.M).filter((x) => x !== null))];
     if (Ms.some((M) => M !== n)) Mmismatch++;
-    if (!Ns.length) { noClaim++; continue; }
+    if (!Ns.length) {
+      noClaim++;
+      continue;
+    }
     if (Ns.length > 1) varies++;
     const bad = Ns.some((N) => N !== all.size);
     if (bad) {
       disagree++;
-      rows.push({ label, N: Ns.join('/'), M: Ms.join('/'), actualItems: all.size, discoveredEdges: discItems, origins: [...bo.keys()].join(',') });
+      rows.push({
+        label,
+        N: Ns.join('/'),
+        M: Ms.join('/'),
+        actualItems: all.size,
+        discoveredEdges: discItems,
+        origins: [...bo.keys()].join(','),
+      });
     }
   }
-  rows.sort((a, b) => Math.abs(+String(b.N).split('/')[0] - b.actualItems) - Math.abs(+String(a.N).split('/')[0] - a.actualItems));
-  log('discovered tags:', disc.size, ' with a parsable N:', disc.size - noClaim, ' N disagrees with items carrying the tag:', disagree, '(' + pct(disagree, disc.size - noClaim) + ')', ' N varies across items:', varies, ' M != items count:', Mmismatch);
+  rows.sort(
+    (a, b) =>
+      Math.abs(+String(b.N).split('/')[0] - b.actualItems) - Math.abs(+String(a.N).split('/')[0] - a.actualItems),
+  );
+  log(
+    'discovered tags:',
+    disc.size,
+    ' with a parsable N:',
+    disc.size - noClaim,
+    ' N disagrees with items carrying the tag:',
+    disagree,
+    '(' + pct(disagree, disc.size - noClaim) + ')',
+    ' N varies across items:',
+    varies,
+    ' M != items count:',
+    Mmismatch,
+  );
   const over = rows.filter((r) => +String(r.N).split('/')[0] > r.actualItems).length;
   log('  of the disagreeing, N > actual:', over, ' N < actual:', rows.length - over);
   log('  examples (largest gap first):');
@@ -283,11 +392,19 @@ function run(argv, log = console.log) {
   // discovered assertion of the tag, not every item carrying it.
   const w = whyCheck(items, f.edges || [], shows);
   const na = (v) => (w.withN ? v : 'n/a');
-  const whyLine = ['why check (N against items with a discovered assertion of the tag, from _references):', 'discovered tags:', w.checked,
-    ' with a parsable N:', w.checked ? w.withN : 'n/a',
-    ' N equals discovered assertions:', na(w.agree),
-    ' mismatches:', na(w.mismatches.length) + (w.withN ? ' (' + pct(w.mismatches.length, w.withN) + ')' : ''),
-    ' discovered edges disagree with _references:', w.edgesKnown ? w.edgesDisagree : 'n/a'];
+  const whyLine = [
+    'why check (N against items with a discovered assertion of the tag, from _references):',
+    'discovered tags:',
+    w.checked,
+    ' with a parsable N:',
+    w.checked ? w.withN : 'n/a',
+    ' N equals discovered assertions:',
+    na(w.agree),
+    ' mismatches:',
+    na(w.mismatches.length) + (w.withN ? ' (' + pct(w.mismatches.length, w.withN) + ')' : ''),
+    ' discovered edges disagree with _references:',
+    w.edgesKnown ? w.edgesDisagree : 'n/a',
+  ];
   if (opt.ratio !== null) whyLine.push(` discovered tags left out at ratio ${opt.ratio}:`, w.leftOut);
   log(...whyLine);
   if (w.mismatches.length) {
@@ -304,7 +421,20 @@ function run(argv, log = console.log) {
     const rel = s.relations ? JSON.stringify(s.relations) : 'n/a';
     const map = s.mappings ? JSON.stringify(s.mappings) : 'n/a';
     const led = s.ledger ? JSON.stringify(s.ledger) : 'n/a';
-    log(rtzKey + ': concepts', (s.concepts || []).length, ' schemes', (s.schemes || []).map((x) => x.id).join(',') || 'n/a', ' relations', rel, ' mappings', map, ' untagged', s.untagged ? s.untagged.count : 'n/a', ' ledger', led);
+    log(
+      rtzKey + ': concepts',
+      (s.concepts || []).length,
+      ' schemes',
+      (s.schemes || []).map((x) => x.id).join(',') || 'n/a',
+      ' relations',
+      rel,
+      ' mappings',
+      map,
+      ' untagged',
+      s.untagged ? s.untagged.count : 'n/a',
+      ' ledger',
+      led,
+    );
   }
   return 0;
 }

@@ -15,16 +15,81 @@
 // Words that almost never carry a title. Deliberately conservative: dropping a
 // word that mattered is worse than keeping one that did not.
 const STOP = new Set([
-  'a', 'an', 'the',
-  'and', 'or', 'but', 'nor', 'so', 'yet',
-  'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'into', 'onto',
-  'over', 'under', 'about', 'as', 'than', 'that', 'this', 'these', 'those',
-  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'am',
-  'has', 'have', 'had', 'do', 'does', 'did',
-  'it', 'its', 'their', 'his', 'her', 'our', 'your', 'my',
-  'we', 'they', 'you', 'he', 'she', 'who', 'whom', 'which',
-  'not', 'no', 'up', 'out', 'off', 'if', 'then', 'when', 'while', 'after',
-  'before', 'during', 'via', 'per', 'vs', 'versus',
+  'a',
+  'an',
+  'the',
+  'and',
+  'or',
+  'but',
+  'nor',
+  'so',
+  'yet',
+  'of',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'with',
+  'by',
+  'from',
+  'into',
+  'onto',
+  'over',
+  'under',
+  'about',
+  'as',
+  'than',
+  'that',
+  'this',
+  'these',
+  'those',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'been',
+  'being',
+  'am',
+  'has',
+  'have',
+  'had',
+  'do',
+  'does',
+  'did',
+  'it',
+  'its',
+  'their',
+  'his',
+  'her',
+  'our',
+  'your',
+  'my',
+  'we',
+  'they',
+  'you',
+  'he',
+  'she',
+  'who',
+  'whom',
+  'which',
+  'not',
+  'no',
+  'up',
+  'out',
+  'off',
+  'if',
+  'then',
+  'when',
+  'while',
+  'after',
+  'before',
+  'during',
+  'via',
+  'per',
+  'vs',
+  'versus',
 ]);
 
 // Split on whitespace, keep internal hyphens and apostrophes, drop surrounding
@@ -52,10 +117,34 @@ function looksProper(word) {
 // pool they poison whatever window they land in — "Art Isn't" and "Isn't Magic"
 // are both worse than the "Art Magic" that dropping the contraction reveals.
 const CONTRACTIONS = new Set([
-  "isn't", "it's", "don't", "can't", "won't", "that's", "there's", "we're",
-  "you're", "they're", "i'm", "he's", "she's", "didn't", "doesn't", "wasn't",
-  "weren't", "aren't", "hasn't", "haven't", "wouldn't", "couldn't", "shouldn't",
-  "let's", "we've", "you've", "they've", "i've",
+  "isn't",
+  "it's",
+  "don't",
+  "can't",
+  "won't",
+  "that's",
+  "there's",
+  "we're",
+  "you're",
+  "they're",
+  "i'm",
+  "he's",
+  "she's",
+  "didn't",
+  "doesn't",
+  "wasn't",
+  "weren't",
+  "aren't",
+  "hasn't",
+  "haven't",
+  "wouldn't",
+  "couldn't",
+  "shouldn't",
+  "let's",
+  "we've",
+  "you've",
+  "they've",
+  "i've",
 ]);
 
 // Real words that simply carry little in a two-word label. Penalised, not
@@ -89,9 +178,7 @@ function nucleus(title, n = 2) {
   if (!words.length) return '';
   if (words.length <= n) return words.map(clean).join(' ');
 
-  const pool = words
-    .map((word, index) => ({ word, index }))
-    .filter(({ word }) => !isStop(word));
+  const pool = words.map((word, index) => ({ word, index })).filter(({ word }) => !isStop(word));
 
   // Fewer content words than asked for: return what there is. Padding back out
   // with the stopwords and contractions we just removed would trade a good
@@ -102,10 +189,7 @@ function nucleus(title, n = 2) {
   let best = null;
   for (let i = 0; i + n <= pool.length; i++) {
     const window = pool.slice(i, i + n);
-    const score = window.reduce(
-      (sum, { word, index }) => sum + wordScore(word, index, words.length),
-      0,
-    );
+    const score = window.reduce((sum, { word, index }) => sum + wordScore(word, index, words.length), 0);
     if (!best || score > best.score) best = { score, window };
   }
 

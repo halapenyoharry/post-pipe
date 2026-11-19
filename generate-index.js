@@ -6,60 +6,66 @@
 //        saved copy in the site (the file its outline's savedCopy names) from
 //        this build's good fetch; an ordinary build never writes them
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const { siteRoot, loadSiteEnv } = require('./src/lib/siteRoot');
 
-const SITE_ROOT    = siteRoot();
+const SITE_ROOT = siteRoot();
 loadSiteEnv(SITE_ROOT);
 
 const LocalFolderAdapter = require('./src/adapters/LocalFolderAdapter');
-const RssAdapter         = require('./src/adapters/RssAdapter');
-const AtomAdapter        = require('./src/adapters/AtomAdapter');
-const JsonFeedAdapter    = require('./src/adapters/JsonFeedAdapter');
-const PageAdapter        = require('./src/adapters/PageAdapter');
-const PageListAdapter    = require('./src/adapters/PageListAdapter');
-const { loadCorpus }     = require('./src/aggregator');
+const RssAdapter = require('./src/adapters/RssAdapter');
+const AtomAdapter = require('./src/adapters/AtomAdapter');
+const JsonFeedAdapter = require('./src/adapters/JsonFeedAdapter');
+const PageAdapter = require('./src/adapters/PageAdapter');
+const PageListAdapter = require('./src/adapters/PageListAdapter');
+const { loadCorpus } = require('./src/aggregator');
 const { cacheDirForSite, SKOS_FILES, rtagzSettings } = require('./src/lib/rtagz');
-const { runFlows }       = require('./src/lib/flowBuild');
-const { parseOpml }      = require('./src/lib/opml');
+const { runFlows } = require('./src/lib/flowBuild');
+const { parseOpml } = require('./src/lib/opml');
 
-const SETTINGS     = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
+const SETTINGS = JSON.parse(fs.readFileSync(path.join(SITE_ROOT, 'settings.json'), 'utf8'));
 
 // The page's colours: settings.theme's own, else the original dark look's
 // (theme name default), so a site that names no colours still gets an opaque
 // reader and readable text. Until 2026-11-07 a colour the site left unset
 // was written as "undefined" and the reader's surface came out see-through.
 const DEFAULT_THEME_COLOURS = {
-  bg: '#1a1a2e', surface: '#0a0e1a', accent: '#64ffda', text: '#a8b2d1',
-  text_bright: '#ccd6f6', border: 'rgba(100, 255, 218, 0.2)',
-  node_published: '#3498db', node_draft: '#7f8c8d', tag_color: '#f39c12',
+  bg: '#1a1a2e',
+  surface: '#0a0e1a',
+  accent: '#64ffda',
+  text: '#a8b2d1',
+  text_bright: '#ccd6f6',
+  border: 'rgba(100, 255, 218, 0.2)',
+  node_published: '#3498db',
+  node_draft: '#7f8c8d',
+  tag_color: '#f39c12',
 };
 const themeColour = (key) => {
   const v = SETTINGS.theme && SETTINGS.theme[key];
   return typeof v === 'string' && v.trim() ? v : DEFAULT_THEME_COLOURS[key];
 };
-const SITE_DIR     = path.join(SITE_ROOT, '_site');
-const COVERS_DIR   = path.join(SITE_DIR, 'covers');
-const FONT_PATH    = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
+const SITE_DIR = path.join(SITE_ROOT, '_site');
+const COVERS_DIR = path.join(SITE_DIR, 'covers');
+const FONT_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Regular.woff2');
 const FONT_BOLD_PATH = path.join(__dirname, 'fonts/AtkinsonHyperlegible-Bold.woff2');
-const OPML_PATH    = path.resolve(SITE_ROOT, SETTINGS.feeds_opml_path || 'feeds.opml');
+const OPML_PATH = path.resolve(SITE_ROOT, SETTINGS.feeds_opml_path || 'feeds.opml');
 // Refreshing the site's saved copies is a deliberate act, never a side effect
 // of a build: they are the site's files, in its git.
-const SAVE_COPIES  = process.argv.slice(2).includes('--save-copies');
-const PAGES_BASE   = SETTINGS.site.base_url;
+const SAVE_COPIES = process.argv.slice(2).includes('--save-copies');
+const PAGES_BASE = SETTINGS.site.base_url;
 
 // Registry of adapter modules keyed by OPML type attribute.
 const ADAPTERS = {
-  local:       LocalFolderAdapter,
-  rss:         RssAdapter,
-  atom:        AtomAdapter,
-  json:        JsonFeedAdapter,
+  local: LocalFolderAdapter,
+  rss: RssAdapter,
+  atom: AtomAdapter,
+  json: JsonFeedAdapter,
   'json-feed': JsonFeedAdapter,
   // One article's page as one item; a local file listing many such pages.
-  page:        PageAdapter,
-  pages:       PageListAdapter,
+  page: PageAdapter,
+  pages: PageListAdapter,
 };
 
 // Read feeds.opml and turn each entry into an {adapter, config} pair the
@@ -71,14 +77,16 @@ function buildAdapterEntries() {
   }
   const opml = parseOpml(fs.readFileSync(OPML_PATH, 'utf8'));
 
-  return opml.map(entry => {
-    const adapter = ADAPTERS[entry.type];
-    if (!adapter) {
-      console.warn(`[generate-index] unknown adapter type "${entry.type}" for ${entry.xmlUrl}; skipping`);
-      return null;
-    }
-    return { adapter, config: configFor(entry) };
-  }).filter(Boolean);
+  return opml
+    .map((entry) => {
+      const adapter = ADAPTERS[entry.type];
+      if (!adapter) {
+        console.warn(`[generate-index] unknown adapter type "${entry.type}" for ${entry.xmlUrl}; skipping`);
+        return null;
+      }
+      return { adapter, config: configFor(entry) };
+    })
+    .filter(Boolean);
 }
 
 function configFor(entry) {
@@ -123,7 +131,9 @@ function configFor(entry) {
 }
 
 function resolveSitePath(p) {
-  let out = String(p || '').replace(/^local:\/\//, '').replace(/^file:\/\//, '');
+  let out = String(p || '')
+    .replace(/^local:\/\//, '')
+    .replace(/^file:\/\//, '');
   if (out.startsWith('~')) out = path.join(require('os').homedir(), out.slice(1));
   if (!out.startsWith('/')) out = path.resolve(SITE_ROOT, out);
   return out;
@@ -158,7 +168,12 @@ function copyReaderFonts() {
 // Theme faces: the sketchbook's handwriting face for titles, shipped next to
 // the page with its license and loaded only when the theme draws a title.
 const THEME_FONTS = [
-  { family: 'PP Sketch Title', file: 'NothingYouCouldDo-Regular.ttf', license: 'NothingYouCouldDo-OFL.txt', format: 'truetype' },
+  {
+    family: 'PP Sketch Title',
+    file: 'NothingYouCouldDo-Regular.ttf',
+    license: 'NothingYouCouldDo-OFL.txt',
+    format: 'truetype',
+  },
 ];
 function copyThemeFonts() {
   const dir = path.join(SITE_DIR, 'fonts');
@@ -168,17 +183,21 @@ function copyThemeFonts() {
   }
 }
 function themeFontFaces() {
-  return THEME_FONTS.map((f) => `
+  return THEME_FONTS.map(
+    (f) => `
   @font-face {
     font-family: '${f.family}';
     src: url(./fonts/${f.file}) format('${f.format}');
     font-weight: normal; font-style: normal; font-display: swap;
-  }`).join('');
+  }`,
+  ).join('');
 }
 // The site's own theme loads its title face at once rather than on first use.
 function themeFontPreload() {
   if (!(SETTINGS.theme && SETTINGS.theme.name === 'sketchbook')) return '';
-  return THEME_FONTS.map((f) => `<link rel="preload" href="./fonts/${f.file}" as="font" type="font/ttf" crossorigin>`).join('\n');
+  return THEME_FONTS.map(
+    (f) => `<link rel="preload" href="./fonts/${f.file}" as="font" type="font/ttf" crossorigin>`,
+  ).join('\n');
 }
 
 // A site's own faces (settings.fonts: [{ family, file, license }], paths
@@ -186,33 +205,58 @@ function themeFontPreload() {
 // declared and preloaded. Nothing is fetched from anywhere else. A face whose
 // file is not there is left out, and whatever names it falls back to the
 // faces after it.
-const FONT_FORMATS = { ttf: ['truetype', 'font/ttf'], otf: ['opentype', 'font/otf'], woff: ['woff', 'font/woff'], woff2: ['woff2', 'font/woff2'] };
+const FONT_FORMATS = {
+  ttf: ['truetype', 'font/ttf'],
+  otf: ['opentype', 'font/otf'],
+  woff: ['woff', 'font/woff'],
+  woff2: ['woff2', 'font/woff2'],
+};
 let siteFontList = null;
 function siteFonts() {
   if (siteFontList) return siteFontList;
-  siteFontList = (Array.isArray(SETTINGS.fonts) ? SETTINGS.fonts : []).filter((f) => {
-    if (!f || typeof f.family !== 'string' || !f.family.trim() || typeof f.file !== 'string') return false;
-    if (f.file.split(/[\\/]/).includes('..') || path.isAbsolute(f.file)) { console.warn(`  fonts: ${f.file} is outside the site; left out`); return false; }
-    const ext = path.extname(f.file).slice(1).toLowerCase();
-    if (!FONT_FORMATS[ext]) { console.warn(`  fonts: ${f.file} is not a font file this page can declare; left out`); return false; }
-    if (!fs.existsSync(path.join(SITE_ROOT, f.file))) {
-      console.warn(`  fonts: ${f.file} not found under ${SITE_ROOT}; "${f.family}" falls back to the faces after it`);
-      return false;
-    }
-    return true;
-  }).map((f) => {
-    const ext = path.extname(f.file).slice(1).toLowerCase();
-    const rel = f.file.replace(/^\.?\//, '');
-    const license = typeof f.license === 'string' && !f.license.split(/[\\/]/).includes('..') ? f.license.replace(/^\.?\//, '') : '';
-    return { family: f.family.trim().replace(/'/g, ''), file: rel, license, format: FONT_FORMATS[ext][0], type: FONT_FORMATS[ext][1] };
-  });
+  siteFontList = (Array.isArray(SETTINGS.fonts) ? SETTINGS.fonts : [])
+    .filter((f) => {
+      if (!f || typeof f.family !== 'string' || !f.family.trim() || typeof f.file !== 'string') return false;
+      if (f.file.split(/[\\/]/).includes('..') || path.isAbsolute(f.file)) {
+        console.warn(`  fonts: ${f.file} is outside the site; left out`);
+        return false;
+      }
+      const ext = path.extname(f.file).slice(1).toLowerCase();
+      if (!FONT_FORMATS[ext]) {
+        console.warn(`  fonts: ${f.file} is not a font file this page can declare; left out`);
+        return false;
+      }
+      if (!fs.existsSync(path.join(SITE_ROOT, f.file))) {
+        console.warn(`  fonts: ${f.file} not found under ${SITE_ROOT}; "${f.family}" falls back to the faces after it`);
+        return false;
+      }
+      return true;
+    })
+    .map((f) => {
+      const ext = path.extname(f.file).slice(1).toLowerCase();
+      const rel = f.file.replace(/^\.?\//, '');
+      const license =
+        typeof f.license === 'string' && !f.license.split(/[\\/]/).includes('..')
+          ? f.license.replace(/^\.?\//, '')
+          : '';
+      return {
+        family: f.family.trim().replace(/'/g, ''),
+        file: rel,
+        license,
+        format: FONT_FORMATS[ext][0],
+        type: FONT_FORMATS[ext][1],
+      };
+    });
   return siteFontList;
 }
 function copySiteFonts() {
   for (const f of siteFonts()) {
     for (const rel of [f.file, f.license].filter(Boolean)) {
       const from = path.join(SITE_ROOT, rel);
-      if (!fs.existsSync(from)) { console.warn(`  fonts: ${rel} not found; not copied`); continue; }
+      if (!fs.existsSync(from)) {
+        console.warn(`  fonts: ${rel} not found; not copied`);
+        continue;
+      }
       const to = path.join(SITE_DIR, rel);
       fs.mkdirSync(path.dirname(to), { recursive: true });
       fs.copyFileSync(from, to);
@@ -220,29 +264,41 @@ function copySiteFonts() {
   }
 }
 function siteFontFaces() {
-  return siteFonts().map((f) => `
+  return siteFonts()
+    .map(
+      (f) => `
   @font-face {
     font-family: '${f.family}';
     src: url(./${f.file}) format('${f.format}');
     font-weight: normal; font-style: normal; font-display: swap;
-  }`).join('');
+  }`,
+    )
+    .join('');
 }
 function siteFontPreload() {
-  return siteFonts().map((f) => `<link rel="preload" href="./${f.file}" as="font" type="${f.type}" crossorigin>`).join('\n');
+  return siteFonts()
+    .map((f) => `<link rel="preload" href="./${f.file}" as="font" type="${f.type}" crossorigin>`)
+    .join('\n');
 }
 
 function readerFontFaces() {
-  return readerFonts(SETTINGS).filter((f) => f.file || (Array.isArray(f.files) && f.files.length)).flatMap((f) => {
-    const variants = Array.isArray(f.files) && f.files.length
-      ? f.files
-      : [{ file: f.file, format: 'woff2', weight: 'normal', style: 'normal' }];
-    return variants.map((v) => `
+  return readerFonts(SETTINGS)
+    .filter((f) => f.file || (Array.isArray(f.files) && f.files.length))
+    .flatMap((f) => {
+      const variants =
+        Array.isArray(f.files) && f.files.length
+          ? f.files
+          : [{ file: f.file, format: 'woff2', weight: 'normal', style: 'normal' }];
+      return variants.map(
+        (v) => `
   @font-face {
     font-family: '${f.label}';
     src: url(./fonts/${v.file}) format('${v.format || 'woff2'}');
     font-weight: ${v.weight || 'normal'}; font-style: ${v.style || 'normal'}; font-display: swap;
-  }`);
-  }).join('');
+  }`,
+      );
+    })
+    .join('');
 }
 const { labelLadder } = require('./src/corpus/titleNucleus');
 const { cardsLedgerPath, readLedger, writeLedger, assignSlugs } = require('./src/lib/cardSlug');
@@ -260,14 +316,20 @@ const { lookFromSettings } = require('./src/components/GraphViewer/containerLook
 function writeFavicon() {
   const own = path.join(SITE_ROOT, 'favicon.svg');
   let hasSiteFavicon = false;
-  try { hasSiteFavicon = fs.statSync(own).isFile(); } catch (_) { /* none */ }
+  try {
+    hasSiteFavicon = fs.statSync(own).isFile();
+  } catch (_) {
+    /* none */
+  }
   const plan = faviconPlan(SETTINGS, { hasSiteFavicon });
   const to = path.join(SITE_DIR, 'favicon.svg');
   if (plan.action === 'copy') {
     fs.copyFileSync(own, to);
   } else if (plan.action === 'placeholder') {
     fs.writeFileSync(to, plan.svg);
-    console.log(`  favicon: the site has no favicon.svg and no site.icons; wrote a placeholder _site/favicon.svg (a circle in ${plan.color})`);
+    console.log(
+      `  favicon: the site has no favicon.svg and no site.icons; wrote a placeholder _site/favicon.svg (a circle in ${plan.color})`,
+    );
   }
 }
 
@@ -317,7 +379,6 @@ function geminiConfigBlock() {
 `;
 }
 
-
 // ─── Build feed.json ─────────────────────────────────────────────────────────
 
 function buildFeed(articles) {
@@ -336,28 +397,39 @@ function buildFeed(articles) {
   return f;
 }
 
-
 // ─── SVG Icons (inline, no dependencies) ─────────────────────────────────────
 
 const ICONS = {
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>',
-  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>',
+  pause:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>',
   stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
-  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  close:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
-  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  download:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
-  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>',
+  chevron:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 12,15 18,9"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
   crown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 20h20v2H2zM4 18l2-12 4 5 2-7 2 7 4-5 2 12z"/></svg>',
-  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
-  medium: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg>',
-  substack: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z"/></svg>',
-  youtube: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/><polygon fill="#fff" points="9.545,15.568 15.818,12 9.545,8.432"/></svg>',
-  linkedin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
-  hackernews: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 0v24h24V0H0zm12.8 13.2V19h-1.6v-5.8L7.5 5.4h1.8l2.7 5.7 2.7-5.7h1.8l-3.7 7.8z"/></svg>',
-  reddit: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>',
-  bluesky: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.785 2.627 3.6 3.476 6.178 3.126-3.976.665-7.416 2.282-2.99 7.088C8.35 25.136 10.603 19.869 12 17.292c1.397 2.577 3.328 7.523 8.188 3.169 4.426-4.806.986-6.423-2.99-7.088 2.578.35 5.393-.499 6.178-3.126C23.622 9.418 24 4.458 24 3.768c0-.688-.139-1.86-.902-2.203-.659-.3-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8z"/></svg>'
+  globe:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  medium:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg>',
+  substack:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z"/></svg>',
+  youtube:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/><polygon fill="#fff" points="9.545,15.568 15.818,12 9.545,8.432"/></svg>',
+  linkedin:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
+  hackernews:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 0v24h24V0H0zm12.8 13.2V19h-1.6v-5.8L7.5 5.4h1.8l2.7 5.7 2.7-5.7h1.8l-3.7 7.8z"/></svg>',
+  reddit:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>',
+  bluesky:
+    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.785 2.627 3.6 3.476 6.178 3.126-3.976.665-7.416 2.282-2.99 7.088C8.35 25.136 10.603 19.869 12 17.292c1.397 2.577 3.328 7.523 8.188 3.169 4.426-4.806.986-6.423-2.99-7.088 2.578.35 5.393-.499 6.178-3.126C23.622 9.418 24 4.458 24 3.768c0-.688-.139-1.86-.902-2.203-.659-.3-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8z"/></svg>',
 };
 
 // ─── Build index.html ────────────────────────────────────────────────────────
@@ -876,13 +948,17 @@ ${reactJs}
               if (v) viewState.setView(v.id, v.props && v.props.layout);
             }
           }),
-${timeOverlayConfig(SETTINGS).show ? `          // The chronology stack (settings.timeOverlay.show, default true);
+${
+  timeOverlayConfig(SETTINGS).show
+    ? `          // The chronology stack (settings.timeOverlay.show, default true);
           // a site that sets it false has no stack on the page at all.
           React.createElement(TimeOverlay, {
             feedData: feed,
             onFilterChange: handleTimeFilter
           }),
-` : ''}          // The bottom bar, unless the controls are in the top bar.
+`
+    : ''
+}          // The bottom bar, unless the controls are in the top bar.
           TOOLBAR.position === 'top' ? null : graphControls
         ),
         // Two panels from one surface (src/lib/panels.js): the main view's,
@@ -969,7 +1045,10 @@ async function main() {
   // rosetta-tagz's cache folder for this site, named here once: the phase
   // writes into it and the SKOS copy below reads from it.
   const rtagzCacheDir = path.resolve(cacheDirForSite(SITE_ROOT));
-  if (SAVE_COPIES) console.log('Saving copies: each fetched feed whose outline names a savedCopy gets it written from this build\'s fetch');
+  if (SAVE_COPIES)
+    console.log(
+      "Saving copies: each fetched feed whose outline names a savedCopy gets it written from this build's fetch",
+    );
   const { items, sources, rtagz } = await loadCorpus(entries, {
     saveCopies: SAVE_COPIES,
     rtagz: rtagzSettings(SETTINGS),
@@ -981,7 +1060,7 @@ async function main() {
   });
 
   console.log(`Aggregated ${items.length} item(s) from ${sources.length} source(s)`);
-  const withTodos = items.filter(a => (a.todos || []).length).length;
+  const withTodos = items.filter((a) => (a.todos || []).length).length;
   if (withTodos) {
     console.log(`  (${withTodos} flagged with TODO files in the site's content folder)`);
   }
@@ -1008,11 +1087,15 @@ async function main() {
   const ledgerFile = cardsLedgerPath(SETTINGS, SITE_ROOT);
   const prior = ledgerFile ? readLedger(ledgerFile) : { ledger: null, status: 'off' };
   if (prior.status === 'unreadable') {
-    console.warn(`  cards: ${path.relative(SITE_ROOT, ledgerFile)} is not a cards ledger; left as it is, slugs discovered afresh this build`);
+    console.warn(
+      `  cards: ${path.relative(SITE_ROOT, ledgerFile)} is not a cards ledger; left as it is, slugs discovered afresh this build`,
+    );
   }
   const slugs = assignSlugs(items, prior.ledger, { now: new Date() });
   if (ledgerFile && prior.status !== 'unreadable' && slugs.changed) writeLedger(ledgerFile, slugs.ledger);
-  console.log(`  cards: ${slugs.summary.known} known, ${slugs.summary.added} new${slugs.summary.suffixed ? ` (${slugs.summary.suffixed} suffixed)` : ''}${ledgerFile ? `; ledger ${path.relative(SITE_ROOT, ledgerFile)}${slugs.changed && prior.status !== 'unreadable' ? ' written' : ' unchanged'}` : '; no ledger (cards.ledger false)'}`);
+  console.log(
+    `  cards: ${slugs.summary.known} known, ${slugs.summary.added} new${slugs.summary.suffixed ? ` (${slugs.summary.suffixed} suffixed)` : ''}${ledgerFile ? `; ledger ${path.relative(SITE_ROOT, ledgerFile)}${slugs.changed && prior.status !== 'unreadable' ? ' written' : ' unchanged'}` : '; no ledger (cards.ledger false)'}`,
+  );
 
   // Beside its slug, every card gets a topic slug (item.topicSlug,
   // provisional; issue #39, src/lib/topicSlug.js): the literal best two
@@ -1025,8 +1108,12 @@ async function main() {
   if (topicSlugOn(SETTINGS)) {
     const topicOptions = topicSlugOptions(SETTINGS);
     const topics = topicSlugs(items, topicOptions);
-    items.forEach((item, i) => { item.topicSlug = topics[i].slug; });
-    console.log(`  topic slugs: ${items.length}, the tags rosetta-tagz found read as ${topicOptions.foundTags} (cards.topicSlugFoundTags; tools/topic-slugs.js shows each with its candidates)`);
+    items.forEach((item, i) => {
+      item.topicSlug = topics[i].slug;
+    });
+    console.log(
+      `  topic slugs: ${items.length}, the tags rosetta-tagz found read as ${topicOptions.foundTags} (cards.topicSlugFoundTags; tools/topic-slugs.js shows each with its candidates)`,
+    );
   } else {
     console.log('  topic slugs: off (cards.topicSlug false)');
   }
@@ -1036,10 +1123,12 @@ async function main() {
   // concept, so containment follows the concept, not only the tag string
   // (src/lib/containers.js); without rosetta-tagz the settings go as they are.
   const conceptOfContainer = (rtagz && rtagz.containers) || {};
-  const withConcept = (c) => (c && typeof c.tag === 'string' && conceptOfContainer[c.tag] ? { ...c, concept: conceptOfContainer[c.tag] } : c);
-  const EDGE_SETTINGS = rtagz && rtagz.containers && Array.isArray(SETTINGS.containment)
-    ? { ...SETTINGS, containment: SETTINGS.containment.map(withConcept) }
-    : SETTINGS;
+  const withConcept = (c) =>
+    c && typeof c.tag === 'string' && conceptOfContainer[c.tag] ? { ...c, concept: conceptOfContainer[c.tag] } : c;
+  const EDGE_SETTINGS =
+    rtagz && rtagz.containers && Array.isArray(SETTINGS.containment)
+      ? { ...SETTINGS, containment: SETTINGS.containment.map(withConcept) }
+      : SETTINGS;
   feed.edges = buildEdges(items, EDGE_SETTINGS);
   // rosetta-tagz's SKOS relations as tag-to-tag edges, when it ran this build.
   if (rtagz) feed.edges.push(...relationEdges(rtagz, items, EDGE_SETTINGS));
@@ -1055,32 +1144,40 @@ async function main() {
       const extra = extras[c.id] || extras[String(c.id).replace(/^container:/, '')] || {};
       const out = { ...withConcept(c) };
       const status = extra.status != null ? extra.status : c.status;
-      if (status != null && status !== '') out.status = String(status); else delete out.status;
+      if (status != null && status !== '') out.status = String(status);
+      else delete out.status;
       const anchor = extra.anchor != null ? extra.anchor : c.anchor;
-      if (anchor && Number.isFinite(Number(anchor.x)) && Number.isFinite(Number(anchor.y))) out.anchor = { x: Number(anchor.x), y: Number(anchor.y) };
+      if (anchor && Number.isFinite(Number(anchor.x)) && Number.isFinite(Number(anchor.y)))
+        out.anchor = { x: Number(anchor.x), y: Number(anchor.y) };
       else delete out.anchor;
       const labelPosition = extra.labelPosition != null ? extra.labelPosition : c.labelPosition;
-      if (['center', 'top', 'hidden'].includes(labelPosition)) out.labelPosition = labelPosition; else delete out.labelPosition;
+      if (['center', 'top', 'hidden'].includes(labelPosition)) out.labelPosition = labelPosition;
+      else delete out.labelPosition;
       // layout ('hang' hangs the container from its anchor), its hang
       // settings ({ direction, firstAt, columns, gap }), and hull (false
       // leaves it undrawn, or { padding }).
       const layout = extra.layout != null ? extra.layout : c.layout;
-      if (layout === 'hang') out.layout = layout; else delete out.layout;
+      if (layout === 'hang') out.layout = layout;
+      else delete out.layout;
       const hang = extra.hang != null ? extra.hang : c.hang;
-      if (hang && typeof hang === 'object') out.hang = { ...hang }; else delete out.hang;
+      if (hang && typeof hang === 'object') out.hang = { ...hang };
+      else delete out.hang;
       const hull = extra.hull != null ? extra.hull : c.hull;
-      if (hull === false || (hull && typeof hull === 'object')) out.hull = hull === false ? false : { ...hull }; else delete out.hull;
+      if (hull === false || (hull && typeof hull === 'object')) out.hull = hull === false ? false : { ...hull };
+      else delete out.hull;
       // spiral: the container's own spiral settings over graph.spiral
       // ({ anchorEnd, openTowards, keepBelow, cardScale, spacing }).
       const spiral = extra.spiral != null ? extra.spiral : c.spiral;
-      if (spiral && typeof spiral === 'object') out.spiral = { ...spiral }; else delete out.spiral;
+      if (spiral && typeof spiral === 'object') out.spiral = { ...spiral };
+      else delete out.spiral;
       // The container's own look, closed and open alike: fill (a colour) at
       // fillOpacity, stroke, its label in labelFace (a family the site's
       // fonts carry) and labelColor (containerLook.js). Kept apart as look,
       // so the containment entry's own colours (its chapters' cards') are
       // untouched.
       const look = lookFromSettings(extra);
-      if (look) out.look = look; else delete out.look;
+      if (look) out.look = look;
+      else delete out.look;
       delete out.blob;
       return out;
     });
@@ -1098,7 +1195,9 @@ async function main() {
   const flows = await runFlows(feed, SETTINGS, { siteRoot: SITE_ROOT });
   if (flows && flows.length) {
     feed.flows = flows;
-    console.log(`  flow: ${flows.length} ${flows.length === 1 ? 'order' : 'orders'} (${flows.map((f) => `${f.name}, ${f.order.length} cards`).join('; ')})`);
+    console.log(
+      `  flow: ${flows.length} ${flows.length === 1 ? 'order' : 'orders'} (${flows.map((f) => `${f.name}, ${f.order.length} cards`).join('; ')})`,
+    );
   } else if (flows) {
     console.log('  flow: no order this build (each listed preset failed, said above)');
   }
@@ -1137,8 +1236,7 @@ async function main() {
   console.log('Generated _site/index.html');
 }
 
-main().catch(err => {
-  console.error("Fatal error:", err);
+main().catch((err) => {
+  console.error('Fatal error:', err);
   process.exit(1);
 });
-

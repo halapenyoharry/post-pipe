@@ -11,7 +11,18 @@
 export const MODES = ['raw', 'hyper', 'dyadic', 'concepts'];
 // SKOS names last: closeMatch (a cross-scheme `near`), broadMatch (a cross-scheme `broader`), relatedMatch
 // (a cross-scheme `related` with text support), exactMatch (human-asserted, or a vocabulary mapping)
-export const RELATION_TYPES = ['broader', 'related', 'adjacent', 'near', 'synergy', 'opposes', 'closeMatch', 'broadMatch', 'relatedMatch', 'exactMatch'];
+export const RELATION_TYPES = [
+  'broader',
+  'related',
+  'adjacent',
+  'near',
+  'synergy',
+  'opposes',
+  'closeMatch',
+  'broadMatch',
+  'relatedMatch',
+  'exactMatch',
+];
 
 const defaults = {
   labels: null, // Map<conceptId, label> to override canonical labels (live re-ranking)
@@ -52,7 +63,10 @@ export function projectGraph(U, mode = 'hyper', options = {}) {
   };
   const srcOk = (s) => !o.hiddenSources || !o.hiddenSources.has(s);
   const items = U.items.filter((it) => srcOk(it.source) || (it.alsoIn ?? []).some(srcOk));
-  const tagsOf = (it) => it.tags.filter((t) => (o.emergent || t.origin === 'explicit') && t.w >= o.minWeight && (!t.sys || t.sys.some(srcOk)));
+  const tagsOf = (it) =>
+    it.tags.filter(
+      (t) => (o.emergent || t.origin === 'explicit') && t.w >= o.minWeight && (!t.sys || t.sys.some(srcOk)),
+    );
   const relOk = (r) => o.relations && (!o.relationTypes || o.relationTypes.has(r.type));
 
   const nodes = new Map();
@@ -62,7 +76,17 @@ export function projectGraph(U, mode = 'hyper', options = {}) {
     return nodes.get(n.id);
   };
   const itemNode = (it) =>
-    addNode({ id: `i:${it.key}`, type: 'item', label: it.title, source: it.source, alsoIn: it.alsoIn ?? [], kind: it.kind, url: it.url, val: 1, itemKey: it.key });
+    addNode({
+      id: `i:${it.key}`,
+      type: 'item',
+      label: it.title,
+      source: it.source,
+      alsoIn: it.alsoIn ?? [],
+      kind: it.kind,
+      url: it.url,
+      val: 1,
+      itemKey: it.key,
+    });
   const conceptNode = (cid) => {
     const c = concept.get(cid);
     return addNode({
@@ -87,7 +111,15 @@ export function projectGraph(U, mode = 'hyper', options = {}) {
         for (const r of t.raw) {
           if (!srcOk(r.s ?? it.source)) continue;
           const id = `t:${r.s ?? it.source}:${r.n}`;
-          const node = addNode({ id, type: 'term', label: r.l, source: r.s ?? it.source, concept: t.c, val: 1.2, count: 0 });
+          const node = addNode({
+            id,
+            type: 'term',
+            label: r.l,
+            source: r.s ?? it.source,
+            concept: t.c,
+            val: 1.2,
+            count: 0,
+          });
           node.count += 1;
           node.val = 1.2 + Math.sqrt(node.count) * 1.4;
           links.push({ source: `i:${it.key}`, target: id, type: 'tag', weight: 1 });
@@ -99,12 +131,20 @@ export function projectGraph(U, mode = 'hyper', options = {}) {
       itemNode(it);
       for (const t of tagsOf(it)) {
         conceptNode(t.c);
-        links.push({ source: `i:${it.key}`, target: `c:${t.c}`, type: 'tag', origin: t.origin, weight: t.w, why: t.why });
+        links.push({
+          source: `i:${it.key}`,
+          target: `c:${t.c}`,
+          type: 'tag',
+          origin: t.origin,
+          weight: t.w,
+          why: t.why,
+        });
       }
     }
     if (o.relations) {
       for (const r of U.relations) {
-        if (relOk(r) && nodes.has(`c:${r.a}`) && nodes.has(`c:${r.b}`)) links.push({ source: `c:${r.a}`, target: `c:${r.b}`, type: r.type, weight: r.weight, relation: true });
+        if (relOk(r) && nodes.has(`c:${r.a}`) && nodes.has(`c:${r.b}`))
+          links.push({ source: `c:${r.a}`, target: `c:${r.b}`, type: r.type, weight: r.weight, relation: true });
       }
     }
   } else if (mode === 'dyadic') {
@@ -129,7 +169,12 @@ export function projectGraph(U, mode = 'hyper', options = {}) {
           const [a, wa] = members[i];
           const [b, wb] = members[j];
           const k = a.key < b.key ? `${a.key}\u0000${b.key}` : `${b.key}\u0000${a.key}`;
-          const e = pair.get(k) ?? { a: a.key < b.key ? a.key : b.key, b: a.key < b.key ? b.key : a.key, weight: 0, tags: [] };
+          const e = pair.get(k) ?? {
+            a: a.key < b.key ? a.key : b.key,
+            b: a.key < b.key ? b.key : a.key,
+            weight: 0,
+            tags: [],
+          };
           e.weight += idf * Math.min(wa, wb);
           e.tags.push(cid);
           pair.set(k, e);
@@ -160,7 +205,8 @@ export function projectGraph(U, mode = 'hyper', options = {}) {
       conceptNode(c.id);
     }
     for (const r of U.relations) {
-      if (relOk(r) && nodes.has(`c:${r.a}`) && nodes.has(`c:${r.b}`)) links.push({ source: `c:${r.a}`, target: `c:${r.b}`, type: r.type, weight: r.weight, relation: true });
+      if (relOk(r) && nodes.has(`c:${r.a}`) && nodes.has(`c:${r.b}`))
+        links.push({ source: `c:${r.a}`, target: `c:${r.b}`, type: r.type, weight: r.weight, relation: true });
     }
   } else {
     throw new Error(`unknown mode "${mode}" (${MODES.join(', ')})`);
@@ -177,10 +223,11 @@ export function neighborhood(graph, mode, conceptId, hops = 2) {
   const seeds = new Set();
   for (const n of graph.nodes) if (n.concept === conceptId) seeds.add(n.id);
   if (mode === 'dyadic') {
-    for (const l of graph.links) if (l.tags?.includes(conceptId)) {
-      seeds.add(l.source.id ?? l.source);
-      seeds.add(l.target.id ?? l.target);
-    }
+    for (const l of graph.links)
+      if (l.tags?.includes(conceptId)) {
+        seeds.add(l.source.id ?? l.source);
+        seeds.add(l.target.id ?? l.target);
+      }
   }
   const adj = new Map();
   for (const l of graph.links) {
@@ -193,10 +240,12 @@ export function neighborhood(graph, mode, conceptId, hops = 2) {
   let frontier = [...seeds];
   for (let h = 0; h < hops; h++) {
     const next = [];
-    for (const id of frontier) for (const n of adj.get(id) ?? []) if (!seen.has(n)) {
-      seen.add(n);
-      next.push(n);
-    }
+    for (const id of frontier)
+      for (const n of adj.get(id) ?? [])
+        if (!seen.has(n)) {
+          seen.add(n);
+          next.push(n);
+        }
     frontier = next;
   }
   return {

@@ -21,7 +21,7 @@ test('prefers a proper-noun phrase when one is present', () => {
 });
 
 test('drops articles, prepositions and contractions', () => {
-  assert.strictEqual(nucleus("Art Isn't Magic. It's Complexity.", 2), "Art Magic");
+  assert.strictEqual(nucleus("Art Isn't Magic. It's Complexity.", 2), 'Art Magic');
   const words = nucleus('Got a Connection to Dominican Baseball? Text Us on WhatsApp.', 2).split(' ');
   assert.ok(!words.includes('a'), 'the article is gone as a word, not as a letter');
   assert.ok(!words.includes('to'), words.join(' '));
@@ -74,7 +74,8 @@ test('an authored short_title over budget is reduced, not truncated', () => {
   });
   assert.strictEqual(ladder.short, 'Effortless Action', 'five words is well past a budget of two');
   assert.strictEqual(
-    ladder.medium, 'Effortless Action vs. Calculated Compliance',
+    ladder.medium,
+    'Effortless Action vs. Calculated Compliance',
     'five words is within one of a budget of four, so the author keeps their wording',
   );
   assert.ok(!ladder.medium.includes('Mechanics'), 'never falls back to the full title');

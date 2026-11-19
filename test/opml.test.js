@@ -11,10 +11,12 @@ const wrap = (body) =>
 
 test('reads a NetNewsWire export unchanged', () => {
   // Verbatim shape of inbox/Subscriptions-OnMyMac.opml.
-  const feeds = parseOpml(wrap(
-    `<outline text="ProPublica" title="ProPublica" description="" type="rss" version="RSS"
+  const feeds = parseOpml(
+    wrap(
+      `<outline text="ProPublica" title="ProPublica" description="" type="rss" version="RSS"
               htmlUrl="https://www.propublica.org/" xmlUrl="https://www.propublica.org/feeds/propublica/main"/>`,
-  ));
+    ),
+  );
   assert.strictEqual(feeds.length, 1);
   assert.strictEqual(feeds[0].type, 'rss');
   assert.strictEqual(feeds[0].xmlUrl, 'https://www.propublica.org/feeds/propublica/main');
@@ -22,9 +24,9 @@ test('reads a NetNewsWire export unchanged', () => {
 });
 
 test('the local:// scheme marks a folder rather than a network feed', () => {
-  const [feed] = parseOpml(wrap(
-    `<outline type="local" text="My Writing" xmlUrl="local://~/Posts" customColor="#2ecc71"/>`,
-  ));
+  const [feed] = parseOpml(
+    wrap(`<outline type="local" text="My Writing" xmlUrl="local://~/Posts" customColor="#2ecc71"/>`),
+  );
   assert.strictEqual(feed.type, 'local');
   assert.strictEqual(feed.customColor, '#2ecc71');
 });
@@ -32,11 +34,13 @@ test('the local:// scheme marks a folder rather than a network feed', () => {
 test('folders are preserved, not flattened away', () => {
   // Readers organize subscriptions into hierarchies. That structure is the
   // user's own topology and is worth keeping.
-  const feeds = parseOpml(wrap(
-    `<outline text="News"><outline text="Politics">
+  const feeds = parseOpml(
+    wrap(
+      `<outline text="News"><outline text="Politics">
        <outline type="rss" text="A" xmlUrl="https://a.test/rss"/>
      </outline></outline>`,
-  ));
+    ),
+  );
   assert.strictEqual(feeds.length, 1);
   assert.strictEqual(feeds[0].folder, 'News/Politics');
 });
@@ -47,10 +51,11 @@ test('a container without an xmlUrl is not mistaken for a feed', () => {
 });
 
 test('type is inferred when the export omits it', () => {
-  const feeds = parseOpml(wrap(
-    `<outline text="J" xmlUrl="https://x.test/feed.json"/>` +
-    `<outline text="A" xmlUrl="https://x.test/atom.xml"/>`,
-  ));
+  const feeds = parseOpml(
+    wrap(
+      `<outline text="J" xmlUrl="https://x.test/feed.json"/>` + `<outline text="A" xmlUrl="https://x.test/atom.xml"/>`,
+    ),
+  );
   assert.strictEqual(feeds[0].type, 'json', 'a .json feed is JSON Feed, not RSS');
   assert.ok(feeds[1].type, 'something is always inferred rather than left undefined');
 });
@@ -63,37 +68,41 @@ test('a local folder is primary and a subscribed feed is secondary by default', 
   // Your own corpus and a subscribed firehose are not peers. This used to fall
   // out of the status field by accident, which meant your own drafts rendered
   // identically to somebody else's news.
-  const feeds = parseOpml(wrap(
-    `<outline type="local" text="Mine" xmlUrl="local://~/Posts"/>` +
-    `<outline type="rss" text="Theirs" xmlUrl="https://x.test/rss"/>`,
-  ));
+  const feeds = parseOpml(
+    wrap(
+      `<outline type="local" text="Mine" xmlUrl="local://~/Posts"/>` +
+        `<outline type="rss" text="Theirs" xmlUrl="https://x.test/rss"/>`,
+    ),
+  );
   assert.strictEqual(feeds[0].prominence, 'primary');
   assert.strictEqual(feeds[1].prominence, 'secondary');
 });
 
 test('prominence can be set explicitly, including against the default', () => {
-  const feeds = parseOpml(wrap(
-    `<outline type="rss" text="Close reading" xmlUrl="https://x.test/rss" prominence="primary"/>` +
-    `<outline type="local" text="Archive" xmlUrl="local://~/Old" prominence="secondary"/>`,
-  ));
+  const feeds = parseOpml(
+    wrap(
+      `<outline type="rss" text="Close reading" xmlUrl="https://x.test/rss" prominence="primary"/>` +
+        `<outline type="local" text="Archive" xmlUrl="local://~/Old" prominence="secondary"/>`,
+    ),
+  );
   assert.strictEqual(feeds[0].prominence, 'primary');
   assert.strictEqual(feeds[1].prominence, 'secondary');
 });
 
 test('an unrecognised prominence falls back to the default rather than through', () => {
-  const [feed] = parseOpml(wrap(
-    `<outline type="local" text="Mine" xmlUrl="local://~/Posts" prominence="loudest"/>`,
-  ));
+  const [feed] = parseOpml(wrap(`<outline type="local" text="Mine" xmlUrl="local://~/Posts" prominence="loudest"/>`));
   assert.strictEqual(feed.prominence, 'primary');
 });
 
 test('per-feed display attributes (cardScale, itemCap, defaultHidden) are parsed from OPML and applied by the aggregator', async () => {
   const { loadCorpus } = require('../src/aggregator');
   const { createViewState } = require('../src/lib/viewState');
-  const feeds = parseOpml(wrap(
-    `<outline type="rss" text="Busy" xmlUrl="https://busy.test/rss" cardScale="0.8" itemCap="2" defaultHidden="true"/>` +
-    `<outline type="rss" text="Plain" xmlUrl="https://plain.test/rss"/>`,
-  ));
+  const feeds = parseOpml(
+    wrap(
+      `<outline type="rss" text="Busy" xmlUrl="https://busy.test/rss" cardScale="0.8" itemCap="2" defaultHidden="true"/>` +
+        `<outline type="rss" text="Plain" xmlUrl="https://plain.test/rss"/>`,
+    ),
+  );
   assert.strictEqual(feeds[0].cardScale, 0.8);
   assert.strictEqual(feeds[0].itemCap, 2);
   assert.strictEqual(feeds[0].defaultHidden, true);
@@ -147,17 +156,18 @@ test('per-feed display attributes (cardScale, itemCap, defaultHidden) are parsed
   assert.strictEqual(vs.isHidden('https://busy.test/rss'), false, 're-seeding does not override reader choice');
 });
 
-
-test('a page entry names one article\'s address; a pages entry names a local list of them', () => {
+test("a page entry names one article's address; a pages entry names a local list of them", () => {
   // Neither is inferred: an address with no type is a feed, as ever.
-  const feeds = parseOpml(wrap(
-    `<outline type="page" text="Kettle piece" xmlUrl="https://quietkitchen.example/essays/kettle-switch/"/>` +
-    `<outline type="pages" text="Kept pages" xmlUrl="kept-pages.txt"/>` +
-    `<outline text="Plain" xmlUrl="https://quietkitchen.example/essays/kettle-switch/"/>`,
-  ));
+  const feeds = parseOpml(
+    wrap(
+      `<outline type="page" text="Kettle piece" xmlUrl="https://quietkitchen.example/essays/kettle-switch/"/>` +
+        `<outline type="pages" text="Kept pages" xmlUrl="kept-pages.txt"/>` +
+        `<outline text="Plain" xmlUrl="https://quietkitchen.example/essays/kettle-switch/"/>`,
+    ),
+  );
   assert.strictEqual(feeds[0].type, 'page');
   assert.strictEqual(feeds[0].title, 'Kettle piece');
-  assert.strictEqual(feeds[0].prominence, 'secondary', 'a page is a subscribed source, not the site\'s own corpus');
+  assert.strictEqual(feeds[0].prominence, 'secondary', "a page is a subscribed source, not the site's own corpus");
   assert.strictEqual(feeds[1].type, 'pages');
   assert.strictEqual(feeds[1].xmlUrl, 'kept-pages.txt');
   assert.strictEqual(feeds[2].type, 'rss');

@@ -23,7 +23,8 @@ const SEARCH_FROM = 20;
 // Whether the graph draws tag nodes at all: the tag layer is on
 // (graph.visibleLayers names it) and the feed has an edge of that layer.
 function hasTagNodes(feedData, graphSettings) {
-  const layers = graphSettings && Array.isArray(graphSettings.visibleLayers) ? graphSettings.visibleLayers : ['sequence'];
+  const layers =
+    graphSettings && Array.isArray(graphSettings.visibleLayers) ? graphSettings.visibleLayers : ['sequence'];
   if (!layers.includes('tag')) return false;
   const edges = feedData && Array.isArray(feedData.edges) ? feedData.edges : [];
   return edges.some((e) => e && e.layer === 'tag');
@@ -52,7 +53,10 @@ function hasTagNodes(feedData, graphSettings) {
 //   maxPieces:     the slider's top, the largest count the graph published
 //                  (window.PostPipeGraphTags.counts), or null for the largest
 //                  of tagCounts, else of the feed's counts
-function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, minPieces = null, tagCounts = null, maxPieces = null } = {}) {
+function tagListModel(
+  feedData,
+  { hiddenSources, sourceColorOf, fallbackColor, minPieces = null, tagCounts = null, maxPieces = null } = {},
+) {
   const items = feedData && Array.isArray(feedData.items) ? feedData.items : [];
   const edges = feedData && Array.isArray(feedData.edges) ? feedData.edges : [];
   const sources = feedData && Array.isArray(feedData._sources) ? feedData._sources : [];
@@ -64,7 +68,7 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, m
   for (const e of edges) {
     if (!e || e.layer !== 'tag') continue;
     const isTag = (v) => typeof v === 'string' && v.startsWith('tag:');
-    const tagId = isTag(e.target) ? e.target : (isTag(e.source) ? e.source : null);
+    const tagId = isTag(e.target) ? e.target : isTag(e.source) ? e.source : null;
     const pieceId = tagId === e.target ? e.source : e.target;
     if (!tagId || !byId.has(pieceId)) continue;
     if (!tags.has(tagId)) tags.set(tagId, new Set());
@@ -83,8 +87,12 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, m
   // The slider's count for each tag, and the value in force, clamped to the
   // slider's top: the largest count among every tag (a hidden feed's tags
   // too), as the graph and the panel read it.
-  const graphCounts = tagCounts instanceof Map ? tagCounts
-    : (tagCounts && typeof tagCounts === 'object' ? new Map(Object.entries(tagCounts)) : null);
+  const graphCounts =
+    tagCounts instanceof Map
+      ? tagCounts
+      : tagCounts && typeof tagCounts === 'object'
+        ? new Map(Object.entries(tagCounts))
+        : null;
   const sliderCount = (id) => {
     const n = graphCounts && graphCounts.has(id) ? Number(graphCounts.get(id)) : NaN;
     return Number.isFinite(n) ? n : tags.get(id).size;
@@ -92,7 +100,7 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, m
   let most = Number(maxPieces);
   if (maxPieces === null || maxPieces === undefined || !Number.isFinite(most)) {
     most = 0;
-    for (const n of (graphCounts ? graphCounts.values() : [...tags.values()].map((set) => set.size))) {
+    for (const n of graphCounts ? graphCounts.values() : [...tags.values()].map((set) => set.size)) {
       if (Number(n) > most) most = Number(n);
     }
   }
@@ -109,7 +117,7 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, m
       const sid = sourceIdOf(it);
       const key = sid || '';
       if (!perSource.has(key)) {
-        const src = sid ? (sourceById.get(sid) || it._source) : null;
+        const src = sid ? sourceById.get(sid) || it._source : null;
         perSource.set(key, { sourceId: sid, title: (src && (src.title || src.id)) || '', count: 0 });
       }
       perSource.get(key).count += 1;
@@ -120,20 +128,28 @@ function tagListModel(feedData, { hiddenSources, sourceColorOf, fallbackColor, m
       label: id.slice(4),
       count: pieces.length,
       pieces: total,
-      color: blendColors(pieces.map((it) => ({ color: colorOf(it), weight: 1 })), fallbackColor),
+      color: blendColors(
+        pieces.map((it) => ({ color: colorOf(it), weight: 1 })),
+        fallbackColor,
+      ),
       contributors,
     });
   }
-  rows.sort((a, b) => (b.pieces - a.pieces)
-    || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
-    || a.label.localeCompare(b.label));
+  rows.sort(
+    (a, b) =>
+      b.pieces - a.pieces ||
+      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }) ||
+      a.label.localeCompare(b.label),
+  );
   return rows;
 }
 
 // The rows whose label has the text typed, case aside; all of them for
 // nothing typed.
 function filterTagRows(rows, query) {
-  const q = String(query || '').trim().toLowerCase();
+  const q = String(query || '')
+    .trim()
+    .toLowerCase();
   if (!q) return rows;
   return rows.filter((r) => r.label.toLowerCase().includes(q));
 }

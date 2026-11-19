@@ -51,11 +51,14 @@ function untaggedBecause(entry, { discover = false, emerge = true } = {}) {
   const e = entry && typeof entry === 'object' ? entry : {};
   const reasons = Array.isArray(e.reasons)
     ? e.reasons.filter((r) => typeof r === 'string' && r)
-    : (typeof e.reason === 'string' && e.reason ? [e.reason] : []);
+    : typeof e.reason === 'string' && e.reason
+      ? [e.reason]
+      : [];
   if (!discover || reasons.includes('noDiscovery')) return DISCOVERY_OFF;
-  const queued = e.candidates && typeof e.candidates === 'object' && Array.isArray(e.candidates.queued)
-    ? e.candidates.queued.length
-    : 0;
+  const queued =
+    e.candidates && typeof e.candidates === 'object' && Array.isArray(e.candidates.queued)
+      ? e.candidates.queued.length
+      : 0;
   if (queued > 0) return queuedLine(queued);
   if (reasons.length && reasons.every((r) => NOT_RECURRING.has(r))) return NOTHING_RECURRED;
   if (discover === 'queue' && !reasons.length) return NOTHING_RECURRED;
@@ -69,7 +72,12 @@ function untaggedBecauseOf(item) {
   if (!item || typeof item !== 'object') return null;
   if (typeof item.untaggedBecause === 'string' && item.untaggedBecause) return item.untaggedBecause;
   const original = item.originalItem;
-  if (original && typeof original === 'object' && typeof original.untaggedBecause === 'string' && original.untaggedBecause) {
+  if (
+    original &&
+    typeof original === 'object' &&
+    typeof original.untaggedBecause === 'string' &&
+    original.untaggedBecause
+  ) {
     return original.untaggedBecause;
   }
   return null;

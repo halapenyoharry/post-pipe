@@ -11,7 +11,16 @@ export function fromPairs(text, opts = {}) {
     if (!item || !tag) continue;
     if (!seen.has(item)) {
       seen.add(item);
-      records.push({ type: 'item', source, id: item, title: title || item, text: '', url: url || '', date: '', kind: '' });
+      records.push({
+        type: 'item',
+        source,
+        id: item,
+        title: title || item,
+        text: '',
+        url: url || '',
+        date: '',
+        kind: '',
+      });
     }
     records.push({ type: 'tag', source, item, label: tag.trim(), weight: 1, origin: 'explicit' });
   }

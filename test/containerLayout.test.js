@@ -22,7 +22,9 @@ function book(closed, options) {
     ['a3', Array.from({ length: 8 }, (_, i) => card('a3-' + (i + 1), i + 1))],
   ]);
   return containerLayout({
-    containers, members, closed,
+    containers,
+    members,
+    closed,
     labelSize: (c, depth) => (depth === 0 ? { w: 600, h: 200 } : { w: 280, h: 100 }),
     macroSize: () => ({ w: 300, h: 120 }),
     options,
@@ -80,7 +82,9 @@ test('units follow their order, not their date', () => {
   const first = L.nodes.get('late');
   assert.strictEqual(first.x, 0);
   // Without an order, date decides.
-  const m2 = new Map([['c', [card('late', undefined, { date: '2030-01-01' }), card('early', undefined, { date: '2020-01-01' })]]]);
+  const m2 = new Map([
+    ['c', [card('late', undefined, { date: '2030-01-01' }), card('early', undefined, { date: '2020-01-01' })]],
+  ]);
   const L2 = containerLayout({ containers, members: m2, labelSize: () => ({ w: 100, h: 40 }) });
   assert.strictEqual(L2.nodes.get('early').x, 0);
 });
@@ -128,7 +132,7 @@ test('the radius grows by the golden ratio every quarter turn', () => {
   const L = book();
   const { a, b } = L.containers.get('a1').spiral;
   assert.ok(a > 0);
-  assert.ok(Math.abs(Math.exp(b * Math.PI / 2) - (1 + Math.sqrt(5)) / 2) < 1e-9);
+  assert.ok(Math.abs(Math.exp((b * Math.PI) / 2) - (1 + Math.sqrt(5)) / 2) < 1e-9);
 });
 
 test('the book places its acts below and beside its label, label a third of the way down', () => {
@@ -198,6 +202,7 @@ test('an inward spiral keeps the reading order and puts the first chapter on top
   const label = inn.containers.get('a1').label;
   for (let i = 0; i < n.length; i++) {
     assert.ok(!rectsOverlap(label, rectOf(n[i])), 'label on a1-' + (i + 1));
-    for (let j = i + 1; j < n.length; j++) assert.ok(!rectsOverlap(rectOf(n[i]), rectOf(n[j])), `a1-${i + 1} on a1-${j + 1}`);
+    for (let j = i + 1; j < n.length; j++)
+      assert.ok(!rectsOverlap(rectOf(n[i]), rectOf(n[j])), `a1-${i + 1} on a1-${j + 1}`);
   }
 });

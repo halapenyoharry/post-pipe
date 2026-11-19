@@ -5,8 +5,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  radialLayout, timelineLayout, computeLayout, layoutNames,
-  layoutIsDegenerate, timeAxisGeometry, compressedTimeScale,
+  radialLayout,
+  timelineLayout,
+  computeLayout,
+  layoutNames,
+  layoutIsDegenerate,
+  timeAxisGeometry,
+  compressedTimeScale,
 } = require('../src/components/GraphViewer/layouts');
 
 const article = (id, extra = {}) => ({ id, type: 'article', ...extra });
@@ -73,7 +78,10 @@ test('radial: no two cards overlap, at any corpus size', () => {
   // rings can be closer than a card is wide and still not touch, and two on
   // the same ring can be further apart than that and still collide.
   for (const n of [10, 60, 102, 200]) {
-    const pos = radialLayout([...Array(n)].map((_, i) => article('a' + i)), CARD);
+    const pos = radialLayout(
+      [...Array(n)].map((_, i) => article('a' + i)),
+      CARD,
+    );
     const pts = Object.values(pos);
     let overlaps = 0;
     for (let i = 0; i < pts.length; i++) {
@@ -138,12 +146,15 @@ test('timeline spreads a corpus that is lumpy in time', () => {
   // The real shape: years of writing alongside a feed that posted eighty items
   // in two days. On a linear axis the feed becomes one column and everything
   // older smears into the left edge.
-  const old = [...Array(20)].map((_, i) => article('old' + i, { date: (2019 + (i % 6)) + '-03-0' + ((i % 8) + 1) }));
+  const old = [...Array(20)].map((_, i) => article('old' + i, { date: 2019 + (i % 6) + '-03-0' + ((i % 8) + 1) }));
   const burst = [...Array(80)].map((_, i) =>
-    article('new' + i, { date: '2026-09-1' + (i % 2) + 'T' + String(i % 24).padStart(2, '0') + ':00:00Z' }));
+    article('new' + i, { date: '2026-09-1' + (i % 2) + 'T' + String(i % 24).padStart(2, '0') + ':00:00Z' }),
+  );
   const pos = timelineLayout([...old, ...burst], CARD);
 
-  const xs = Object.values(pos).map((p) => p.x).sort((a, b) => a - b);
+  const xs = Object.values(pos)
+    .map((p) => p.x)
+    .sort((a, b) => a - b);
   const lo = xs[0];
   const hi = xs[xs.length - 1];
   const bins = Array(10).fill(0);
@@ -179,16 +190,16 @@ test('an unsettled heap is recognised as not an arrangement', () => {
 });
 
 test('a real arrangement is not mistaken for a heap', () => {
-  const real = radialLayout([...Array(178)].map((_, i) => article('a' + i)), CARD);
-  assert.strictEqual(
-    layoutIsDegenerate(Object.values(real), { width: 180, height: 140 }), false,
+  const real = radialLayout(
+    [...Array(178)].map((_, i) => article('a' + i)),
+    CARD,
   );
+  assert.strictEqual(layoutIsDegenerate(Object.values(real), { width: 180, height: 140 }), false);
   const line = timelineLayout(
-    [...Array(60)].map((_, i) => article('a' + i, { date: '2026-0' + ((i % 9) + 1) + '-01' })), CARD,
+    [...Array(60)].map((_, i) => article('a' + i, { date: '2026-0' + ((i % 9) + 1) + '-01' })),
+    CARD,
   );
-  assert.strictEqual(
-    layoutIsDegenerate(Object.values(line), { width: 180, height: 140 }), false,
-  );
+  assert.strictEqual(layoutIsDegenerate(Object.values(line), { width: 180, height: 140 }), false);
 });
 
 test('a collapsed core is still a heap even with a couple of real outliers', () => {
@@ -201,10 +212,11 @@ test('a collapsed core is still a heap even with a couple of real outliers', () 
     const a = i * 2.4;
     return { x: r * Math.cos(a), y: r * Math.sin(a) };
   });
-  const outliers = [{ x: 2400, y: -1800 }, { x: -2100, y: 2600 }];
-  assert.strictEqual(
-    layoutIsDegenerate([...heap, ...outliers], { width: 180, height: 140 }), true,
-  );
+  const outliers = [
+    { x: 2400, y: -1800 },
+    { x: -2100, y: 2600 },
+  ];
+  assert.strictEqual(layoutIsDegenerate([...heap, ...outliers], { width: 180, height: 140 }), true);
 });
 
 test('too few nodes to judge is left alone', () => {
@@ -256,17 +268,23 @@ test('every dated piece gets an anchor and no undated one is invented', () => {
   assert.deepStrictEqual(Object.keys(g.anchors).sort(), ['a', 'b']);
 });
 
-test('ticks are round dates, not the corpus\'s own timestamps', () => {
+test("ticks are round dates, not the corpus's own timestamps", () => {
   const nodes = [dat('a', '2021-03-17T04:21:00Z'), dat('b', '2025-11-02T19:03:00Z')];
   const g = timeAxisGeometry(nodes, axisOpts('ltr'));
   assert.ok(g.ticks.length >= 3, 'a four-year span should carry year ticks');
-  assert.deepStrictEqual(g.ticks.map((t) => t.label), ['2022', '2023', '2024', '2025']);
+  assert.deepStrictEqual(
+    g.ticks.map((t) => t.label),
+    ['2022', '2023', '2024', '2025'],
+  );
 });
 
 test('ticks tighten to months once the span is short', () => {
   const nodes = [dat('a', '2026-02-01'), dat('b', '2026-08-01')];
   const g = timeAxisGeometry(nodes, axisOpts('ltr'));
-  assert.ok(g.ticks.every((t) => /[A-Za-z]{3} \d\d/.test(t.label)), g.ticks.map(t => t.label).join(','));
+  assert.ok(
+    g.ticks.every((t) => /[A-Za-z]{3} \d\d/.test(t.label)),
+    g.ticks.map((t) => t.label).join(','),
+  );
 });
 
 test('the axis and the timeline layout agree about where a date sits', () => {

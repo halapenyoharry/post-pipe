@@ -22,7 +22,9 @@ const { tagReferences } = require('../lib/tagReferences');
 function nonTagReferences(item) {
   const raw = Array.isArray(item && item._references)
     ? item._references
-    : (item && item.originalItem && Array.isArray(item.originalItem._references) ? item.originalItem._references : []);
+    : item && item.originalItem && Array.isArray(item.originalItem._references)
+      ? item.originalItem._references
+      : [];
   const out = [];
   for (const r of raw) {
     if (!r || typeof r !== 'object') continue;
@@ -68,7 +70,8 @@ function buildEdges(items, options = {}) {
   const containerByConcept = new Map();
   for (const c of containmentConfigs) {
     if (c.tag) containerByTag.set(c.tag, c);
-    if (typeof c.concept === 'string' && c.concept && !containerByConcept.has(c.concept)) containerByConcept.set(c.concept, c);
+    if (typeof c.concept === 'string' && c.concept && !containerByConcept.has(c.concept))
+      containerByConcept.set(c.concept, c);
   }
 
   // Hierarchical containment edges between containers (e.g. Epic contains Act 1)
@@ -125,11 +128,14 @@ function buildEdges(items, options = {}) {
           // rosetta-tagz's word on this attachment, only where it wrote one: why
           // (an explicit tag's is null and stays out) and the PROV fields.
           if (ref.why !== undefined && ref.why !== null) edge.attrs.why = ref.why;
-          if (ref.wasDerivedFrom !== undefined && ref.wasDerivedFrom !== null) edge.attrs.wasDerivedFrom = ref.wasDerivedFrom;
-          if (ref.wasGeneratedBy !== undefined && ref.wasGeneratedBy !== null) edge.attrs.wasGeneratedBy = ref.wasGeneratedBy;
+          if (ref.wasDerivedFrom !== undefined && ref.wasDerivedFrom !== null)
+            edge.attrs.wasDerivedFrom = ref.wasDerivedFrom;
+          if (ref.wasGeneratedBy !== undefined && ref.wasGeneratedBy !== null)
+            edge.attrs.wasGeneratedBy = ref.wasGeneratedBy;
           // The source coherence ratio the viewer filters discovered tags by
           // (src/lib/sourceRatio.js), only where rosetta-tagz gave one.
-          if (typeof ref.sourceRatio === 'number' && Number.isFinite(ref.sourceRatio)) edge.attrs.sourceRatio = ref.sourceRatio;
+          if (typeof ref.sourceRatio === 'number' && Number.isFinite(ref.sourceRatio))
+            edge.attrs.sourceRatio = ref.sourceRatio;
         }
         edges.push(edge);
       }
@@ -171,9 +177,11 @@ function buildEdges(items, options = {}) {
     for (const ref of nonTagReferences(item)) {
       const target = idBySlug.has(ref.value)
         ? idBySlug.get(ref.value)
-        : (itemIds.has(ref.value)
+        : itemIds.has(ref.value)
           ? ref.value
-          : (ref.value.startsWith(`${ref.type}:`) ? ref.value : `${ref.type}:${ref.value}`));
+          : ref.value.startsWith(`${ref.type}:`)
+            ? ref.value
+            : `${ref.type}:${ref.value}`;
       const attrs = { type: ref.type, value: ref.value, weight: ref.weight };
       if (ref.label !== undefined) attrs.label = ref.label;
       if (ref.origin !== undefined) attrs.origin = ref.origin;
@@ -244,13 +252,10 @@ function referenceEdgeLabel(edge) {
   if (!edge) return '';
   if (edge.label) return edge.label;
   if (edge.attrs && edge.attrs.label) return edge.attrs.label;
-  const refType = (edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type)
-    || edge.role
-    || edge.layer
-    || 'reference';
-  const weight = edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight)
-    ? edge.attrs.weight
-    : 1;
+  const refType =
+    (edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type) || edge.role || edge.layer || 'reference';
+  const weight =
+    edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight) ? edge.attrs.weight : 1;
   const wPart = weight !== 1 ? ` (${weight})` : '';
   const whyPart = edge.attrs && typeof edge.attrs.why === 'string' && edge.attrs.why ? `\n${edge.attrs.why}` : '';
   return `${refType}${wPart}${whyPart}`;

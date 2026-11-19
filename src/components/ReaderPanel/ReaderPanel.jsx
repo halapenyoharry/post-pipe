@@ -33,10 +33,19 @@ const READ_THE_REST = 'read the rest';
 // (provisional, Harold's to keep or replace).
 const TURN_NAMES = { prev: 'Previous', next: 'Next' };
 
-
 // contributions: what readers brought (settings.contributions), already
 // filtered to what this page shows; contributionsConfig its settings.
-export function ReaderPanel({ article, onClose, settings, viewState, targetParagraph, feedData, onNavigate, contributions, contributionsConfig }) {
+export function ReaderPanel({
+  article,
+  onClose,
+  settings,
+  viewState,
+  targetParagraph,
+  feedData,
+  onNavigate,
+  contributions,
+  contributionsConfig,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [floatingPos, setFloatingPos] = useState(null);
@@ -90,7 +99,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // Derive initial state when article changes
   useEffect(() => {
     // A save still waiting belongs to the chapter that is leaving.
-    if (saveTimer.current) { clearTimeout(saveTimer.current); saveProgress(); }
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveProgress();
+    }
     if (article) {
       setIsOpen(true);
       setIsMinimized(false);
@@ -214,8 +226,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     const pct = openCardFraction(el, openCardSpan(el)) * 100;
     setScrollProgress(Math.max(0, Math.min(pct, 100)));
     if (progressFor.current && !cutRef.current) {
-      if (pct >= 98) { clearTimeout(saveTimer.current); saveProgress(); }
-      else if (!saveTimer.current) saveTimer.current = setTimeout(saveProgress, 350);
+      if (pct >= 98) {
+        clearTimeout(saveTimer.current);
+        saveProgress();
+      } else if (!saveTimer.current) saveTimer.current = setTimeout(saveProgress, 350);
     }
   };
   // Where the open card's header starts and its text ends, in the reader's
@@ -237,11 +251,16 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     const marks = viewState.bookmarks(pId);
     const topP = findTopVisibleParagraph();
     const action = bookmarkTap(marks, topP);
-    marks.forEach(b => viewState.removeBookmark(b.id));
+    marks.forEach((b) => viewState.removeBookmark(b.id));
     if (action === 'set') {
       const ps = textRef.current ? textRef.current.querySelectorAll('p') : [];
       const words = topP !== null && ps[topP] ? ps[topP].innerText.trim().split(/\s+/).slice(0, 8).join(' ') : '';
-      viewState.addBookmark({ item: pId, para: topP !== null ? topP : undefined, quote: words, version: article.version });
+      viewState.addBookmark({
+        item: pId,
+        para: topP !== null ? topP : undefined,
+        quote: words,
+        version: article.version,
+      });
     }
   };
 
@@ -288,7 +307,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     if (ps[pIndex]) {
       const containerRect = bodyRef.current.getBoundingClientRect();
       const pRect = ps[pIndex].getBoundingClientRect();
-      bodyRef.current.scrollTop += (pRect.top - containerRect.top) - 20; // 20px padding
+      bodyRef.current.scrollTop += pRect.top - containerRect.top - 20; // 20px padding
     }
   };
 
@@ -362,7 +381,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
         if (mapped !== undefined && mapped !== -1) return mapped;
       }
       if (b.quote) {
-        const paragraphTexts = Array.from(ps).map(p => p.innerText);
+        const paragraphTexts = Array.from(ps).map((p) => p.innerText);
         return resolveParagraph(para, b.quote, paragraphTexts);
       }
     }
@@ -373,13 +392,13 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     if (!viewState || !bodyRef.current) return;
     const pId = article ? getPersistentId(article) : null;
     const marks = viewState.bookmarks();
-    
+
     // Clear old ribbons
     const oldRibbons = bodyRef.current.querySelectorAll('.bookmarkRibbon');
-    oldRibbons.forEach(el => el.remove());
+    oldRibbons.forEach((el) => el.remove());
 
     if (pId && textRef.current) {
-      const b = marks.find(m => m.item === pId);
+      const b = marks.find((m) => m.item === pId);
       if (b) {
         const ps = textRef.current.querySelectorAll('p');
         const placedPara = getPlacedBookmarkParagraph(b, article, ps);
@@ -394,7 +413,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           ribbon.style.color = 'var(--rp-accent)';
           ribbon.style.width = '20px';
           ribbon.style.height = '20px';
-          
+
           ps[placedPara].style.position = 'relative';
           ps[placedPara].appendChild(ribbon);
         }
@@ -416,15 +435,21 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // sequence edges). The same options go to the arrow keys and swipes.
   const orderPref = viewState && viewState.preference ? viewState.preference(READING_ORDER_PREF) : null;
   const flowOpts = useMemo(() => flowNav(feedData, settings, orderPref), [feedData, settings, orderPref]);
-  const nav = useMemo(() => (article && feedData ? neighbours(feedData, article.id, flowOpts) : { prev: [], next: [] }), [article, feedData, flowOpts]);
+  const nav = useMemo(
+    () => (article && feedData ? neighbours(feedData, article.id, flowOpts) : { prev: [], next: [] }),
+    [article, feedData, flowOpts],
+  );
   // The cards the two arrows beside the text go to: where Next and Previous
   // (goStep) go, null on a side with nowhere to go (src/lib/readerNav.js).
-  const turns = useMemo(() => (article && feedData ? turnTargets(feedData, article.id, flowOpts) : { prev: null, next: null }), [article, feedData, flowOpts]);
+  const turns = useMemo(
+    () => (article && feedData ? turnTargets(feedData, article.id, flowOpts) : { prev: null, next: null }),
+    [article, feedData, flowOpts],
+  );
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
 
-  const reduceMotion = () => typeof window !== 'undefined' && window.matchMedia
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduceMotion = () =>
+    typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Turn the page: the old chapter slides away, the new one comes in from
   // the side it was turned toward. fromDrag: the card is already partway
@@ -442,7 +467,11 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       el.style.transform = '';
       el.style.opacity = '';
     };
-    if (reduceMotion()) { clearDrag(); onNavigate(item); return; }
+    if (reduceMotion()) {
+      clearDrag();
+      onNavigate(item);
+      return;
+    }
     if (fromDrag && el) {
       el.style.transition = 'transform 0.17s ease-in, opacity 0.17s ease-in';
       el.style.transform = `translate3d(${dir === 'next' ? -100 : 100}%, 0, 0)`;
@@ -450,12 +479,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     } else {
       setTurnOut(dir);
     }
-    turnTimers.current.push(setTimeout(() => {
-      clearDrag();
-      setTurnIn(dir);
-      onNavigate(item);
-      turnTimers.current.push(setTimeout(() => setTurnIn(null), 520));
-    }, 170));
+    turnTimers.current.push(
+      setTimeout(() => {
+        clearDrag();
+        setTurnIn(dir);
+        onNavigate(item);
+        turnTimers.current.push(setTimeout(() => setTurnIn(null), 520));
+      }, 170),
+    );
   };
   const goStep = (dir, opts) => {
     if (!article || !feedData) return;
@@ -480,7 +511,11 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // The same, drawn before this returns: for the voice, which takes the text
   // as it stands when it starts, and for Download.
   const showWholeNow = () => {
-    try { flushSync(showWhole); } catch (_) { showWhole(); }
+    try {
+      flushSync(showWhole);
+    } catch (_) {
+      showWhole();
+    }
   };
   const showWholeNowRef = useRef(showWholeNow);
   showWholeNowRef.current = showWholeNow;
@@ -520,8 +555,14 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       const t = e.target;
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      if (e.key === 'ArrowRight') { e.preventDefault(); goStepRef.current('next'); }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); goStepRef.current('prev'); }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goStepRef.current('next');
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goStepRef.current('prev');
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -546,15 +587,28 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       clearTimeout(easing);
       el.style.transition = ease ? 'transform 0.2s ease-out' : 'none';
       el.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
-      if (ease) easing = setTimeout(() => { el.style.transition = ''; }, 220);
+      if (ease)
+        easing = setTimeout(() => {
+          el.style.transition = '';
+        }, 220);
     };
     const easeBack = () => place(0, true);
     const onStart = (e) => {
       if (start && start.mode === 'follow') easeBack();
-      if (e.touches.length !== 1) { start = null; return; }
+      if (e.touches.length !== 1) {
+        start = null;
+        return;
+      }
       const t = e.touches[0];
       const onText = !!(e.target && e.target.closest && e.target.closest('p, li, blockquote'));
-      start = { x: t.clientX, y: t.clientY, t: Date.now(), onText, aside: !!sidewaysScroller(e.target, el), mode: null };
+      start = {
+        x: t.clientX,
+        y: t.clientY,
+        t: Date.now(),
+        onText,
+        aside: !!sidewaysScroller(e.target, el),
+        mode: null,
+      };
     };
     const standsAside = (s0) => s0.aside || (followOn && s0.onText) || hasSelection();
     const onMove = (e) => {
@@ -583,7 +637,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       const t = e.changedTouches && e.changedTouches[0];
       let dir = t ? touchTurn({ dx: t.clientX - s0.x, dy: t.clientY - s0.y, dt: Date.now() - s0.t, followed }) : null;
       if (dir && (standsAside(s0) || !turnsRef.current[dir])) dir = null;
-      if (!dir) { if (followed) easeBack(); return; }
+      if (!dir) {
+        if (followed) easeBack();
+        return;
+      }
       goStepRef.current(dir, { fromDrag: followed });
     };
     const onCancel = () => {
@@ -616,14 +673,17 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
     if (!live || !wrap) return;
     const gesture = createWheelTurn();
     const onWheel = (e) => {
-      const out = gesture.wheel({
-        deltaX: e.deltaX,
-        deltaY: e.deltaY,
-        deltaMode: e.deltaMode,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        aside: !!sidewaysScroller(e.target, bodyRef.current),
-      }, e.timeStamp);
+      const out = gesture.wheel(
+        {
+          deltaX: e.deltaX,
+          deltaY: e.deltaY,
+          deltaMode: e.deltaMode,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          aside: !!sidewaysScroller(e.target, bodyRef.current),
+        },
+        e.timeStamp,
+      );
       if (out.claim && e.cancelable) e.preventDefault();
       if (out.turn && turnsRef.current[out.turn]) goStepRef.current(out.turn);
     };
@@ -635,7 +695,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   const toggleRef = useRef(null);
   toggleRef.current = toggleBookmark;
   useEffect(() => {
-    const onMark = () => { if (toggleRef.current) toggleRef.current(); };
+    const onMark = () => {
+      if (toggleRef.current) toggleRef.current();
+    };
     window.addEventListener('postpipe:reader-mark', onMark);
     return () => window.removeEventListener('postpipe:reader-mark', onMark);
   }, []);
@@ -648,7 +710,12 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // render: the page re-renders the reader whenever the view state changes
   // (its subscribe(bump)), so a tap on this pill or on the top bar's changes
   // both at once.
-  const sourcePill = readerSourcePill(article, viewState && viewState.state ? viewState.state.hiddenSources : null, feedData && feedData._sources, settings);
+  const sourcePill = readerSourcePill(
+    article,
+    viewState && viewState.state ? viewState.state.hiddenSources : null,
+    feedData && feedData._sources,
+    settings,
+  );
 
   if (!article) return null;
 
@@ -657,13 +724,29 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
   // button. Absent where there is no neighbour.
   const navLink = (item, dir) => {
     const status = navStatus(feedData, item);
-    const arrow = <Icon body={iconBody(dir === 'next' ? 'arrow-right' : 'arrow-left')} size={16} className={styles.navArrow} />;
-    const inner = dir === 'next'
-      ? (<><span className={styles.navTitle}>{item.title}</span>{arrow}</>)
-      : (<>{arrow}<span className={styles.navTitle}>{item.title}</span></>);
+    const arrow = (
+      <Icon body={iconBody(dir === 'next' ? 'arrow-right' : 'arrow-left')} size={16} className={styles.navArrow} />
+    );
+    const inner =
+      dir === 'next' ? (
+        <>
+          <span className={styles.navTitle}>{item.title}</span>
+          {arrow}
+        </>
+      ) : (
+        <>
+          {arrow}
+          <span className={styles.navTitle}>{item.title}</span>
+        </>
+      );
     if (status) {
       return (
-        <div key={item.id} className={`${styles.navItem} ${styles.navLocked} ${dir === 'next' ? styles.navNext : ''}`} data-reader-nav={dir} data-nav-status>
+        <div
+          key={item.id}
+          className={`${styles.navItem} ${styles.navLocked} ${dir === 'next' ? styles.navNext : ''}`}
+          data-reader-nav={dir}
+          data-nav-status
+        >
           <span className={styles.navLine}>{inner}</span>
           <span className={styles.navStatus}>{status}</span>
         </div>
@@ -704,14 +787,28 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       </button>
     );
   };
-  const navRow = (where) => (nav.prev.length > 0 || nav.next.length > 0) && (
-    <nav className={where === 'top' ? styles.navTop : styles.navBottom} aria-label="Chapters either side" data-reader-nav-row={where} {...(where === 'bottom' ? { 'data-reader-nav-bottom': '' } : {})}>
-      <span className={styles.navSide}>{nav.prev.map((item) => navLink(item, 'prev'))}</span>
-      <span className={`${styles.navSide} ${styles.navSideNext}`}>{nav.next.map((item) => navLink(item, 'next'))}</span>
-    </nav>
-  );
+  const navRow = (where) =>
+    (nav.prev.length > 0 || nav.next.length > 0) && (
+      <nav
+        className={where === 'top' ? styles.navTop : styles.navBottom}
+        aria-label="Chapters either side"
+        data-reader-nav-row={where}
+        {...(where === 'bottom' ? { 'data-reader-nav-bottom': '' } : {})}
+      >
+        <span className={styles.navSide}>{nav.prev.map((item) => navLink(item, 'prev'))}</span>
+        <span className={`${styles.navSide} ${styles.navSideNext}`}>
+          {nav.next.map((item) => navLink(item, 'next'))}
+        </span>
+      </nav>
+    );
 
-  const dateStr = article.date ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  const dateStr = article.date
+    ? new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : '';
   const metaParts = [dateStr, article.reading_time].filter(Boolean);
 
   // The byline (src/lib/byline.js), kept for the piece's author: its own
@@ -732,10 +829,7 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 
   return (
     <>
-      <div
-        className={`${styles.overlay} ${isOpen && !isMinimized ? styles.open : ''}`}
-        onClick={onClose}
-      />
+      <div className={`${styles.overlay} ${isOpen && !isMinimized ? styles.open : ''}`} onClick={onClose} />
       <div
         data-reader-panel
         className={`${styles.panel} ${isOpen && !isMinimized ? styles.open : ''} ${isMinimized ? styles.minimized : ''} ${wide ? styles.wide : ''} ${full ? styles.full : ''}`}
@@ -764,7 +858,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           title="Drag to move the reader · Double-click to put it back"
           data-reader-header
         >
-          <div className={styles.dragGrip} aria-hidden="true">⋮⋮</div>
+          <div className={styles.dragGrip} aria-hidden="true">
+            ⋮⋮
+          </div>
           <div id="tts-mount-point" className={`${styles.toolbarGroup} ${styles.ttsMount}`}></div>
 
           <div className={styles.toolbarGroup}>
@@ -772,7 +868,11 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               className={`${styles.tb} ${styles.tbLabeled} ${itemBookmarks.length > 0 ? styles.active : ''}`}
               onClick={toggleBookmark}
               aria-pressed={itemBookmarks.length > 0}
-              title={itemBookmarks.length > 0 ? 'Bookmark the paragraph at the top (it replaces this chapter\'s bookmark), or take it away where it is' : 'Bookmark the paragraph at the top of the reader'}
+              title={
+                itemBookmarks.length > 0
+                  ? "Bookmark the paragraph at the top (it replaces this chapter's bookmark), or take it away where it is"
+                  : 'Bookmark the paragraph at the top of the reader'
+              }
               data-bookmark-toggle
             >
               <Icon body={iconBody('bookmark')} size={17} />
@@ -799,7 +899,11 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             >
               <Icon body={iconBody('link')} size={17} />
             </button>
-            {copied && <span className={styles.copied} role="status" data-reader-copied>copied</span>}
+            {copied && (
+              <span className={styles.copied} role="status" data-reader-copied>
+                copied
+              </span>
+            )}
             <button
               className={`${styles.tb} ${showFrontmatter ? styles.active : ''}`}
               onClick={() => setShowFrontmatter(!showFrontmatter)}
@@ -811,7 +915,13 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               <Icon body={iconBody('info')} size={17} />
             </button>
             {canDownload && (
-              <button className={styles.tb} onClick={handleExport} title="Download" aria-label="Download" data-reader-download>
+              <button
+                className={styles.tb}
+                onClick={handleExport}
+                title="Download"
+                aria-label="Download"
+                data-reader-download
+              >
                 <Icon body={iconBody('download')} size={17} />
               </button>
             )}
@@ -840,7 +950,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           <div className={styles.windowControls} data-reader-window>
             <button
               className={styles.tb}
-              onClick={() => window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { where: 'reader' } }))}
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent('postpipe:toggle-settings', { detail: { where: 'reader' } }))
+              }
               title="Reading settings"
               aria-label="Reading settings"
               data-reader-settings
@@ -859,7 +971,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             </button>
             <button
               className={`${styles.tb} ${full ? styles.active : ''}`}
-              onClick={() => { setFull((f) => !f); setFloatingPos(null); }}
+              onClick={() => {
+                setFull((f) => !f);
+                setFloatingPos(null);
+              }}
               aria-pressed={full}
               title={full ? 'Back to the side' : 'Fill the window'}
               aria-label={full ? 'Back to the side' : 'Fill the window'}
@@ -878,13 +993,17 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             </button>
           </div>
         </div>
-        <button className={styles.closeX} onClick={onClose} title="Close the reader" aria-label="Close the reader" data-reader-close>
+        <button
+          className={styles.closeX}
+          onClick={onClose}
+          title="Close the reader"
+          aria-label="Close the reader"
+          data-reader-close
+        >
           <Icon body={iconBody('x')} size={20} />
         </button>
 
-        {showFrontmatter && (
-          <FrontmatterPanel article={article} settings={settings} />
-        )}
+        {showFrontmatter && <FrontmatterPanel article={article} settings={settings} />}
         {showMarks && bookmarksList(settings) && (
           <BookmarkList viewState={viewState} feedData={feedData} itemId={pId} />
         )}
@@ -902,22 +1021,21 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
           >
             {navRow('top')}
             <div className={styles.articleHeader} ref={headerRef}>
-              {header.kicker && (
-                <div className={styles.articleKicker}>{header.kicker}</div>
-              )}
+              {header.kicker && <div className={styles.articleKicker}>{header.kicker}</div>}
               <h1 className={styles.articleTitle}>{article.title || article.label}</h1>
               {header.byline && authorName && (
                 <div className={styles.articleByline}>
-                  by {authorLink ? (
-                    <a href={authorLink} target="_blank" rel="noopener noreferrer">{authorName}</a>
+                  by{' '}
+                  {authorLink ? (
+                    <a href={authorLink} target="_blank" rel="noopener noreferrer">
+                      {authorName}
+                    </a>
                   ) : (
                     authorName
                   )}
                 </div>
               )}
-              {metaParts.length > 0 && (
-                <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>
-              )}
+              {metaParts.length > 0 && <div className={styles.articleMeta}>{metaParts.join(' · ')}</div>}
               {sourcePill && (
                 // The top bar's own pill, its tap the same (viewState.toggleSource,
                 // as the top bar's onToggleSource). A screen reader hears "hidden
@@ -933,7 +1051,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
                   <FeedPill
                     source={sourcePill.source}
                     hidden={sourcePill.hidden}
-                    onToggle={() => { if (viewState) viewState.toggleSource(sourcePill.source.id); }}
+                    onToggle={() => {
+                      if (viewState) viewState.toggleSource(sourcePill.source.id);
+                    }}
                     viewState={viewState}
                     showCount={showContainerCount(settings && settings.graph)}
                     staleAge={!!(settings && settings.topBar && settings.topBar.staleAge === true)}
@@ -951,8 +1071,21 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
               </button>
             )}
             {!cut && nonTagRefs.length > 0 && contentHtml && article._posted !== 'title' && (
-              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--rp-border)' }} data-reader-references>
-                <div style={{ color: 'var(--rp-accent)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>references</div>
+              <div
+                style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--rp-border)' }}
+                data-reader-references
+              >
+                <div
+                  style={{
+                    color: 'var(--rp-accent)',
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: 8,
+                  }}
+                >
+                  references
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {nonTagRefs.map((r, i) => (
                     <span
@@ -962,7 +1095,8 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
                       data-reference-weight={r.weight}
                       title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
                     >
-                      {r.type}: {r.label || r.value}{r.weight !== 1 ? ` (${r.weight})` : ''}
+                      {r.type}: {r.label || r.value}
+                      {r.weight !== 1 ? ` (${r.weight})` : ''}
                     </span>
                   ))}
                 </div>
@@ -970,7 +1104,9 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
             )}
             {contentHtml && navRow('bottom')}
             {rights && contentHtml && (
-              <footer className={styles.rightsLine} data-reader-rights>{rights}</footer>
+              <footer className={styles.rightsLine} data-reader-rights>
+                {rights}
+              </footer>
             )}
             {!cut && contributionsConfig && contentHtml && article._posted !== 'title' && (
               <Contributions
@@ -989,12 +1125,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
       </div>
 
       {isMinimized && article && (
-        <div
-          className={styles.restorePill}
-          onClick={() => setIsMinimized(false)}
-          title="Bring reading window back"
-        >
-          <span className={styles.pillIcon}><Icon body={iconBody('bookmark')} size={18} /></span>
+        <div className={styles.restorePill} onClick={() => setIsMinimized(false)} title="Bring reading window back">
+          <span className={styles.pillIcon}>
+            <Icon body={iconBody('bookmark')} size={18} />
+          </span>
           <span className={styles.pillLabel}>
             <span className={styles.pillTitle}>{article.title || article.label}</span>
             {authorName && <span className={styles.pillAuthor}>by {authorName}</span>}
@@ -1009,7 +1143,10 @@ export function ReaderPanel({ article, onClose, settings, viewState, targetParag
 // Helpers
 
 function escapeHtml(v) {
-  return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(v).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
 }
 
 // The HTML the reader shows for an item, by its kind (Substrate dispatch in
@@ -1142,7 +1279,8 @@ function cleanHtml(html) {
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase();
       if (name.startsWith('on')) el.removeAttribute(attr.name);
-      else if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+      else if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^\s*javascript:/i.test(attr.value))
+        el.removeAttribute(attr.name);
     }
   });
   const body = doc.querySelector('body');
@@ -1157,7 +1295,9 @@ function renderFeedItem(item) {
     const cleaned = cleanHtml(item.content_html);
     // A bare run of text gets a paragraph, so it reads (and bookmarks,
     // follows along) like any other.
-    html += /<(p|div|ul|ol|h[1-6]|blockquote|pre|table|figure|section|article)\b/i.test(cleaned) ? cleaned : `<p>${cleaned}</p>`;
+    html += /<(p|div|ul|ol|h[1-6]|blockquote|pre|table|figure|section|article)\b/i.test(cleaned)
+      ? cleaned
+      : `<p>${cleaned}</p>`;
   } else if (item.tldr || item.summary) {
     html += `<p>${escapeHtml(item.tldr || item.summary)}</p>`;
   }
@@ -1165,7 +1305,13 @@ function renderFeedItem(item) {
   if (link) {
     const source = sourceOf(item);
     let where = (source && source.title) || '';
-    if (!where) { try { where = new URL(link).hostname; } catch (_) { where = ''; } }
+    if (!where) {
+      try {
+        where = new URL(link).hostname;
+      } catch (_) {
+        where = '';
+      }
+    }
     html += `<p data-reader-link-out><a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Read the whole piece${where ? ' at ' + escapeHtml(where) : ''}</a></p>`;
   }
   return html;
@@ -1190,7 +1336,7 @@ function renderCompanions(article) {
   if (!companions.length) return '';
   let html = `<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--rp-border);">`;
   html += `<div style="color:var(--rp-accent);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">also exists as</div>`;
-  html += `<div style="color:var(--rp-text);font-size:14px;">${companions.map(c => `<span class="${styles.fmTag}">${c}</span>`).join(' ')}</div>`;
+  html += `<div style="color:var(--rp-text);font-size:14px;">${companions.map((c) => `<span class="${styles.fmTag}">${c}</span>`).join(' ')}</div>`;
   html += `</div>`;
   return html;
 }
@@ -1216,16 +1362,19 @@ function renderMetadata(article) {
 function FrontmatterPanel({ article, settings }) {
   const baseFields = settings?.frontmatter_display || [];
   const nonTagRefs = nonTagReferences(article);
-  const fields = nonTagRefs.length && !baseFields.includes('references')
-    ? [...baseFields, 'references']
-    : baseFields;
+  const fields = nonTagRefs.length && !baseFields.includes('references') ? [...baseFields, 'references'] : baseFields;
   let hasData = false;
 
   const renderField = (field) => {
     let value = '';
     switch (field) {
       case 'publish_date':
-        if (article.date) value = new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        if (article.date)
+          value = new Date(`${article.date}T00:00:00`).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
         break;
       case 'updated_date':
         if (article.updated_date) value = article.updated_date;
@@ -1242,38 +1391,58 @@ function FrontmatterPanel({ article, settings }) {
         // (src/lib/provenance.js: the same lines, after the role).
         const tagRefs = tagReferences(article);
         if (tagRefs.length) {
-          value = <>{tagRefs.map((r) => (
-            <span
-              key={r.value}
-              className={styles.fmTag}
-              data-concept={typeof r.concept === 'string' && r.concept ? r.concept : undefined}
-              data-origin={typeof r.origin === 'string' && r.origin ? r.origin : undefined}
-              data-weight={typeof r.weight === 'number' && Number.isFinite(r.weight) ? r.weight : undefined}
-              title={typeof r.why === 'string' && r.why ? [...wrapText(r.why), ...provenanceLines(r)].join('\n') : undefined}
-            >{r.value}</span>
-          ))}</>;
+          value = (
+            <>
+              {tagRefs.map((r) => (
+                <span
+                  key={r.value}
+                  className={styles.fmTag}
+                  data-concept={typeof r.concept === 'string' && r.concept ? r.concept : undefined}
+                  data-origin={typeof r.origin === 'string' && r.origin ? r.origin : undefined}
+                  data-weight={typeof r.weight === 'number' && Number.isFinite(r.weight) ? r.weight : undefined}
+                  title={
+                    typeof r.why === 'string' && r.why
+                      ? [...wrapText(r.why), ...provenanceLines(r)].join('\n')
+                      : undefined
+                  }
+                >
+                  {r.value}
+                </span>
+              ))}
+            </>
+          );
         } else {
           // A card with no tagz says why, in the build's own words, where
           // the chips would be (src/lib/untaggedBecause.js): plain text,
           // not a chip, so it reads as a note and never as a tag.
           const because = untaggedBecauseOf(article);
-          if (because) value = <span className={styles.fmUntagged} data-untagged-because>{because}</span>;
+          if (because)
+            value = (
+              <span className={styles.fmUntagged} data-untagged-because>
+                {because}
+              </span>
+            );
         }
         break;
       }
       case 'references':
         if (nonTagRefs.length) {
-          value = <>{nonTagRefs.map((r, i) => (
-            <span
-              key={`${r.type}:${r.value}:${i}`}
-              className={styles.fmTag}
-              data-reference-type={r.type}
-              data-reference-weight={r.weight}
-              title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
-            >
-              {r.type}: {r.label || r.value}{r.weight !== 1 ? ` (${r.weight})` : ''}
-            </span>
-          ))}</>;
+          value = (
+            <>
+              {nonTagRefs.map((r, i) => (
+                <span
+                  key={`${r.type}:${r.value}:${i}`}
+                  className={styles.fmTag}
+                  data-reference-type={r.type}
+                  data-reference-weight={r.weight}
+                  title={r.why || `${r.type}: ${r.value}${r.weight !== 1 ? ` (${r.weight})` : ''}`}
+                >
+                  {r.type}: {r.label || r.value}
+                  {r.weight !== 1 ? ` (${r.weight})` : ''}
+                </span>
+              ))}
+            </>
+          );
         }
         break;
       case 'series':
@@ -1284,14 +1453,20 @@ function FrontmatterPanel({ article, settings }) {
         break;
       case 'syndication':
         const synd = article.syndication || {};
-        const links = Object.entries(synd).filter(([,url]) => url);
+        const links = Object.entries(synd).filter(([, url]) => url);
         if (links.length) {
-          value = <>{links.map(([p, url], i) => (
-            <React.Fragment key={p}>
-              <a className={styles.fmSyndLink} href={url} target="_blank" rel="noopener noreferrer">{p}</a>
-              {i < links.length - 1 ? ' · ' : ''}
-            </React.Fragment>
-          ))}</>;
+          value = (
+            <>
+              {links.map(([p, url], i) => (
+                <React.Fragment key={p}>
+                  <a className={styles.fmSyndLink} href={url} target="_blank" rel="noopener noreferrer">
+                    {p}
+                  </a>
+                  {i < links.length - 1 ? ' · ' : ''}
+                </React.Fragment>
+              ))}
+            </>
+          );
         }
         break;
       default:
@@ -1313,7 +1488,15 @@ function FrontmatterPanel({ article, settings }) {
 
   return (
     <div className={`${styles.frontmatterPanel} ${styles.open}`}>
-      {hasData ? content : <div className={styles.fmRow}><span className={styles.fmValue} style={{color: '#666'}}>No metadata available.</span></div>}
+      {hasData ? (
+        content
+      ) : (
+        <div className={styles.fmRow}>
+          <span className={styles.fmValue} style={{ color: '#666' }}>
+            No metadata available.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

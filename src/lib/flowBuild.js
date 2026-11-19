@@ -74,8 +74,12 @@ function runProgram(bin, args, input, timeoutMs = TIMEOUT_MS) {
 
     const out = [];
     let stderr = '';
-    child.stdout.on('data', (chunk) => { out.push(chunk); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.stdout.on('data', (chunk) => {
+      out.push(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
     // A program that stops before reading all of its input says why on
     // stderr; the broken pipe itself is not the news.
     child.stdin.on('error', () => {});
@@ -84,7 +88,9 @@ function runProgram(bin, args, input, timeoutMs = TIMEOUT_MS) {
       try {
         process.kill(-child.pid, 'SIGKILL');
       } catch (_) {
-        try { child.kill('SIGKILL'); } catch (__) {}
+        try {
+          child.kill('SIGKILL');
+        } catch (__) {}
       }
       finish({ ok: false, reason: `timed out after ${timeoutMs}ms` });
     }, timeoutMs);
@@ -113,7 +119,11 @@ function runProgram(bin, args, input, timeoutMs = TIMEOUT_MS) {
 // flow-select fails, each said in one line). flow-select --all is the same
 // for every preset, so it runs once and its subfield goes to each flow-score.
 // warn: where a failure's one line goes (console.warn by default).
-async function runFlows(feed, settings, { siteRoot, flowDir = FLOW_DIR, timeoutMs = TIMEOUT_MS, warn = console.warn } = {}) {
+async function runFlows(
+  feed,
+  settings,
+  { siteRoot, flowDir = FLOW_DIR, timeoutMs = TIMEOUT_MS, warn = console.warn } = {},
+) {
   const f = settings && settings.flow && typeof settings.flow === 'object' ? settings.flow : null;
   if (f && f.presets !== undefined && f.presets !== null && !Array.isArray(f.presets)) {
     warn('flow: flow.presets is not a list of presets; built on without orders');
@@ -129,9 +139,11 @@ async function runFlows(feed, settings, { siteRoot, flowDir = FLOW_DIR, timeoutM
     return null;
   }
 
-  const ids = new Set(((feed && Array.isArray(feed.items)) ? feed.items : [])
-    .map((it) => it && it.id)
-    .filter((id) => typeof id === 'string'));
+  const ids = new Set(
+    (feed && Array.isArray(feed.items) ? feed.items : [])
+      .map((it) => it && it.id)
+      .filter((id) => typeof id === 'string'),
+  );
 
   const selected = await runProgram(bin('flow-select'), ['--all'], JSON.stringify(feed), timeoutMs);
   if (!selected.ok) {
@@ -165,9 +177,12 @@ async function runFlows(feed, settings, { siteRoot, flowDir = FLOW_DIR, timeoutM
       warn(`flow: ${entry}: unreadable output (${err.message}); built on without that order`);
       continue;
     }
-    const name = flow && flow.summary && typeof flow.summary.preset === 'string' && flow.summary.preset
-      ? flow.summary.preset
-      : (typeof preset.name === 'string' ? preset.name : '');
+    const name =
+      flow && flow.summary && typeof flow.summary.preset === 'string' && flow.summary.preset
+        ? flow.summary.preset
+        : typeof preset.name === 'string'
+          ? preset.name
+          : '';
     if (!name || !flow || !Array.isArray(flow.items)) {
       warn(`flow: ${entry}: no order in flow-order's output; built on without that order`);
       continue;

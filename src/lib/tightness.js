@@ -47,7 +47,12 @@ function tightened(sim, t, card) {
   const shorter = Math.min(num(c.width, DEFAULT_CARD.width), num(c.height, DEFAULT_CARD.height));
   return {
     linkDistance: run(linkDistance * LOOSE.linkDistance, linkDistance, linkDistance * TIGHT.linkDistance, tt),
-    chargeStrength: run(chargeStrength * LOOSE.chargeStrength, chargeStrength, chargeStrength * TIGHT.chargeStrength, tt),
+    chargeStrength: run(
+      chargeStrength * LOOSE.chargeStrength,
+      chargeStrength,
+      chargeStrength * TIGHT.chargeStrength,
+      tt,
+    ),
     collidePadding: run(collidePadding * LOOSE.collidePadding, collidePadding, -shorter * TIGHT_OVERLAP, tt),
   };
 }

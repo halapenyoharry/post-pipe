@@ -15,14 +15,14 @@ async function main() {
   console.log('Pushing index.html...');
   const indexContent = fs.readFileSync(path.join(SITE_ROOT, '_site', 'index.html'), 'utf8');
   await pushFile('index.html', indexContent);
-  
+
   console.log('Done.');
 }
 
 async function pushCovers() {
   const coversDir = path.join(SITE_ROOT, '_site', 'covers');
   if (!fs.existsSync(coversDir)) return;
-  
+
   const files = fs.readdirSync(coversDir);
   for (const file of files) {
     if (file.startsWith('.')) continue; // skip .DS_Store

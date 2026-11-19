@@ -2,7 +2,7 @@
 // Keyed by feed id (the OPML xmlUrl). One JSON file under .feed-cache/.
 // .feed-cache/ is already in .gitignore.
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;

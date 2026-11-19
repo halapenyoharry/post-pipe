@@ -21,8 +21,10 @@ export const itemKey = (source, id) => `${source}::${id}`;
 // ` (system)` appended to its scheme id so the two never collide.
 export const SITE_SCHEME = 'site';
 export const DISCOVERED_SCHEME = 'discovered';
-export const schemeOfSource = (source) => (source === SITE_SCHEME || source === DISCOVERED_SCHEME ? `${source} (system)` : source);
-export const schemeOf = (record) => ((record.origin ?? 'explicit') === 'discovered' ? DISCOVERED_SCHEME : schemeOfSource(record.source));
+export const schemeOfSource = (source) =>
+  source === SITE_SCHEME || source === DISCOVERED_SCHEME ? `${source} (system)` : source;
+export const schemeOf = (record) =>
+  (record.origin ?? 'explicit') === 'discovered' ? DISCOVERED_SCHEME : schemeOfSource(record.source);
 
 // An earned record under its own build's bar: its `sourceRatio` is below the `sourceCoherenceRatio`
 // it was generated with. A discovered one only rtz-discover's lower floor admitted; an emergent one
@@ -61,7 +63,8 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
   const terms = new Map();
 
   const source = (name) => {
-    if (!sources.has(name)) sources.set(name, { name, color: null, items: new Set(), tagged: new Set(), occurrences: 0 });
+    if (!sources.has(name))
+      sources.set(name, { name, color: null, items: new Set(), tagged: new Set(), occurrences: 0 });
     return sources.get(name);
   };
 
@@ -93,7 +96,16 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
     if (!info.norm || ignore.has(info.norm)) continue;
     const key = itemKey(r.source, r.item);
     if (!items.has(key)) {
-      items.set(key, { key, source: r.source, id: String(r.item), title: String(r.item), text: '', url: '', date: '', kind: '' });
+      items.set(key, {
+        key,
+        source: r.source,
+        id: String(r.item),
+        title: String(r.item),
+        text: '',
+        url: '',
+        date: '',
+        kind: '',
+      });
       source(r.source).items.add(key);
     }
     const s = source(r.source);
@@ -121,7 +133,8 @@ export function loadCorpus(records, { ignore = new Set(), includeEmergent = fals
       };
       terms.set(info.norm, t);
     }
-    if (origin === 'discovered' && typeof r.sourceRatio === 'number') t.ratio = Math.max(t.ratio ?? -Infinity, r.sourceRatio);
+    if (origin === 'discovered' && typeof r.sourceRatio === 'number')
+      t.ratio = Math.max(t.ratio ?? -Infinity, r.sourceRatio);
     else t.unrated = true;
     if (!belowBar(r)) t.atBar += 1;
     // forms, counts and item sets are filed by SCHEME: a discovered spelling goes under
@@ -182,11 +195,14 @@ export const ratioOf = (term) => (term.unrated || term.ratio === null ? null : t
 // then the most frequent, then one with capitals.
 export function displayForm(term) {
   const human = new Set();
-  for (const [scheme, forms] of term.formsBySource) if (scheme !== DISCOVERED_SCHEME) for (const raw of forms.keys()) human.add(raw);
+  for (const [scheme, forms] of term.formsBySource)
+    if (scheme !== DISCOVERED_SCHEME) for (const raw of forms.keys()) human.add(raw);
   const entries = [...term.forms.entries()].filter(([raw]) => !human.size || human.has(raw));
   if (term.acronymLike && term.tokens.length === 1) {
     const plain = (raw) => Number(!/[.\s]/.test(raw));
-    const acro = entries.filter(([raw]) => looksLikeAcronym(raw)).sort((a, b) => b[1] - a[1] || plain(b[0]) - plain(a[0]) || (a[0] < b[0] ? -1 : 1));
+    const acro = entries
+      .filter(([raw]) => looksLikeAcronym(raw))
+      .sort((a, b) => b[1] - a[1] || plain(b[0]) - plain(a[0]) || (a[0] < b[0] ? -1 : 1));
     return acro[0][0];
   }
   const clean = entries.filter(([raw]) => !/[-_]/.test(raw));
@@ -195,7 +211,8 @@ export function displayForm(term) {
 }
 
 // displayForm's order among spellings: most used, then one with capitals, then alphabetical.
-const byFormPreference = (a, b) => b[1] - a[1] || Number(/[A-Z]/.test(b[0])) - Number(/[A-Z]/.test(a[0])) || (a[0] < b[0] ? -1 : 1);
+const byFormPreference = (a, b) =>
+  b[1] - a[1] || Number(/[A-Z]/.test(b[0])) - Number(/[A-Z]/.test(a[0])) || (a[0] < b[0] ? -1 : 1);
 
 // The preferred spelling among `{raw: count}` entries of ONE scheme: the most frequent raw form as
 // written, ties broken as displayForm breaks them (a spelling without joiners first, then one with

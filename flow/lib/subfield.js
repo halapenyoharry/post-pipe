@@ -5,7 +5,16 @@
 // Nothing is added that the feed does not carry.
 
 /** The SKOS relation layers post-pipe writes between two tagz (src/corpus/relationEdges.js). */
-export const RELATION_LAYERS = ['broader', 'narrower', 'related', 'closeMatch', 'exactMatch', 'broadMatch', 'narrowMatch', 'relatedMatch'];
+export const RELATION_LAYERS = [
+  'broader',
+  'narrower',
+  'related',
+  'closeMatch',
+  'exactMatch',
+  'broadMatch',
+  'narrowMatch',
+  'relatedMatch',
+];
 
 /** The fields of a tag reference the subfield keeps, in this order. */
 const TAG_REF_FIELDS = ['type', 'concept', 'value', 'weight', 'origin', 'why', 'prefLabel', 'sourceRatio', 'systems'];
@@ -120,7 +129,13 @@ export function buildField(feed) {
     }
     if (e.layer === 'tag') continue; // already a hyperedge, from the references
     if (!cardIds.has(e.source) && !cardIds.has(e.target)) continue;
-    links.push({ source: e.source, target: e.target, layer: e.layer ?? null, role: e.role ?? null, directed: Boolean(e.directed) });
+    links.push({
+      source: e.source,
+      target: e.target,
+      layer: e.layer ?? null,
+      role: e.role ?? null,
+      directed: Boolean(e.directed),
+    });
   }
 
   return { schemes, cards, tagz: [...tagz.values()], relations, links };
@@ -141,7 +156,8 @@ export function adjacencyOf(sub) {
     if (!adj.has(h.id)) adj.set(h.id, new Set());
     for (const m of h.members) if (cardIds.has(m.card)) add(h.id, m.card);
   }
-  for (const l of sub.links) if (cardIds.has(l.source) && cardIds.has(l.target) && l.source !== l.target) add(l.source, l.target);
+  for (const l of sub.links)
+    if (cardIds.has(l.source) && cardIds.has(l.target) && l.source !== l.target) add(l.source, l.target);
   return adj;
 }
 
@@ -170,9 +186,12 @@ function restrict(field, keep, selector, position) {
     .filter((h) => h.members.length);
   const tagIds = new Set(tagz.map((h) => h.id));
   const relations = field.relations.filter((r) => tagIds.has(r.a) && tagIds.has(r.b));
-  const links = field.links.filter((l) => (keepSet.has(l.source) || keepSet.has(l.target))
-    && (!field.cardIds.has(l.source) || keepSet.has(l.source))
-    && (!field.cardIds.has(l.target) || keepSet.has(l.target)));
+  const links = field.links.filter(
+    (l) =>
+      (keepSet.has(l.source) || keepSet.has(l.target)) &&
+      (!field.cardIds.has(l.source) || keepSet.has(l.source)) &&
+      (!field.cardIds.has(l.target) || keepSet.has(l.target)),
+  );
   const sub = { selector, position, schemes: field.schemes, cards, tagz, relations, links };
   if (position) {
     const hops = hopsFrom(adjacencyOf(sub), position);
@@ -191,7 +210,12 @@ export function select(feed, selector) {
   field.cardIds = new Set(field.cards.map((c) => c.id));
   const mode = selector.mode || 'all';
   if (mode === 'all') {
-    return restrict(field, field.cards.map((c) => c.id), { mode: 'all' }, null);
+    return restrict(
+      field,
+      field.cards.map((c) => c.id),
+      { mode: 'all' },
+      null,
+    );
   }
   if (mode === 'set') {
     const ids = (selector.ids || []).filter(Boolean);

@@ -8,7 +8,11 @@ test('the text front matter wins, the metadata fills the rest', () => {
 });
 
 test('top-level fields count too, unknown times do not, empty is null', () => {
-  assert.deepStrictEqual(sceneFrom({ time_of_day: 'late night', place: 'Austin' }), { time_of_day: 'late-night', date: '', place: 'Austin' });
+  assert.deepStrictEqual(sceneFrom({ time_of_day: 'late night', place: 'Austin' }), {
+    time_of_day: 'late-night',
+    date: '',
+    place: 'Austin',
+  });
   assert.strictEqual(sceneFrom({ time_of_day: 'teatime' }), null);
   assert.strictEqual(sceneFrom(null, { scene: { time_of_day: '', date: '', place: '' } }), null);
 });

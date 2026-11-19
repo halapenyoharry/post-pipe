@@ -5,11 +5,7 @@
 // Provisional switch: settings.topBar.autodiscover (default true; set false
 // to use the pasted URL as-is without fetching or parsing HTML).
 
-const FEED_MIME_TYPES = new Set([
-  'application/rss+xml',
-  'application/atom+xml',
-  'application/feed+json',
-]);
+const FEED_MIME_TYPES = new Set(['application/rss+xml', 'application/atom+xml', 'application/feed+json']);
 
 function autodiscoverEnabled(settings) {
   if (!settings || typeof settings !== 'object') return true;
@@ -67,9 +63,15 @@ function parseAlternateFeedLink(html, baseUrl) {
   let m;
   while ((m = linkRe.exec(head)) !== null) {
     const attrs = parseAttributes(m[0]);
-    const relTokens = String(attrs.rel || '').toLowerCase().trim().split(/\s+/);
+    const relTokens = String(attrs.rel || '')
+      .toLowerCase()
+      .trim()
+      .split(/\s+/);
     if (!relTokens.includes('alternate')) continue;
-    const mime = String(attrs.type || '').toLowerCase().split(';')[0].trim();
+    const mime = String(attrs.type || '')
+      .toLowerCase()
+      .split(';')[0]
+      .trim();
     if (!FEED_MIME_TYPES.has(mime)) continue;
     const rawHref = decodeBasicEntities(attrs.href || '').trim();
     if (!rawHref) continue;
@@ -133,7 +135,8 @@ function parsePageTitle(html) {
   while ((m = metaRe.exec(head)) !== null) {
     const attrs = parseAttributes(m[0]);
     const key = String(attrs.property || attrs.name || '').toLowerCase();
-    if ((key === 'og:title' || key === 'twitter:title') && attrs.content) return decodeBasicEntities(attrs.content).trim();
+    if ((key === 'og:title' || key === 'twitter:title') && attrs.content)
+      return decodeBasicEntities(attrs.content).trim();
   }
   const t = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(head);
   return t ? decodeBasicEntities(t[1]).replace(/\s+/g, ' ').trim() : '';

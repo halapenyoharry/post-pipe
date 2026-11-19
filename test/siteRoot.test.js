@@ -32,18 +32,9 @@ test('siteRoot: POSTPIPE_SITE wins and a leading ~ expands', () => {
   const prevHome = process.env.HOME;
   process.env.HOME = home;
   try {
-    assert.strictEqual(
-      siteRoot({ POSTPIPE_SITE: '~/my-site/sub' }),
-      path.resolve(path.join(home, 'my-site', 'sub'))
-    );
-    assert.strictEqual(
-      siteRoot({ POSTPIPE_SITE: '/tmp/explicit-site' }),
-      path.resolve('/tmp/explicit-site')
-    );
-    assert.strictEqual(
-      expandHome('~/example'),
-      path.resolve(path.join(home, 'example'))
-    );
+    assert.strictEqual(siteRoot({ POSTPIPE_SITE: '~/my-site/sub' }), path.resolve(path.join(home, 'my-site', 'sub')));
+    assert.strictEqual(siteRoot({ POSTPIPE_SITE: '/tmp/explicit-site' }), path.resolve('/tmp/explicit-site'));
+    assert.strictEqual(expandHome('~/example'), path.resolve(path.join(home, 'example')));
   } finally {
     if (prevHome === undefined) delete process.env.HOME;
     else process.env.HOME = prevHome;
@@ -78,7 +69,7 @@ test('author fallback: piece with no author takes site author (name, else displa
     fs.mkdirSync(path.join(contentDir, 'gen2-no-author'), { recursive: true });
     fs.writeFileSync(
       path.join(contentDir, 'gen2-no-author', 'frontmatter.json'),
-      JSON.stringify({ title: 'Gen 2 Piece', posted: true })
+      JSON.stringify({ title: 'Gen 2 Piece', posted: true }),
     );
     fs.writeFileSync(path.join(contentDir, 'gen2-no-author', 'index.md'), 'Body text.');
 
@@ -86,7 +77,7 @@ test('author fallback: piece with no author takes site author (name, else displa
     fs.mkdirSync(path.join(contentDir, 'qmd-no-author'), { recursive: true });
     fs.writeFileSync(
       path.join(contentDir, 'qmd-no-author', 'index.qmd'),
-      '---\ntitle: Qmd Piece\nposted: true\n---\nBody text.\n'
+      '---\ntitle: Qmd Piece\nposted: true\n---\nBody text.\n',
     );
 
     // 3. Gen 0 (unstructured) with no author
@@ -97,7 +88,7 @@ test('author fallback: piece with no author takes site author (name, else displa
     fs.mkdirSync(path.join(contentDir, 'with-author'), { recursive: true });
     fs.writeFileSync(
       path.join(contentDir, 'with-author', 'frontmatter.json'),
-      JSON.stringify({ title: 'Authored Piece', meta: { author: 'Ada Lovelace' }, posted: true })
+      JSON.stringify({ title: 'Authored Piece', meta: { author: 'Ada Lovelace' }, posted: true }),
     );
 
     // Case A: no site author -> stays empty
@@ -125,7 +116,9 @@ test('author fallback: piece with no author takes site author (name, else displa
       for (const item of items) {
         if (item.url.endsWith('/with-author.html')) {
           assert.strictEqual(item.author, 'ada lovelace');
-          assert.deepStrictEqual(item.authors, [{ name: 'ada lovelace', url: 'https://example.test/with-author.html' }]);
+          assert.deepStrictEqual(item.authors, [
+            { name: 'ada lovelace', url: 'https://example.test/with-author.html' },
+          ]);
         } else {
           assert.strictEqual(item.author, '');
           assert.deepStrictEqual(item.authors, []);
@@ -189,7 +182,7 @@ test('author fallback: piece with no author takes site author (name, else displa
   }
 });
 
-test('author suffix kept: an author written as \'Ada Lovelace [tag]\' comes out as \'ada lovelace [tag]\'', async () => {
+test("author suffix kept: an author written as 'Ada Lovelace [tag]' comes out as 'ada lovelace [tag]'", async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-author-suffix-'));
   const contentDir = path.join(tmpRoot, 'items');
   const coversDir = path.join(tmpRoot, 'covers');
@@ -199,7 +192,7 @@ test('author suffix kept: an author written as \'Ada Lovelace [tag]\' comes out 
     fs.mkdirSync(path.join(contentDir, 'with-author'), { recursive: true });
     fs.writeFileSync(
       path.join(contentDir, 'with-author', 'frontmatter.json'),
-      JSON.stringify({ title: 'Piece', meta: { author: 'Ada Lovelace [tag]' }, posted: true })
+      JSON.stringify({ title: 'Piece', meta: { author: 'Ada Lovelace [tag]' }, posted: true }),
     );
 
     const { contents } = ingestFolder(contentDir);
@@ -222,4 +215,3 @@ test('author suffix kept: an author written as \'Ada Lovelace [tag]\' comes out 
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
 });
-

@@ -21597,8 +21597,8 @@ function lu({ url: e, kind: t = "feed", pageTitle: n = "", onKind: r, onDismiss:
 								className: J.codeInline,
 								children: "</body>"
 							}),
+							" in feeds.opml, then run",
 							" ",
-							"in feeds.opml, then run ",
 							/* @__PURE__ */ (0, W.jsx)("code", {
 								className: J.codeInline,
 								children: "node generate-index.js"
@@ -22981,12 +22981,16 @@ function Du({ article: e, onClose: t, settings: n, viewState: r, targetParagraph
 										}),
 										it.byline && nt && /* @__PURE__ */ (0, W.jsxs)("div", {
 											className: q.articleByline,
-											children: ["by ", rt ? /* @__PURE__ */ (0, W.jsx)("a", {
-												href: rt,
-												target: "_blank",
-												rel: "noopener noreferrer",
-												children: nt
-											}) : nt]
+											children: [
+												"by",
+												" ",
+												rt ? /* @__PURE__ */ (0, W.jsx)("a", {
+													href: rt,
+													target: "_blank",
+													rel: "noopener noreferrer",
+													children: nt
+												}) : nt
+											]
 										}),
 										et.length > 0 && /* @__PURE__ */ (0, W.jsx)("div", {
 											className: q.articleMeta,
@@ -24784,7 +24788,8 @@ function pd({ viewState: e, feedData: t, subject: n, readerOpen: r, where: i = "
 								style: { minWidth: `${String(se.total).length}ch` },
 								children: se.shown
 							}),
-							" of ",
+							" ",
+							"of ",
 							se.total,
 							" tagz"
 						]
@@ -24970,7 +24975,8 @@ function pd({ viewState: e, feedData: t, subject: n, readerOpen: r, where: i = "
 				className: Z.hint,
 				children: [
 					e.label,
-					" is under the ",
+					" is under the",
+					" ",
 					/* @__PURE__ */ (0, W.jsx)("a", {
 						className: Z.hintLink,
 						href: `./fonts/${e.license}`,
