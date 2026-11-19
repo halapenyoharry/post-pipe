@@ -73,6 +73,16 @@ function nextGranularity(g) {
 //   { kind: 'granularity', value }                      when the dimension on has one
 // heading is the group label. No rows without dimensions: then the menu and
 // its button are left out.
+/**
+ * @param {{
+ *   dimensions?: Array<{ id: string, label: string, title?: string }>,
+ *   layers?: Array<{ id: string, label: string, title?: string }>,
+ *   axis?: { on?: boolean, dimension?: string, granularity?: string },
+ *   preferences?: Record<string, any>,
+ *   show?: { dimensions?: boolean, history?: boolean, layout?: boolean },
+ *   group?: string
+ * }} opts
+ */
 function menuModel({ dimensions = [], layers = [], axis = {}, preferences = {}, show = {}, group = 'dimensions' }) {
   const rows = [];
   const current = axis.dimension || 'time';

@@ -53,6 +53,17 @@ function hasTagNodes(feedData, graphSettings) {
 //   maxPieces:     the slider's top, the largest count the graph published
 //                  (window.PostPipeGraphTags.counts), or null for the largest
 //                  of tagCounts, else of the feed's counts
+/**
+ * @param {any} feedData
+ * @param {{
+ *   hiddenSources?: Set<string>|string[],
+ *   sourceColorOf?: ((sourceId: string) => string|null)|null,
+ *   fallbackColor?: string|null,
+ *   minPieces?: number|null,
+ *   tagCounts?: Map<string, number>|Record<string, number>|null,
+ *   maxPieces?: number|null
+ * }} [opts]
+ */
 function tagListModel(
   feedData,
   { hiddenSources, sourceColorOf, fallbackColor, minPieces = null, tagCounts = null, maxPieces = null } = {},

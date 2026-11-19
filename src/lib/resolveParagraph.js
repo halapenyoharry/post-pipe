@@ -14,6 +14,11 @@ function normalize(str) {
     .trim();
 }
 
+/**
+ * @param {string[]} paragraphTexts
+ * @param {{ para?: number|string, quote?: string }} [opts]
+ * @returns {number}
+ */
 function resolveParagraph(paragraphTexts, { para, quote } = {}) {
   if (!Array.isArray(paragraphTexts) || paragraphTexts.length === 0) {
     return 0;
@@ -44,5 +49,5 @@ function resolveParagraph(paragraphTexts, { para, quote } = {}) {
 module.exports = { resolveParagraph, normalize };
 
 if (typeof window !== 'undefined') {
-  window.resolveParagraph = resolveParagraph;
+  /** @type {any} */ (window).resolveParagraph = resolveParagraph;
 }

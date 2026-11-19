@@ -36,6 +36,10 @@ function hasBodyText(text) {
 }
 
 // A piece is a link node when it names a link and has no body text.
+/**
+ * @param {{ link?: string, body?: string }} [opts]
+ * @returns {boolean}
+ */
 function isLinkContent({ link, body } = {}) {
   return Boolean(str(link)) && !hasBodyText(body);
 }
@@ -95,12 +99,17 @@ function linkTarget(href, { mode = 'external', base = '' } = {}) {
 // Follow a link item's link from the page in `win`: a new tab or this one,
 // per graph.links.newTab. Returns { href, target }, or null for an item with
 // no link.
+/**
+ * @param {any} item
+ * @param {{ settings?: any, win?: any }} [opts]
+ * @returns {{ href: string, target: '_blank'|'_self' }|null}
+ */
 function followLink(item, { settings = null, win = typeof window !== 'undefined' ? window : null } = {}) {
   const raw = linkOf(item);
   if (!raw || !win) return null;
   const base = (win.document && win.document.baseURI) || (win.location && win.location.href) || '';
   const href = resolveLink(raw, base);
-  const target = linkTarget(raw, { mode: newTabMode(settings || win.SETTINGS), base });
+  const target = linkTarget(raw, { mode: newTabMode(settings || /** @type {any} */ (win).SETTINGS), base });
   if (target === '_blank') win.open(href, '_blank', 'noopener');
   else win.location.assign(href);
   return { href, target };

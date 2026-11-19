@@ -487,6 +487,11 @@ function revealFactor(hidden, at, now) {
 // The state the page opens on. A link straight to a chapter (#read=) opens
 // on the graph with the chapter; otherwise startOn, and for 'remembered' the
 // state this reader left, or the art for a reader with no memory here.
+/**
+ * @param {any} config
+ * @param {{ stored?: string|null, hash?: string }} [opts]
+ * @returns {'art'|'graph'|string}
+ */
 function startState(config, { stored, hash } = {}) {
   if (!config) return 'graph';
   if (typeof hash === 'string' && hash.startsWith('#read=')) return 'graph';
@@ -528,6 +533,12 @@ function startState(config, { stored, hash } = {}) {
 //               of its top (align 'center', under the art, without a title),
 //               or its top left corner (align 'left', under the title: under
 //               'title'), between the two layouts' places as the page moves
+/**
+ * @param {any} config
+ * @param {{ vw?: number, vh?: number, art?: { w?: number, h?: number }|null, bottom?: number, zoom?: { k: number, homeK: number }|null, controls?: number, ink?: any, perPx?: number|null }} [opts]
+ * @param {number} [p]
+ * @returns {any}
+ */
 function coverGeometry(
   config,
   { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null, perPx = null } = {},
@@ -668,6 +679,21 @@ const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) 
 //   tapArt(), tapTop()   to the graph; the cover handle, to the art
 //   go(state, { instant })   to a rest
 //   resize(travel)   px of travel for a whole scrub (the art's move)
+/**
+ * @param {any} config
+ * @param {{
+ *   start?: string,
+ *   reducedMotion?: boolean,
+ *   travel?: number,
+ *   now?: () => number,
+ *   frame?: (fn: () => void) => any,
+ *   cancelFrame?: (h: any) => void,
+ *   setTimer?: typeof setTimeout,
+ *   clearTimer?: typeof clearTimeout,
+ *   onChange?: (p: number, info?: any) => void,
+ *   onRest?: (state: string) => void
+ * }} [opts]
+ */
 function createCover(
   config,
   {

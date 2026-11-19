@@ -226,12 +226,13 @@ function hostParamsBackend(api, field) {
 }
 
 /**
- * @param {Object}  opts
- * @param {Object}  [opts.backend]      persistence adapter; defaults to memory
- * @param {string}  [opts.corpusId]     namespace, so two corpora do not collide
- * @param {number}  [opts.debounceMs]   coalesce writes during a drag
- * @param {number}  [opts.maxHistory]   undo depth
- * @param {Function}[opts.now]          injectable clock, for tests
+ * @param {Object}  [opts]
+ * @param {Object}  [opts.backend]        persistence adapter; defaults to memory
+ * @param {string}  [opts.corpusId]       namespace, so two corpora do not collide
+ * @param {string}  [opts.layoutVersion]  layout version string, clears auto positions on bump
+ * @param {number}  [opts.debounceMs]     coalesce writes during a drag
+ * @param {number}  [opts.maxHistory]     undo depth
+ * @param {Function}[opts.now]            injectable clock, for tests
  */
 function createViewState(opts = {}) {
   const backend = opts.backend || memoryBackend();
@@ -849,12 +850,17 @@ function createViewState(opts = {}) {
         .sort((a, b) => (a.para ?? 0) - (b.para ?? 0) || (a.t ?? 0) - (b.t ?? 0));
     },
 
+    /**
+     * @param {{ item?: string, para?: number|string, quote?: string, note?: string, version?: string }} [opts]
+     * @returns {string}
+     */
     addBookmark({ item, para, quote, note, version } = {}) {
       const id = 'bm-' + now() + '-' + Math.random().toString(36).slice(2, 8);
+      /** @type {Record<string, any>} */
       const entry = {
         id,
         item,
-        para: typeof para === 'number' ? para : parseInt(para, 10) || 0,
+        para: typeof para === 'number' ? para : parseInt(String(para), 10) || 0,
         quote: quote ? String(quote) : '',
         note: note ? String(note) : '',
         t: now(),
@@ -933,7 +939,7 @@ module.exports = {
 // Browser global, for the static page which inlines this file the way it
 // inlines tts.js. Same module, no build step, no second copy.
 if (typeof window !== 'undefined') {
-  window.ViewState = {
+  /** @type {any} */ (window).ViewState = {
     createViewState,
     memoryBackend,
     localStorageBackend,

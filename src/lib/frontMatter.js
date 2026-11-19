@@ -7,11 +7,16 @@
 // Only a block that parses as a YAML mapping counts. A chapter that opens
 // with a scene-break `---`, prose, and another `---` is prose, not metadata.
 
+/** @type {any} */
 const matter = require('gray-matter');
 
 const OPEN = /^﻿?---[ \t]*\r?\n/;
 const CLOSE = /^(?:---|\.\.\.)[ \t]*$/;
 
+/**
+ * @param {string|null|undefined} text
+ * @returns {{ data: Record<string, any>|null, body: string, raw: string }}
+ */
 function splitFrontMatter(text) {
   const src = String(text == null ? '' : text);
   const open = OPEN.exec(src);
@@ -45,18 +50,25 @@ function stripFrontMatter(text) {
 
 // Commits whose message starts with `meta:` are structural (moves, renames,
 // front matter edits), not revisions of the text.
+/**
+ * @param {string|null|undefined} message
+ * @returns {boolean}
+ */
 function isMetaCommit(message) {
   return /^\s*meta:/i.test(String(message || ''));
 }
 
-module.exports = { splitFrontMatter, stripFrontMatter, isMetaCommit };
-
 // The dates the commits dimension draws, oldest first. `commits` is
 // [{ date, message }]; with hideMeta (the default) structural commits are
 // left out of the revision timeline.
+/**
+ * @param {Array<{ date?: string, message?: string }>} commits
+ * @param {{ hideMeta?: boolean }} [opts]
+ * @returns {string[]}
+ */
 function commitTimes(commits, { hideMeta = true } = {}) {
   if (!Array.isArray(commits)) return [];
   return commits.filter((c) => c && c.date && !(hideMeta && isMetaCommit(c.message))).map((c) => c.date);
 }
 
-module.exports.commitTimes = commitTimes;
+module.exports = { splitFrontMatter, stripFrontMatter, isMetaCommit, commitTimes };

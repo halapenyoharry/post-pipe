@@ -56,9 +56,28 @@ function penalty(n, how) {
   return Math.sqrt(v);
 }
 
-// Flow's recency x for one card (calendar or session), 0 when undated or
-// unknown.
+/**
+ * @typedef {Object} EdgeWeightsConfig
+ * @property {string} mode
+ * @property {string} degreePenalty
+ * @property {string} recencyClock
+ * @property {number} recencyHalfLifeDays
+ * @property {number} recencyFloor
+ * @property {number} distanceSpread
+ * @property {Record<string, number>} weights
+ */
+
+/**
+ * Flow's recency x for one card (calendar or session), 0 when undated or
+ * unknown.
+ *
+ * @param {string|number|null|undefined} dateIso
+ * @param {string|number|null|undefined} newestMs
+ * @param {{ clock?: string, rankIndex?: number, count?: number, halfLifeDays?: number }} [opts]
+ * @returns {number}
+ */
 function recencyX(dateIso, newestMs, opts = {}) {
+  /** @type {any} */
   const o = opts && typeof opts === 'object' ? opts : {};
   if (o.clock === 'session') {
     if (!isFiniteNum(o.rankIndex) || !isFiniteNum(o.count)) return 0;
@@ -206,10 +225,17 @@ function inferNewestMs(ctx, sNode, tNode) {
   return newest;
 }
 
-// Effective weight for one link:
-//   raw * degreeFactor * recencyFactor * typeWeight
-// Returns { eff, raw, degreeFactor, recencyFactor, typeWeight }.
+/**
+ * Effective weight for one link:
+ *   raw * degreeFactor * recencyFactor * typeWeight
+ * Returns { eff, raw, degreeFactor, recencyFactor, typeWeight }.
+ *
+ * @param {any} link
+ * @param {Record<string, any>} [ctx]
+ * @returns {{ eff: number, raw: number, degreeFactor: number, recencyFactor: number, typeWeight: number }}
+ */
 function effectiveWeight(link, ctx = {}) {
+  /** @type {any} */
   const c = ctx && typeof ctx === 'object' ? ctx : {};
   const ew = normaliseEdgeWeights(c.settings || c.edgeWeights || c);
 

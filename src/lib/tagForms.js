@@ -315,6 +315,11 @@ function targetName(summary, target) {
 //   for a bubble standing for several tags at the depth chosen,
 //   "stands for <member>, <member>, …" (options.members, their labels).
 // info may be null when only the members have something to say.
+/**
+ * @param {any} info
+ * @param {{ rtagz?: any, members?: string[] }} [opts]
+ * @returns {string[]}
+ */
 function tagFormsLines(info, { rtagz, members } = {}) {
   const lines = [];
   if (info && Array.isArray(info.forms)) {

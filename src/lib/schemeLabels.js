@@ -207,6 +207,12 @@ function depthOf(depth) {
 //            a broader concept's id (or an external id) further up; tags
 //            sharing one are one group
 // systems    one source id per piece the tag joins, for the majority fallback
+/**
+ * @param {any} rtagz
+ * @param {string} conceptId
+ * @param {{ scheme?: string, depth?: number, systems?: string[] }} [opts]
+ * @returns {{ label: string|null, scheme: string|null, fallback: boolean, groupId: string|null }}
+ */
 function labelFor(rtagz, conceptId, { scheme, depth, systems } = {}) {
   const chosen = typeof scheme === 'string' && scheme ? scheme : SITE_SCHEME;
   const steps = depthOf(depth);
@@ -246,6 +252,12 @@ function labelFor(rtagz, conceptId, { scheme, depth, systems } = {}) {
 
 // Which group each concept falls in at a scheme and depth: Map conceptId ->
 // groupId (labelFor's). A concept rosetta-tagz does not know is its own group.
+/**
+ * @param {any} rtagz
+ * @param {string[]} conceptIds
+ * @param {{ scheme?: string, depth?: number }} [opts]
+ * @returns {Map<string, string>}
+ */
 function groupsFor(rtagz, conceptIds, { scheme, depth } = {}) {
   const out = new Map();
   for (const id of Array.isArray(conceptIds) ? conceptIds : []) {

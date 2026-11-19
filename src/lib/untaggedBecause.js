@@ -47,6 +47,11 @@ const NOT_RECURRING = new Set(['noRecurring', 'noCandidate', 'nearCopy']);
 // entry: an item of build.json's untagged report (reason, reasons, candidates)
 // as feed._rtagz.untagged carries it; settings: the site's rtagz switches,
 // discover (true | 'queue' | false) and emerge (boolean). Returns the line.
+/**
+ * @param {any} entry
+ * @param {{ discover?: boolean|'queue'|string, emerge?: boolean }} [opts]
+ * @returns {string}
+ */
 function untaggedBecause(entry, { discover = false, emerge = true } = {}) {
   const e = entry && typeof entry === 'object' ? entry : {};
   const reasons = Array.isArray(e.reasons)

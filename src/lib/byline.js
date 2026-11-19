@@ -13,15 +13,65 @@
 //
 // Author names are shown lowercase, as the engine has always drawn them.
 
+/**
+ * @typedef {Object} CardItem
+ * @property {string} [id]
+ * @property {string} [url]
+ * @property {string} [canonical_url]
+ * @property {string} [external_url]
+ * @property {string} [link]
+ * @property {string} [title]
+ * @property {string} [label]
+ * @property {string} [subtitle]
+ * @property {string} [summary]
+ * @property {string} [blurb]
+ * @property {string} [author]
+ * @property {Array<{ name?: string, url?: string }>} [authors]
+ * @property {string} [content_html]
+ * @property {string} [content_text]
+ * @property {string[]} [tags]
+ * @property {any[]} [_references]
+ * @property {{ id?: string, title?: string, type?: string, color?: string }} [_source]
+ * @property {CardItem} [originalItem]
+ */
+
+/**
+ * @typedef {Object} SiteSettings
+ * @property {{ title?: string, description?: string, lang?: string }} [site]
+ * @property {{ name?: string, display?: string, url?: string }} [author]
+ * @property {string} [accent]
+ * @property {Record<string, any>} [theme]
+ * @property {Record<string, any>} [graph]
+ * @property {Record<string, any>} [reader]
+ * @property {Record<string, any>} [cards]
+ * @property {Record<string, any>} [topBar]
+ * @property {Record<string, any>} [toolbar]
+ * @property {Record<string, any>} [opening]
+ * @property {Record<string, any>} [rtagz]
+ * @property {Record<string, any>} [flow]
+ */
+
+/**
+ * @param {CardItem|null|undefined} article
+ */
 function sourceOf(article) {
   if (!article) return null;
   return article._source || (article.originalItem && article.originalItem._source) || null;
 }
 
+/**
+ * @param {CardItem} article
+ * @returns {string|null}
+ */
 function pieceLink(article) {
   return article.canonical_url || article.url || null;
 }
 
+/**
+ * @param {SiteSettings|null|undefined} settings
+ * @param {CardItem|null|undefined} article
+ * @returns {{ name: string, url: string|null }|null}
+ */
 function byline(settings, article) {
   if (!article) return null;
 

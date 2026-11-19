@@ -30,8 +30,36 @@ const DEFAULTS = {
   limits: { name: 60, body: 8000, exact: 400 },
 };
 
-// settings.contributions, filled with the engine's defaults. null when the
-// site has no contributions at all, so a page without them asks for nothing.
+/**
+ * @typedef {Object} ContributionQuote
+ * @property {string} exact
+ * @property {string} [prefix]
+ * @property {string} [suffix]
+ */
+
+/**
+ * @typedef {Object} Contribution
+ * @property {string} id
+ * @property {'essay'|'comment'|'art'|'connection'|string} type
+ * @property {string} author
+ * @property {string} created
+ * @property {boolean} [test]
+ * @property {string} chapter
+ * @property {string|null} [to]
+ * @property {ContributionQuote|null} [quote]
+ * @property {string} [title]
+ * @property {string} [body]
+ * @property {string|null} [asset]
+ * @property {string} [alt]
+ */
+
+/**
+ * settings.contributions, filled with the engine's defaults. null when the
+ * site has no contributions at all, so a page without them asks for nothing.
+ *
+ * @param {any} settings
+ * @returns {any}
+ */
 function contributionsConfig(settings) {
   const c = settings && settings.contributions;
   if (!c || c.enabled === false) return null;
@@ -82,9 +110,15 @@ function assetUrl(asset, cfg) {
   return base.replace(/\/?$/, '/') + asset;
 }
 
-// The contributions a page shows: well formed, approved, attached to a
-// chapter that exists, test items only when asked for. Everything else is
-// dropped quietly; nothing a contributor wrote is trusted to be well formed.
+/**
+ * The contributions a page shows: well formed, approved, attached to a
+ * chapter that exists, test items only when asked for. Everything else is
+ * dropped quietly; nothing a contributor wrote is trusted to be well formed.
+ *
+ * @param {any} data
+ * @param {{ items?: any[], showTest?: boolean }} [opts]
+ * @returns {Contribution[]}
+ */
 function visibleContributions(data, { items, showTest = false } = {}) {
   const list = Array.isArray(data) ? data : data && Array.isArray(data.contributions) ? data.contributions : [];
   const chapters = items ? chapterIndex(items) : null;

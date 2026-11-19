@@ -61,6 +61,19 @@ function otherVoice(voice, voices, engineDefault) {
 //   engineFailed   true when the engine itself would not start: its other
 //                  voices are not tried
 //   skip           [{ engine, voice }] already found failing this chapter
+/**
+ * @param {{
+ *   mode?: string,
+ *   engine?: string,
+ *   voice?: string|null,
+ *   voices?: Array<{ id?: string, lang?: string }>,
+ *   engineDefault?: string|null,
+ *   browser?: { defaultVoice?: string|null, deviceVoice?: string|null }|null,
+ *   engineFailed?: boolean,
+ *   skip?: Array<{ engine: string, voice: string|null }>
+ * }} [opts]
+ * @returns {Array<{ engine: string, voice: string|null }>}
+ */
 function fallbackPlan({
   mode,
   engine,
@@ -142,6 +155,11 @@ async function speakWithFallback({ text, current, plan, speak }) {
 // voice's name, null for the device's own; engineLabel(engine): an engine's
 // name. The engines are named only when they differ, the browser's as "on
 // this device" (its voices are the device's own).
+/**
+ * @param {{ from?: { engine: string, voice?: string|null }, to?: { engine: string, voice?: string|null } }|null} fb
+ * @param {{ label?: ((engine: string, voice: string) => string|null)|null, engineLabel?: ((engine: string) => string|null)|null }} [opts]
+ * @returns {string}
+ */
 function fallbackNote(fb, { label, engineLabel } = {}) {
   if (!fb || !fb.from || !fb.to) return '';
   const name = (e, v) => {
