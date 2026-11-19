@@ -851,7 +851,7 @@ function createViewState(opts = {}) {
     },
 
     /**
-     * @param {{ item?: string, para?: number|string, quote?: string, note?: string, version?: string }} [opts]
+     * @param {{ item?: string, para?: any, quote?: string, note?: string, version?: string }} [opts]
      * @returns {string}
      */
     addBookmark({ item, para, quote, note, version } = {}) {
@@ -860,7 +860,7 @@ function createViewState(opts = {}) {
       const entry = {
         id,
         item,
-        para: typeof para === 'number' ? para : parseInt(String(para), 10) || 0,
+        para: typeof para === 'number' ? para : parseInt(para, 10) || 0,
         quote: quote ? String(quote) : '',
         note: note ? String(note) : '',
         t: now(),
