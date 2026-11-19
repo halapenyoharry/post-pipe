@@ -67,6 +67,8 @@ node --test flow/test/*.test.js                     # flow
 cd rosetta-tagz && node --test test/*.test.js       # rosetta-tagz
 ```
 
+`npm run hooks:install` copies the repository's `pre-commit` and `pre-push` check hooks into `.git/hooks`.
+
 ## Licence
 
 post-pipe is free for creators and for non-commercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE), with an [additional permission](COMMERCIAL.md) from its author: creative work is free, and commercial use is free until it brings in US$10,000 a year. Above that, or to sell or host post-pipe itself, open an issue titled "commercial licence". Fonts and icons it ships keep their own licences; see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).

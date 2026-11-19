@@ -1,0 +1,29 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: node --test flow/test/*.test.js
+      - run: cd rosetta-tagz && node --test test/*.test.js
+      - run: npm run build
+      - run: npm run build:lib
+      - run: npm run build:embed
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke

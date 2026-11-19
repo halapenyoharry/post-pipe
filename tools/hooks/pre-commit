@@ -1,0 +1,19 @@
+#!/bin/sh
+# installed by tools/install-hooks.js
+top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+cd "$top" || exit 1
+
+if ! node -e 'const p = require("./package.json"); process.exit(p.scripts && p.scripts["check:commit"] ? 0 : 1)' 2>/dev/null; then
+  echo "pre-commit: skipped (no check:commit script in $top/package.json)"
+  exit 0
+fi
+
+if [ ! -d "$top/node_modules" ]; then
+  echo "pre-commit: node_modules is missing in $top; run npm ci" >&2
+  exit 1
+fi
+
+npm run check:commit || {
+  echo "pre-commit: check:commit failed" >&2
+  exit 1
+}

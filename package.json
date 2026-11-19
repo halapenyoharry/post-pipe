@@ -17,6 +17,8 @@
     "test": "node --test test/*.test.js",
     "smoke": "node tools/smoke.js",
     "typecheck": "tsc -p tsconfig.json",
+    "check:commit": "npm run format:check && npm run lint && npm run typecheck && npm test && node --test flow/test/*.test.js && (cd rosetta-tagz && node --test test/*.test.js)",
+    "hooks:install": "node tools/install-hooks.js",
     "login:medium": "node index.js medium --login",
     "login:substack": "node index.js substack --login",
     "login:youtube": "node index.js youtube --login"
