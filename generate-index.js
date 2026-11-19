@@ -54,6 +54,11 @@ const OPML_PATH = path.resolve(SITE_ROOT, SETTINGS.feeds_opml_path || 'feeds.opm
 // Refreshing the site's saved copies is a deliberate act, never a side effect
 // of a build: they are the site's files, in its git.
 const SAVE_COPIES = process.argv.slice(2).includes('--save-copies');
+const SAVED_COPIES = ['1', 'true', 'yes'].includes(
+  String(process.env.POSTPIPE_SAVED_COPIES || '')
+    .trim()
+    .toLowerCase(),
+);
 const PAGES_BASE = SETTINGS.site.base_url;
 
 // Registry of adapter modules keyed by OPML type attribute.
@@ -1049,8 +1054,13 @@ async function main() {
     console.log(
       "Saving copies: each fetched feed whose outline names a savedCopy gets it written from this build's fetch",
     );
+  if (SAVED_COPIES)
+    console.log(
+      "Saved copies only (POSTPIPE_SAVED_COPIES): reading each fetched feed from the site's saved copy, without reaching the network",
+    );
   const { items, sources, rtagz } = await loadCorpus(entries, {
     saveCopies: SAVE_COPIES,
+    savedCopiesOnly: SAVED_COPIES,
     rtagz: rtagzSettings(SETTINGS),
     siteRoot: SITE_ROOT,
     containment: SETTINGS.containment,

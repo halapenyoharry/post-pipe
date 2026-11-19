@@ -271,3 +271,52 @@ test('feeds.opml: savedCopy on an outline names the file, relative to the site',
   assert.strictEqual(a.savedCopy, 'saved/a.json');
   assert.strictEqual(b.savedCopy, null);
 });
+
+test('savedCopiesOnly: reads a fetched feed from its saved copy without calling fetchText; a missing copy gives no items; off tries fetchText first', async () => {
+  const s = scratch();
+  try {
+    const file = s.saved('a.json');
+    writeSiteCopy(file, {
+      url: URL_A,
+      fetchedAt: '2026-11-03T09:00:00.000Z',
+      body: rss(['saved one', 'saved two'], 'Tue, 03 Nov 2026 08:00:00 GMT'),
+    });
+
+    const notCalled = failing();
+    const outSaved = await loadCorpus([entryWith(file)], s.opts({ fetchText: notCalled, savedCopiesOnly: true }));
+    assert.strictEqual(notCalled.calls.length, 0, 'fetchText is never called when savedCopiesOnly is true');
+    assert.deepStrictEqual(
+      outSaved.items.map((it) => it.title),
+      ['saved two', 'saved one'],
+    );
+    assert.strictEqual(outSaved.sources[0].ok, true);
+    assert.strictEqual(outSaved.sources[0].fetchedAt, '2026-11-03T09:00:00.000Z');
+
+    const notCalledMissing = failing();
+    const outMissing = await loadCorpus(
+      [entryWith(s.saved('missing.json'))],
+      s.opts({ fetchText: notCalledMissing, savedCopiesOnly: true }),
+    );
+    assert.strictEqual(
+      notCalledMissing.calls.length,
+      0,
+      'fetchText is never called even when the saved copy is missing',
+    );
+    assert.strictEqual(outMissing.items.length, 0);
+    assert.strictEqual(outMissing.sources[0].ok, false);
+
+    const liveCalls = [];
+    const liveFetch = async (url) => {
+      liveCalls.push(url);
+      return rss(['live one']);
+    };
+    const outLive = await loadCorpus([entryWith(file)], s.opts({ fetchText: liveFetch }));
+    assert.strictEqual(liveCalls.length, 1, 'with savedCopiesOnly off, the fetch is tried first');
+    assert.deepStrictEqual(
+      outLive.items.map((it) => it.title),
+      ['live one'],
+    );
+  } finally {
+    s.done();
+  }
+});
