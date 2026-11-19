@@ -4,28 +4,45 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const {
-  createViewState, localStorageBackend, forgetStorage, STORAGE_PREFIX,
-} = require('../src/lib/viewState');
+const { createViewState, localStorageBackend, forgetStorage, STORAGE_PREFIX } = require('../src/lib/viewState');
 
 function fakeStorage() {
   const m = new Map();
   return {
-    get length() { return m.size; },
-    key(i) { return [...m.keys()][i] ?? null; },
-    getItem(k) { return m.has(k) ? m.get(k) : null; },
-    setItem(k, v) { m.set(k, String(v)); },
-    removeItem(k) { m.delete(k); },
-    keys() { return [...m.keys()]; },
+    get length() {
+      return m.size;
+    },
+    key(i) {
+      return [...m.keys()][i] ?? null;
+    },
+    getItem(k) {
+      return m.has(k) ? m.get(k) : null;
+    },
+    setItem(k, v) {
+      m.set(k, String(v));
+    },
+    removeItem(k) {
+      m.delete(k);
+    },
+    keys() {
+      return [...m.keys()];
+    },
   };
 }
 
 function fakeIndexedDB(names) {
   const dbs = new Set(names);
   return {
-    async databases() { return [...dbs].map((name) => ({ name, version: 1 })); },
-    deleteDatabase(name) { dbs.delete(name); return {}; },
-    names() { return [...dbs]; },
+    async databases() {
+      return [...dbs].map((name) => ({ name, version: 1 }));
+    },
+    deleteDatabase(name) {
+      dbs.delete(name);
+      return {};
+    },
+    names() {
+      return [...dbs];
+    },
   };
 }
 
@@ -36,7 +53,8 @@ function engineKeysIn(store) {
 async function fullyUsedStore(local) {
   const vs = createViewState({
     backend: localStorageBackend('post-pipe:viewstate', local),
-    corpusId: 'corpus', debounceMs: 0,
+    corpusId: 'corpus',
+    debounceMs: 0,
   });
   await vs.ready();
   vs.setNodePosition('force::a', 10, 20);
@@ -72,7 +90,7 @@ test('every engine key starts with the prefix', async () => {
   assert.deepStrictEqual(engineKeysIn(local), local.keys());
 });
 
-test('forget clears every kind of state from local, session and IndexedDB, and only the engine\'s', async () => {
+test("forget clears every kind of state from local, session and IndexedDB, and only the engine's", async () => {
   const local = fakeStorage();
   const session = fakeStorage();
   const vs = await fullyUsedStore(local);
@@ -132,7 +150,11 @@ test('reset keeps notes and progress; forget does not', async () => {
 });
 
 test('forgetStorage copes with storage that throws', async () => {
-  const broken = { get length() { throw new Error('denied'); } };
+  const broken = {
+    get length() {
+      throw new Error('denied');
+    },
+  };
   const removed = await forgetStorage({ localStorage: broken, sessionStorage: null, indexedDB: null });
   assert.deepStrictEqual(removed, []);
 });

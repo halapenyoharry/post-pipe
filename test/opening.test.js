@@ -7,8 +7,16 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  DEFAULTS, TUNING, openingConfig, startState, coverGeometry, createCover, pageKey,
-  groundConfig, topConfig, firstInkRow,
+  DEFAULTS,
+  TUNING,
+  openingConfig,
+  startState,
+  coverGeometry,
+  createCover,
+  pageKey,
+  groundConfig,
+  topConfig,
+  firstInkRow,
 } = require('../src/lib/opening');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
 
@@ -18,10 +26,20 @@ function fakeClock() {
   const timers = new Map();
   const clock = {
     now: () => t,
-    setTimer(fn, ms) { id += 1; timers.set(id, { at: t + ms, fn }); return id; },
-    clearTimer(h) { timers.delete(h); },
-    frame(fn) { return clock.setTimer(fn, 16); },
-    cancelFrame(h) { clock.clearTimer(h); },
+    setTimer(fn, ms) {
+      id += 1;
+      timers.set(id, { at: t + ms, fn });
+      return id;
+    },
+    clearTimer(h) {
+      timers.delete(h);
+    },
+    frame(fn) {
+      return clock.setTimer(fn, 16);
+    },
+    cancelFrame(h) {
+      clock.clearTimer(h);
+    },
     advance(ms) {
       const until = t + ms;
       for (;;) {
@@ -33,17 +51,24 @@ function fakeClock() {
       }
       t = until;
     },
-    get pending() { return timers.size; },
+    get pending() {
+      return timers.size;
+    },
   };
   return clock;
 }
 
 const SITE = {
   opening: {
-    enabled: true, mode: 'two-state',
+    enabled: true,
+    mode: 'two-state',
     art: { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png' },
-    alt: 'A plant', ground: 'dark', graph: { artOffset: 0.33 },
-    byline: { text: 'by someone', href: 'someone/' }, startOn: 'remembered', snapMs: 420,
+    alt: 'A plant',
+    ground: 'dark',
+    graph: { artOffset: 0.33 },
+    byline: { text: 'by someone', href: 'someone/' },
+    startOn: 'remembered',
+    snapMs: 420,
   },
 };
 
@@ -54,9 +79,15 @@ function run(opts = {}, settings = SITE) {
   const swaps = [];
   const m = createCover(openingConfig(settings), {
     travel: 500,
-    now: clock.now, frame: clock.frame, cancelFrame: clock.cancelFrame,
-    setTimer: clock.setTimer, clearTimer: clock.clearTimer,
-    onChange: (p, info) => { ps.push(p); if (info.swap) swaps.push(p); },
+    now: clock.now,
+    frame: clock.frame,
+    cancelFrame: clock.cancelFrame,
+    setTimer: clock.setTimer,
+    clearTimer: clock.clearTimer,
+    onChange: (p, info) => {
+      ps.push(p);
+      if (info.swap) swaps.push(p);
+    },
     onRest: (s) => rests.push(s),
     ...opts,
   });
@@ -68,17 +99,54 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.equal(openingConfig({}), null);
   assert.equal(openingConfig({ opening: { ...SITE.opening, enabled: false } }), null);
   assert.equal(openingConfig({ opening: { ...SITE.opening, mode: 'dissolve' } }), null, 'another mode is not this one');
-  assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png' } } }), null, 'one state image and no full: no art');
-  assert.equal(openingConfig({ opening: { enabled: true, art: { bush: 'b.png', roots: 'r.png' } } }), null, 'the old halves are not read');
+  assert.equal(
+    openingConfig({ opening: { enabled: true, art: { artState: 'a.png' } } }),
+    null,
+    'one state image and no full: no art',
+  );
+  assert.equal(
+    openingConfig({ opening: { enabled: true, art: { bush: 'b.png', roots: 'r.png' } } }),
+    null,
+    'the old halves are not read',
+  );
   const both = openingConfig(SITE);
-  assert.deepStrictEqual(both.art, { artState: 'cover/art-state.png', graphState: 'cover/graph-state.png', full: '', rootsVector: '', rootsFollowMs: 0 });
-  assert.equal(openingConfig({ opening: { ...SITE.opening, art: { ...SITE.opening.art, rootsFollowMs: 120 } } }).art.rootsFollowMs, 120, 'the roots follow their acts that far behind');
-  assert.equal(openingConfig({ opening: { ...SITE.opening, art: { ...SITE.opening.art, rootsFollowMs: -5 } } }).art.rootsFollowMs, 0);
+  assert.deepStrictEqual(both.art, {
+    artState: 'cover/art-state.png',
+    graphState: 'cover/graph-state.png',
+    full: '',
+    rootsVector: '',
+    rootsFollowMs: 0,
+  });
+  assert.equal(
+    openingConfig({ opening: { ...SITE.opening, art: { ...SITE.opening.art, rootsFollowMs: 120 } } }).art.rootsFollowMs,
+    120,
+    'the roots follow their acts that far behind',
+  );
+  assert.equal(
+    openingConfig({ opening: { ...SITE.opening, art: { ...SITE.opening.art, rootsFollowMs: -5 } } }).art.rootsFollowMs,
+    0,
+  );
   const onlyFull = openingConfig({ opening: { enabled: true, art: { full: 'a.png' } } });
   assert.ok(onlyFull, 'full alone is enough');
-  assert.deepStrictEqual(onlyFull.art, { artState: 'a.png', graphState: '', full: 'a.png', rootsVector: '', rootsFollowMs: 0 }, 'full stands for both states');
-  assert.equal(openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art.artState, 'a.png', 'the two states win over full');
-  assert.deepStrictEqual(onlyFull.graph, { artOffset: 0.33, artStateOpacity: 0.6, hiddenUntilMove: false, rootsFit: null, rootsBrightness: 1, footRoom: 0 });
+  assert.deepStrictEqual(
+    onlyFull.art,
+    { artState: 'a.png', graphState: '', full: 'a.png', rootsVector: '', rootsFollowMs: 0 },
+    'full stands for both states',
+  );
+  assert.equal(
+    openingConfig({ opening: { enabled: true, art: { artState: 'a.png', graphState: 'g.png', full: 'f.png' } } }).art
+      .artState,
+    'a.png',
+    'the two states win over full',
+  );
+  assert.deepStrictEqual(onlyFull.graph, {
+    artOffset: 0.33,
+    artStateOpacity: 0.6,
+    hiddenUntilMove: false,
+    rootsFit: null,
+    rootsBrightness: 1,
+    footRoom: 0,
+  });
   assert.equal(onlyFull.fit, 'height');
   assert.equal(onlyFull.sideMargin, 0);
   assert.equal(onlyFull.returnAbove, null);
@@ -88,7 +156,16 @@ test('settings: off by default, on with art, and every default filled in', () =>
   assert.equal(onlyFull.ground, 'dark');
   assert.equal(onlyFull.startOn, 'remembered');
   assert.equal(onlyFull.snapMs, 420);
-  const odd = openingConfig({ opening: { enabled: true, art: { full: 'a.png' }, ground: 'neon', startOn: 'middle', snapMs: -5, graph: { artOffset: 3, artOpacity: 7 } } });
+  const odd = openingConfig({
+    opening: {
+      enabled: true,
+      art: { full: 'a.png' },
+      ground: 'neon',
+      startOn: 'middle',
+      snapMs: -5,
+      graph: { artOffset: 3, artOpacity: 7 },
+    },
+  });
   assert.equal(odd.backdrop.opacity, 1, 'the earlier artOpacity still read, held to 0..1');
   assert.equal(odd.ground, 'dark');
   assert.equal(odd.startOn, 'remembered');
@@ -110,7 +187,10 @@ test('start: remembered lands where the reader left, the art with no memory, the
 
 test('geometry: the whole plant fits at the art rest, scrolled up by artOffset at the graph rest, one scale throughout', () => {
   const c = openingConfig(SITE);
-  for (const [vw, vh] of [[390, 844], [1280, 800]]) {
+  for (const [vw, vh] of [
+    [390, 844],
+    [1280, 800],
+  ]) {
     const view = { vw, vh, art: { w: 1045, h: 2111 }, bottom: 100 };
     const a = coverGeometry(c, view, 0);
     const g = coverGeometry(c, view, 1);
@@ -119,10 +199,13 @@ test('geometry: the whole plant fits at the art rest, scrolled up by artOffset a
     assert.ok(a.art.left >= 0 && a.art.left + a.art.width <= vw + 0.01, 'fits across');
     assert.ok(Math.abs(a.art.width / a.art.height - 1045 / 2111) < 1e-9, 'shape kept');
     assert.equal(g.art.scale, a.art.scale, 'one scale');
-    assert.ok(Math.abs(g.art.top - (-0.33 * g.art.height)) < 1e-9);
+    assert.ok(Math.abs(g.art.top - -0.33 * g.art.height) < 1e-9);
     assert.equal(a.travel, a.art.top - g.art.top);
     const crown = (g.art.top + (1330 / 2111) * g.art.height) / vh;
-    assert.ok(crown > 0.15 && crown < 0.35, `where the plant meets the roots, about a quarter down (${crown.toFixed(2)})`);
+    assert.ok(
+      crown > 0.15 && crown < 0.35,
+      `where the plant meets the roots, about a quarter down (${crown.toFixed(2)})`,
+    );
     assert.deepStrictEqual(a.fade, { art: 1, graph: 0 }, "the art state's image at the art rest");
     assert.deepStrictEqual(g.fade, { art: 0, graph: 1 }, "the graph state's image at the graph rest");
     assert.equal(a.graph.opacity, 0);
@@ -142,7 +225,10 @@ test('geometry: everything follows p continuously between the rests', () => {
   let prev = coverGeometry(c, view, 0);
   for (let i = 1; i <= 20; i += 1) {
     const g = coverGeometry(c, view, i / 20);
-    assert.ok(Math.abs(g.fade.art - (1 - i / 20)) < 1e-9 && Math.abs(g.fade.graph - i / 20) < 1e-9, 'the images crossfade with p');
+    assert.ok(
+      Math.abs(g.fade.art - (1 - i / 20)) < 1e-9 && Math.abs(g.fade.graph - i / 20) < 1e-9,
+      'the images crossfade with p',
+    );
     assert.ok(g.art.top < prev.art.top, 'the art moves up');
     assert.ok(g.graph.opacity >= prev.graph.opacity, 'the graph comes in');
     assert.ok(g.graph.shift <= prev.graph.shift, 'and rises');
@@ -151,11 +237,16 @@ test('geometry: everything follows p continuously between the rests', () => {
   }
   const half = coverGeometry(c, view, 0.5);
   assert.ok(half.graph.opacity > 0 && half.graph.opacity < 1, 'partway is in between');
-  const dim = openingConfig({ opening: { ...SITE.opening, backdrop: { opacity: 0.4, opacityZoomedIn: 0.1, zoomForFloor: 2 } } });
+  const dim = openingConfig({
+    opening: { ...SITE.opening, backdrop: { opacity: 0.4, opacityZoomedIn: 0.1, zoomForFloor: 2 } },
+  });
   assert.equal(coverGeometry(dim, view, 1).roots, 0.4, 'the roots at backdrop.opacity behind the graph');
   assert.equal(coverGeometry(dim, view, 1).art.opacity, 1, 'the canvas itself (the small plant) at full strength');
   assert.equal(coverGeometry(dim, view, 0).roots, 1, 'the art state at full strength');
-  assert.ok(Math.abs(coverGeometry(dim, { ...view, zoom: { k: 0.8, homeK: 0.4 } }, 1).roots - 0.1) < 1e-9, 'zoomed in to the floor');
+  assert.ok(
+    Math.abs(coverGeometry(dim, { ...view, zoom: { k: 0.8, homeK: 0.4 } }, 1).roots - 0.1) < 1e-9,
+    'zoomed in to the floor',
+  );
   assert.equal(coverGeometry(dim, { ...view, zoom: { k: 0.2, homeK: 0.4 } }, 1).roots, 0.4, 'zoomed out: resting');
 });
 
@@ -175,7 +266,10 @@ test('a wheel scrubs partway, and a pause settles it: on past the threshold, bac
   assert.equal(m.p, 1);
   assert.equal(m.rest, 'graph');
   assert.deepStrictEqual(rests, ['art', 'graph']);
-  assert.ok(ps.some((p) => p > 0.5 && p < 1), 'the snap passes through the in-between');
+  assert.ok(
+    ps.some((p) => p > 0.5 && p < 1),
+    'the snap passes through the in-between',
+  );
 });
 
 test('a wheel up at the art rest, or down at the graph rest on the art, does nothing', () => {
@@ -188,7 +282,7 @@ test('a wheel up at the art rest, or down at the graph rest on the art, does not
   assert.equal(m.p, 1);
 });
 
-test('in the graph state the wheel is the graph\'s, except a scroll up at the top edge', () => {
+test("in the graph state the wheel is the graph's, except a scroll up at the top edge", () => {
   const { m, clock } = run({ start: 'graph' });
   clock.advance(1000);
   assert.equal(m.wheel(-120, { where: 'graph' }), false, 'up inside the graph: its zoom');
@@ -201,7 +295,7 @@ test('in the graph state the wheel is the graph\'s, except a scroll up at the to
   assert.equal(m.rest, 'art');
 });
 
-test('just after a page move, the graph does not take the trackpad\'s momentum', () => {
+test("just after a page move, the graph does not take the trackpad's momentum", () => {
   const { m, clock } = run();
   m.go('graph');
   clock.advance(440);
@@ -326,20 +420,36 @@ test('the state is remembered, kept through undo, and forgotten with the rest', 
 const { titleConfig, titleLayout, TITLE_FALLBACK } = require('../src/lib/opening');
 
 const TITLE = {
-  font: 'Some Face', color: '#00a7a4', opacity: 0.56,
-  art: { lines: [
-    { x: 0.2, y: 0.4, spans: [{ text: 'The', size: 0.06, rise: 0.03 }, { text: ' Big ', size: 0.1 }, { text: 'of', size: 0.08 }] },
-    { x: 0.25, y: 0.5, spans: [{ text: 'Word', size: 0.15 }] },
-  ] },
+  font: 'Some Face',
+  color: '#00a7a4',
+  opacity: 0.56,
+  art: {
+    lines: [
+      {
+        x: 0.2,
+        y: 0.4,
+        spans: [
+          { text: 'The', size: 0.06, rise: 0.03 },
+          { text: ' Big ', size: 0.1 },
+          { text: 'of', size: 0.08 },
+        ],
+      },
+      { x: 0.25, y: 0.5, spans: [{ text: 'Word', size: 0.15 }] },
+    ],
+  },
   graph: { lines: [{ x: 0.1, y: 0.6, spans: [{ text: 'The Big Word', size: 0.05 }] }] },
 };
 
 test('title: off without lines, its defaults, the face before the fallback', () => {
   assert.equal(titleConfig(null), null);
   assert.equal(titleConfig({ font: 'X', art: { lines: [] } }), null, 'no lines: no title');
-  assert.equal(titleConfig({ art: { lines: [{ x: 0, y: 0, spans: [{ text: '' }] }] } }), null, 'empty spans do not count');
+  assert.equal(
+    titleConfig({ art: { lines: [{ x: 0, y: 0, spans: [{ text: '' }] }] } }),
+    null,
+    'empty spans do not count',
+  );
   const t = titleConfig(TITLE);
-  assert.equal(t.text, 'The Big of Word', 'its name: the art layout\'s words');
+  assert.equal(t.text, 'The Big of Word', "its name: the art layout's words");
   assert.equal(t.family, `'Some Face', ${TITLE_FALLBACK}`);
   assert.equal(TITLE_FALLBACK, "'Arial Black', Impact, sans-serif");
   assert.equal(t.opacity, 0.56);
@@ -356,16 +466,22 @@ test('title: off without lines, its defaults, the face before the fallback', () 
 
 test('title: fractions of the canvas to px, at two sizes of the art', () => {
   const t = titleConfig(TITLE);
-  for (const box of [{ left: 29, top: 16, width: 331, height: 670 }, { left: 478, top: -215, width: 323, height: 653 }]) {
+  for (const box of [
+    { left: 29, top: 16, width: 331, height: 670 },
+    { left: 478, top: -215, width: 323, height: 653 },
+  ]) {
     const L = titleLayout(t.art, box);
     assert.equal(L.lines.length, 2);
     const [a, b] = L.lines;
     assert.ok(Math.abs(a.x - (box.left + 0.2 * box.width)) < 1e-9, 'left edge');
     assert.ok(Math.abs(a.y - (box.top + 0.4 * box.height)) < 1e-9, 'baseline');
-    assert.ok(Math.abs(a.spans[0].size - 0.06 * box.width) < 1e-9, 'size scales with the art\'s width');
+    assert.ok(Math.abs(a.spans[0].size - 0.06 * box.width) < 1e-9, "size scales with the art's width");
     assert.ok(Math.abs(a.spans[0].rise - 0.03 * box.width) < 1e-9, 'and so does the rise');
     assert.equal(a.spans[1].rise, 0);
-    assert.deepStrictEqual(a.spans.map((s) => s.text), ['The', ' Big ', 'of']);
+    assert.deepStrictEqual(
+      a.spans.map((s) => s.text),
+      ['The', ' Big ', 'of'],
+    );
     assert.ok(Math.abs(b.x - (box.left + 0.25 * box.width)) < 1e-9);
     assert.ok(Math.abs(b.spans[0].size - 0.15 * box.width) < 1e-9);
     const G = titleLayout(t.graph, box);
@@ -387,7 +503,10 @@ test('ground: dark or paper as before, or a night sky with its gradient and its 
   assert.deepStrictEqual(groundConfig('paper'), { mode: 'paper', sky: null });
   assert.deepStrictEqual(groundConfig(undefined), { mode: 'dark', sky: null });
   const sky = groundConfig({ top: '#050505', bottom: '', textureFrom: 0.35 });
-  assert.deepStrictEqual(sky, { mode: 'dark', sky: { top: '#050505', bottom: '', textureFrom: 0.35, colorFrom: 0.35, texture: 1 } });
+  assert.deepStrictEqual(sky, {
+    mode: 'dark',
+    sky: { top: '#050505', bottom: '', textureFrom: 0.35, colorFrom: 0.35, texture: 1 },
+  });
   const named = groundConfig({ top: '#000', bottom: '#2a2a2e', textureFrom: 2, colorFrom: 0.2, texture: 9 });
   assert.equal(named.sky.textureFrom, 1, 'held to the screen');
   assert.equal(named.sky.colorFrom, 0.2);
@@ -417,7 +536,10 @@ test('top: the plant comes up to a margin under the top controls in each state, 
   // measure from under it.
   const c = { ...base, topBarInArt: true, top: { art: 6, graph: 6 } };
   const ink = { art: 0.01, graph: 0.42 };
-  for (const [vw, vh] of [[390, 844], [1280, 800]]) {
+  for (const [vw, vh] of [
+    [390, 844],
+    [1280, 800],
+  ]) {
     const view = { vw, vh, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48, ink };
     const a = coverGeometry(c, view, 0);
     const g = coverGeometry(c, view, 1);
@@ -438,14 +560,19 @@ test('top: the plant comes up to a margin under the top controls in each state, 
     const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48, ink };
     const d = { ...base, top: { art: 6, graph: 6 } };
     assert.equal(base.topBarInArt, false);
-    const a = coverGeometry(d, view, 0), g = coverGeometry(d, view, 1);
+    const a = coverGeometry(d, view, 0),
+      g = coverGeometry(d, view, 1);
     assert.ok(Math.abs(a.art.top + ink.art * a.art.height - 6) < 1e-9, 'art state: 6 px under the screen top');
     assert.ok(Math.abs(g.art.top + ink.graph * g.art.height - 54) < 1e-9, 'graph state: 6 px under the bar');
   }
   // Unset, or no ink known: as before.
   const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 }, bottom: 100, controls: 48 };
   assert.deepStrictEqual(coverGeometry({ ...base, top: null }, view, 1).art, coverGeometry(base, view, 1).art);
-  assert.equal(coverGeometry(c, view, 1).art.top, -0.33 * coverGeometry(c, view, 1).art.height, 'no ink for the graph state: artOffset');
+  assert.equal(
+    coverGeometry(c, view, 1).art.top,
+    -0.33 * coverGeometry(c, view, 1).art.height,
+    'no ink for the graph state: artOffset',
+  );
 });
 
 test('the graph hangs from the roots in both states: moved with the art, at artStateOpacity in the art state', () => {
@@ -463,13 +590,26 @@ test('the graph hangs from the roots in both states: moved with the art, at artS
   }
   const odd = openingConfig({ opening: { ...SITE.opening, graph: { artOffset: 0.33, artStateOpacity: 4 } } });
   assert.equal(odd.graph.artStateOpacity, 1);
-  assert.equal(coverGeometry(openingConfig({ opening: { ...SITE.opening, graph: { artStateOpacity: 0.35 } } }), view, 0).layer.opacity, 0.35);
+  assert.equal(
+    coverGeometry(openingConfig({ opening: { ...SITE.opening, graph: { artStateOpacity: 0.35 } } }), view, 0).layer
+      .opacity,
+    0.35,
+  );
 });
 
 test('byline: defaults, lower case, and its opacity per state', () => {
   const { bylineConfig, bylineText } = require('../src/lib/opening');
   const d = bylineConfig({ text: 'by Some One', href: 'about.html' });
-  assert.deepStrictEqual(d, { text: 'by Some One', href: 'about.html', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower', graphScale: null });
+  assert.deepStrictEqual(d, {
+    text: 'by Some One',
+    href: 'about.html',
+    opacity: { art: 0.35, graph: 0.56 },
+    size: 0.25,
+    gap: 0.3,
+    minSize: 0,
+    case: 'lower',
+    graphScale: null,
+  });
   assert.equal(bylineText(d), 'by some one');
   assert.equal(bylineText(bylineConfig({ text: 'by Some One', case: 'as-written' })), 'by Some One');
   assert.deepStrictEqual(bylineConfig({ text: 'x', opacity: 0.5 }).opacity, { art: 0.5, graph: 0.5 });
@@ -479,23 +619,37 @@ test('byline: defaults, lower case, and its opacity per state', () => {
 
 test('byline: directly under the title in both states, a quarter of its size, in between on the way', () => {
   const title = {
-    text: 'A Title', font: 'Some Face',
-    art: { lines: [{ x: 0.2, y: 0.4, spans: [{ text: 'A', size: 0.1 }] }, { x: 0.18, y: 0.5, spans: [{ text: 'Title', size: 0.16 }] }] },
+    text: 'A Title',
+    font: 'Some Face',
+    art: {
+      lines: [
+        { x: 0.2, y: 0.4, spans: [{ text: 'A', size: 0.1 }] },
+        { x: 0.18, y: 0.5, spans: [{ text: 'Title', size: 0.16 }] },
+      ],
+    },
     graph: { lines: [{ x: 0.09, y: 0.6, spans: [{ text: 'A Title', size: 0.06 }] }] },
   };
   const c = openingConfig({ opening: { ...SITE.opening, title } });
   const view = { vw: 390, vh: 844, art: { w: 1045, h: 2111 } };
-  for (const [p, line, big] of [[0, title.art.lines[1], 0.16], [1, title.graph.lines[0], 0.06]]) {
+  for (const [p, line, big] of [
+    [0, title.art.lines[1], 0.16],
+    [1, title.graph.lines[0], 0.06],
+  ]) {
     const g = coverGeometry(c, view, p);
     const titleSize = big * g.art.width;
     assert.equal(g.byline.align, 'left');
     assert.equal(g.byline.under, 'title');
-    assert.ok(Math.abs(g.byline.x - (g.art.left + line.x * g.art.width)) < 1e-9, 'at the last line\'s left edge');
-    assert.ok(Math.abs(g.byline.y - (g.art.top + line.y * g.art.height + 0.3 * titleSize)) < 1e-9, 'just under its baseline');
+    assert.ok(Math.abs(g.byline.x - (g.art.left + line.x * g.art.width)) < 1e-9, "at the last line's left edge");
+    assert.ok(
+      Math.abs(g.byline.y - (g.art.top + line.y * g.art.height + 0.3 * titleSize)) < 1e-9,
+      'just under its baseline',
+    );
     assert.ok(Math.abs(g.byline.size / titleSize - 0.25) < 1e-9, 'a quarter of the title');
     assert.equal(g.byline.opacity, p === 0 ? 0.35 : 0.56);
   }
-  const a = coverGeometry(c, view, 0), g = coverGeometry(c, view, 1), m = coverGeometry(c, view, 0.5);
+  const a = coverGeometry(c, view, 0),
+    g = coverGeometry(c, view, 1),
+    m = coverGeometry(c, view, 0.5);
   assert.ok(m.byline.opacity > a.byline.opacity && m.byline.opacity < g.byline.opacity);
   const cMin = openingConfig({ opening: { ...SITE.opening, title, byline: { ...SITE.opening.byline, minSize: 9 } } });
   assert.equal(coverGeometry(cMin, view, 1).byline.size, 9, 'never under minSize');
@@ -503,7 +657,7 @@ test('byline: directly under the title in both states, a quarter of its size, in
   assert.equal(plain.byline.align, 'center', 'without a title: under the art, as before');
 });
 
-test('grip: extra px below the top bar\'s row, 16 by default; the strip reaches the row\'s foot plus that', () => {
+test("grip: extra px below the top bar's row, 16 by default; the strip reaches the row's foot plus that", () => {
   const { gripConfig, gripHeight } = require('../src/lib/opening');
   assert.deepEqual(gripConfig(undefined), { extra: 16 });
   assert.deepEqual(gripConfig({ extra: 24 }), { extra: 24 });
@@ -520,8 +674,14 @@ test('grip: extra px below the top bar\'s row, 16 by default; the strip reaches 
 test('hiddenUntilMove: off by default; on, the graph waits for a move and fades in over 300 ms', () => {
   const { revealFactor, REVEAL_MS } = require('../src/lib/opening');
   assert.strictEqual(openingConfig({ opening: { ...SITE.opening } }).graph.hiddenUntilMove, false);
-  assert.strictEqual(openingConfig({ opening: { ...SITE.opening, graph: { hiddenUntilMove: true } } }).graph.hiddenUntilMove, true);
-  assert.strictEqual(openingConfig({ opening: { ...SITE.opening, graph: { hiddenUntilMove: 'yes' } } }).graph.hiddenUntilMove, false);
+  assert.strictEqual(
+    openingConfig({ opening: { ...SITE.opening, graph: { hiddenUntilMove: true } } }).graph.hiddenUntilMove,
+    true,
+  );
+  assert.strictEqual(
+    openingConfig({ opening: { ...SITE.opening, graph: { hiddenUntilMove: 'yes' } } }).graph.hiddenUntilMove,
+    false,
+  );
   assert.strictEqual(REVEAL_MS, 300);
   assert.strictEqual(revealFactor(false, null, 0), 1);
   assert.strictEqual(revealFactor(true, null, 1000), 0);

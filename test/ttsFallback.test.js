@@ -27,18 +27,31 @@ const DEVICE_VOICES = [
 ];
 
 // A page: the sandbox, its log of what was spoken by whom, its console lines.
-function page({ fallback, defaultEngine = 'browser', failingDevice = [], failingGemini = [], withFallback = true } = {}) {
+function page({
+  fallback,
+  defaultEngine = 'browser',
+  failingDevice = [],
+  failingGemini = [],
+  withFallback = true,
+} = {}) {
   const spoken = [];
   const info = [];
   const synth = {
     getVoices: () => DEVICE_VOICES,
     addEventListener: () => {},
-    cancel: () => {}, pause: () => {}, resume: () => {},
+    cancel: () => {},
+    pause: () => {},
+    resume: () => {},
     speak(utt) {
       const name = utt.voice ? utt.voice.name : '(device)';
       setTimeout(() => {
-        if (failingDevice.includes(name)) { spoken.push(`browser:${name}:failed`); utt.onerror({ error: 'synthesis-failed' }); }
-        else { spoken.push(`browser:${name}:${utt.text}`); utt.onend(); }
+        if (failingDevice.includes(name)) {
+          spoken.push(`browser:${name}:failed`);
+          utt.onerror({ error: 'synthesis-failed' });
+        } else {
+          spoken.push(`browser:${name}:${utt.text}`);
+          utt.onend();
+        }
       }, 0);
     },
   };
@@ -60,35 +73,67 @@ function page({ fallback, defaultEngine = 'browser', failingDevice = [], failing
   };
   const sandbox = {
     console: { info: (...a) => info.push(a.join(' ')), log: () => {}, warn: () => {}, error: () => {} },
-    setTimeout, clearTimeout, Promise,
+    setTimeout,
+    clearTimeout,
+    Promise,
     speechSynthesis: synth,
-    SpeechSynthesisUtterance: function (text) { this.text = text; },
-    document, NodeFilter,
+    SpeechSynthesisUtterance: function (text) {
+      this.text = text;
+    },
+    document,
+    NodeFilter,
   };
   sandbox.window = sandbox;
-  sandbox.TTS_CONFIG = { exposedEngines: ['browser', 'gemini'], defaultEngine, lang: 'en', preferredVoices: ['Samantha'], fallback };
+  sandbox.TTS_CONFIG = {
+    exposedEngines: ['browser', 'gemini'],
+    defaultEngine,
+    lang: 'en',
+    preferredVoices: ['Samantha'],
+    fallback,
+  };
   vm.createContext(sandbox);
   if (withFallback) vm.runInContext(FALLBACK_PAGE, sandbox);
   vm.runInContext(TTS_SRC, sandbox);
   // A stand-in Gemini: its requests fail for the voices in failingGemini.
   sandbox.TTS.register({
-    id: 'gemini', label: 'Google Gemini',
+    id: 'gemini',
+    label: 'Google Gemini',
     capabilities: { voice: { type: 'voice', label: 'Voice', default: 'Kore' } },
     init: async () => {},
-    voices: () => [{ id: 'Kore', label: 'Kore — Firm', lang: 'multi' }, { id: 'Puck', label: 'Puck — Upbeat', lang: 'multi' }],
+    voices: () => [
+      { id: 'Kore', label: 'Kore — Firm', lang: 'multi' },
+      { id: 'Puck', label: 'Puck — Upbeat', lang: 'multi' },
+    ],
     speak: async (text, p) => {
-      if (failingGemini.includes(p.voice)) { spoken.push(`gemini:${p.voice}:failed`); throw new TypeError('Failed to fetch'); }
+      if (failingGemini.includes(p.voice)) {
+        spoken.push(`gemini:${p.voice}:failed`);
+        throw new TypeError('Failed to fetch');
+      }
       spoken.push(`gemini:${p.voice}:${text}`);
     },
-    pause() {}, resume() {}, stop() {},
+    pause() {},
+    resume() {},
+    stop() {},
   });
   return { T: sandbox.TTS, spoken, info };
 }
 
 // A chapter of three sentences, as the reader's body holds it.
 function chapter() {
-  const container = { tagName: 'DIV', scrollTop: 0, getBoundingClientRect: () => ({ top: 0, height: 600 }), scrollTo() {} };
-  const p = { tagName: 'P', parentElement: container, style: { removeProperty() {} }, dataset: {}, getBoundingClientRect: () => ({ top: 0, height: 20 }), closest: () => null };
+  const container = {
+    tagName: 'DIV',
+    scrollTop: 0,
+    getBoundingClientRect: () => ({ top: 0, height: 600 }),
+    scrollTo() {},
+  };
+  const p = {
+    tagName: 'P',
+    parentElement: container,
+    style: { removeProperty() {} },
+    dataset: {},
+    getBoundingClientRect: () => ({ top: 0, height: 20 }),
+    closest: () => null,
+  };
   container._textNodes = [{ nodeType: 3, textContent: 'One here. Two here. Three here.', parentElement: p }];
   return container;
 }
@@ -109,19 +154,31 @@ function read(T) {
   });
 }
 
-test('a Gemini request that fails: another Gemini voice, then the browser\'s default reads on, said once', async () => {
+test("a Gemini request that fails: another Gemini voice, then the browser's default reads on, said once", async () => {
   const { T, spoken, info } = page({ defaultEngine: 'gemini', failingGemini: ['Puck', 'Kore'] });
   T.select('gemini');
   T.set('voice', 'Puck');
   const events = await read(T);
-  assert.deepStrictEqual(spoken, [
-    'gemini:Puck:failed', 'gemini:Kore:failed', 'browser:Google US English:One here.',
-    'browser:Google US English:Two here.', 'browser:Google US English:Three here.',
-  ], 'each voice tried once, then the one that spoke reads the rest');
+  assert.deepStrictEqual(
+    spoken,
+    [
+      'gemini:Puck:failed',
+      'gemini:Kore:failed',
+      'browser:Google US English:One here.',
+      'browser:Google US English:Two here.',
+      'browser:Google US English:Three here.',
+    ],
+    'each voice tried once, then the one that spoke reads the rest',
+  );
   assert.strictEqual(events.error.length, 0, 'no error over the text');
   assert.strictEqual(events.fallback.length, 1);
-  assert.strictEqual(events.fallback[0].note, 'Puck — Upbeat (Google Gemini) did not work; reading with Google US English on this device.');
-  assert.deepStrictEqual(info, ['[tts] Puck — Upbeat (Google Gemini) did not work; reading with Google US English on this device. (Failed to fetch)']);
+  assert.strictEqual(
+    events.fallback[0].note,
+    'Puck — Upbeat (Google Gemini) did not work; reading with Google US English on this device.',
+  );
+  assert.deepStrictEqual(info, [
+    '[tts] Puck — Upbeat (Google Gemini) did not work; reading with Google US English on this device. (Failed to fetch)',
+  ]);
   assert.strictEqual(T.selected(), 'browser', 'the picker follows: the browser engine now reads');
   assert.strictEqual(T.get('voice'), 'Google US English');
   assert.strictEqual(T.lastFallback().to.voice, 'Google US English');
@@ -132,13 +189,16 @@ test('a browser voice that errors: the next voice of the device in its language 
   T.set('voice', 'Google US English');
   const events = await read(T);
   assert.deepStrictEqual(spoken, [
-    'browser:Google US English:failed', 'browser:Samantha:One here.', 'browser:Samantha:Two here.', 'browser:Samantha:Three here.',
+    'browser:Google US English:failed',
+    'browser:Samantha:One here.',
+    'browser:Samantha:Two here.',
+    'browser:Samantha:Three here.',
   ]);
   assert.strictEqual(events.error.length, 0);
   assert.strictEqual(events.fallback[0].note, 'Google US English did not work; reading with Samantha.');
 });
 
-test('a browser voice the device does not have: the browser\'s default reads instead', async () => {
+test("a browser voice the device does not have: the browser's default reads instead", async () => {
   const { T, spoken } = page();
   T.set('voice', 'Moira');
   const events = await read(T);
@@ -147,7 +207,7 @@ test('a browser voice the device does not have: the browser\'s default reads ins
   assert.match(events.fallback[0].error, /not on this device/);
 });
 
-test('mode browser: straight to the browser\'s default, no other Gemini voice tried', async () => {
+test("mode browser: straight to the browser's default, no other Gemini voice tried", async () => {
   const { T, spoken } = page({ fallback: 'browser', defaultEngine: 'gemini', failingGemini: ['Puck', 'Kore'] });
   T.select('gemini');
   T.set('voice', 'Puck');

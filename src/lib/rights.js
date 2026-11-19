@@ -3,11 +3,7 @@
 // { holder, year, statement, noAiTraining, position }.
 
 function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // "© 2026 Holder. Statement". When noAiTraining is set and the statement
@@ -43,15 +39,25 @@ function rightsPosition(rights) {
 function rightsFooterHtml(rights) {
   const line = rightsLine(rights);
   const pos = rightsPosition(rights);
-  return line ? `<footer class="pp-rights" data-rights${pos ? ` data-rights-position="${pos}"` : ''}>${escapeHtml(line)}</footer>` : '';
+  return line
+    ? `<footer class="pp-rights" data-rights${pos ? ` data-rights-position="${pos}"` : ''}>${escapeHtml(line)}</footer>`
+    : '';
 }
 
 // Whether the line's box (a DOMRect-like { left, top, right, bottom }) meets
 // any of the cards' boxes: then it fades so it never sits over one.
 function rightsOverCards(line, cards) {
   if (!line || !(line.right > line.left) || !(line.bottom > line.top)) return false;
-  return (cards || []).some((c) => c && c.right > c.left && c.bottom > c.top
-    && c.left < line.right && line.left < c.right && c.top < line.bottom && line.top < c.bottom);
+  return (cards || []).some(
+    (c) =>
+      c &&
+      c.right > c.left &&
+      c.bottom > c.top &&
+      c.left < line.right &&
+      line.left < c.right &&
+      c.top < line.bottom &&
+      line.top < c.bottom,
+  );
 }
 
 module.exports = { rightsLine, rightsMeta, rightsFooterHtml, rightsPosition, rightsOverCards };

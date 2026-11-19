@@ -9,14 +9,14 @@
 import { TextView } from './TextView';
 
 const defaultRegistry = {
-  text:              TextView,
-  essay:             TextView,
-  fragment:          TextView,
-  multi:             TextView,
-  image:             TextView,   // future: ImageView
-  'podcast-episode': TextView,   // future: AudioView
-  video:             TextView,   // future: VideoView
-  link:              TextView,   // its link card
+  text: TextView,
+  essay: TextView,
+  fragment: TextView,
+  multi: TextView,
+  image: TextView, // future: ImageView
+  'podcast-episode': TextView, // future: AudioView
+  video: TextView, // future: VideoView
+  link: TextView, // its link card
 };
 
 /**

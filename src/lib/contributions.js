@@ -49,7 +49,10 @@ function contributionsConfig(settings) {
 // Also accepted: the item's own id (a full url for local content).
 function slugOf(item) {
   const u = (item && (item.url || item.id)) || '';
-  return String(u).split('/').pop().replace(/\.html?$/, '');
+  return String(u)
+    .split('/')
+    .pop()
+    .replace(/\.html?$/, '');
 }
 
 function chapterIndex(items) {
@@ -83,7 +86,7 @@ function assetUrl(asset, cfg) {
 // chapter that exists, test items only when asked for. Everything else is
 // dropped quietly; nothing a contributor wrote is trusted to be well formed.
 function visibleContributions(data, { items, showTest = false } = {}) {
-  const list = Array.isArray(data) ? data : (data && Array.isArray(data.contributions) ? data.contributions : []);
+  const list = Array.isArray(data) ? data : data && Array.isArray(data.contributions) ? data.contributions : [];
   const chapters = items ? chapterIndex(items) : null;
   const known = (id) => !chapters || chapters.has(str(id));
   const out = [];
@@ -143,9 +146,16 @@ function countsByChapter(list) {
 // The readers' edge layer: one edge per connection, never mixed with the
 // canon's edges.
 function connectionEdges(list) {
-  return (list || []).filter((c) => c.type === 'connection').map((c) => ({
-    id: c.id, source: c.chapter, target: c.to, layer: 'contribution', label: c.body, author: c.author,
-  }));
+  return (list || [])
+    .filter((c) => c.type === 'connection')
+    .map((c) => ({
+      id: c.id,
+      source: c.chapter,
+      target: c.to,
+      layer: 'contribution',
+      label: c.body,
+      author: c.author,
+    }));
 }
 
 // ── Text-quote anchors ──────────────────────────────────────────────────────
@@ -161,7 +171,10 @@ function allIndexes(hay, needle) {
   const out = [];
   if (!needle) return out;
   let i = hay.indexOf(needle);
-  while (i !== -1) { out.push(i); i = hay.indexOf(needle, i + 1); }
+  while (i !== -1) {
+    out.push(i);
+    i = hay.indexOf(needle, i + 1);
+  }
   return out;
 }
 
@@ -177,13 +190,32 @@ function resolveQuote(paragraphs, quote) {
   // cross from one paragraph into the next.
   const starts = [];
   let whole = '';
-  texts.forEach((t, i) => { starts.push(whole.length); whole += t + (i < texts.length - 1 ? '\n' : ''); });
+  texts.forEach((t, i) => {
+    starts.push(whole.length);
+    whole += t + (i < texts.length - 1 ? '\n' : '');
+  });
   const hits = allIndexes(whole, exact).filter((i) => !whole.slice(i, i + exact.length).includes('\n'));
   if (!hits.length) return null;
   const score = (i) => {
     let s = 0;
-    if (prefix && whole.slice(Math.max(0, i - prefix.length - 2), i).replace(/\n/g, ' ').trim().endsWith(prefix)) s += 1;
-    if (suffix && whole.slice(i + exact.length, i + exact.length + suffix.length + 2).replace(/\n/g, ' ').trim().startsWith(suffix)) s += 1;
+    if (
+      prefix &&
+      whole
+        .slice(Math.max(0, i - prefix.length - 2), i)
+        .replace(/\n/g, ' ')
+        .trim()
+        .endsWith(prefix)
+    )
+      s += 1;
+    if (
+      suffix &&
+      whole
+        .slice(i + exact.length, i + exact.length + suffix.length + 2)
+        .replace(/\n/g, ' ')
+        .trim()
+        .startsWith(suffix)
+    )
+      s += 1;
     return s;
   };
   let pick = hits[0];
@@ -200,7 +232,11 @@ function resolveQuote(paragraphs, quote) {
 // An essay's text as paragraphs, split on blank lines. Text only: the caller
 // renders each as a text node, so nothing in it is ever read as markup.
 function paragraphsOf(body) {
-  return String(body || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  return String(body || '')
+    .replace(/\r\n?/g, '\n')
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 }
 
 // ── Submissions ─────────────────────────────────────────────────────────────
@@ -230,7 +266,8 @@ function checkSubmission(s, cfg) {
   if (body.length > limits.body) errors.push(`At most ${limits.body} characters.`);
   const anchor = (s && s.anchor) || {};
   if (!str(anchor.chapter)) errors.push('Which chapter is this about?');
-  if (anchor.exact && str(anchor.exact).length > limits.exact) errors.push(`The passage can be at most ${limits.exact} characters.`);
+  if (anchor.exact && str(anchor.exact).length > limits.exact)
+    errors.push(`The passage can be at most ${limits.exact} characters.`);
   if (type === 'connection' && (!str(s.to) || s.to === anchor.chapter)) errors.push('Choose the other chapter.');
   return errors;
 }

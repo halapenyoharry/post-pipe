@@ -26,13 +26,7 @@ function articlesAndTags(nodes) {
  * and gap where it is flattest, which looks like a mistake rather than a shape.
  */
 function radialLayout(nodes, opts = {}) {
-  const {
-    cardW = DEFAULT_CARD.width,
-    cardH = DEFAULT_CARD.height,
-    gap = 28,
-    flatten = 0.62,
-    maxRings = 4,
-  } = opts;
+  const { cardW = DEFAULT_CARD.width, cardH = DEFAULT_CARD.height, gap = 28, flatten = 0.62, maxRings = 4 } = opts;
   const { articles, tags } = articlesAndTags(nodes);
   const out = {};
   if (!articles.length) return out;
@@ -63,10 +57,8 @@ function radialLayout(nodes, opts = {}) {
   };
 
   const ringCount = Math.max(1, Math.min(maxRings, Math.ceil(ordered.length / 26)));
-  const radiiFor = (inner) =>
-    [...Array(ringCount)].map((_, i) => inner + i * ringGap);
-  const capacity = (inner) =>
-    radiiFor(inner).reduce((sum, rx) => sum + Math.floor(perimeter(rx) / arcNeed), 0);
+  const radiiFor = (inner) => [...Array(ringCount)].map((_, i) => inner + i * ringGap);
+  const capacity = (inner) => radiiFor(inner).reduce((sum, rx) => sum + Math.floor(perimeter(rx) / arcNeed), 0);
 
   // Smallest innermost radius whose rings hold the corpus. Concentric rings
   // pack the same number of pieces into a far smaller figure than one giant
@@ -247,14 +239,15 @@ function timelineLayout(nodes, opts = {}) {
   const place = (n, x) => {
     const left = x - cardW / 2;
     let lane = laneEnds.findIndex((end) => left > end + gap);
-    if (lane === -1) { lane = laneEnds.length; laneEnds.push(-Infinity); }
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(-Infinity);
+    }
     laneEnds[lane] = x + cardW / 2;
     out[n.id] = { x, y: lane * (cardH + gap) };
   };
 
-  [...dated]
-    .sort((a, b) => timeOf(a) - timeOf(b))
-    .forEach((n) => place(n, (xOfTime.get(timeOf(n)) / rawSpan) * span));
+  [...dated].sort((a, b) => timeOf(a) - timeOf(b)).forEach((n) => place(n, (xOfTime.get(timeOf(n)) / rawSpan) * span));
 
   // Undated, to the left of everything dated and clearly apart from it.
   const undatedRight = -span * 0.12;
@@ -274,7 +267,10 @@ function timelineLayout(nodes, opts = {}) {
   let trow = 0;
   tags.forEach((n) => {
     const w = (n._r ? n._r * 1.6 : 90) + gap;
-    if (tx + w > span) { tx = 0; trow++; }
+    if (tx + w > span) {
+      tx = 0;
+      trow++;
+    }
     out[n.id] = { x: tx, y: bandY - trow * (cardH * 0.55) };
     tx += w;
   });
@@ -301,10 +297,8 @@ function timelineLayout(nodes, opts = {}) {
  * @param {number} [fraction] share of the needed area below which it is a heap
  */
 function layoutIsDegenerate(positions, card, fraction = 0.3) {
-  const pts = (positions || []).filter(
-    (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y),
-  );
-  if (pts.length <= 8) return false;   // too few to judge; leave it alone
+  const pts = (positions || []).filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (pts.length <= 8) return false; // too few to judge; leave it alone
 
   // Plain min/max is fooled by a couple of legitimately far-flung nodes —
   // this corpus has plenty of orphans (no edges at all), which charge
@@ -375,7 +369,9 @@ function timeAxisGeometry(nodes, axis = {}) {
   const along = (d) => ({ x: origin.x + dir.x * d, y: origin.y + dir.y * d });
 
   const anchors = {};
-  dated.forEach((n) => { anchors[n.id] = along(scale.position(timeOf(n))); });
+  dated.forEach((n) => {
+    anchors[n.id] = along(scale.position(timeOf(n)));
+  });
 
   // Ticks on round dates rather than on the corpus's own timestamps, so the
   // axis reads as a calendar and not as a list of when things happened to be
@@ -383,7 +379,7 @@ function timeAxisGeometry(nodes, axis = {}) {
   const first = scale.times[0];
   const last = scale.times[scale.times.length - 1];
   const YEAR = 365.25 * 24 * 3600 * 1000;
-  const byMonth = (last - first) < YEAR * 2;
+  const byMonth = last - first < YEAR * 2;
 
   const ticks = [];
   const cursor = new Date(first);
@@ -662,12 +658,7 @@ function formatBucketTick(timeMs, unit) {
  */
 function dimensionAxisGeometry(nodes, axis = {}) {
   const dimension = axis.dimension || 'time';
-  const {
-    orientation = 'ltr',
-    origin = { x: 0, y: 0 },
-    length = 4200,
-    granularity = 'auto',
-  } = axis;
+  const { orientation = 'ltr', origin = { x: 0, y: 0 }, length = 4200, granularity = 'auto' } = axis;
 
   const dir = {
     ltr: { x: 1, y: 0 },
@@ -822,7 +813,7 @@ function dimensionAxisGeometry(nodes, axis = {}) {
 }
 
 const LAYOUTS = {
-  force: null,        // the simulation owns this one; see GraphViewer
+  force: null, // the simulation owns this one; see GraphViewer
   radial: radialLayout,
   timeline: timelineLayout,
 };
@@ -837,7 +828,15 @@ function computeLayout(name, nodes, opts) {
 }
 
 module.exports = {
-  radialLayout, timelineLayout, computeLayout, layoutNames,
-  layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry,
-  dimensionIntervals, parseLooseDate, compressedTimeScale, LAYOUTS,
+  radialLayout,
+  timelineLayout,
+  computeLayout,
+  layoutNames,
+  layoutIsDegenerate,
+  timeAxisGeometry,
+  dimensionAxisGeometry,
+  dimensionIntervals,
+  parseLooseDate,
+  compressedTimeScale,
+  LAYOUTS,
 };

@@ -38,7 +38,9 @@ export function Subscribe({ config }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
@@ -77,12 +79,25 @@ export function Subscribe({ config }) {
         aria-expanded={open}
         data-top-subscribe
         data-has-icon={config.icon ? '' : undefined}
-        onClick={() => { setResult(null); setOpen((o) => !o); }}
+        onClick={() => {
+          setResult(null);
+          setOpen((o) => !o);
+        }}
       >
-        {config.icon ? <Icon body={config.icon} size={15} className={styles.pillIcon} /> : <span className={styles.title}>{config.label}</span>}
+        {config.icon ? (
+          <Icon body={config.icon} size={15} className={styles.pillIcon} />
+        ) : (
+          <span className={styles.title}>{config.label}</span>
+        )}
       </button>
       {open && (
-        <div ref={sheetRef} className={styles.subscribeSheet} role="dialog" aria-label={config.label} data-top-subscribe-sheet>
+        <div
+          ref={sheetRef}
+          className={styles.subscribeSheet}
+          role="dialog"
+          aria-label={config.label}
+          data-top-subscribe-sheet
+        >
           <form
             className={styles.subscribeForm}
             onSubmit={onSubmit}
@@ -104,7 +119,12 @@ export function Subscribe({ config }) {
               {config.label}
             </button>
           </form>
-          <p className={`${styles.subscribeMessage} ${result ? (result.ok ? styles.subscribeOk : styles.subscribeError) : ''}`} role="status" aria-live="polite" data-top-subscribe-message>
+          <p
+            className={`${styles.subscribeMessage} ${result ? (result.ok ? styles.subscribeOk : styles.subscribeError) : ''}`}
+            role="status"
+            aria-live="polite"
+            data-top-subscribe-message
+          >
             {result ? result.message : ''}
           </p>
         </div>

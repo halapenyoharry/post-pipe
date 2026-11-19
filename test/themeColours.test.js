@@ -19,11 +19,18 @@ function buildWith(theme) {
       fs.writeFileSync(path.join(root, rel), text);
     };
     put('settings.json', JSON.stringify({ site: { title: 'Theme', base_url: 'https://theme.test' }, theme }));
-    put('feeds.opml', '<?xml version="1.0"?><opml version="2.0"><head><title>t</title></head><body>'
-      + '<outline text="Items" title="Items" type="local" xmlUrl="local://items"/></body></opml>');
+    put(
+      'feeds.opml',
+      '<?xml version="1.0"?><opml version="2.0"><head><title>t</title></head><body>' +
+        '<outline text="Items" title="Items" type="local" xmlUrl="local://items"/></body></opml>',
+    );
     put('items/one/frontmatter.json', JSON.stringify({ title: 'One', tags: ['a'] }));
     put('items/one/index.md', 'One.\n');
-    const r = spawnSync(process.execPath, [GENERATE], { cwd: root, env: { ...process.env, POSTPIPE_SITE: root }, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [GENERATE], {
+      cwd: root,
+      env: { ...process.env, POSTPIPE_SITE: root },
+      encoding: 'utf8',
+    });
     assert.strictEqual(r.status, 0, r.stderr || r.stdout);
     return fs.readFileSync(path.join(root, '_site', 'index.html'), 'utf8');
   } finally {

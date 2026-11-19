@@ -19,42 +19,42 @@ import styles from './ConfigPanel.module.css';
 // ── Default feature map ──────────────────────────────────────────────────────
 
 export const DEFAULT_FEATURES = {
-  readerPanel:     true,
-  tts:             true,
-  feedBar:         true,
-  addFeed:         true,
-  layoutControls:  true,
-  dimensions:      true,
-  undoRedo:        true,
-  colorSettings:   true,
-  configPanel:     true,
+  readerPanel: true,
+  tts: true,
+  feedBar: true,
+  addFeed: true,
+  layoutControls: true,
+  dimensions: true,
+  undoRedo: true,
+  colorSettings: true,
+  configPanel: true,
   keyboardShortcuts: true,
 };
 
 const FEATURE_META = [
-  { key: 'readerPanel',      label: 'Reader Panel',       sub: 'Click a node to read the full article' },
-  { key: 'tts',              label: 'Text-to-Speech',     sub: 'Read-aloud toolbar inside the reader' },
-  { key: 'feedBar',          label: 'Feed Sources Bar',   sub: 'Pill bar to show/hide feed sources' },
-  { key: 'addFeed',          label: 'Add Feed (+)',        sub: 'Button to add new RSS/Atom/JSON feeds' },
-  { key: 'layoutControls',   label: 'Layout Controls',    sub: 'Cluster / ring layout picker' },
-  { key: 'dimensions',       label: 'Dimensions',         sub: 'Time, narrative, chronology overlays' },
-  { key: 'undoRedo',         label: 'Undo / Redo',        sub: 'History controls for arrangement' },
-  { key: 'colorSettings',    label: 'Color Settings',     sub: 'Graph color scheme (gear icon)' },
+  { key: 'readerPanel', label: 'Reader Panel', sub: 'Click a node to read the full article' },
+  { key: 'tts', label: 'Text-to-Speech', sub: 'Read-aloud toolbar inside the reader' },
+  { key: 'feedBar', label: 'Feed Sources Bar', sub: 'Pill bar to show/hide feed sources' },
+  { key: 'addFeed', label: 'Add Feed (+)', sub: 'Button to add new RSS/Atom/JSON feeds' },
+  { key: 'layoutControls', label: 'Layout Controls', sub: 'Cluster / ring layout picker' },
+  { key: 'dimensions', label: 'Dimensions', sub: 'Time, narrative, chronology overlays' },
+  { key: 'undoRedo', label: 'Undo / Redo', sub: 'History controls for arrangement' },
+  { key: 'colorSettings', label: 'Color Settings', sub: 'Graph color scheme (gear icon)' },
   { key: 'keyboardShortcuts', label: 'Keyboard Shortcuts', sub: 'Cmd+Z undo, escape to close, etc.' },
 ];
 
 const THEME_FIELDS = [
-  { key: 'bg',           label: 'Background' },
-  { key: 'surface',      label: 'Surface' },
-  { key: 'accent',       label: 'Accent' },
-  { key: 'text',         label: 'Text' },
-  { key: 'text_bright',  label: 'Text Bright' },
+  { key: 'bg', label: 'Background' },
+  { key: 'surface', label: 'Surface' },
+  { key: 'accent', label: 'Accent' },
+  { key: 'text', label: 'Text' },
+  { key: 'text_bright', label: 'Text Bright' },
 ];
 
 const PERSISTENCE_OPTIONS = [
   { value: 'localStorage', label: 'Browser (localStorage)' },
-  { value: 'memory',       label: 'Session only (memory)' },
-  { value: 'none',         label: 'Disabled' },
+  { value: 'memory', label: 'Session only (memory)' },
+  { value: 'none', label: 'Disabled' },
 ];
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -77,11 +77,12 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
     if (touchStartY.current === null) return;
     const currentY = e.touches[0].clientY;
     const diff = currentY - touchStartY.current;
-    
+
     // If scrolling inside the panel content, don't dismiss immediately unless at top
     if (panelRef.current && panelRef.current.scrollTop > 0) return;
 
-    if (diff > 80) { // Swipe down threshold
+    if (diff > 80) {
+      // Swipe down threshold
       setOpen(false);
       touchStartY.current = null;
     }
@@ -94,7 +95,9 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
   // Close on Escape
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
@@ -102,36 +105,51 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
   const features = { ...DEFAULT_FEATURES, ...(config.features || {}) };
   const theme = config.theme || {};
 
-  const setFeature = useCallback((key, value) => {
-    onUpdate({
-      features: { ...features, [key]: value },
-    });
-  }, [features, onUpdate]);
+  const setFeature = useCallback(
+    (key, value) => {
+      onUpdate({
+        features: { ...features, [key]: value },
+      });
+    },
+    [features, onUpdate],
+  );
 
-  const setThemeColor = useCallback((key, value) => {
-    onUpdate({
-      theme: { ...theme, [key]: value },
-    });
-  }, [theme, onUpdate]);
+  const setThemeColor = useCallback(
+    (key, value) => {
+      onUpdate({
+        theme: { ...theme, [key]: value },
+      });
+    },
+    [theme, onUpdate],
+  );
 
-  const setPersistence = useCallback((value) => {
-    onUpdate({ persistence: value });
-  }, [onUpdate]);
+  const setPersistence = useCallback(
+    (value) => {
+      onUpdate({ persistence: value });
+    },
+    [onUpdate],
+  );
 
-  const setFeedUrl = useCallback((value) => {
-    onUpdate({ feed: value || undefined });
-  }, [onUpdate]);
+  const setFeedUrl = useCallback(
+    (value) => {
+      onUpdate({ feed: value || undefined });
+    },
+    [onUpdate],
+  );
 
   // Export config as JSON
   const handleExport = useCallback(() => {
     const snippet = buildEmbedSnippet(config);
-    navigator.clipboard.writeText(snippet).then(() => {
-      setToast('Copied to clipboard');
-      setTimeout(() => setToast(null), 1800);
-    }).catch(() => {
-      // Clipboard denied; toggle the snippet view so they can copy manually
-      setShowSnippet(true);
-    });
+    navigator.clipboard
+      .writeText(snippet)
+      .then(() => {
+        setToast('Copied to clipboard');
+        setTimeout(() => setToast(null), 1800);
+      })
+      .catch(() => {
+        // Clipboard denied; toggle the snippet view so they can copy manually
+        setShowSnippet(true);
+      });
   }, [config]);
 
   // Import config from JSON file
@@ -139,24 +157,27 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
     if (fileInputRef.current) fileInputRef.current.click();
   }, []);
 
-  const handleFileChange = useCallback((e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target.result);
-        onUpdate(parsed);
-        setToast('Config imported');
-        setTimeout(() => setToast(null), 1800);
-      } catch (_) {
-        setToast('Invalid JSON');
-        setTimeout(() => setToast(null), 2500);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }, [onUpdate]);
+  const handleFileChange = useCallback(
+    (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          onUpdate(parsed);
+          setToast('Config imported');
+          setTimeout(() => setToast(null), 1800);
+        } catch (_) {
+          setToast('Invalid JSON');
+          setTimeout(() => setToast(null), 2500);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    },
+    [onUpdate],
+  );
 
   if (!visible) return null;
 
@@ -174,9 +195,9 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
       {open && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} />
-          <div 
-            className={styles.panel} 
-            role="dialog" 
+          <div
+            className={styles.panel}
+            role="dialog"
             aria-label="Viewer Configuration"
             ref={panelRef}
             onTouchStart={handleTouchStart}
@@ -185,11 +206,7 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
           >
             <div className={styles.header}>
               <span className={styles.panelTitle}>Viewer Configuration</span>
-              <button
-                className={styles.closeBtn}
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-              >
+              <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close">
                 ×
               </button>
             </div>
@@ -227,7 +244,9 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
                   onChange={(e) => setPersistence(e.target.value)}
                 >
                   {PERSISTENCE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -245,9 +264,7 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
                     value={theme[f.key] || getDefaultThemeColor(f.key)}
                     onChange={(e) => setThemeColor(f.key, e.target.value)}
                   />
-                  <span className={styles.colorHex}>
-                    {theme[f.key] || getDefaultThemeColor(f.key)}
-                  </span>
+                  <span className={styles.colorHex}>{theme[f.key] || getDefaultThemeColor(f.key)}</span>
                 </div>
               ))}
             </div>
@@ -276,9 +293,7 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
 
               {showSnippet && (
                 <div className={styles.snippet}>
-                  <code className={styles.snippetCode}>
-                    {buildEmbedSnippet(config)}
-                  </code>
+                  <code className={styles.snippetCode}>{buildEmbedSnippet(config)}</code>
                 </div>
               )}
               {!showSnippet && (
@@ -308,7 +323,6 @@ export function ConfigPanel({ config, onUpdate, onReset, visible = true }) {
     </>
   );
 }
-
 
 // ── Toggle sub-component ─────────────────────────────────────────────────────
 

@@ -17,7 +17,8 @@ function nodePalettesOf(graphSettings) {
   const out = [];
   for (const p of list) {
     if (!p || typeof p !== 'object') continue;
-    const id = str(p.id), color = str(p.color);
+    const id = str(p.id),
+      color = str(p.color);
     if (!id || !color || seen.has(id)) continue;
     seen.add(id);
     const op = Number(p.fillOpacity);
@@ -25,7 +26,8 @@ function nodePalettesOf(graphSettings) {
       id,
       label: str(p.label) || id,
       color,
-      fillOpacity: p.fillOpacity !== null && p.fillOpacity !== '' && Number.isFinite(op) ? Math.max(0, Math.min(1, op)) : null,
+      fillOpacity:
+        p.fillOpacity !== null && p.fillOpacity !== '' && Number.isFinite(op) ? Math.max(0, Math.min(1, op)) : null,
       labelColor: str(p.labelColor),
     });
   }

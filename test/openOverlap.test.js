@@ -22,7 +22,8 @@ test('cards that already clear each other do not move', () => {
 test('a nudge is small: two cards barely overlapping move only as far as they must', () => {
   const rects = [open('a', 0, 0), open('b', 230, 20)];
   const moved = separateOpen(rects, { gap: 12 });
-  const a = moved.get('a'), b = moved.get('b');
+  const a = moved.get('a'),
+    b = moved.get('b');
   assert.ok(Math.abs(b.x - a.x - 242) < 1e-9);
   assert.strictEqual(a.y, 0);
   assert.strictEqual(b.y, 20);

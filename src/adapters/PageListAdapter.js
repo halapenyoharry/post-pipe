@@ -32,14 +32,18 @@ async function load(config, { fetchText: fetchPage = fetchText } = {}) {
     throw new Error(`PageListAdapter: list file not found at ${listPath}`);
   }
   const urls = readList(fs.readFileSync(listPath, 'utf8'));
-  const results = await Promise.all(urls.map(async (url) => {
-    try {
-      return pageItem(await fetchPage(url), url);
-    } catch (err) {
-      console.warn(`[pages] ${title || id}: ${url} failed: ${err && err.message ? err.message : err}; left out this build`);
-      return null;
-    }
-  }));
+  const results = await Promise.all(
+    urls.map(async (url) => {
+      try {
+        return pageItem(await fetchPage(url), url);
+      } catch (err) {
+        console.warn(
+          `[pages] ${title || id}: ${url} failed: ${err && err.message ? err.message : err}; left out this build`,
+        );
+        return null;
+      }
+    }),
+  );
   const items = results.filter(Boolean);
   return {
     items,

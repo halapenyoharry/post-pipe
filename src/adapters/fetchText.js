@@ -19,8 +19,10 @@ const UA = 'post-pipe/1.0 (+https://github.com/halapenyoharry/post-pipe)';
 // still wins when it is longer); the whole fetch is still bounded by
 // timeoutMs. It is set for the whole process, which is a build.
 const CONNECT_ATTEMPT_MS = 2_500;
-if (typeof net.setDefaultAutoSelectFamilyAttemptTimeout === 'function'
-    && net.getDefaultAutoSelectFamilyAttemptTimeout() < CONNECT_ATTEMPT_MS) {
+if (
+  typeof net.setDefaultAutoSelectFamilyAttemptTimeout === 'function' &&
+  net.getDefaultAutoSelectFamilyAttemptTimeout() < CONNECT_ATTEMPT_MS
+) {
   net.setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_ATTEMPT_MS);
 }
 

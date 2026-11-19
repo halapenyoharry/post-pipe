@@ -191,7 +191,11 @@ function hangRows(n, columns) {
  * @returns {{ positions: [{x, y}], label: rect, rows, columns, slots: [{col, row}] }}
  */
 function hangChain(units, lab, opts = {}) {
-  const o = { ...hangOptions(opts), pad: opts.pad != null ? opts.pad : 40, labelGap: opts.labelGap != null ? opts.labelGap : 12 };
+  const o = {
+    ...hangOptions(opts),
+    pad: opts.pad != null ? opts.pad : 40,
+    labelGap: opts.labelGap != null ? opts.labelGap : 12,
+  };
   const n = units.length;
   const cw = n ? Math.max(...units.map((u) => u.w)) : 0;
   const ch = n ? Math.max(...units.map((u) => u.h)) : 0;
@@ -209,8 +213,12 @@ function hangChain(units, lab, opts = {}) {
   const stepX = cw + o.gap;
   const stepY = ch + o.gap;
   // x of the near column's centre.
-  const nearX = o.direction === 'down' ? -far * ((usedCols - 1) * stepX) / 2
-    : o.direction === 'down-right' ? o.pad + cw / 2 : -(o.pad + cw / 2);
+  const nearX =
+    o.direction === 'down'
+      ? (-far * ((usedCols - 1) * stepX)) / 2
+      : o.direction === 'down-right'
+        ? o.pad + cw / 2
+        : -(o.pad + cw / 2);
   const colX = (j) => nearX + far * j * stepX;
 
   // The far column's empty top, above the far end of the chain: rows before
@@ -244,7 +252,14 @@ function hangChain(units, lab, opts = {}) {
     const s = slotOf(k);
     return { x: colX(s.col), y: top + s.row * stepY + ch / 2 };
   });
-  return { positions, label, rows: R, columns: usedCols, slots: units.map((u, k) => slotOf(k)), labelBeside: fitsBeside };
+  return {
+    positions,
+    label,
+    rows: R,
+    columns: usedCols,
+    slots: units.map((u, k) => slotOf(k)),
+    labelBeside: fitsBeside,
+  };
 }
 
 /**
@@ -301,9 +316,13 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       if (!sub) continue;
       if (sub.nodes.size === 0 && !closedSet.has(ch.id)) continue;
       units.push({
-        kind: 'container', id: ch.id, sub,
-        w: sub.box.x1 - sub.box.x0, h: sub.box.y1 - sub.box.y0,
-        order: Number.isFinite(ch.order) ? ch.order : null, index: -10000 + index,
+        kind: 'container',
+        id: ch.id,
+        sub,
+        w: sub.box.x1 - sub.box.x0,
+        h: sub.box.y1 - sub.box.y0,
+        order: Number.isFinite(ch.order) ? ch.order : null,
+        index: -10000 + index,
       });
     }
     // The spiral's own settings; its cards are spaced at the scale they are
@@ -311,7 +330,16 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
     const so = spiralOptions(options.spiralOf ? options.spiralOf(c) : null);
     const ownSpacing = so.spacing !== null ? so.spacing : spacing;
     (members.get(c.id) || []).forEach((m, index) => {
-      units.push({ kind: 'node', id: m.id, w: m.w * so.cardScale, h: m.h * so.cardScale, scale: so.cardScale, order: m.order, date: m.date, index });
+      units.push({
+        kind: 'node',
+        id: m.id,
+        w: m.w * so.cardScale,
+        h: m.h * so.cardScale,
+        scale: so.cardScale,
+        order: m.order,
+        date: m.date,
+        index,
+      });
     });
     units.sort(compareUnits);
 
@@ -335,7 +363,11 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       const bulge = pad * 1.25;
       const box = { x0: inner.x0 - bulge, y0: 0, x1: inner.x1 + bulge, y1: inner.y1 + bulge };
       const self = {
-        label: res.label, box, center: { x: 0, y: 0 }, closed: false, spiral: null,
+        label: res.label,
+        box,
+        center: { x: 0, y: 0 },
+        closed: false,
+        spiral: null,
         hang: { ...hang, pad, rows: res.rows, columns: res.columns, labelBeside: res.labelBeside },
       };
       return { box, nodes, containers: new Map([[c.id, self]]) };
@@ -351,13 +383,21 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
       const first = units[0];
       const fx = 0;
       const fy = lab.h / 2 + gap + first.h / 2;
-      const clear = (rect) => !rectsOverlap(rect, labelRect, gap) && !placed.some((p) => rectsOverlap(rect, p, ownSpacing));
+      const clear = (rect) =>
+        !rectsOverlap(rect, labelRect, gap) && !placed.some((p) => rectsOverlap(rect, p, ownSpacing));
       const hasChildContainers = units.some((u) => u.kind === 'container');
       const ordered = units.some((u) => Number.isFinite(u.order));
-      const arrangement = hasChildContainers ? (mode === 'scatter' ? 'scatter' : 'beside')
-        : mode === 'ring' ? 'ring'
-        : mode === 'scatter' ? 'scatter'
-        : ordered ? 'path' : 'scatter';
+      const arrangement = hasChildContainers
+        ? mode === 'scatter'
+          ? 'scatter'
+          : 'beside'
+        : mode === 'ring'
+          ? 'ring'
+          : mode === 'scatter'
+            ? 'scatter'
+            : ordered
+              ? 'path'
+              : 'scatter';
       const positions = [];
 
       if (arrangement === 'path') {
@@ -381,7 +421,8 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
         const a = options.startRadius != null ? options.startRadius : maxSide * 0.65;
         const t0 = -Math.PI / 2;
         const walk = (theta) => {
-          const cos = Math.cos(theta), sin = Math.sin(theta);
+          const cos = Math.cos(theta),
+            sin = Math.sin(theta);
           const rot = (x, y) => ({ x: x * cos - y * sin, y: x * sin + y * cos });
           const c0 = rot(0, a);
           const cx0 = fx + c0.x;
@@ -393,7 +434,8 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
           };
           const pos = [];
           const rects = [];
-          const free = (rect) => !rectsOverlap(rect, labelRect, gap) && !rects.some((p) => rectsOverlap(rect, p, ownSpacing));
+          const free = (rect) =>
+            !rectsOverlap(rect, labelRect, gap) && !rects.some((p) => rectsOverlap(rect, p, ownSpacing));
           let t = t0;
           order.forEach((u, k) => {
             let p = { x: fx, y: sy };
@@ -416,14 +458,19 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
             pos.reverse();
             rects.reverse();
             for (const p of pos) p.x = -p.x;
-            for (const r of rects) { const x0 = -r.x1; r.x1 = -r.x0; r.x0 = x0; }
+            for (const r of rects) {
+              const x0 = -r.x1;
+              r.x1 = -r.x0;
+              r.x0 = x0;
+            }
             sp = { ...sp, cx: -sp.cx, mirrored: true, inward: true };
           }
           return { pos, rects, sp };
         };
         // The direction from the last member to the first.
         const opening = (res) => {
-          const f = res.pos[0], l = res.pos[res.pos.length - 1];
+          const f = res.pos[0],
+            l = res.pos[res.pos.length - 1];
           return Math.atan2(f.y - l.y, f.x - l.x);
         };
         // Turned by theta, then moved so the last member is at the origin.
@@ -431,7 +478,8 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
         const shifted = (theta) => {
           const res = walk(theta);
           const last = res.pos[res.pos.length - 1];
-          const dx = outerEnd ? -last.x : 0, dy = outerEnd ? -last.y : 0;
+          const dx = outerEnd ? -last.x : 0,
+            dy = outerEnd ? -last.y : 0;
           return { ...res, dx, dy };
         };
         let theta = 0;
@@ -473,22 +521,34 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
           if (Math.abs(rest) >= 0.002 && Math.abs(rest) < (15 * Math.PI) / 180) {
             const L = res.pos[res.pos.length - 1];
             const turnBy = (ang) => {
-              const cos = Math.cos(ang), sin = Math.sin(ang);
-              const turn = (p) => ({ x: L.x + (p.x - L.x) * cos - (p.y - L.y) * sin, y: L.y + (p.x - L.x) * sin + (p.y - L.y) * cos });
+              const cos = Math.cos(ang),
+                sin = Math.sin(ang);
+              const turn = (p) => ({
+                x: L.x + (p.x - L.x) * cos - (p.y - L.y) * sin,
+                y: L.y + (p.x - L.x) * sin + (p.y - L.y) * cos,
+              });
               const pos = res.pos.map(turn);
               const rects = res.rects.map((r, k) => rectAt(pos[k].x, pos[k].y, r.x1 - r.x0, r.y1 - r.y0));
               const lc = turn({ x: (labelRect.x0 + labelRect.x1) / 2, y: (labelRect.y0 + labelRect.y1) / 2 });
               const lr = rectAt(lc.x, lc.y, labelRect.x1 - labelRect.x0, labelRect.y1 - labelRect.y0);
               const sc = turn({ x: res.sp.cx, y: res.sp.cy });
-              const ok = rects.every((r, i) => !rectsOverlap(r, lr, gap / 2) && rects.every((q, j) => j <= i || !rectsOverlap(r, q, ownSpacing / 4)));
+              const ok = rects.every(
+                (r, i) =>
+                  !rectsOverlap(r, lr, gap / 2) && rects.every((q, j) => j <= i || !rectsOverlap(r, q, ownSpacing / 4)),
+              );
               return ok ? { ...res, pos, rects, lab: lr, sp: { ...res.sp, cx: sc.x, cy: sc.y } } : null;
             };
-            let lo = 0, hi = 1, done = turnBy(rest);
+            let lo = 0,
+              hi = 1,
+              done = turnBy(rest);
             if (!done) {
               for (let i = 0; i < 12; i++) {
                 const mid = (lo + hi) / 2;
                 const r = turnBy(rest * mid);
-                if (r) { lo = mid; done = r; } else hi = mid;
+                if (r) {
+                  lo = mid;
+                  done = r;
+                } else hi = mid;
               }
             }
             if (done) res = done;
@@ -507,15 +567,21 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
             for (let step = 1; step <= 18 && !found; step++) {
               for (const s of [1, -1]) {
                 const r = shifted(theta + s * step * (Math.PI / 36));
-                if (topOf(r) >= so.keepBelowY) { found = r; break; }
+                if (topOf(r) >= so.keepBelowY) {
+                  found = r;
+                  break;
+                }
               }
             }
             if (found) res = found;
             else drop = so.keepBelowY - topOf(res);
           }
         }
-        const dx = res.dx, dy = res.dy + drop;
-        res.pos.forEach((p, k) => { positions[k] = { x: p.x + dx, y: p.y + dy }; });
+        const dx = res.dx,
+          dy = res.dy + drop;
+        res.pos.forEach((p, k) => {
+          positions[k] = { x: p.x + dx, y: p.y + dy };
+        });
         res.rects.forEach((r) => placed.push({ x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy }));
         const lr = res.lab || labelRect;
         labelRect = { x0: lr.x0 + dx, y0: lr.y0 + dy, x1: lr.x1 + dx, y1: lr.y1 + dy };
@@ -562,8 +628,13 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
           if (top + u.h > bottom) top = -u.h / 3;
           const y = top + u.h / 2;
           let x;
-          if (i % 2 === 0) { x = right + spacing * 2 + u.w / 2; right = x + u.w / 2; }
-          else { x = left - spacing * 2 - u.w / 2; left = x - u.w / 2; }
+          if (i % 2 === 0) {
+            x = right + spacing * 2 + u.w / 2;
+            right = x + u.w / 2;
+          } else {
+            x = left - spacing * 2 - u.w / 2;
+            left = x - u.w / 2;
+          }
           bottom = Math.max(bottom, top + u.h);
           positions.push({ x, y });
           placed.push(rectAt(x, y, u.w, u.h));
@@ -641,6 +712,15 @@ function containerLayout({ containers, members, labelSize, macroSize, closed, op
 }
 
 module.exports = {
-  containerLayout, rectsOverlap, compareUnits, hangChain, hangOptions, hangRows, spiralOptions,
-  containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf,
+  containerLayout,
+  rectsOverlap,
+  compareUnits,
+  hangChain,
+  hangOptions,
+  hangRows,
+  spiralOptions,
+  containerLayoutOf,
+  hullDrawn,
+  closedPillScaleOf,
+  closedPillOf,
 };

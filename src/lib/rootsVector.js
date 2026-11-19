@@ -78,7 +78,8 @@ function parseRoots(text) {
   return { w, h, edges, tips };
 }
 
-const segLen = (pts) => pts.reduce((t, p, i) => (i ? t + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
+const segLen = (pts) =>
+  pts.reduce((t, p, i) => (i ? t + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
 
 // The tree: for each node the edge that reaches it from the crown, the
 // edges in an order where an edge's start is reached before it, each
@@ -104,7 +105,10 @@ function rootsModel(parsed) {
     const n = queue.shift();
     for (const edge of from.get(n) || []) {
       order.push(edge);
-      if (!seen.has(edge.b)) { seen.add(edge.b); queue.push(edge.b); }
+      if (!seen.has(edge.b)) {
+        seen.add(edge.b);
+        queue.push(edge.b);
+      }
     }
   }
   const chainTo = (node) => {
@@ -129,11 +133,15 @@ function rootsModel(parsed) {
 
 // The tip nearest a point (art px), by name; null without tips.
 function nearestTip(model, p) {
-  let best = null, bd = Infinity;
+  let best = null,
+    bd = Infinity;
   for (const [name, t] of model.tips) {
     if (!model.chains.has(name)) continue;
     const d = Math.hypot(t.x - p.x, t.y - p.y);
-    if (d < bd) { bd = d; best = name; }
+    if (d < bd) {
+      bd = d;
+      best = name;
+    }
   }
   return best;
 }
@@ -146,7 +154,10 @@ function actRoots(model, acts) {
   if (!model) return out;
   for (const a of acts || []) {
     const named = Array.isArray(a.rootTips) ? a.rootTips.filter((t) => model.chains.has(t)) : [];
-    if (named.length) { out.set(a.id, named); continue; }
+    if (named.length) {
+      out.set(a.id, named);
+      continue;
+    }
     if (!a.anchor) continue;
     const tip = nearestTip(model, { x: a.anchor.x * model.w, y: a.anchor.y * model.h });
     if (tip) out.set(a.id, [tip]);
@@ -154,7 +165,10 @@ function actRoots(model, acts) {
   return out;
 }
 
-const ease = (u) => { const t = Math.max(0, Math.min(1, (u - 2 / 3) * 3)); return t * t * (3 - 2 * t); };
+const ease = (u) => {
+  const t = Math.max(0, Math.min(1, (u - 2 / 3) * 3));
+  return t * t * (3 - 2 * t);
+};
 
 // Where every point is with the acts moved: drifts, Map id -> { dx, dy } in
 // art px; roots, from actRoots. Returns, per edge (by its number), per part,
@@ -171,7 +185,7 @@ function bentRoots(model, roots, drifts) {
     any = true;
     // This act's own weights: on its roots' last thirds, the largest over
     // its tips where they share an edge.
-    const weight = new Map();   // edge -> per part, per point
+    const weight = new Map(); // edge -> per part, per point
     const nodeW = new Map([[0, 0]]);
     for (const tip of tips) {
       const chain = model.chains.get(tip);
@@ -197,40 +211,59 @@ function bentRoots(model, roots, drifts) {
       const ws = weight.get(edge.e);
       const f = field.get(edge.e);
       if (ws) {
-        ws.forEach((row, pi) => row.forEach((wt, k) => { f[pi][k][0] += wt * d.dx; f[pi][k][1] += wt * d.dy; }));
+        ws.forEach((row, pi) =>
+          row.forEach((wt, k) => {
+            f[pi][k][0] += wt * d.dx;
+            f[pi][k][1] += wt * d.dy;
+          }),
+        );
         nodeMove.set(edge.b, nodeW.get(edge.b) || 0);
       } else {
         const wa = nodeMove.get(edge.a) || 0;
-        if (wa) f.forEach((row) => row.forEach((q) => { q[0] += wa * d.dx; q[1] += wa * d.dy; }));
+        if (wa)
+          f.forEach((row) =>
+            row.forEach((q) => {
+              q[0] += wa * d.dx;
+              q[1] += wa * d.dy;
+            }),
+          );
         if (!nodeMove.has(edge.b)) nodeMove.set(edge.b, wa);
       }
     }
     // A loop's ends may move apart: it is stretched between them.
     for (const edge of model.edges) {
       if (!edge.loop) continue;
-      const wa = nodeMove.get(edge.a) || 0, wb = nodeMove.get(edge.b) || 0;
+      const wa = nodeMove.get(edge.a) || 0,
+        wb = nodeMove.get(edge.b) || 0;
       if (!wa && !wb) continue;
       const total = edge.length || 1;
       let s = 0;
       const f = field.get(edge.e);
-      edge.parts.forEach((part, pi) => part.pts.forEach((pt, k) => {
-        if (k > 0) s += Math.hypot(pt[0] - part.pts[k - 1][0], pt[1] - part.pts[k - 1][1]);
-        const wt = wa + (wb - wa) * (s / total);
-        f[pi][k][0] += wt * d.dx; f[pi][k][1] += wt * d.dy;
-      }));
+      edge.parts.forEach((part, pi) =>
+        part.pts.forEach((pt, k) => {
+          if (k > 0) s += Math.hypot(pt[0] - part.pts[k - 1][0], pt[1] - part.pts[k - 1][1]);
+          const wt = wa + (wb - wa) * (s / total);
+          f[pi][k][0] += wt * d.dx;
+          f[pi][k][1] += wt * d.dy;
+        }),
+      );
     }
   }
   for (const edge of model.edges) {
     const f = field.get(edge.e);
     const still = !any || f.every((row) => row.every((q) => q[0] === 0 && q[1] === 0));
-    moved.set(edge.e, still
-      ? edge.parts.map((p) => p.pts)
-      : edge.parts.map((p, pi) => p.pts.map((pt, k) => [pt[0] + f[pi][k][0], pt[1] + f[pi][k][1]])));
+    moved.set(
+      edge.e,
+      still
+        ? edge.parts.map((p) => p.pts)
+        : edge.parts.map((p, pi) => p.pts.map((pt, k) => [pt[0] + f[pi][k][0], pt[1] + f[pi][k][1]])),
+    );
   }
   return moved;
 }
 
-const pathD = (pts) => (pts.length ? 'M' + pts.map(([x, y]) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`).join('L') : '');
+const pathD = (pts) =>
+  pts.length ? 'M' + pts.map(([x, y]) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`).join('L') : '';
 
 // The roots follow their acts, a little behind (opening.art.rootsFollowMs):
 // each act's bend is a critically damped spring pulled toward where its act
@@ -268,13 +301,21 @@ function createFollow(ms) {
         };
         [s.x, s.vx] = axis(s.x, s.vx, t.dx);
         [s.y, s.vy] = axis(s.y, s.vy, t.dy);
-        if (Math.abs(s.x - t.dx) < EPS && Math.abs(s.y - t.dy) < EPS && Math.abs(s.vx) < EPS / 16 && Math.abs(s.vy) < EPS / 16) {
+        if (
+          Math.abs(s.x - t.dx) < EPS &&
+          Math.abs(s.y - t.dy) < EPS &&
+          Math.abs(s.vx) < EPS / 16 &&
+          Math.abs(s.vy) < EPS / 16
+        ) {
           s = { x: t.dx, y: t.dy, vx: 0, vy: 0 };
         }
       }
       if (s.x !== t.dx || s.y !== t.dy) still = false;
       // Back at rest and no longer asked for: forgotten.
-      if (!(targets && targets.has(id)) && s.x === 0 && s.y === 0) { state.delete(id); continue; }
+      if (!(targets && targets.has(id)) && s.x === 0 && s.y === 0) {
+        state.delete(id);
+        continue;
+      }
       state.set(id, s);
       out.set(id, { dx: s.x, dy: s.y });
     }
@@ -283,7 +324,11 @@ function createFollow(ms) {
   return {
     step,
     settled: () => still,
-    reset() { state.clear(); last = null; still = true; },
+    reset() {
+      state.clear();
+      last = null;
+      still = true;
+    },
   };
 }
 

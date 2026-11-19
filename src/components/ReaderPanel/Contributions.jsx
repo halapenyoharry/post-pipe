@@ -1,6 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import styles from './Contributions.module.css';
-import { forChapter, resolveQuote, paragraphsOf, assetUrl, slugOf, quoteFromSelection, checkSubmission } from '../../lib/contributions';
+import {
+  forChapter,
+  resolveQuote,
+  paragraphsOf,
+  assetUrl,
+  slugOf,
+  quoteFromSelection,
+  checkSubmission,
+} from '../../lib/contributions';
 
 /**
  * Contributions — what readers brought to this chapter, under the chapter and
@@ -25,7 +33,9 @@ function dateLabel(iso) {
 }
 
 function clip(s, n) {
-  const t = String(s || '').replace(/\s+/g, ' ').trim();
+  const t = String(s || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t;
 }
 
@@ -34,7 +44,9 @@ function rangeIn(p, offset, length) {
   const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT, {
     acceptNode(n) {
       const el = n.parentElement;
-      return el && el.closest('.bookmarkRibbon, [aria-hidden="true"]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      return el && el.closest('.bookmarkRibbon, [aria-hidden="true"]')
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT;
     },
   });
   // resolveQuote counted with runs of whitespace squashed to one space; walk
@@ -51,9 +63,15 @@ function rangeIn(p, offset, length) {
       const space = /\s/.test(v[i]);
       if (space && prevSpace) continue;
       prevSpace = space;
-      if (!started && pos === offset) { r.setStart(n, i); started = true; }
+      if (!started && pos === offset) {
+        r.setStart(n, i);
+        started = true;
+      }
       pos++;
-      if (started && pos === end) { r.setEnd(n, i + 1); return r; }
+      if (started && pos === end) {
+        r.setEnd(n, i + 1);
+        return r;
+      }
     }
   }
   return started ? r : null;
@@ -87,7 +105,12 @@ export function Contributions({ article, contributions, config, feedData, textRe
     return () => clearTimeout(t);
   }, [list, article, textKey]);
 
-  useEffect(() => () => { if (hasHighlights()) CSS.highlights.delete(HIGHLIGHT); }, [article]);
+  useEffect(
+    () => () => {
+      if (hasHighlights()) CSS.highlights.delete(HIGHLIGHT);
+    },
+    [article],
+  );
 
   const showPassage = (c) => {
     const at = placed[c.id];
@@ -155,55 +178,84 @@ export function Contributions({ article, contributions, config, feedData, textRe
       <ul className={styles.list}>
         {list.map((c) => (
           <li key={c.id} className={styles.item} data-contrib={c.id} data-contrib-type={c.type}>
-            <div className={styles.kind}>{
-              c.type === 'essay' ? 'Essay' : c.type === 'art' ? 'Art' : c.type === 'connection' ? 'Connection' : 'Comment'
-            }</div>
+            <div className={styles.kind}>
+              {c.type === 'essay'
+                ? 'Essay'
+                : c.type === 'art'
+                  ? 'Art'
+                  : c.type === 'connection'
+                    ? 'Connection'
+                    : 'Comment'}
+            </div>
             {c.title && <div className={styles.itemTitle}>{c.title}</div>}
             {byline(c)}
             {quoteLine(c)}
-            {c.type === 'comment' && paragraphsOf(c.body).map((p, i) => <div key={i} className={styles.para}>{p}</div>)}
-            {c.type === 'connection' && (() => {
-              const other = c.chapter === chapter ? c.to : c.chapter;
-              const it = titleOf.get(other);
-              return (
-                <>
-                  <div className={styles.para}>
-                    Connects this chapter with{' '}
-                    {it && onOpenChapter ? (
-                      <button type="button" className={styles.linkBtn} onClick={() => onOpenChapter(it)} data-contrib-goto={other}>
-                        {it.title || other}
-                      </button>
-                    ) : (it && it.title) || other}
-                  </div>
-                  {paragraphsOf(c.body).map((p, i) => <div key={i} className={styles.para}>{p}</div>)}
-                </>
-              );
-            })()}
+            {c.type === 'comment' &&
+              paragraphsOf(c.body).map((p, i) => (
+                <div key={i} className={styles.para}>
+                  {p}
+                </div>
+              ))}
+            {c.type === 'connection' &&
+              (() => {
+                const other = c.chapter === chapter ? c.to : c.chapter;
+                const it = titleOf.get(other);
+                return (
+                  <>
+                    <div className={styles.para}>
+                      Connects this chapter with{' '}
+                      {it && onOpenChapter ? (
+                        <button
+                          type="button"
+                          className={styles.linkBtn}
+                          onClick={() => onOpenChapter(it)}
+                          data-contrib-goto={other}
+                        >
+                          {it.title || other}
+                        </button>
+                      ) : (
+                        (it && it.title) || other
+                      )}
+                    </div>
+                    {paragraphsOf(c.body).map((p, i) => (
+                      <div key={i} className={styles.para}>
+                        {p}
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
             {c.type === 'art' && (
               <figure className={styles.art}>
                 <img src={assetUrl(c.asset, config)} alt={c.alt || `Art by ${c.author}`} loading="lazy" />
                 {c.body && <figcaption className={styles.para}>{c.body}</figcaption>}
               </figure>
             )}
-            {c.type === 'essay' && (() => {
-              const ps = paragraphsOf(c.body);
-              const open = openEssay === c.id;
-              return (
-                <div className={styles.essay} data-contrib-essay={open ? 'open' : 'closed'}>
-                  {!open && <div className={styles.para}>{clip(ps[0] || '', 220)}</div>}
-                  {open && ps.map((p, i) => <div key={i} className={styles.para}>{p}</div>)}
-                  <button
-                    type="button"
-                    className={styles.linkBtn}
-                    aria-expanded={open}
-                    onClick={() => setOpenEssay(open ? null : c.id)}
-                    data-contrib-open
-                  >
-                    {open ? 'Close the essay' : 'Read the essay'}
-                  </button>
-                </div>
-              );
-            })()}
+            {c.type === 'essay' &&
+              (() => {
+                const ps = paragraphsOf(c.body);
+                const open = openEssay === c.id;
+                return (
+                  <div className={styles.essay} data-contrib-essay={open ? 'open' : 'closed'}>
+                    {!open && <div className={styles.para}>{clip(ps[0] || '', 220)}</div>}
+                    {open &&
+                      ps.map((p, i) => (
+                        <div key={i} className={styles.para}>
+                          {p}
+                        </div>
+                      ))}
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      aria-expanded={open}
+                      onClick={() => setOpenEssay(open ? null : c.id)}
+                      data-contrib-open
+                    >
+                      {open ? 'Close the essay' : 'Read the essay'}
+                    </button>
+                  </div>
+                );
+              })()}
           </li>
         ))}
       </ul>
@@ -224,7 +276,8 @@ function selectedQuote(textEl) {
   if (!textEl.contains(range.commonAncestorContainer)) return null;
   const startEl = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
   const p = startEl && startEl.closest('p');
-  if (!p || !textEl.contains(p) || !p.contains(range.endContainer)) return { error: 'Choose a passage within one paragraph.' };
+  if (!p || !textEl.contains(p) || !p.contains(range.endContainer))
+    return { error: 'Choose a passage within one paragraph.' };
   const pre = document.createRange();
   pre.setStart(p, 0);
   pre.setEnd(range.startContainer, range.startOffset);
@@ -250,7 +303,11 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
   const [state, setState] = useState({ sending: false, errors: [], done: false });
   const limits = config.limits || {};
 
-  useEffect(() => { setQuote(null); setLastSel(null); setState({ sending: false, errors: [], done: false }); }, [chapter]);
+  useEffect(() => {
+    setQuote(null);
+    setLastSel(null);
+    setState({ sending: false, errors: [], done: false });
+  }, [chapter]);
 
   // A tap on a button can clear a selection on a phone, so the last
   // selection made in the text is kept while the form is open.
@@ -281,7 +338,10 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
     e.preventDefault();
     const s = submission();
     const errors = checkSubmission(s, config);
-    if (errors.length) { setState({ sending: false, errors, done: false }); return; }
+    if (errors.length) {
+      setState({ sending: false, errors, done: false });
+      return;
+    }
     setState({ sending: true, errors: [], done: false });
     try {
       const r = await fetch(config.endpoint, {
@@ -291,10 +351,16 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
       });
       const out = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setState({ sending: false, errors: out.errors || [out.error || 'It could not be sent just now. Please try again later.'], done: false });
+        setState({
+          sending: false,
+          errors: out.errors || [out.error || 'It could not be sent just now. Please try again later.'],
+          done: false,
+        });
         return;
       }
-      setBody(''); setTitle(''); setQuote(null);
+      setBody('');
+      setTitle('');
+      setQuote(null);
       setState({ sending: false, errors: [], done: true });
     } catch (_) {
       setState({ sending: false, errors: ['It could not be sent just now. Please try again later.'], done: false });
@@ -315,11 +381,18 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
     <form className={styles.form} onSubmit={send} data-contrib-form noValidate>
       <div className={styles.formTitle}>Add yours</div>
       <div className={styles.note}>
-        It is read before it appears here. Only the name you give is kept with it; nothing else about you is asked for or stored.
+        It is read before it appears here. Only the name you give is kept with it; nothing else about you is asked for
+        or stored.
       </div>
       <label className={styles.field}>
         <span>Name to show</span>
-        <input value={author} maxLength={limits.name} onChange={(e) => setAuthor(e.target.value)} autoComplete="nickname" data-contrib-field="author" />
+        <input
+          value={author}
+          maxLength={limits.name}
+          onChange={(e) => setAuthor(e.target.value)}
+          autoComplete="nickname"
+          data-contrib-field="author"
+        />
       </label>
       <label className={styles.field}>
         <span>What it is</span>
@@ -340,19 +413,31 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
           <span>The other chapter</span>
           <select value={to} onChange={(e) => setTo(e.target.value)} data-contrib-field="to">
             <option value="">Choose…</option>
-            {others.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+            {others.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.title}
+              </option>
+            ))}
           </select>
         </label>
       )}
       <label className={styles.field}>
         <span>{type === 'connection' ? 'How they connect' : 'Your words'}</span>
-        <textarea value={body} maxLength={limits.body} rows={type === 'essay' ? 10 : 4} onChange={(e) => setBody(e.target.value)} data-contrib-field="body" />
+        <textarea
+          value={body}
+          maxLength={limits.body}
+          rows={type === 'essay' ? 10 : 4}
+          onChange={(e) => setBody(e.target.value)}
+          data-contrib-field="body"
+        />
       </label>
       <div className={styles.passage}>
         {quote && !quote.error ? (
           <>
             <span className={styles.quoteText}>About: “{clip(quote.exact, 120)}”</span>
-            <button type="button" className={styles.linkBtn} onClick={() => setQuote(null)}>Not about a passage</button>
+            <button type="button" className={styles.linkBtn} onClick={() => setQuote(null)}>
+              Not about a passage
+            </button>
           </>
         ) : (
           <>
@@ -363,7 +448,12 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
               type="button"
               className={styles.linkBtn}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setQuote(selectedQuote(textRef && textRef.current) || lastSel || { error: 'Select a passage in the chapter first.' })}
+              onClick={() =>
+                setQuote(
+                  selectedQuote(textRef && textRef.current) ||
+                    lastSel || { error: 'Select a passage in the chapter first.' },
+                )
+              }
               data-contrib-use-selection
             >
               Use the passage I selected
@@ -373,7 +463,9 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
       </div>
       {state.errors.length > 0 && (
         <ul className={styles.errors} role="alert">
-          {state.errors.map((m, i) => <li key={i}>{m}</li>)}
+          {state.errors.map((m, i) => (
+            <li key={i}>{m}</li>
+          ))}
         </ul>
       )}
       {state.done && (
@@ -385,7 +477,9 @@ function SubmitForm({ article, chapter, config, feedData, textRef }) {
         <button type="submit" className={styles.addBtn} disabled={state.sending} data-contrib-send>
           {state.sending ? 'Sending…' : 'Send'}
         </button>
-        <button type="button" className={styles.linkBtn} onClick={() => setOpen(false)}>Close</button>
+        <button type="button" className={styles.linkBtn} onClick={() => setOpen(false)}>
+          Close
+        </button>
       </div>
     </form>
   );

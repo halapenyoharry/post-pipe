@@ -22,7 +22,11 @@ test('an edge gets a second pass that keeps its ends near its own', () => {
 });
 
 test('hull points are nudged the same way by index', () => {
-  const p = [[0, 0], [10, 0], [10, 10]];
+  const p = [
+    [0, 0],
+    [10, 0],
+    [10, 10],
+  ];
   assert.deepStrictEqual(jitterPoints(p, 'c'), jitterPoints(p, 'c'));
   for (const [i, q] of jitterPoints(p, 'c', 3).entries()) assert.ok(Math.abs(q[0] - p[i][0]) <= 3);
 });

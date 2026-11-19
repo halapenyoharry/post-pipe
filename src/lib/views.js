@@ -37,7 +37,12 @@ function viewLayout(entry) {
 // once. Unknown ids are left out and named in one line to `log` (default
 // console.warn). With nothing left, the default list.
 function siteViews(settings, registry, log) {
-  const say = typeof log === 'function' ? log : (typeof console !== 'undefined' && console.warn ? console.warn.bind(console) : () => {});
+  const say =
+    typeof log === 'function'
+      ? log
+      : typeof console !== 'undefined' && console.warn
+        ? console.warn.bind(console)
+        : () => {};
   const raw = settings && Array.isArray(settings.views) ? settings.views : [];
   const ids = [];
   const unknown = [];
@@ -47,7 +52,8 @@ function siteViews(settings, registry, log) {
     if (viewById(registry, id)) ids.push(id);
     else unknown.push(id);
   }
-  if (unknown.length) say(`[post-pipe] settings.views: unknown view${unknown.length > 1 ? 's' : ''} skipped: ${unknown.join(', ')}`);
+  if (unknown.length)
+    say(`[post-pipe] settings.views: unknown view${unknown.length > 1 ? 's' : ''} skipped: ${unknown.join(', ')}`);
   const chosen = ids.length ? ids : DEFAULT_VIEWS;
   return chosen.map((id) => viewById(registry, id)).filter(Boolean);
 }
@@ -62,7 +68,11 @@ function viewFromSearch(search, listed) {
     const eq = part.indexOf('=');
     const k = eq < 0 ? part : part.slice(0, eq);
     if (k !== 'view') continue;
-    try { id = decodeURIComponent(eq < 0 ? '' : part.slice(eq + 1).replace(/\+/g, ' ')); } catch (_) { id = ''; }
+    try {
+      id = decodeURIComponent(eq < 0 ? '' : part.slice(eq + 1).replace(/\+/g, ' '));
+    } catch (_) {
+      id = '';
+    }
     break;
   }
   return viewById(listed, id);

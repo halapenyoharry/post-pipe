@@ -5,11 +5,20 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  containerLayout, rectsOverlap, hangChain, hangRows, hangOptions,
-  containerLayoutOf, hullDrawn, closedPillScaleOf,
+  containerLayout,
+  rectsOverlap,
+  hangChain,
+  hangRows,
+  hangOptions,
+  containerLayoutOf,
+  hullDrawn,
+  closedPillScaleOf,
 } = require('../src/components/GraphViewer/containerLayout');
 
-const W = 180, H = 140, PAD = 90, GAP = 12;
+const W = 180,
+  H = 140,
+  PAD = 90,
+  GAP = 12;
 const card = (id, order) => ({ id, w: W, h: H, order });
 const rectOf = (p) => ({ x0: p.x - W / 2, y0: p.y - H / 2, x1: p.x + W / 2, y1: p.y + H / 2 });
 
@@ -17,7 +26,9 @@ function hanging(n, { hang = {}, closed, label = { w: 150, h: 70 } } = {}) {
   const containers = [{ id: 'act', parent: null }];
   const members = new Map([['act', Array.from({ length: n }, (_, i) => card('c' + (i + 1), i + 1))]]);
   return containerLayout({
-    containers, members, closed,
+    containers,
+    members,
+    closed,
     labelSize: () => label,
     macroSize: () => ({ w: 162, h: 126 }),
     options: { gap: 28, padding: () => PAD, layoutOf: () => 'hang', hangOf: () => ({ gap: GAP, ...hang }) },
@@ -43,7 +54,8 @@ test('the chain keeps reading order, each member one card step from the last', (
   const L = hanging(11);
   const p = pts(L, 11);
   for (let i = 1; i < p.length; i++) {
-    const dx = Math.abs(p[i].x - p[i - 1].x), dy = Math.abs(p[i].y - p[i - 1].y);
+    const dx = Math.abs(p[i].x - p[i - 1].x),
+      dy = Math.abs(p[i].y - p[i - 1].y);
     // A step down or up a column, or across to the next column on the same row.
     const down = dx < 1e-6 && Math.abs(dy - (H + GAP)) < 1e-6;
     const across = dy < 1e-6 && Math.abs(dx - (W + GAP)) < 1e-6;
@@ -61,7 +73,8 @@ test('firstAt bottom: the first member low on the far side, the last at the top 
   assert.ok(p[0].y >= (topY + bottomY) / 2, 'the first is at the middle or lower');
   assert.ok(p[0].x > 0, 'on the far side (right, for down)');
   // Down the far side, then up the near side.
-  const far = p.filter((q) => q.x > 0), near = p.filter((q) => q.x < 0);
+  const far = p.filter((q) => q.x > 0),
+    near = p.filter((q) => q.x < 0);
   for (let i = 1; i < far.length; i++) assert.ok(far[i].y > far[i - 1].y, 'down the far side');
   for (let i = 1; i < near.length; i++) assert.ok(near[i].y < near[i - 1].y, 'up the near side');
   assert.strictEqual(near.length, hangRows(11, 2));
@@ -162,14 +175,20 @@ test('the layout is chosen per container, else for all; a hull can be left undra
 });
 
 test('a container holding containers is not hung; its children are', () => {
-  const containers = [{ id: 'book', parent: null }, { id: 'a1', parent: 'book' }, { id: 'a2', parent: 'book' }];
+  const containers = [
+    { id: 'book', parent: null },
+    { id: 'a1', parent: 'book' },
+    { id: 'a2', parent: 'book' },
+  ];
   const members = new Map([
     ['book', []],
     ['a1', Array.from({ length: 5 }, (_, i) => card('a1-' + (i + 1), i + 1))],
     ['a2', Array.from({ length: 4 }, (_, i) => card('a2-' + (i + 1), i + 1))],
   ]);
   const L = containerLayout({
-    containers, members, labelSize: () => ({ w: 150, h: 70 }),
+    containers,
+    members,
+    labelSize: () => ({ w: 150, h: 70 }),
     options: { padding: () => PAD, layoutOf: () => 'hang', hangOf: () => ({}) },
   });
   assert.ok(!L.containers.get('book').hang);

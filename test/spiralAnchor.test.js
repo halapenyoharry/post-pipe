@@ -24,9 +24,27 @@ const deg = (r) => (r * 180) / Math.PI;
 const dirOf = (from, to) => deg(Math.atan2(to.y - from.y, to.x - from.x));
 
 test('spiral settings: defaults, and only known values', () => {
-  assert.deepStrictEqual(spiralOptions(), { anchorEnd: 'center', openTowards: 'down', keepBelowY: null, cardScale: 1, spacing: null });
-  const o = spiralOptions({ anchorEnd: 'outer', openTowards: 'down-left', keepBelowY: -300, cardScale: 0.5, spacing: 12 });
-  assert.deepStrictEqual(o, { anchorEnd: 'outer', openTowards: 'down-left', keepBelowY: -300, cardScale: 0.5, spacing: 12 });
+  assert.deepStrictEqual(spiralOptions(), {
+    anchorEnd: 'center',
+    openTowards: 'down',
+    keepBelowY: null,
+    cardScale: 1,
+    spacing: null,
+  });
+  const o = spiralOptions({
+    anchorEnd: 'outer',
+    openTowards: 'down-left',
+    keepBelowY: -300,
+    cardScale: 0.5,
+    spacing: 12,
+  });
+  assert.deepStrictEqual(o, {
+    anchorEnd: 'outer',
+    openTowards: 'down-left',
+    keepBelowY: -300,
+    cardScale: 0.5,
+    spacing: 12,
+  });
   assert.strictEqual(spiralOptions({ openTowards: 'up', cardScale: -1, anchorEnd: 'x' }).openTowards, 'down');
   assert.strictEqual(spiralOptions({ cardScale: -1 }).cardScale, 1);
   assert.strictEqual(spiralOptions({ anchorEnd: 'x' }).anchorEnd, 'center');
@@ -35,7 +53,9 @@ test('spiral settings: defaults, and only known values', () => {
 test('anchorEnd center keeps the label at the origin, as before', () => {
   const { info, pos } = act(11, {});
   assert.deepStrictEqual(info.center, { x: 0, y: 0 });
-  assert.ok(Math.abs((info.label.x0 + info.label.x1) / 2) < 1e-9 && Math.abs((info.label.y0 + info.label.y1) / 2) < 1e-9);
+  assert.ok(
+    Math.abs((info.label.x0 + info.label.x1) / 2) < 1e-9 && Math.abs((info.label.y0 + info.label.y1) / 2) < 1e-9,
+  );
   assert.ok(pos[0].y > 0, 'chapter one below the label');
 });
 
@@ -49,7 +69,11 @@ test('anchorEnd outer puts the last member at the anchor, within 1 px', () => {
 });
 
 test('openTowards turns the spiral: the first member lies from the last that way', () => {
-  for (const [towards, want] of [['down', 90], ['down-right', 45], ['down-left', 135]]) {
+  for (const [towards, want] of [
+    ['down', 90],
+    ['down-right', 45],
+    ['down-left', 135],
+  ]) {
     for (const n of [5, 11, 12]) {
       const { pos } = act(n, { anchorEnd: 'outer', openTowards: towards });
       const got = dirOf(pos[n - 1], pos[0]);
@@ -64,7 +88,8 @@ test('a turned spiral still keeps its order, its cards apart and off the label',
     const rects = pos.map((p) => ({ x0: p.x - 90, y0: p.y - 70, x1: p.x + 90, y1: p.y + 70 }));
     for (let i = 0; i < rects.length; i++) {
       assert.ok(!rectsOverlap(rects[i], info.label), `${towards}: card ${i + 1} on the label`);
-      for (let j = i + 1; j < rects.length; j++) assert.ok(!rectsOverlap(rects[i], rects[j]), `${towards}: ${i + 1} on ${j + 1}`);
+      for (let j = i + 1; j < rects.length; j++)
+        assert.ok(!rectsOverlap(rects[i], rects[j]), `${towards}: ${i + 1} on ${j + 1}`);
     }
     // Each one further along the curve than the one before: further from its centre.
     const { cx, cy } = info.spiral;
@@ -105,10 +130,12 @@ test('cardScale scales the cards, the extent with them', () => {
   for (const p of half.pos) assert.strictEqual(p.scale, 0.5);
   for (const p of full.pos) assert.strictEqual(p.scale, 1);
   const span = (r) => {
-    const xs = r.pos.map((p) => p.x), ys = r.pos.map((p) => p.y);
+    const xs = r.pos.map((p) => p.x),
+      ys = r.pos.map((p) => p.y);
     return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
   };
-  const [fw, fh] = span(full), [hw, hh] = span(half);
+  const [fw, fh] = span(full),
+    [hw, hh] = span(half);
   // The label stays its size, so the half-size spiral is about, not exactly, half.
   assert.ok(hw < fw * 0.75 && hw > fw * 0.35, `width ${hw} against ${fw}`);
   assert.ok(hh < fh * 0.75 && hh > fh * 0.35, `height ${hh} against ${fh}`);

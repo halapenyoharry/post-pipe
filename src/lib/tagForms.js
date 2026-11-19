@@ -63,9 +63,7 @@ function collectReferences(source, canonical, out = []) {
   }
   if (typeof source !== 'object') return out;
 
-  const itemRefs = source._references
-    || (source.originalItem && source.originalItem._references)
-    || source.references;
+  const itemRefs = source._references || (source.originalItem && source.originalItem._references) || source.references;
   if (Array.isArray(itemRefs)) {
     for (const ref of itemRefs) collectReferences(ref, canonical, out);
     return out;
@@ -172,19 +170,18 @@ function tagForms(rtagz, key, fallback) {
     fallbackSource = rtagz;
   }
 
-  const systemNames = rtagzObj && rtagzObj.systems && typeof rtagzObj.systems === 'object'
-    ? Object.keys(rtagzObj.systems)
-    : [];
+  const systemNames =
+    rtagzObj && rtagzObj.systems && typeof rtagzObj.systems === 'object' ? Object.keys(rtagzObj.systems) : [];
 
   if (rtagzObj && rtagzObj.concepts) {
     const list = Array.isArray(rtagzObj.concepts) ? rtagzObj.concepts : null;
     let concept;
     if (list) {
-      concept = list.find((c) => c && c.id === canonical)
-        || list.find((c) => c && c.canonical === canonical);
+      concept = list.find((c) => c && c.id === canonical) || list.find((c) => c && c.canonical === canonical);
     } else {
-      concept = rtagzObj.concepts[canonical]
-        || Object.values(rtagzObj.concepts).find((c) => c && typeof c === 'object' && c.id === canonical);
+      concept =
+        rtagzObj.concepts[canonical] ||
+        Object.values(rtagzObj.concepts).find((c) => c && typeof c === 'object' && c.id === canonical);
     }
     if (!concept || typeof concept !== 'object') return null;
     const label = typeof concept.canonical === 'string' && concept.canonical ? concept.canonical : canonical;
@@ -198,7 +195,8 @@ function tagForms(rtagz, key, fallback) {
 
     // Nothing to show: one system writing the canonical, no scheme naming
     // the concept otherwise, and no mapping.
-    const prefLabels = concept.prefLabel && typeof concept.prefLabel === 'object' ? Object.values(concept.prefLabel) : [];
+    const prefLabels =
+      concept.prefLabel && typeof concept.prefLabel === 'object' ? Object.values(concept.prefLabel) : [];
     const otherLabel = prefLabels.some((l) => typeof l === 'string' && l && l !== label);
     const anyMapping = Array.isArray(concept.mappings) && concept.mappings.length > 0;
     if (!hasExtraBeyondCanonical(forms, label) && !otherLabel && !anyMapping) return null;
@@ -286,12 +284,19 @@ function targetName(summary, target) {
   if (own && typeof own.canonical === 'string' && own.canonical) return own.canonical;
   const ext = summary && summary.external && typeof summary.external === 'object' ? summary.external[target] : null;
   if (ext) {
-    const scheme = typeof ext.scheme === 'string' && ext.scheme ? ext.scheme
-      : (typeof target === 'string' && target.includes(':') ? target.slice(0, target.indexOf(':')) : '');
+    const scheme =
+      typeof ext.scheme === 'string' && ext.scheme
+        ? ext.scheme
+        : typeof target === 'string' && target.includes(':')
+          ? target.slice(0, target.indexOf(':'))
+          : '';
     let label = '';
     if (typeof ext.prefLabel === 'string') label = ext.prefLabel;
     else if (ext.prefLabel && typeof ext.prefLabel === 'object') {
-      label = typeof ext.prefLabel[scheme] === 'string' ? ext.prefLabel[scheme] : (Object.values(ext.prefLabel).find((v) => typeof v === 'string' && v) || '');
+      label =
+        typeof ext.prefLabel[scheme] === 'string'
+          ? ext.prefLabel[scheme]
+          : Object.values(ext.prefLabel).find((v) => typeof v === 'string' && v) || '';
     }
     if (label) return scheme ? `${label} (${schemeName(summary, scheme)})` : label;
   }

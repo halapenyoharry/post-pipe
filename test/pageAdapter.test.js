@@ -22,7 +22,11 @@ function scratch() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-page-'));
   return {
     root,
-    opts: (extra) => ({ lastGoodDir: path.join(root, 'last-good'), colorCachePath: path.join(root, 'colors.json'), ...extra }),
+    opts: (extra) => ({
+      lastGoodDir: path.join(root, 'last-good'),
+      colorCachePath: path.join(root, 'colors.json'),
+      ...extra,
+    }),
   };
 }
 
@@ -34,12 +38,20 @@ test('extractPage reads the title, author, date, canonical link and tags the pag
   assert.strictEqual(page.canonical_link, CANONICAL, 'the canonical link as written');
   assert.strictEqual(page.url, CANONICAL);
   assert.deepStrictEqual(page.article_tags, ['kitchens', 'small machines']);
-  assert.deepStrictEqual(page.keywords, ['kettles', 'thermostats', 'kitchens', 'steam'], 'meta keywords, then JSON-LD keywords, without repeats');
-  assert.strictEqual(page.image, 'https://quietkitchen.example/images/kettle.jpg', 'og:image resolved against the page');
+  assert.deepStrictEqual(
+    page.keywords,
+    ['kettles', 'thermostats', 'kitchens', 'steam'],
+    'meta keywords, then JSON-LD keywords, without repeats',
+  );
+  assert.strictEqual(
+    page.image,
+    'https://quietkitchen.example/images/kettle.jpg',
+    'og:image resolved against the page',
+  );
   assert.ok(page.summary.startsWith('A short piece on the click'), 'the description is the summary');
 });
 
-test('extractPage keeps the article\'s block and drops the page\'s chrome', () => {
+test("extractPage keeps the article's block and drops the page's chrome", () => {
   const page = extractPage(HTML, LISTED);
   const html = page.content_html;
   assert.ok(html.includes('does not measure the water at all'), 'first paragraph');
@@ -49,7 +61,10 @@ test('extractPage keeps the article\'s block and drops the page\'s chrome', () =
   assert.ok(!html.includes('Privacy'), 'nor the footer');
   assert.ok(!html.includes('dataLayer') && !html.includes('never shown'), 'nor scripts');
   assert.ok(!html.includes('class='), 'class attributes are dropped');
-  assert.ok(html.includes('href="https://quietkitchen.example/essays/toaster-timer/"'), 'a relative link resolves against the page');
+  assert.ok(
+    html.includes('href="https://quietkitchen.example/essays/toaster-timer/"'),
+    'a relative link resolves against the page',
+  );
   assert.ok(html.includes('src="https://quietkitchen.example/images/strip.png"'), 'so does an image');
   assert.ok(page.content_text.includes('snaps across and breaks the circuit'));
   assert.ok(!page.content_text.includes('Published under'));
@@ -72,12 +87,18 @@ test('a page with no metadata still yields a title and its largest text block', 
   assert.strictEqual(page.url, 'https://plain.example/p', 'the fetched address when there is no canonical');
   assert.ok(page.content_html.includes('second paragraph'));
   assert.ok(!page.content_html.includes('href="https://plain.example/a"'), 'the link row is not the block');
-  assert.ok(page.summary.startsWith('A plain heading Here is a paragraph'), 'the text opens the summary when there is no description');
+  assert.ok(
+    page.summary.startsWith('A plain heading Here is a paragraph'),
+    'the text opens the summary when there is no description',
+  );
 });
 
 test('PageAdapter makes one item whose id is the address as listed and whose url is the canonical', async () => {
   const calls = [];
-  const fetchText = async (url) => { calls.push(url); return HTML; };
+  const fetchText = async (url) => {
+    calls.push(url);
+    return HTML;
+  };
   const out = await PageAdapter.load({ id: LISTED, title: 'Kettle piece', xmlUrl: LISTED }, { fetchText });
   assert.deepStrictEqual(calls, [LISTED], 'one fetch, of the listed address');
   assert.strictEqual(out.items.length, 1);
@@ -89,7 +110,10 @@ test('PageAdapter makes one item whose id is the address as listed and whose url
   assert.deepStrictEqual(item.authors, [{ name: 'Mira Okafor' }]);
   assert.strictEqual(item.date_published, '2026-03-14T09:30:00.000Z');
   assert.deepStrictEqual(item.tags, ['kitchens', 'small machines', 'kettles', 'thermostats', 'steam']);
-  assert.deepStrictEqual(item._references, item.tags.map((value) => ({ type: 'tag', value })));
+  assert.deepStrictEqual(
+    item._references,
+    item.tags.map((value) => ({ type: 'tag', value })),
+  );
   assert.deepStrictEqual(item._page, {
     listed_url: LISTED,
     canonical_link: CANONICAL,
@@ -98,21 +122,34 @@ test('PageAdapter makes one item whose id is the address as listed and whose url
   });
   assert.strictEqual(item.kind, 'text');
   assert.strictEqual(item.attachments[0].url, 'https://quietkitchen.example/images/kettle.jpg');
-  assert.strictEqual(out.feedMeta.title, 'Kettle piece', 'the entry\'s title is the source');
+  assert.strictEqual(out.feedMeta.title, 'Kettle piece', "the entry's title is the source");
   assert.strictEqual(out.feedMeta.home_page_url, 'https://quietkitchen.example');
 });
 
-test('through the aggregator the item carries the entry\'s title as its source and the page is kept as a last good copy', async () => {
+test("through the aggregator the item carries the entry's title as its source and the page is kept as a last good copy", async () => {
   const s = scratch();
-  const entry = { adapter: PageAdapter, config: { id: LISTED, title: 'Kettle piece', xmlUrl: LISTED, customColor: '#336699' } };
-  const first = await loadCorpus([entry], s.opts({ fetchText: async () => HTML, now: () => new Date('2026-11-04T10:00:00Z') }));
+  const entry = {
+    adapter: PageAdapter,
+    config: { id: LISTED, title: 'Kettle piece', xmlUrl: LISTED, customColor: '#336699' },
+  };
+  const first = await loadCorpus(
+    [entry],
+    s.opts({ fetchText: async () => HTML, now: () => new Date('2026-11-04T10:00:00Z') }),
+  );
   assert.strictEqual(first.items.length, 1);
   assert.strictEqual(first.items[0]._source.title, 'Kettle piece');
   assert.strictEqual(first.items[0]._source.type, 'page');
   assert.strictEqual(first.sources[0].ok, true);
   assert.strictEqual(first.sources[0].stale, undefined);
 
-  const second = await loadCorpus([entry], s.opts({ fetchText: async () => { throw new Error('HTTP 503 Service Unavailable'); } }));
+  const second = await loadCorpus(
+    [entry],
+    s.opts({
+      fetchText: async () => {
+        throw new Error('HTTP 503 Service Unavailable');
+      },
+    }),
+  );
   assert.strictEqual(second.items.length, 1, 'the card comes from the copy');
   assert.strictEqual(second.sources[0].stale, true);
   assert.strictEqual(second.sources[0].copyDate, '2026-11-04T10:00:00.000Z');
@@ -120,7 +157,9 @@ test('through the aggregator the item carries the entry\'s title as its source a
 
 test('PageListAdapter reads addresses one per line, skips blanks, comments and repeats, and leaves out a page that fails', async () => {
   assert.deepStrictEqual(
-    PageListAdapter.readList('# kept pages\nhttps://a.example/one\n\n  https://a.example/two  \nnot a url\nhttps://a.example/one\n'),
+    PageListAdapter.readList(
+      '# kept pages\nhttps://a.example/one\n\n  https://a.example/two  \nnot a url\nhttps://a.example/one\n',
+    ),
     ['https://a.example/one', 'https://a.example/two'],
   );
   const s = scratch();
@@ -131,16 +170,25 @@ test('PageListAdapter reads addresses one per line, skips blanks, comments and r
   console.warn = (m) => warnings.push(String(m));
   let out;
   try {
-    out = await PageListAdapter.load({ id: 'pages.txt', title: 'Kept pages', path: list }, {
-      fetchText: async (url) => { if (url === LISTED) return HTML; throw new Error('HTTP 404 Not Found'); },
-    });
+    out = await PageListAdapter.load(
+      { id: 'pages.txt', title: 'Kept pages', path: list },
+      {
+        fetchText: async (url) => {
+          if (url === LISTED) return HTML;
+          throw new Error('HTTP 404 Not Found');
+        },
+      },
+    );
   } finally {
     console.warn = warn;
   }
   assert.strictEqual(out.items.length, 1);
   assert.strictEqual(out.items[0].id, LISTED);
   assert.strictEqual(out.feedMeta.title, 'Kept pages');
-  assert.ok(warnings.some((w) => w.includes('missing') && w.includes('404')), 'the failed page is named');
+  assert.ok(
+    warnings.some((w) => w.includes('missing') && w.includes('404')),
+    'the failed page is named',
+  );
 
   await assert.rejects(
     () => PageListAdapter.load({ id: 'x', title: 'x', path: path.join(s.root, 'nowhere.txt') }),

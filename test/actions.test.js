@@ -19,7 +19,7 @@ const SITE = [
 
 const quiet = () => {};
 
-test('the engine\'s own table does what the graph did before there was one', () => {
+test("the engine's own table does what the graph did before there was one", () => {
   const t = bindingsOf({});
   assert.deepStrictEqual(t, defaultBindings({}));
   assert.equal(resolve(t, 'container', 'tap'), 'container.toggle');
@@ -56,13 +56,17 @@ test('collapseGesture still picks the gesture that opens a container', () => {
   assert.equal(resolve(other, 'container', 'tap'), 'container.toggle', 'anything else is the default, tap');
 });
 
-test('a site\'s rows go over the engine\'s: an example site\'s table', () => {
+test("a site's rows go over the engine's: an example site's table", () => {
   const t = bindingsOf({ collapseGesture: 'tap', bindings: SITE }, { warn: quiet });
   assert.equal(resolve(t, 'container', 'doubletap'), 'container.toggle');
-  assert.equal(resolve(t, 'container', 'tap'), 'none', 'the site moved container.toggle to the double tap, so a single tap no longer opens');
+  assert.equal(
+    resolve(t, 'container', 'tap'),
+    'none',
+    'the site moved container.toggle to the double tap, so a single tap no longer opens',
+  );
   assert.equal(resolve(t, 'container', 'drag'), 'node.move');
   assert.equal(resolve(t, 'space', 'doubletap'), 'view.zoomInStep');
-  assert.equal(resolve(t, 'space', 'tap'), 'view.deselect', 'not named by the site: the engine\'s');
+  assert.equal(resolve(t, 'space', 'tap'), 'view.deselect', "not named by the site: the engine's");
   assert.equal(resolve(t, 'space', 'drag'), 'view.pan');
   assert.equal(resolve(t, 'node', 'tap'), 'node.select', 'single taps select only');
   assert.equal(resolve(t, 'node', 'doubletap'), 'node.zoomToReadable');
@@ -75,29 +79,43 @@ test('a site\'s rows go over the engine\'s: an example site\'s table', () => {
   assert.equal(isBound(t, 'node.openReader'), true);
 });
 
-test('a site row replaces the engine\'s rows for its target and gesture, and a bound action stays where the site puts it', () => {
+test("a site row replaces the engine's rows for its target and gesture, and a bound action stays where the site puts it", () => {
   const t = bindingsOf({ bindings: [{ target: 'space', gesture: 'tap', action: 'view.zoomInStep' }] }, { warn: quiet });
   assert.equal(resolve(t, 'space', 'tap'), 'view.zoomInStep');
   assert.equal(resolve(t, 'node', 'tap'), 'node.select');
-  const moved = bindingsOf({ bindings: [{ target: 'node', gesture: 'tap', action: 'node.openReader' }] }, { warn: quiet });
+  const moved = bindingsOf(
+    { bindings: [{ target: 'node', gesture: 'tap', action: 'node.openReader' }] },
+    { warn: quiet },
+  );
   assert.equal(resolve(moved, 'node', 'tap'), 'node.openReader');
   assert.equal(resolve(moved, 'node', 'doubletap'), 'none', 'node.openReader is only where the site put it');
   const off = bindingsOf({ bindings: [{ target: 'node', gesture: 'doubletap', action: 'none' }] }, { warn: quiet });
   assert.equal(resolve(off, 'node', 'doubletap'), 'none', 'none unbinds a gesture');
   assert.equal(resolve(off, 'node', 'tap'), 'node.select');
-  const last = bindingsOf({ bindings: [
-    { target: 'space', gesture: 'tap', action: 'view.zoomInStep' },
-    { target: 'space', gesture: 'tap', action: 'view.deselect' },
-  ] }, { warn: quiet });
+  const last = bindingsOf(
+    {
+      bindings: [
+        { target: 'space', gesture: 'tap', action: 'view.zoomInStep' },
+        { target: 'space', gesture: 'tap', action: 'view.deselect' },
+      ],
+    },
+    { warn: quiet },
+  );
   assert.equal(resolve(last, 'space', 'tap'), 'view.deselect', 'of two rows for one gesture, the later');
-  const lp = bindingsOf({ bindings: [{ target: 'node', gesture: 'longpress', action: 'node.openReader' }] }, { warn: quiet });
+  const lp = bindingsOf(
+    { bindings: [{ target: 'node', gesture: 'longpress', action: 'node.openReader' }] },
+    { warn: quiet },
+  );
   assert.equal(usesGesture(lp, 'longpress'), true);
   assert.equal(resolve(lp, 'node', 'longpress'), 'node.openReader');
 });
 
 test('an action the engine does not have does nothing, with a warning', () => {
   const said = [];
-  const t = bindingsOf({ bindings: [{ target: 'node', gesture: 'doubletap', action: 'node.explode' }] }, { warn: (m) => said.push(m) });
+  const t = bindingsOf(
+    { bindings: [{ target: 'node', gesture: 'doubletap', action: 'node.explode' }] },
+    { warn: (m) => said.push(m) },
+  );
   assert.equal(resolve(t, 'node', 'doubletap'), 'none');
   assert.equal(said.length, 1);
   assert.match(said[0], /node\.explode/);
@@ -109,18 +127,25 @@ test('an action the engine does not have does nothing, with a warning', () => {
     const gs = { bindings: [{ target: 'space', gesture: 'tap', action: 'view.somersault' }] };
     assert.equal(resolve(bindingsOf(gs), 'space', 'tap'), 'none');
     bindingsOf(gs);
-  } finally { console.warn = orig; }
+  } finally {
+    console.warn = orig;
+  }
   assert.equal(logged.length, 1);
   assert.match(logged[0], /view\.somersault/);
 });
 
 test('an action that cannot answer that gesture on that target does nothing, with a warning', () => {
   const said = [];
-  const t = bindingsOf({ bindings: [
-    { target: 'node', gesture: 'tap', action: 'node.move' },          // a drag action on a tap
-    { target: 'space', gesture: 'doubletap', action: 'node.openReader' }, // a card action on space
-    { target: 'container', gesture: 'drag', action: 'view.pan' },      // only space pans
-  ] }, { warn: (m) => said.push(m) });
+  const t = bindingsOf(
+    {
+      bindings: [
+        { target: 'node', gesture: 'tap', action: 'node.move' }, // a drag action on a tap
+        { target: 'space', gesture: 'doubletap', action: 'node.openReader' }, // a card action on space
+        { target: 'container', gesture: 'drag', action: 'view.pan' }, // only space pans
+      ],
+    },
+    { warn: (m) => said.push(m) },
+  );
   assert.equal(resolve(t, 'node', 'tap'), 'none');
   assert.equal(resolve(t, 'space', 'doubletap'), 'none');
   assert.equal(resolve(t, 'container', 'drag'), 'none');
@@ -129,12 +154,17 @@ test('an action that cannot answer that gesture on that target does nothing, wit
 
 test('a row with no such target or gesture is left out, with a warning', () => {
   const said = [];
-  const t = bindingsOf({ bindings: [
-    { target: 'edge', gesture: 'tap', action: 'none' },
-    { target: 'node', gesture: 'triple', action: 'node.openReader' },
-    null,
-    'node tap',
-  ] }, { warn: (m) => said.push(m) });
+  const t = bindingsOf(
+    {
+      bindings: [
+        { target: 'edge', gesture: 'tap', action: 'none' },
+        { target: 'node', gesture: 'triple', action: 'node.openReader' },
+        null,
+        'node tap',
+      ],
+    },
+    { warn: (m) => said.push(m) },
+  );
   assert.deepStrictEqual(t, defaultBindings({}));
   assert.equal(said.length, 2);
 });
@@ -142,27 +172,38 @@ test('a row with no such target or gesture is left out, with a warning', () => {
 test('docs/ACTIONS.md names every action and every target', () => {
   const doc = fs.readFileSync(path.join(__dirname, '../docs/ACTIONS.md'), 'utf8');
   for (const id of Object.keys(ACTIONS)) assert.ok(doc.includes('`' + id + '`'), `${id} in docs/ACTIONS.md`);
-  for (const t of ['container', 'node', 'node.readable', 'space']) assert.ok(doc.includes('`' + t + '`'), `${t} in docs/ACTIONS.md`);
+  for (const t of ['container', 'node', 'node.readable', 'space'])
+    assert.ok(doc.includes('`' + t + '`'), `${t} in docs/ACTIONS.md`);
 });
 
 test('node.listen and node.stopListening answer a press on a card and are bound nowhere by default', () => {
   const t = bindingsOf({});
   assert.ok(!isBound(t, 'node.listen'));
   assert.ok(!isBound(t, 'node.stopListening'));
-  const site = bindingsOf({ bindings: [
-    { target: 'node', gesture: 'longpress', action: 'node.listen' },
-    { target: 'node.readable', gesture: 'doubletap', action: 'node.stopListening' },
-  ] }, { warn: quiet });
+  const site = bindingsOf(
+    {
+      bindings: [
+        { target: 'node', gesture: 'longpress', action: 'node.listen' },
+        { target: 'node.readable', gesture: 'doubletap', action: 'node.stopListening' },
+      ],
+    },
+    { warn: quiet },
+  );
   assert.equal(resolve(site, 'node', 'longpress'), 'node.listen');
   assert.equal(resolve(site, 'node.readable', 'longpress'), 'node.listen');
   assert.equal(resolve(site, 'node.readable', 'doubletap'), 'node.stopListening');
   assert.equal(resolve(site, 'node', 'tap'), 'node.select');
   // Not on the canvas, and not a drag.
   const warned = [];
-  const bad = bindingsOf({ bindings: [
-    { target: 'space', gesture: 'tap', action: 'node.listen' },
-    { target: 'node', gesture: 'drag', action: 'node.listen' },
-  ] }, { warn: (m) => warned.push(m) });
+  const bad = bindingsOf(
+    {
+      bindings: [
+        { target: 'space', gesture: 'tap', action: 'node.listen' },
+        { target: 'node', gesture: 'drag', action: 'node.listen' },
+      ],
+    },
+    { warn: (m) => warned.push(m) },
+  );
   assert.equal(resolve(bad, 'space', 'tap'), 'none');
   assert.equal(resolve(bad, 'node', 'drag'), 'none');
   assert.equal(warned.length, 2);

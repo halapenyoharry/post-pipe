@@ -32,18 +32,58 @@ const ANY = ['container', 'node', 'node.readable', 'space'];
 const CARD = ['node', 'node.readable'];
 const ACTIONS = {
   none: { kind: 'any', targets: ANY, does: 'Nothing.' },
-  'container.toggle': { kind: 'press', targets: ['container'], does: 'Opens a closed container, or closes an open one.' },
-  'view.zoomInStep': { kind: 'press', targets: ANY, does: 'Zooms in one step, the step of the + key (1.25 times), about the point every zoom keeps still (the cover art\'s pivot when the site has one, else the middle of the screen).' },
-  'view.zoomAtPoint': { kind: 'press', targets: ANY, does: 'Zooms in about 2 times at the point tapped (out, with shift held); where every zoom is about the cover art\'s pivot, about the pivot.' },
-  'node.zoomToReadable': { kind: 'press', targets: CARD, does: 'Zooms in until the card\'s title renders at graph.readablePx CSS px or more (default 16), in the site\'s zoom mode; when that would take the card off the screen, the view also pans so the card stays under the finger.' },
-  'node.openReader': { kind: 'press', targets: CARD, does: 'Opens the reader on the card\'s piece.' },
-  'node.select': { kind: 'press', targets: CARD, does: 'Opens or closes the card in place (its text inside it) and makes it the card the panel acts on; the reader stays as it is.' },
-  'node.listen': { kind: 'press', targets: CARD, does: 'Reads the card\'s text aloud in the voice and at the speed the panel has, from its start; on the card being read, pauses; on the card paused in, reads on. A closed card opens first. What the play button in an open card does (settings.cards.listen).' },
-  'node.stopListening': { kind: 'press', targets: CARD, does: 'Ends the reading when it is this card\'s; nothing otherwise. What the stop button in an open card does.' },
-  'node.move': { kind: 'drag', targets: ['container', 'node', 'node.readable'], does: 'Moves the card, or the container with all it holds, with the pointer or the finger.' },
-  'node.resize': { kind: 'drag', targets: CARD, does: 'A drag that starts on a card\'s edge or corner changes its size. Only while it is bound do the cards have edges to drag, and the panel "Reset sizes".' },
+  'container.toggle': {
+    kind: 'press',
+    targets: ['container'],
+    does: 'Opens a closed container, or closes an open one.',
+  },
+  'view.zoomInStep': {
+    kind: 'press',
+    targets: ANY,
+    does: "Zooms in one step, the step of the + key (1.25 times), about the point every zoom keeps still (the cover art's pivot when the site has one, else the middle of the screen).",
+  },
+  'view.zoomAtPoint': {
+    kind: 'press',
+    targets: ANY,
+    does: "Zooms in about 2 times at the point tapped (out, with shift held); where every zoom is about the cover art's pivot, about the pivot.",
+  },
+  'node.zoomToReadable': {
+    kind: 'press',
+    targets: CARD,
+    does: "Zooms in until the card's title renders at graph.readablePx CSS px or more (default 16), in the site's zoom mode; when that would take the card off the screen, the view also pans so the card stays under the finger.",
+  },
+  'node.openReader': { kind: 'press', targets: CARD, does: "Opens the reader on the card's piece." },
+  'node.select': {
+    kind: 'press',
+    targets: CARD,
+    does: 'Opens or closes the card in place (its text inside it) and makes it the card the panel acts on; the reader stays as it is.',
+  },
+  'node.listen': {
+    kind: 'press',
+    targets: CARD,
+    does: "Reads the card's text aloud in the voice and at the speed the panel has, from its start; on the card being read, pauses; on the card paused in, reads on. A closed card opens first. What the play button in an open card does (settings.cards.listen).",
+  },
+  'node.stopListening': {
+    kind: 'press',
+    targets: CARD,
+    does: "Ends the reading when it is this card's; nothing otherwise. What the stop button in an open card does.",
+  },
+  'node.move': {
+    kind: 'drag',
+    targets: ['container', 'node', 'node.readable'],
+    does: 'Moves the card, or the container with all it holds, with the pointer or the finger.',
+  },
+  'node.resize': {
+    kind: 'drag',
+    targets: CARD,
+    does: 'A drag that starts on a card\'s edge or corner changes its size. Only while it is bound do the cards have edges to drag, and the panel "Reset sizes".',
+  },
   'view.pan': { kind: 'drag', targets: ['space'], does: 'Moves the whole view with the pointer or the finger.' },
-  'view.deselect': { kind: 'press', targets: ANY, does: 'Closes the reader, takes off a highlighted tag and hides an edge\'s name.' },
+  'view.deselect': {
+    kind: 'press',
+    targets: ANY,
+    does: "Closes the reader, takes off a highlighted tag and hides an edge's name.",
+  },
 };
 const TARGETS = ['container', 'node', 'node.readable', 'space'];
 const GESTURES = ['tap', 'doubletap', 'drag', 'longpress'];
@@ -83,7 +123,9 @@ function rowOf(raw, warn) {
   if (!raw || typeof raw !== 'object') return null;
   const { target, gesture, action } = raw;
   if (!TARGETS.includes(target) || !GESTURES.includes(gesture)) {
-    warn(`graph.bindings: no target "${target}" or gesture "${gesture}"; the row is left out (targets: ${TARGETS.join(', ')}; gestures: ${GESTURES.join(', ')})`);
+    warn(
+      `graph.bindings: no target "${target}" or gesture "${gesture}"; the row is left out (targets: ${TARGETS.join(', ')}; gestures: ${GESTURES.join(', ')})`,
+    );
     return null;
   }
   const a = ACTIONS[action];

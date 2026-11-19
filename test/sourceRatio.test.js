@@ -4,7 +4,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  PREF, DEFAULT_BAR, ratioOf, ratioRange, clampRatio, ratioShows, shownAt, pairKey, ratioText,
+  PREF,
+  DEFAULT_BAR,
+  ratioOf,
+  ratioRange,
+  clampRatio,
+  ratioShows,
+  shownAt,
+  pairKey,
+  ratioText,
 } = require('../src/lib/sourceRatio');
 
 const tagEdge = (item, tag, ratio, params) => ({
@@ -12,13 +20,15 @@ const tagEdge = (item, tag, ratio, params) => ({
   target: `tag:${tag}`,
   layer: 'tag',
   attrs: {
-    concept: `c_${tag}`, weight: 0.4, origin: ratio === undefined ? 'explicit' : 'discovered',
+    concept: `c_${tag}`,
+    weight: 0.4,
+    origin: ratio === undefined ? 'explicit' : 'discovered',
     ...(ratio === undefined ? {} : { sourceRatio: ratio }),
     ...(params ? { wasGeneratedBy: { activity: 'discover', parameters: params } } : {}),
   },
 });
 
-test('the preference has a plain key, and the default bar is rosetta-tagz\'s', () => {
+test("the preference has a plain key, and the default bar is rosetta-tagz's", () => {
   assert.strictEqual(PREF, 'minSourceRatio');
   assert.strictEqual(DEFAULT_BAR, 1.6);
 });
@@ -30,7 +40,9 @@ test('a ratio is a finite number, nothing else', () => {
 });
 
 test('no ratio in the feed: nothing to offer and nothing filtered', () => {
-  const feed = { edges: [tagEdge('i1', 'ai'), { source: 'tag:a', target: 'tag:b', layer: 'related', attrs: { weight: 1 } }] };
+  const feed = {
+    edges: [tagEdge('i1', 'ai'), { source: 'tag:a', target: 'tag:b', layer: 'related', attrs: { weight: 1 } }],
+  };
   const range = ratioRange(feed);
   assert.strictEqual(range.has, false);
   assert.strictEqual(clampRatio(2, range), null);
@@ -38,7 +50,7 @@ test('no ratio in the feed: nothing to offer and nothing filtered', () => {
   assert.strictEqual(ratioRange(null).has, false);
 });
 
-test('the range: from the floor the build recorded, at least 1.0, to the largest ratio in tenths rounded down; the bar the build\'s', () => {
+test("the range: from the floor the build recorded, at least 1.0, to the largest ratio in tenths rounded down; the bar the build's", () => {
   const feed = {
     edges: [
       tagEdge('i1', 'cancer', 2.964, { sourceCoherenceRatio: 1.6 }),
@@ -51,14 +63,35 @@ test('the range: from the floor the build recorded, at least 1.0, to the largest
 });
 
 test('without a recorded floor the lowest ratio sets the bottom, never under 1.0 nor above the bar', () => {
-  assert.deepStrictEqual(ratioRange({ edges: [tagEdge('i1', 'a', 1.234), tagEdge('i2', 'b', 2.5)] }), { has: true, lo: 1.2, hi: 2.5, bar: 1.6 });
-  assert.deepStrictEqual(ratioRange({ edges: [tagEdge('i1', 'a', 0.7), tagEdge('i2', 'b', 2.5)] }).lo, 1, 'never under 1.0');
-  assert.deepStrictEqual(ratioRange({ edges: [tagEdge('i1', 'a', 2.1), tagEdge('i2', 'b', 3.3)] }).lo, 1.6, 'never above the bar, so the default is on the slider');
-  assert.deepStrictEqual(ratioRange({ edges: [tagEdge('i1', 'a', 1.2), tagEdge('i2', 'b', 1.4)] }).hi, 1.6, 'the top reaches the bar');
-  assert.strictEqual(ratioRange({ edges: [tagEdge('i1', 'a', 2.5, { sourceCoherenceRatio: 2 })] }).bar, 2, 'a build with another bar says so');
+  assert.deepStrictEqual(ratioRange({ edges: [tagEdge('i1', 'a', 1.234), tagEdge('i2', 'b', 2.5)] }), {
+    has: true,
+    lo: 1.2,
+    hi: 2.5,
+    bar: 1.6,
+  });
+  assert.deepStrictEqual(
+    ratioRange({ edges: [tagEdge('i1', 'a', 0.7), tagEdge('i2', 'b', 2.5)] }).lo,
+    1,
+    'never under 1.0',
+  );
+  assert.deepStrictEqual(
+    ratioRange({ edges: [tagEdge('i1', 'a', 2.1), tagEdge('i2', 'b', 3.3)] }).lo,
+    1.6,
+    'never above the bar, so the default is on the slider',
+  );
+  assert.deepStrictEqual(
+    ratioRange({ edges: [tagEdge('i1', 'a', 1.2), tagEdge('i2', 'b', 1.4)] }).hi,
+    1.6,
+    'the top reaches the bar',
+  );
+  assert.strictEqual(
+    ratioRange({ edges: [tagEdge('i1', 'a', 2.5, { sourceCoherenceRatio: 2 })] }).bar,
+    2,
+    'a build with another bar says so',
+  );
 });
 
-test('the value in force: the build\'s bar for nothing chosen, else the choice in tenths within the range', () => {
+test("the value in force: the build's bar for nothing chosen, else the choice in tenths within the range", () => {
   const range = { has: true, lo: 1, hi: 5.7, bar: 1.6 };
   assert.strictEqual(clampRatio(null, range), 1.6);
   assert.strictEqual(clampRatio(undefined, range), 1.6);
@@ -93,9 +126,16 @@ test('which attachments show: a pair needs one, a tag or bubble with none is hid
     { piece: 'p6', bubble: 'tag:warm', tag: 'tag:warm', ratio: 1.3 },
   ];
   const at16 = shownAt(entries, 1.6);
-  assert.deepStrictEqual([...at16.pairs].sort(), [pairKey('p1', 'tag:cancer'), pairKey('p4', 'tag:ai'), pairKey('p5', 'tag:warm')].sort());
+  assert.deepStrictEqual(
+    [...at16.pairs].sort(),
+    [pairKey('p1', 'tag:cancer'), pairKey('p4', 'tag:ai'), pairKey('p5', 'tag:warm')].sort(),
+  );
   assert.deepStrictEqual([...at16.hiddenTags].sort(), ['tag:instead', 'tag:warm']);
-  assert.deepStrictEqual([...at16.hiddenBubbles], ['tag:instead'], 'warm shows: global warming, folded into it, has a pair');
+  assert.deepStrictEqual(
+    [...at16.hiddenBubbles],
+    ['tag:instead'],
+    'warm shows: global warming, folded into it, has a pair',
+  );
   const at1 = shownAt(entries, 1);
   assert.strictEqual(at1.pairs.size, 6);
   assert.strictEqual(at1.hiddenTags.size, 0);
@@ -103,7 +143,11 @@ test('which attachments show: a pair needs one, a tag or bubble with none is hid
   const none = shownAt(entries, null);
   assert.strictEqual(none.hiddenTags.size, 0, 'no value, nothing hidden');
   const at3 = shownAt(entries, 3);
-  assert.deepStrictEqual([...at3.hiddenBubbles].sort(), ['tag:cancer', 'tag:instead'], 'raised, the strongest hub goes too');
+  assert.deepStrictEqual(
+    [...at3.hiddenBubbles].sort(),
+    ['tag:cancer', 'tag:instead'],
+    'raised, the strongest hub goes too',
+  );
 });
 
 test('the value as the panel shows it: always one decimal', () => {
@@ -130,7 +174,7 @@ const RANGES = [
   { has: true, lo: 1, hi: 100, bar: 1.6 },
 ];
 
-test('the travel\'s two ends are the range\'s two ends, exactly', () => {
+test("the travel's two ends are the range's two ends, exactly", () => {
   for (const range of RANGES) {
     const n = travelLength(range);
     assert.ok(Number.isInteger(n) && n >= 1000, `${n} positions`);

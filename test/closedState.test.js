@@ -28,11 +28,23 @@ test('containers start closed or open as the site says, initialCollapsed otherwi
     { id: 'container:act-1', parent: 'container:book' },
     { id: 'container:act-2', parent: 'container:book' },
   ];
-  assert.deepStrictEqual(initiallyClosed(book, { containersStart: 'closed' }), ['container:act-1', 'container:act-2'], 'the acts, not the book');
+  assert.deepStrictEqual(
+    initiallyClosed(book, { containersStart: 'closed' }),
+    ['container:act-1', 'container:act-2'],
+    'the acts, not the book',
+  );
   assert.deepStrictEqual(initiallyClosed(book, { containersStart: 'open' }), []);
-  assert.deepStrictEqual(initiallyClosed(book, { containersStart: 'open', initialCollapsed: 'all' }), [], 'containersStart wins');
+  assert.deepStrictEqual(
+    initiallyClosed(book, { containersStart: 'open', initialCollapsed: 'all' }),
+    [],
+    'containersStart wins',
+  );
   const flat = [{ id: 'a' }, { id: 'b' }];
-  assert.deepStrictEqual(initiallyClosed(flat, { containersStart: 'closed' }), ['a', 'b'], 'none inside another: all of them');
+  assert.deepStrictEqual(
+    initiallyClosed(flat, { containersStart: 'closed' }),
+    ['a', 'b'],
+    'none inside another: all of them',
+  );
   assert.deepStrictEqual(initiallyClosed(book, {}), [], 'nothing set: none closed');
   assert.deepStrictEqual(initiallyClosed(book, { initialCollapsed: 'all' }).length, 3);
   assert.deepStrictEqual(initiallyClosed(book, { initialCollapsed: ['container:act-2'] }), ['container:act-2']);

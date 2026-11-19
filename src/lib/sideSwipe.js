@@ -139,6 +139,16 @@ function followOffset(dx, canGo) {
 }
 
 module.exports = {
-  TURN_PX, QUIET_MS, SWIPE_PX, FLICK_MS, SLOP_PX, LONG_PRESS_MS, EDGE_GIVE,
-  wheelPixels, createWheelTurn, touchIntent, touchTurn, followOffset,
+  TURN_PX,
+  QUIET_MS,
+  SWIPE_PX,
+  FLICK_MS,
+  SLOP_PX,
+  LONG_PRESS_MS,
+  EDGE_GIVE,
+  wheelPixels,
+  createWheelTurn,
+  touchIntent,
+  touchTurn,
+  followOffset,
 };

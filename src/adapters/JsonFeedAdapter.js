@@ -13,8 +13,11 @@ async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
   const { id, title, xmlUrl } = config;
   const text = await fetchFeed(xmlUrl);
   let feed;
-  try { feed = JSON.parse(text); }
-  catch (err) { throw new Error(`JsonFeedAdapter: invalid JSON at ${xmlUrl}: ${err.message}`); }
+  try {
+    feed = JSON.parse(text);
+  } catch (err) {
+    throw new Error(`JsonFeedAdapter: invalid JSON at ${xmlUrl}: ${err.message}`);
+  }
 
   if (!feed.items || !Array.isArray(feed.items)) {
     throw new Error(`JsonFeedAdapter: no items array in ${xmlUrl}`);
@@ -47,13 +50,11 @@ function normalizeItem(it) {
   // Preserve any incoming attachments. Add the cover image as a synthetic
   // attachment if there isn't one already.
   const attachments = Array.isArray(it.attachments) ? [...it.attachments] : [];
-  if (image && !attachments.some(a => a.url === image)) {
+  if (image && !attachments.some((a) => a.url === image)) {
     attachments.push({ url: image, mime_type: 'image/*', _role: 'cover' });
   }
   // Preserve any incoming _references; derive from tags if absent.
-  const _references = Array.isArray(it._references)
-    ? it._references
-    : tags.map(value => ({ type: 'tag', value }));
+  const _references = Array.isArray(it._references) ? it._references : tags.map((value) => ({ type: 'tag', value }));
 
   return {
     id: it.id || url,
@@ -73,7 +74,7 @@ function normalizeItem(it) {
     // A DOI the item names (doi or _doi), kept for the card's slug.
     ...(typeof (it.doi || it._doi) === 'string' && (it.doi || it._doi) ? { doi: it.doi || it._doi } : {}),
     // An item that is only a link (external_url, no content) is a link node.
-    kind: isLinkFeedItem(it) ? 'link' : (it._kind || it.kind || 'text'),
+    kind: isLinkFeedItem(it) ? 'link' : it._kind || it.kind || 'text',
     attachments,
     _references,
   };

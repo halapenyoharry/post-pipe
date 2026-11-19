@@ -4,7 +4,14 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { toolbarConfig, menuModel, menuMove, toggleDimension, nextGranularity, VIEW_ACTIONS } = require('../src/lib/toolbar');
+const {
+  toolbarConfig,
+  menuModel,
+  menuMove,
+  toggleDimension,
+  nextGranularity,
+  VIEW_ACTIONS,
+} = require('../src/lib/toolbar');
 
 test('position: top by default, bottom only when set so', () => {
   assert.strictEqual(toolbarConfig(null).position, 'top');
@@ -20,11 +27,18 @@ test('show: every group on by default; false turns one off, at the top as at the
   const top = toolbarConfig({ toolbar: { position: 'top', show: { layout: false } } });
   assert.strictEqual(top.position, 'top');
   assert.deepStrictEqual(top.show, { history: true, layout: false, dimensions: true });
-  assert.deepStrictEqual(toolbarConfig({ toolbar: { show: { history: false, dimensions: false } } }).show, { history: false, layout: true, dimensions: false });
+  assert.deepStrictEqual(toolbarConfig({ toolbar: { show: { history: false, dimensions: false } } }).show, {
+    history: false,
+    layout: true,
+    dimensions: false,
+  });
 });
 
-test('show: the embed\'s switches can turn a group off as well', () => {
-  const c = toolbarConfig({ toolbar: { position: 'top' } }, { undoRedo: false, layoutControls: true, dimensions: true });
+test("show: the embed's switches can turn a group off as well", () => {
+  const c = toolbarConfig(
+    { toolbar: { position: 'top' } },
+    { undoRedo: false, layoutControls: true, dimensions: true },
+  );
   assert.deepStrictEqual(c.show, { history: false, layout: true, dimensions: true });
 });
 
@@ -33,13 +47,27 @@ const DIMS = [
   { id: 'commits', label: 'revisions', title: 'c' },
   { id: 'chronology', label: 'chronology', title: 'h' },
 ];
-const LAYOUTS = [{ id: 'force', label: 'cluster', title: 'a' }, { id: 'radial', label: 'ring', title: 'b' }];
+const LAYOUTS = [
+  { id: 'force', label: 'cluster', title: 'a' },
+  { id: 'radial', label: 'ring', title: 'b' },
+];
 
 test('menu: a checkbox row per dimension, checked when its axis is on, and the bucket size; nothing else', () => {
-  const m = menuModel({ dimensions: DIMS, axis: { on: true, dimension: 'commits', granularity: 'week' }, show: {}, group: 'timelines' });
+  const m = menuModel({
+    dimensions: DIMS,
+    axis: { on: true, dimension: 'commits', granularity: 'week' },
+    show: {},
+    group: 'timelines',
+  });
   assert.strictEqual(m.heading, 'timelines');
-  assert.deepStrictEqual(m.rows.map((r) => r.kind), ['dimension', 'dimension', 'dimension', 'granularity']);
-  assert.deepStrictEqual(m.rows.filter((r) => r.kind === 'dimension').map((r) => r.checked), [false, true, false]);
+  assert.deepStrictEqual(
+    m.rows.map((r) => r.kind),
+    ['dimension', 'dimension', 'dimension', 'granularity'],
+  );
+  assert.deepStrictEqual(
+    m.rows.filter((r) => r.kind === 'dimension').map((r) => r.checked),
+    [false, true, false],
+  );
   assert.strictEqual(m.rows[3].value, 'week');
 });
 
@@ -53,7 +81,13 @@ test('menu: no bucket size for a dimension without one, nor with the axis off', 
 });
 
 test('menu: an edge layer is its own switch; without dimensions the menu is empty', () => {
-  const m = menuModel({ dimensions: DIMS, layers: [{ id: 'readers', label: 'readers' }], preferences: { readers: true }, axis: {}, show: {} });
+  const m = menuModel({
+    dimensions: DIMS,
+    layers: [{ id: 'readers', label: 'readers' }],
+    preferences: { readers: true },
+    axis: {},
+    show: {},
+  });
   const layer = m.rows.find((r) => r.kind === 'layer');
   assert.deepStrictEqual([layer.id, layer.checked], ['readers', true]);
   const v = menuModel({ dimensions: DIMS, axis: {}, show: { dimensions: false } });
@@ -88,7 +122,7 @@ test('menu keys: arrows move and wrap, Home and End go to the ends, others do no
 test('"Reset sizes" is offered only while a card can be resized', () => {
   const { viewActionsFor } = require('../src/lib/toolbar');
   const events = (s) => viewActionsFor(s).map((a) => a.event);
-  assert.ok(events(null).includes('graph:reset-sizes'), 'the engine\'s table resizes from a card\'s edge');
+  assert.ok(events(null).includes('graph:reset-sizes'), "the engine's table resizes from a card's edge");
   assert.ok(events({ graph: {} }).includes('graph:reset-sizes'));
   const noResize = { graph: { bindings: [{ target: 'node', gesture: 'drag', action: 'node.move' }] } };
   assert.deepStrictEqual(events(noResize), ['graph:zoom-to-fit', 'graph:unpin-all']);

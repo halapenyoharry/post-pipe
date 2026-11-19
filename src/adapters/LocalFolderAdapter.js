@@ -10,7 +10,7 @@
 // etc. — the aggregator treats them all the same.
 
 const { rightsMeta, rightsFooterHtml } = require('../lib/rights');
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { marked } = require('marked');
 
@@ -41,19 +41,22 @@ async function load(config) {
     fs.mkdirSync(coversDir, { recursive: true });
   }
 
-  const defaultAuthor = config.author !== undefined
-    ? String(config.author || '').trim().toLowerCase()
-    : siteAuthor(config.settings);
+  const defaultAuthor =
+    config.author !== undefined
+      ? String(config.author || '')
+          .trim()
+          .toLowerCase()
+      : siteAuthor(config.settings);
 
   const { contents } = ingestFolder(rootPath, { settings: config.settings, author: config.author });
-  
+
   const hiddenSlugs = new Set();
   const visibleContents = [];
-  
+
   for (const c of contents) {
     let vis = c.posted;
     if (vis === undefined || vis === null) vis = config.visibilityDefault;
-    const isVisible = (vis === true || vis === 'yes' || vis === 'true' || vis === 'public' || vis === 'title');
+    const isVisible = vis === true || vis === 'yes' || vis === 'true' || vis === 'public' || vis === 'title';
     if (isVisible) {
       visibleContents.push(c);
     } else {
@@ -61,9 +64,9 @@ async function load(config) {
     }
   }
 
-  const items = visibleContents.map(c => {
+  const items = visibleContents.map((c) => {
     if (c.connected_to && Array.isArray(c.connected_to)) {
-      c.connected_to = c.connected_to.filter(slug => !hiddenSlugs.has(slug));
+      c.connected_to = c.connected_to.filter((slug) => !hiddenSlugs.has(slug));
     }
     generateItemPage(c, rootPath, pagesDir, hiddenSlugs, config.rights);
     return contentToItem(c, rootPath, pagesBase, coversDir, config.commits || {}, defaultAuthor);
@@ -88,7 +91,7 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, d
   const isTitleOnly = c.posted === 'title';
   const imageUrl = copyCoverIfPresent(c, rootPath, coversDir);
   const pagesUrl = `${pagesBase}/${c.id}.html`;
-  const bucket   = statusBucket(c);
+  const bucket = statusBucket(c);
 
   const tags = c.tags || [];
   const itemAuthor = (c.author ? c.author.trim() : defaultAuthor).toLowerCase();
@@ -114,24 +117,36 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, d
     // Commits with messages come first: they can be filtered. A bare
     // commit_times list is taken as given. Failing both, the item folder's
     // own git history.
-    commit_times: isTitleOnly ? [] : (Array.isArray(c.commits) ? commitTimes(c.commits, { hideMeta })
-      : Array.isArray(c.commit_times) ? c.commit_times : (() => {
-      try {
-        const itemFolder = path.join(resolveHome(rootPath), c.id);
-        const out = require('child_process').execFileSync('git', ['log', '--format=%cI%x09%s', '--reverse', '--', '.'], {
-          cwd: itemFolder,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-        });
-        const commits = out.split('\n').filter(Boolean).map((line) => {
-          const tab = line.indexOf('\t');
-          return { date: line.slice(0, tab), message: line.slice(tab + 1) };
-        });
-        return commitTimes(commits, { hideMeta });
-      } catch {
-        return [];
-      }
-    })()),
+    commit_times: isTitleOnly
+      ? []
+      : Array.isArray(c.commits)
+        ? commitTimes(c.commits, { hideMeta })
+        : Array.isArray(c.commit_times)
+          ? c.commit_times
+          : (() => {
+              try {
+                const itemFolder = path.join(resolveHome(rootPath), c.id);
+                const out = require('child_process').execFileSync(
+                  'git',
+                  ['log', '--format=%cI%x09%s', '--reverse', '--', '.'],
+                  {
+                    cwd: itemFolder,
+                    encoding: 'utf8',
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                  },
+                );
+                const commits = out
+                  .split('\n')
+                  .filter(Boolean)
+                  .map((line) => {
+                    const tab = line.indexOf('\t');
+                    return { date: line.slice(0, tab), message: line.slice(tab + 1) };
+                  });
+                return commitTimes(commits, { hideMeta });
+              } catch {
+                return [];
+              }
+            })(),
     license: c.license || '',
     canonical_url: c.syndication?.canonical || pagesUrl,
     syndication: c.syndication || {},
@@ -148,8 +163,10 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, d
     // people, places, dates. Code that still wants just tags keeps
     // reading `tags` (above) for compatibility.
     _references: [
-      ...(Array.isArray(c.references) ? c.references.filter(r => r && typeof r === 'object' && r.type && r.type !== 'tag' && r.value) : []),
-      ...tags.map(value => ({ type: 'tag', value })),
+      ...(Array.isArray(c.references)
+        ? c.references.filter((r) => r && typeof r === 'object' && r.type && r.type !== 'tag' && r.value)
+        : []),
+      ...tags.map((value) => ({ type: 'tag', value })),
     ],
     // Project schema fields the graph and TextView consume. Underscore-
     // prefixing them to match JSON Feed conventions is a breaking
@@ -172,8 +189,8 @@ function contentToItem(c, rootPath, pagesBase, coversDir, commitSettings = {}, d
     note: c.note,
     todos: c.todos || [],
     schema: c.schema,
-    version: isTitleOnly ? undefined : (c.version || undefined),
-    version_maps: isTitleOnly ? undefined : (c.version_maps || undefined),
+    version: isTitleOnly ? undefined : c.version || undefined,
+    version_maps: isTitleOnly ? undefined : c.version_maps || undefined,
   };
 }
 
@@ -194,14 +211,16 @@ function buildAttachments(c, imageUrl) {
 
 function mimeFromExt(url) {
   const ext = path.extname(url).toLowerCase();
-  return ({
-    '.png':  'image/png',
-    '.jpg':  'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif':  'image/gif',
-    '.webp': 'image/webp',
-    '.svg':  'image/svg+xml',
-  })[ext] || 'application/octet-stream';
+  return (
+    {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+    }[ext] || 'application/octet-stream'
+  );
 }
 
 function copyCoverIfPresent(c, rootPath, coversDir) {
@@ -219,9 +238,9 @@ function copyCoverIfPresent(c, rootPath, coversDir) {
 // reads as published for graph coloring purposes; the graph currently only
 // has two tints (draft / published).
 function statusBucket(c) {
-  if (c.status === 'published')     return 'published';
-  if (c.syndication?.canonical)     return 'published';
-  if (c.status === 'bloomed')       return 'published';
+  if (c.status === 'published') return 'published';
+  if (c.syndication?.canonical) return 'published';
+  if (c.status === 'bloomed') return 'published';
   return 'draft';
 }
 
@@ -230,8 +249,8 @@ function statusBucket(c) {
 function toIsoDate(s) {
   if (!s) return undefined;
   const str = String(s).trim();
-  if (/^\d{4}$/.test(str))        return new Date(`${str}-01-01T00:00:00Z`).toISOString();
-  if (/^\d{4}-\d{2}$/.test(str))  return new Date(`${str}-01T00:00:00Z`).toISOString();
+  if (/^\d{4}$/.test(str)) return new Date(`${str}-01-01T00:00:00Z`).toISOString();
+  if (/^\d{4}-\d{2}$/.test(str)) return new Date(`${str}-01T00:00:00Z`).toISOString();
   const d = new Date(str);
   return isNaN(d.getTime()) ? undefined : d.toISOString();
 }
@@ -254,7 +273,11 @@ function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set(), rights
   // A link node's page sends the visitor on to its link.
   if (pagesDir && c.kind === 'link' && c.link) {
     if (!fs.existsSync(pagesDir)) fs.mkdirSync(pagesDir, { recursive: true });
-    fs.writeFileSync(path.join(pagesDir, `${c.id}.html`), redirectPage({ title: c.title, href: c.link, blurb: c.summary, head: rightsMeta(rights) }), 'utf8');
+    fs.writeFileSync(
+      path.join(pagesDir, `${c.id}.html`),
+      redirectPage({ title: c.title, href: c.link, blurb: c.summary, head: rightsMeta(rights) }),
+      'utf8',
+    );
     return;
   }
   if (!pagesDir || !c.body || c.posted === 'title') return;
@@ -285,7 +308,10 @@ function generateItemPage(c, rootPath, pagesDir, hiddenSlugs = new Set(), rights
         const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
         rawMd = rawMd.replace(linkRegex, (match, text, url) => {
           // Normalize url to slug
-          let slug = url.replace(/^\.\//, '').replace(/\.html$/, '').replace(/\/$/, '');
+          let slug = url
+            .replace(/^\.\//, '')
+            .replace(/\.html$/, '')
+            .replace(/\/$/, '');
           if (hiddenSlugs.has(slug)) {
             return text; // Strip the link, leave the text
           }

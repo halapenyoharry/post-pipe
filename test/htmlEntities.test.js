@@ -11,7 +11,10 @@ test('numeric references, decimal and hex', () => {
 });
 
 test('the common named references', () => {
-  assert.strictEqual(decodeHtmlEntities('Tom &amp; Jerry &lt;3 &quot;cats&quot; &apos;dogs&apos;'), 'Tom & Jerry <3 "cats" \'dogs\'');
+  assert.strictEqual(
+    decodeHtmlEntities('Tom &amp; Jerry &lt;3 &quot;cats&quot; &apos;dogs&apos;'),
+    'Tom & Jerry <3 "cats" \'dogs\'',
+  );
   assert.strictEqual(decodeHtmlEntities('one&nbsp;two &ndash; three &mdash; four&hellip;'), 'one two – three — four…');
   assert.strictEqual(decodeHtmlEntities('&ldquo;caf&eacute;&rdquo; &copy; 2026'), '“café” © 2026');
 });

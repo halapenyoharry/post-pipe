@@ -57,13 +57,17 @@ function indexOf(rtagz) {
   const sourceToScheme = new Map();
   for (const s of schemesOf(rtagz)) {
     schemes.set(s.id, s);
-    if (typeof s.sourceId === 'string' && s.sourceId && !sourceToScheme.has(s.sourceId)) sourceToScheme.set(s.sourceId, s.id);
+    if (typeof s.sourceId === 'string' && s.sourceId && !sourceToScheme.has(s.sourceId))
+      sourceToScheme.set(s.sourceId, s.id);
   }
-  const systems = rtagz.systems && typeof rtagz.systems === 'object' && !Array.isArray(rtagz.systems) ? rtagz.systems : {};
+  const systems =
+    rtagz.systems && typeof rtagz.systems === 'object' && !Array.isArray(rtagz.systems) ? rtagz.systems : {};
   for (const [name, info] of Object.entries(systems)) {
-    if (info && typeof info.sourceId === 'string' && info.sourceId && !sourceToScheme.has(info.sourceId)) sourceToScheme.set(info.sourceId, name);
+    if (info && typeof info.sourceId === 'string' && info.sourceId && !sourceToScheme.has(info.sourceId))
+      sourceToScheme.set(info.sourceId, name);
   }
-  const external = rtagz.external && typeof rtagz.external === 'object' && !Array.isArray(rtagz.external) ? rtagz.external : {};
+  const external =
+    rtagz.external && typeof rtagz.external === 'object' && !Array.isArray(rtagz.external) ? rtagz.external : {};
   const idx = { byId, schemes, systems, sourceToScheme, external };
   indexes.set(rtagz, idx);
   return idx;

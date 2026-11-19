@@ -5,9 +5,9 @@
 // No login, no OAuth, no Google.
 
 const { chromium } = require('playwright');
-const matter       = require('gray-matter');
-const path         = require('path');
-const fs           = require('fs');
+const matter = require('gray-matter');
+const path = require('path');
+const fs = require('fs');
 const { pushArticle, PAGES_BASE } = require('./github-pages');
 
 // ─── Login ───────────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ async function post(input, { draft = true } = {}) {
   } else {
     // Legacy: raw markdown string
     const { data: fm, content } = matter(input);
-    const title  = fm.title || extractTitle(content);
+    const title = fm.title || extractTitle(content);
     slug = fm.slug || slugify(title);
 
     const { marked } = require('marked');
@@ -68,12 +68,12 @@ ${marked(bodyMd)}
   }
 
   console.log('Waiting 8s for GitHub Pages to propagate...');
-  await new Promise(r => setTimeout(r, 8000));
+  await new Promise((r) => setTimeout(r, 8000));
 
   console.log('Opening Medium import...');
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext();
-  const page    = await context.newPage();
+  const page = await context.newPage();
 
   try {
     // medium.com/p/import is dead — go to stories and use Import button
@@ -82,8 +82,7 @@ ${marked(bodyMd)}
     await page.locator('button:has-text("Import a story"), a:has-text("Import a story")').first().click();
     await page.waitForTimeout(2000);
 
-    await page.locator('input[type="url"], input[placeholder*="URL"], input[name="url"]')
-      .first().fill(pagesUrl);
+    await page.locator('input[type="url"], input[placeholder*="URL"], input[name="url"]').first().fill(pagesUrl);
     await page.locator('button:has-text("Import"), button[type="submit"]').first().click();
     await page.waitForTimeout(5000);
 
@@ -101,7 +100,10 @@ function extractTitle(markdown) {
 }
 
 function slugify(title) {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 module.exports = { login, post };

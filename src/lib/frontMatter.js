@@ -24,7 +24,11 @@ function splitFrontMatter(text) {
     if (CLOSE.test(line)) {
       const raw = rest.slice(0, offset);
       let data;
-      try { data = raw.trim() ? matter.engines.yaml.parse(raw) : {}; } catch (_) { return { data: null, body: src, raw: '' }; }
+      try {
+        data = raw.trim() ? matter.engines.yaml.parse(raw) : {};
+      } catch (_) {
+        return { data: null, body: src, raw: '' };
+      }
       if (!data || typeof data !== 'object' || Array.isArray(data)) return { data: null, body: src, raw: '' };
       // Drop the fence and the blank lines under it.
       const body = rest.slice(offset + lines[i].length + 1).replace(/^(?:[ \t]*\r?\n)+/, '');
@@ -52,9 +56,7 @@ module.exports = { splitFrontMatter, stripFrontMatter, isMetaCommit };
 // left out of the revision timeline.
 function commitTimes(commits, { hideMeta = true } = {}) {
   if (!Array.isArray(commits)) return [];
-  return commits
-    .filter((c) => c && c.date && !(hideMeta && isMetaCommit(c.message)))
-    .map((c) => c.date);
+  return commits.filter((c) => c && c.date && !(hideMeta && isMetaCommit(c.message))).map((c) => c.date);
 }
 
 module.exports.commitTimes = commitTimes;

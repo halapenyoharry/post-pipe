@@ -12,19 +12,23 @@ function roundedRectPoints(w, h, r, step = 12) {
   const pts = [];
   const line = (x0, y0, x1, y1) => {
     const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / step));
-    for (let i = 0; i < n; i++) pts.push([x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n]);
+    for (let i = 0; i < n; i++) pts.push([x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n]);
   };
   const arc = (cx, cy, a0) => {
-    const n = Math.max(2, Math.round((Math.PI / 2) * r / step));
+    const n = Math.max(2, Math.round(((Math.PI / 2) * r) / step));
     for (let i = 0; i < n; i++) {
-      const a = a0 + (Math.PI / 2) * i / n;
+      const a = a0 + ((Math.PI / 2) * i) / n;
       pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
     }
   };
-  line(r, 0, w - r, 0); arc(w - r, r, -Math.PI / 2);
-  line(w, r, w, h - r); arc(w - r, h - r, 0);
-  line(w - r, h, r, h); arc(r, h - r, Math.PI / 2);
-  line(0, h - r, 0, r); arc(r, r, Math.PI);
+  line(r, 0, w - r, 0);
+  arc(w - r, r, -Math.PI / 2);
+  line(w, r, w, h - r);
+  arc(w - r, h - r, 0);
+  line(w - r, h, r, h);
+  arc(r, h - r, Math.PI / 2);
+  line(0, h - r, 0, r);
+  arc(r, r, Math.PI);
   return pts;
 }
 
@@ -63,7 +67,8 @@ function ghostOf(d, seed) {
   const [x1, y1] = [v[0], v[1]];
   const [x2, y2] = [v[v.length - 2], v[v.length - 1]];
   const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-  const nx = -(y2 - y1) / len, ny = (x2 - x1) / len;
+  const nx = -(y2 - y1) / len,
+    ny = (x2 - x1) / len;
   const bow = j(Math.min(6, len * 0.03));
   const cx = (v.length >= 6 ? v[2] : (x1 + x2) / 2) + nx * bow;
   const cy = (v.length >= 6 ? v[3] : (y1 + y2) / 2) + ny * bow;

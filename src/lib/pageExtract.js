@@ -11,19 +11,125 @@
 
 const { decodeHtmlEntities } = require('./htmlEntities');
 
-const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+const VOID = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+]);
 // Tags whose content is text, not markup, until their own close tag.
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title', 'noscript']);
 // Browsers close an open <p> when one of these opens.
-const CLOSES_P = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul']);
+const CLOSES_P = new Set([
+  'address',
+  'article',
+  'aside',
+  'blockquote',
+  'details',
+  'div',
+  'dl',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'hr',
+  'main',
+  'nav',
+  'ol',
+  'p',
+  'pre',
+  'section',
+  'table',
+  'ul',
+]);
 // An open one of these closes when the same one opens again.
 const SELF_CLOSING_SIBLINGS = new Set(['li', 'dt', 'dd', 'tr', 'td', 'th', 'option']);
 // Page chrome: never part of the article's text.
-const CHROME = new Set(['script', 'style', 'nav', 'header', 'footer', 'aside', 'noscript', 'svg', 'form', 'iframe', 'template', 'button', 'select', 'textarea', 'input']);
+const CHROME = new Set([
+  'script',
+  'style',
+  'nav',
+  'header',
+  'footer',
+  'aside',
+  'noscript',
+  'svg',
+  'form',
+  'iframe',
+  'template',
+  'button',
+  'select',
+  'textarea',
+  'input',
+]);
 // Containers that can be the article's block.
 const CANDIDATES = new Set(['article', 'main', 'section', 'div', 'td', 'body', 'blockquote', 'li']);
-const BLOCK = new Set(['p', 'div', 'section', 'article', 'main', 'li', 'ul', 'ol', 'blockquote', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'figure', 'figcaption', 'table', 'tr', 'td', 'th', 'dl', 'dt', 'dd', 'hr', 'br', 'body', 'header', 'footer', 'aside', 'nav']);
-const ATTRS_KEPT = new Set(['href', 'src', 'alt', 'title', 'datetime', 'cite', 'colspan', 'rowspan', 'srcset', 'width', 'height', 'start']);
+const BLOCK = new Set([
+  'p',
+  'div',
+  'section',
+  'article',
+  'main',
+  'li',
+  'ul',
+  'ol',
+  'blockquote',
+  'pre',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'figure',
+  'figcaption',
+  'table',
+  'tr',
+  'td',
+  'th',
+  'dl',
+  'dt',
+  'dd',
+  'hr',
+  'br',
+  'body',
+  'header',
+  'footer',
+  'aside',
+  'nav',
+]);
+const ATTRS_KEPT = new Set([
+  'href',
+  'src',
+  'alt',
+  'title',
+  'datetime',
+  'cite',
+  'colspan',
+  'rowspan',
+  'srcset',
+  'width',
+  'height',
+  'start',
+]);
 
 function parseAttributes(s) {
   const attrs = {};
@@ -55,11 +161,16 @@ function parseHtml(html) {
     while (n && n !== root && n.name !== name) n = n.parent;
     if (n && n !== root) cur = n.parent;
   };
-  const text = (t) => { if (t) cur.children.push({ text: t }); };
+  const text = (t) => {
+    if (t) cur.children.push({ text: t });
+  };
 
   while (i < len) {
     const lt = src.indexOf('<', i);
-    if (lt < 0) { text(src.slice(i)); break; }
+    if (lt < 0) {
+      text(src.slice(i));
+      break;
+    }
     if (lt > i) text(src.slice(i, lt));
     if (src.startsWith('<!--', lt)) {
       const end = src.indexOf('-->', lt + 4);
@@ -72,10 +183,17 @@ function parseHtml(html) {
       continue;
     }
     const m = /^<(\/?)([a-zA-Z][^\s\/>]*)([^>]*?)(\/?)>/.exec(src.slice(lt, lt + 4096));
-    if (!m) { text('<'); i = lt + 1; continue; }
+    if (!m) {
+      text('<');
+      i = lt + 1;
+      continue;
+    }
     i = lt + m[0].length;
     const name = m[2].toLowerCase();
-    if (m[1]) { closeTo(name); continue; }
+    if (m[1]) {
+      closeTo(name);
+      continue;
+    }
     const attrs = parseAttributes(m[3]);
     if (CLOSES_P.has(name)) {
       let n = cur;
@@ -84,7 +202,17 @@ function parseHtml(html) {
     }
     if (SELF_CLOSING_SIBLINGS.has(name)) {
       let n = cur;
-      while (n && n !== root && !CANDIDATES.has(n.name) && n.name !== name && n.name !== 'ul' && n.name !== 'ol' && n.name !== 'table' && n.name !== 'dl') n = n.parent;
+      while (
+        n &&
+        n !== root &&
+        !CANDIDATES.has(n.name) &&
+        n.name !== name &&
+        n.name !== 'ul' &&
+        n.name !== 'ol' &&
+        n.name !== 'table' &&
+        n.name !== 'dl'
+      )
+        n = n.parent;
       if (n && n !== root && n.name === name) cur = n.parent;
     }
     open(name, attrs);
@@ -94,7 +222,7 @@ function parseHtml(html) {
       text(src.slice(i, end));
       cur = cur.parent;
       const gt = src.indexOf('>', end);
-      i = close < 0 ? len : (gt < 0 ? len : gt + 1);
+      i = close < 0 ? len : gt < 0 ? len : gt + 1;
     } else if (m[4] && !VOID.has(name)) {
       cur = cur.parent;
     }
@@ -119,7 +247,9 @@ function findAll(root, pred) {
   return out;
 }
 
-function isChrome(name) { return CHROME.has(name); }
+function isChrome(name) {
+  return CHROME.has(name);
+}
 
 function textOf(node, { skipChrome = true } = {}) {
   if (!node) return '';
@@ -138,18 +268,27 @@ function textOf(node, { skipChrome = true } = {}) {
 }
 
 function clean(s) {
-  return decodeHtmlEntities(String(s || '')).replace(/\s+/g, ' ').trim();
+  return decodeHtmlEntities(String(s || ''))
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
-function escText(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+function escText(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 // The block's inner HTML, chrome dropped, attributes other than the ones a
 // reader needs dropped, text re-escaped.
 function serializeChildren(node, baseUrl) {
   let out = '';
   for (const c of node.children) {
-    if (c.text !== undefined) { out += escText(decodeHtmlEntities(c.text)); continue; }
+    if (c.text !== undefined) {
+      out += escText(decodeHtmlEntities(c.text));
+      continue;
+    }
     if (isChrome(c.name)) continue;
     const attrs = [];
     for (const k of Object.keys(c.attrs)) {
@@ -197,7 +336,10 @@ function mainBlock(root) {
     const all = clean(textOf(el)).length || 1;
     const links = findAll(el, (n) => n.name === 'a').reduce((s, a) => s + clean(textOf(a)).length, 0);
     const score = raw * (1 - links / all);
-    if (score > bestScore) { best = el; bestScore = score; }
+    if (score > bestScore) {
+      best = el;
+      bestScore = score;
+    }
   }
   if (best) return best;
   // No paragraphs worth the name: the article or main element, else the body.
@@ -214,7 +356,9 @@ function candidateAncestor(node, from) {
   let steps = from;
   while (n && n.name !== '#root') {
     if (CANDIDATES.has(n.name) && --steps <= 0) return n;
-    if (!CANDIDATES.has(n.name)) { /* inline or other wrapper: keep climbing */ }
+    if (!CANDIDATES.has(n.name)) {
+      /* inline or other wrapper: keep climbing */
+    }
     n = n.parent;
   }
   return null;
@@ -249,7 +393,11 @@ function jsonLd(root) {
   const out = { headline: '', author: '', date: '', keywords: [] };
   for (const s of findAll(root, (n) => n.name === 'script' && /ld\+json/i.test(n.attrs.type || ''))) {
     let data;
-    try { data = JSON.parse(textOf(s, { skipChrome: false })); } catch (_) { continue; }
+    try {
+      data = JSON.parse(textOf(s, { skipChrome: false }));
+    } catch (_) {
+      continue;
+    }
     const list = [];
     const push = (v) => {
       if (!v || typeof v !== 'object') return;
@@ -318,23 +466,55 @@ function extractPage(html, url) {
   const ld = jsonLd(root);
   const block = mainBlock(root);
 
-  const canonicalEl = find(root, (n) => n.name === 'link' && /(^|\s)canonical(\s|$)/i.test(n.attrs.rel || '') && n.attrs.href);
+  const canonicalEl = find(
+    root,
+    (n) => n.name === 'link' && /(^|\s)canonical(\s|$)/i.test(n.attrs.rel || '') && n.attrs.href,
+  );
   const canonical_link = (canonicalEl && clean(canonicalEl.attrs.href)) || meta(m, 'og:url') || null;
   const pageUrl = (canonical_link && resolveUrl(canonical_link, url)) || url || '';
 
   const h1 = find(block, (n) => n.name === 'h1') || find(root, (n) => n.name === 'h1');
   const titleEl = find(root, (n) => n.name === 'title');
-  const title = meta(m, 'og:title', 'twitter:title') || ld.headline || clean(textOf(h1)) || clean(textOf(titleEl, { skipChrome: false }));
+  const title =
+    meta(m, 'og:title', 'twitter:title') ||
+    ld.headline ||
+    clean(textOf(h1)) ||
+    clean(textOf(titleEl, { skipChrome: false }));
 
-  const authorEl = find(root, (n) => (n.name === 'a' || n.name === 'link') && /(^|\s)author(\s|$)/i.test(n.attrs.rel || ''))
-    || find(root, (n) => /(^|\s)author(\s|$)/i.test(n.attrs.itemprop || '') && n.name !== 'meta');
-  const authorFromEl = authorEl ? (authorEl.name === 'link' ? clean(authorEl.attrs.title) : clean(textOf(authorEl))) : '';
-  const author = meta(m, 'author', 'article:author', 'dc.creator', 'dcterms.creator', 'parsely-author', 'sailthru.author') || ld.author || authorFromEl;
-  const authorValue = /^https?:\/\//i.test(author) ? (ld.author || authorFromEl) : author;
+  const authorEl =
+    find(root, (n) => (n.name === 'a' || n.name === 'link') && /(^|\s)author(\s|$)/i.test(n.attrs.rel || '')) ||
+    find(root, (n) => /(^|\s)author(\s|$)/i.test(n.attrs.itemprop || '') && n.name !== 'meta');
+  const authorFromEl = authorEl
+    ? authorEl.name === 'link'
+      ? clean(authorEl.attrs.title)
+      : clean(textOf(authorEl))
+    : '';
+  const author =
+    meta(m, 'author', 'article:author', 'dc.creator', 'dcterms.creator', 'parsely-author', 'sailthru.author') ||
+    ld.author ||
+    authorFromEl;
+  const authorValue = /^https?:\/\//i.test(author) ? ld.author || authorFromEl : author;
 
-  const timeEl = find(block, (n) => n.name === 'time' && n.attrs.datetime) || find(root, (n) => n.name === 'time' && n.attrs.datetime);
-  const date = meta(m, 'article:published_time', 'datepublished', 'date', 'dc.date', 'dcterms.date', 'dc.date.issued', 'parsely-pub-date', 'sailthru.date', 'pubdate', 'publish_date', 'og:published_time')
-    || ld.date || (timeEl ? timeEl.attrs.datetime : '');
+  const timeEl =
+    find(block, (n) => n.name === 'time' && n.attrs.datetime) ||
+    find(root, (n) => n.name === 'time' && n.attrs.datetime);
+  const date =
+    meta(
+      m,
+      'article:published_time',
+      'datepublished',
+      'date',
+      'dc.date',
+      'dcterms.date',
+      'dc.date.issued',
+      'parsely-pub-date',
+      'sailthru.date',
+      'pubdate',
+      'publish_date',
+      'og:published_time',
+    ) ||
+    ld.date ||
+    (timeEl ? timeEl.attrs.datetime : '');
 
   const article_tags = unique(metaAll(m, 'article:tag'));
   const keywords = unique([...keywordList(meta(m, 'keywords', 'news_keywords')), ...ld.keywords]);

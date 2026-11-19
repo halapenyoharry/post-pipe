@@ -28,7 +28,10 @@ function byline(settings, article) {
   const authors = Array.isArray(article.authors) ? article.authors.filter((a) => a && a.name) : [];
   if (authors.length) {
     return {
-      name: authors.map((a) => String(a.name).trim()).join(', ').toLowerCase(),
+      name: authors
+        .map((a) => String(a.name).trim())
+        .join(', ')
+        .toLowerCase(),
       url: authors[0].url || pieceLink(article),
     };
   }

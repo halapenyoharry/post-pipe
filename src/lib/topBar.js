@@ -52,22 +52,39 @@ function safeHref(v) {
 
 // settings.topBar with its defaults.
 function topBarConfig(settings) {
-  const t = (settings && settings.topBar && typeof settings.topBar === 'object') ? settings.topBar : {};
+  const t = settings && settings.topBar && typeof settings.topBar === 'object' ? settings.topBar : {};
   const pages = (Array.isArray(t.pages) ? t.pages : [])
     .filter((p) => p && typeof p === 'object' && str(p.id))
     .map((p) => {
       const icon = siteIcon(p.icon);
-      return { id: str(p.id), label: str(p.label) || str(p.id), hideFromGraph: p.hideFromGraph === true, icon, showLabel: !icon || p.showLabel !== false };
+      return {
+        id: str(p.id),
+        label: str(p.label) || str(p.id),
+        hideFromGraph: p.hideFromGraph === true,
+        icon,
+        showLabel: !icon || p.showLabel !== false,
+      };
     });
   const links = (Array.isArray(t.links) ? t.links : [])
     .filter((l) => l && typeof l === 'object' && safeHref(l.href) && (str(l.label) || str(l.id)))
     .map((l, i) => {
       const icon = siteIcon(l.icon);
       const label = str(l.label) || str(l.id);
-      return { id: str(l.id) || `link-${i + 1}`, label, href: safeHref(l.href), icon, newTab: l.newTab === true, showLabel: !icon || l.showLabel === true };
+      return {
+        id: str(l.id) || `link-${i + 1}`,
+        label,
+        href: safeHref(l.href),
+        icon,
+        newTab: l.newTab === true,
+        showLabel: !icon || l.showLabel === true,
+      };
     });
   return {
-    pages, links, subscribe: subscribeConfig(t.subscribe), addFeed: t.addFeed !== false, showSourcePills: t.showSourcePills !== false,
+    pages,
+    links,
+    subscribe: subscribeConfig(t.subscribe),
+    addFeed: t.addFeed !== false,
+    showSourcePills: t.showSourcePills !== false,
     resume: resumeConfig(t.resume),
     order: Array.isArray(t.order) ? t.order.map(str).filter(Boolean) : [],
   };
@@ -77,7 +94,13 @@ function topBarConfig(settings) {
 function resumeConfig(v) {
   if (!v || typeof v !== 'object') return null;
   const icon = siteIcon(v.icon);
-  return { id: 'resume', label: str(v.label) || 'read', icon, showLabel: !icon || v.showLabel === true, start: str(v.start) };
+  return {
+    id: 'resume',
+    label: str(v.label) || 'read',
+    icon,
+    showLabel: !icon || v.showLabel === true,
+    start: str(v.start),
+  };
 }
 
 // The top bar's buttons in order: keys 'resume', 'page:<id>', 'link:<id>',
@@ -90,10 +113,19 @@ function topBarOrder(config) {
   for (const p of c.pages || []) all.push(`page:${p.id}`);
   for (const l of c.links || []) all.push(`link:${l.id}`);
   if (c.subscribe) all.push('subscribe');
-  const keyOf = (id) => (id === 'resume' || id === 'subscribe') ? id
-    : all.includes(`page:${id}`) ? `page:${id}` : all.includes(`link:${id}`) ? `link:${id}` : null;
+  const keyOf = (id) =>
+    id === 'resume' || id === 'subscribe'
+      ? id
+      : all.includes(`page:${id}`)
+        ? `page:${id}`
+        : all.includes(`link:${id}`)
+          ? `link:${id}`
+          : null;
   const out = [];
-  for (const id of c.order || []) { const k = keyOf(id); if (k && all.includes(k) && !out.includes(k)) out.push(k); }
+  for (const id of c.order || []) {
+    const k = keyOf(id);
+    if (k && all.includes(k) && !out.includes(k)) out.push(k);
+  }
   for (const k of all) if (!out.includes(k)) out.push(k);
   return out;
 }
@@ -110,20 +142,30 @@ function resumeTarget(items, reading, config, order) {
   const isLink = (it) => isLinkItem(it);
   const eligible = list.filter((it) => it && it.id && !isPage(it) && !isLink(it));
   const mem = reading && typeof reading === 'object' ? reading : {};
-  let best = null, bestT = -Infinity;
+  let best = null,
+    bestT = -Infinity;
   for (const it of eligible) {
     const r = mem[it.id];
     if (!r) continue;
     const read = Number(r.max) > 0 || Number(r.at) > 0 || Number(r.scroll) > 0;
     const t = Number(r.t);
-    if (read && Number.isFinite(t) && t > bestT) { bestT = t; best = it; }
+    if (read && Number.isFinite(t) && t > bestT) {
+      bestT = t;
+      best = it;
+    }
   }
   if (best) return best;
   const start = config && config.resume && config.resume.start;
-  if (start) { const s = eligible.find((it) => it.id === start || slugOf(it) === start); if (s) return s; }
+  if (start) {
+    const s = eligible.find((it) => it.id === start || slugOf(it) === start);
+    if (s) return s;
+  }
   if (Array.isArray(order) && order.length) {
     const byId = new Map(eligible.map((it) => [it.id, it]));
-    for (const id of order) { const it = byId.get(id); if (it && isReadable(it)) return it; }
+    for (const id of order) {
+      const it = byId.get(id);
+      if (it && isReadable(it)) return it;
+    }
   }
   return eligible[0] || null;
 }
@@ -185,12 +227,20 @@ async function subscribe(config, value, fetchImpl) {
     return { ok: false, message: config.error };
   }
   let body = null;
-  try { body = await res.json(); } catch (e) { body = null; }
+  try {
+    body = await res.json();
+  } catch (e) {
+    body = null;
+  }
   return subscribeResult(config, res.status, body);
 }
 
 // An item's slug: the last part of its url (or id), without .html.
-const slugOf = (item) => String((item && (item.url || item.id)) || '').split('/').pop().replace(/\.html$/, '');
+const slugOf = (item) =>
+  String((item && (item.url || item.id)) || '')
+    .split('/')
+    .pop()
+    .replace(/\.html$/, '');
 
 // The item a page names: by its id, or else by its slug.
 function findItem(items, ref) {
@@ -201,18 +251,25 @@ function findItem(items, ref) {
 // The pages with the items they open; a page whose item is not in the feed
 // is left out.
 function resolvePages(config, items) {
-  return ((config && config.pages) || [])
-    .map((p) => ({ ...p, item: findItem(items, p.id) }))
-    .filter((p) => p.item);
+  return ((config && config.pages) || []).map((p) => ({ ...p, item: findItem(items, p.id) })).filter((p) => p.item);
 }
 
 // The feed the graph draws: without the items of pages kept out of it, nor
 // any edge with an end on one of them. The same feed when none is.
 function graphFeed(feed, config) {
   if (!feed) return feed;
-  const hidden = new Set(resolvePages(config, feed.items).filter((p) => p.hideFromGraph).map((p) => p.item.id));
+  const hidden = new Set(
+    resolvePages(config, feed.items)
+      .filter((p) => p.hideFromGraph)
+      .map((p) => p.item.id),
+  );
   if (!hidden.size) return feed;
-  const urls = new Set((feed.items || []).filter((i) => hidden.has(i.id)).map((i) => i.url).filter(Boolean));
+  const urls = new Set(
+    (feed.items || [])
+      .filter((i) => hidden.has(i.id))
+      .map((i) => i.url)
+      .filter(Boolean),
+  );
   const gone = (end) => hidden.has(end) || urls.has(end);
   return {
     ...feed,
@@ -221,4 +278,17 @@ function graphFeed(feed, config) {
   };
 }
 
-module.exports = { topBarConfig, findItem, resolvePages, graphFeed, slugOf, safeHref, subscribeConfig, subscribeResult, subscribe, resumeConfig, topBarOrder, resumeTarget };
+module.exports = {
+  topBarConfig,
+  findItem,
+  resolvePages,
+  graphFeed,
+  slugOf,
+  safeHref,
+  subscribeConfig,
+  subscribeResult,
+  subscribe,
+  resumeConfig,
+  topBarOrder,
+  resumeTarget,
+};

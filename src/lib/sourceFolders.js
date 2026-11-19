@@ -89,9 +89,8 @@ function groupSourcesByFolder(sources) {
  * @returns {{ action: 'show' | 'hide', ids: string[] }}
  */
 function toggleFolderSources(sources, folderPrefix, hiddenSources) {
-  const hidden = hiddenSources instanceof Set
-    ? hiddenSources
-    : new Set(Array.isArray(hiddenSources) ? hiddenSources : []);
+  const hidden =
+    hiddenSources instanceof Set ? hiddenSources : new Set(Array.isArray(hiddenSources) ? hiddenSources : []);
   const matching = filterSourcesByFolder(sources, folderPrefix);
   const allHidden = matching.length > 0 && matching.every((s) => hidden.has(s.id));
   if (allHidden) {

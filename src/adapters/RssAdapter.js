@@ -25,10 +25,7 @@ async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
   // RSS 2.0: <rss><channel><item>…
   // RSS 1.0: <rdf:RDF><channel/><item/>…
   const channel = doc?.rss?.channel || doc?.['rdf:RDF']?.channel || null;
-  const rawItems =
-    (doc?.rss?.channel?.item) ||
-    (doc?.['rdf:RDF']?.item) ||
-    [];
+  const rawItems = doc?.rss?.channel?.item || doc?.['rdf:RDF']?.item || [];
 
   if (!channel) throw new Error(`RssAdapter: no channel found in ${xmlUrl}`);
 
@@ -53,7 +50,7 @@ async function load(config, { fetchText: fetchFeed = fetchText } = {}) {
 
 function feedUpdated(channel) {
   for (const v of [channel.lastBuildDate, channel.pubDate, channel['dc:date']]) {
-    const d = parseDate(typeof v === 'string' ? v : (v && typeof v === 'object' ? v['#text'] : v));
+    const d = parseDate(typeof v === 'string' ? v : v && typeof v === 'object' ? v['#text'] : v);
     if (d) return d;
   }
   return null;
@@ -61,16 +58,17 @@ function feedUpdated(channel) {
 
 function normalizeItem(it) {
   const url = it.link || it.guid?.['#text'] || it.guid || '';
-  const id  = (typeof it.guid === 'object' ? it.guid['#text'] : it.guid) || url;
+  const id = (typeof it.guid === 'object' ? it.guid['#text'] : it.guid) || url;
   const description = stripCdata(it.description || it['content:encoded'] || '');
   // Text fields (title, summary, author) are shown as text, so the HTML
   // character references a feed leaves in them are decoded here, once.
   // content_html stays as it came: it is HTML and keeps its own entities.
   const summary = decodeHtmlEntities(description.replace(/<[^>]+>/g, '')).slice(0, 400);
-  const author = decodeHtmlEntities((typeof it['dc:creator'] === 'string' ? it['dc:creator']
-                : typeof it.author === 'string' ? it.author : '') || '');
+  const author = decodeHtmlEntities(
+    (typeof it['dc:creator'] === 'string' ? it['dc:creator'] : typeof it.author === 'string' ? it.author : '') || '',
+  );
   const image = extractImage(it);
-  const tags  = extractCategories(it.category);
+  const tags = extractCategories(it.category);
   // What the item carries of its own identity, kept for the card's slug
   // (src/lib/cardSlug.js): an <atom:link rel="canonical">, and a DOI in
   // <prism:doi> or <dc:identifier>.
@@ -93,7 +91,7 @@ function normalizeItem(it) {
     ...(doi ? { doi } : {}),
     kind: 'text',
     attachments: image ? [{ url: image, mime_type: 'image/*', _role: 'cover' }] : [],
-    _references: tags.map(value => ({ type: 'tag', value })),
+    _references: tags.map((value) => ({ type: 'tag', value })),
   };
 }
 
@@ -101,20 +99,23 @@ function normalizeItem(it) {
 function canonicalLink(links) {
   if (!links) return '';
   const arr = Array.isArray(links) ? links : [links];
-  const c = arr.find(l => l && typeof l === 'object' && l['@_rel'] === 'canonical' && l['@_href']);
+  const c = arr.find((l) => l && typeof l === 'object' && l['@_rel'] === 'canonical' && l['@_href']);
   return c ? String(c['@_href']).trim() : '';
 }
 
 // A DOI in a field (bare, "doi:…" or a doi.org address); '' when none.
 function doiOf(v) {
-  const s = typeof v === 'string' ? v : (v && typeof v === 'object' && typeof v['#text'] === 'string' ? v['#text'] : '');
+  const s = typeof v === 'string' ? v : v && typeof v === 'object' && typeof v['#text'] === 'string' ? v['#text'] : '';
   const m = s.match(/(?:doi\.org\/|doi:\s*|^|[\s(])(10\.\d{4,9}\/[^\s"'<>]+)/i);
   return m ? m[1].replace(/[.,;:)\]]+$/, '') : '';
 }
 
 function stripCdata(s) {
   if (typeof s !== 'string') return '';
-  return s.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '').trim();
+  return s
+    .replace(/^<!\[CDATA\[/, '')
+    .replace(/\]\]>$/, '')
+    .trim();
 }
 
 function extractImage(it) {
@@ -132,7 +133,7 @@ function extractImage(it) {
 
 function extractCategories(cat) {
   if (!cat) return [];
-  if (Array.isArray(cat)) return cat.map(c => typeof c === 'string' ? c : c?.['#text'] || '').filter(Boolean);
+  if (Array.isArray(cat)) return cat.map((c) => (typeof c === 'string' ? c : c?.['#text'] || '')).filter(Boolean);
   if (typeof cat === 'string') return [cat];
   return cat['#text'] ? [cat['#text']] : [];
 }

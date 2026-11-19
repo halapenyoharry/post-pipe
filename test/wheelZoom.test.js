@@ -17,14 +17,14 @@ test('a mouse click of hundreds of pixels is capped to one step, in and out', ()
   assert.ok(factor > 1.2 && factor < 1.3, `one click zooms about 1.25x (${factor})`);
 });
 
-test('a trackpad\'s small deltas pass through as d3 would have them', () => {
+test("a trackpad's small deltas pass through as d3 would have them", () => {
   near(wheelDelta(ev(-5)), 0.01);
   near(wheelDelta(ev(5)), -0.01);
   near(wheelDelta(ev(-50)), 0.1);
   near(wheelDelta(ev(0)), 0);
 });
 
-test('lines and pages keep d3\'s units, under the same cap', () => {
+test("lines and pages keep d3's units, under the same cap", () => {
   near(wheelDelta(ev(-3, { deltaMode: 1 })), 0.15);
   assert.strictEqual(wheelDelta(ev(-10, { deltaMode: 1 })), WHEEL_STEP_MAX);
   assert.strictEqual(wheelDelta(ev(-1, { deltaMode: 2 })), WHEEL_STEP_MAX);

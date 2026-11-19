@@ -10,9 +10,16 @@ import { containerLook } from './containerLook';
 import { nodePaletteFor } from '../../lib/nodePalettes';
 import { tightened } from '../../lib/tightness';
 import {
-  MODE_PREF as EDGE_WEIGHT_MODE_PREF, PENALTY_PREF as DEGREE_PENALTY_PREF,
-  EDGE_WEIGHT_MODES, DEGREE_PENALTIES,
-  degreesOf, effectiveWeight, linkStrength, linkDistance, normaliseEdgeWeights, edgeWeightLine,
+  MODE_PREF as EDGE_WEIGHT_MODE_PREF,
+  PENALTY_PREF as DEGREE_PENALTY_PREF,
+  EDGE_WEIGHT_MODES,
+  DEGREE_PENALTIES,
+  degreesOf,
+  effectiveWeight,
+  linkStrength,
+  linkDistance,
+  normaliseEdgeWeights,
+  edgeWeightLine,
 } from '../../lib/edgeWeight';
 import { actsApart } from './actsApart';
 import { showContainerCount, containerCountText } from './containerCount';
@@ -39,7 +46,14 @@ import { labelFor, migrationPairs, schemesOf, SITE_SCHEME } from '../../lib/sche
 import { blendColors } from '../../lib/blendColors';
 import { wheelDelta } from '../../lib/wheelZoom';
 import { PREF as MIN_PIECES_PREF, pieceCounts, tagsBelow, clampMinPieces } from '../../lib/minPieces';
-import { isRelationEdge, drawnRelativesOf, relativeLabel, foldedChoice, FOLDED_PREF, STRONGEST } from '../../lib/tagNetwork';
+import {
+  isRelationEdge,
+  drawnRelativesOf,
+  relativeLabel,
+  foldedChoice,
+  FOLDED_PREF,
+  STRONGEST,
+} from '../../lib/tagNetwork';
 import { tagEdgeLabel } from '../../lib/provenance';
 import { containerHas } from '../../lib/containers';
 import { tagReferences } from '../../lib/tagReferences';
@@ -47,7 +61,11 @@ import { PREF as SOURCE_RATIO_PREF, ratioOf, ratioRange, clampRatio, shownAt, pa
 import { nonTagReferences, referenceEdgeLabel } from '../../corpus/buildEdges';
 import { listenInCard, toggleListen, stopListening } from '../../lib/listenInCard';
 import {
-  PREF as TAG_SHOW_PREF, LABELS_PREF as TAG_LABELS_PREF, tagDrawing, tagMarkRadius, tagMarkHitRadius,
+  PREF as TAG_SHOW_PREF,
+  LABELS_PREF as TAG_LABELS_PREF,
+  tagDrawing,
+  tagMarkRadius,
+  tagMarkHitRadius,
 } from '../../lib/tagPills';
 import { PREF as READING_ORDER_PREF } from '../../lib/readingOrder';
 
@@ -79,13 +97,19 @@ function feedToGraph(feed, config = {}) {
   const previousLabelOf = new Map();
   const rtagzConcepts = feed._rtagz && Array.isArray(feed._rtagz.concepts) ? feed._rtagz.concepts : [];
   for (const c of rtagzConcepts) {
-    if (c && typeof c.id === 'string' && c.ledger && typeof c.ledger.previousLabel === 'string' && c.ledger.previousLabel) {
+    if (
+      c &&
+      typeof c.id === 'string' &&
+      c.ledger &&
+      typeof c.ledger.previousLabel === 'string' &&
+      c.ledger.previousLabel
+    ) {
       previousLabelOf.set(c.id, c.ledger.previousLabel);
     }
   }
 
   const sourceScaleById = new Map();
-  for (const s of (feed._sources || [])) {
+  for (const s of feed._sources || []) {
     if (s && s.id && Number(s.cardScale) > 0) sourceScaleById.set(s.id, Number(s.cardScale));
   }
 
@@ -103,9 +127,8 @@ function feedToGraph(feed, config = {}) {
       }
     }
 
-    const rawSourceScale = Number(item._source && item._source.cardScale)
-      || (item._source && sourceScaleById.get(item._source.id))
-      || 1;
+    const rawSourceScale =
+      Number(item._source && item._source.cardScale) || (item._source && sourceScaleById.get(item._source.id)) || 1;
     const sourceCardScale = Number.isFinite(rawSourceScale) && rawSourceScale > 0 ? rawSourceScale : 1;
 
     nodes.push({
@@ -162,7 +185,7 @@ function feedToGraph(feed, config = {}) {
       _source: item._source || null,
       _sourceCardScale: sourceCardScale,
       _cardScale: sourceCardScale,
-      originalItem: item
+      originalItem: item,
     });
   }
 
@@ -186,7 +209,7 @@ function feedToGraph(feed, config = {}) {
   const seenRefEdge = new Set(
     allEdges
       .filter((e) => e && e.layer === 'reference' && e.attrs && e.attrs.type && e.attrs.value)
-      .map((e) => `${e.source}\u0000${e.attrs.type}\u0000${e.attrs.value}`)
+      .map((e) => `${e.source}\u0000${e.attrs.type}\u0000${e.attrs.value}`),
   );
   for (const item of feed.items) {
     for (const ref of nonTagReferences(item)) {
@@ -195,9 +218,11 @@ function feedToGraph(feed, config = {}) {
       seenRefEdge.add(key);
       const target = articleSlugs.has(ref.value)
         ? ref.value
-        : (idToSlug.has(ref.value)
+        : idToSlug.has(ref.value)
           ? idToSlug.get(ref.value)
-          : (ref.value.startsWith(`${ref.type}:`) ? ref.value : `${ref.type}:${ref.value}`));
+          : ref.value.startsWith(`${ref.type}:`)
+            ? ref.value
+            : `${ref.type}:${ref.value}`;
       allEdges.push({
         source: item.id,
         target,
@@ -230,10 +255,13 @@ function feedToGraph(feed, config = {}) {
       continue;
     }
 
-    const refType = edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type !== 'tag' ? edge.attrs.type : null;
+    const refType =
+      edge.attrs && typeof edge.attrs.type === 'string' && edge.attrs.type !== 'tag' ? edge.attrs.type : null;
     const isRefEdge = edge.layer === 'reference' || Boolean(refType);
-    const layerVisible = visibleLayers.has(edge.layer)
-      || (isRefEdge && (visibleLayers.has('reference') || (refType && visibleLayers.has(refType)) || visibleLayers.has('tag')));
+    const layerVisible =
+      visibleLayers.has(edge.layer) ||
+      (isRefEdge &&
+        (visibleLayers.has('reference') || (refType && visibleLayers.has(refType)) || visibleLayers.has('tag')));
     if (!layerVisible) continue;
     const source = resolveEndpoint(edge.source);
     const target = resolveEndpoint(edge.target);
@@ -245,7 +273,8 @@ function feedToGraph(feed, config = {}) {
       // (systems, filled once every edge is read). Positions key on the
       // concept (persistKey), and the scheme and depth chosen in the panel
       // read the label through it (lib/schemeLabels.js).
-      const concept = edge.attrs && typeof edge.attrs.concept === 'string' && edge.attrs.concept ? edge.attrs.concept : null;
+      const concept =
+        edge.attrs && typeof edge.attrs.concept === 'string' && edge.attrs.concept ? edge.attrs.concept : null;
       const node = { id: target, label: target.slice(4), type: 'tag', size: 30, color: tagColor, concept, systems: [] };
       if (concept && previousLabelOf.has(concept)) node.previousLabel = previousLabelOf.get(concept);
       auxNodes.set(target, node);
@@ -253,9 +282,10 @@ function feedToGraph(feed, config = {}) {
       auxNodes.set(target, { id: target, label: target.slice(9), type: 'topology', size: 30, color: topologyColor });
     } else if (isRefEdge && !articleSlugs.has(target) && !auxNodes.has(target)) {
       const prefix = refType ? `${refType}:` : 'reference:';
-      const refLabel = (edge.attrs && edge.attrs.label)
-        || (edge.attrs && edge.attrs.value)
-        || (target.startsWith(prefix) ? target.slice(prefix.length) : target);
+      const refLabel =
+        (edge.attrs && edge.attrs.label) ||
+        (edge.attrs && edge.attrs.value) ||
+        (target.startsWith(prefix) ? target.slice(prefix.length) : target);
       auxNodes.set(target, {
         id: target,
         label: refLabel,
@@ -274,15 +304,24 @@ function feedToGraph(feed, config = {}) {
     // (a flashback, say), otherwise its role; a card-to-tag edge adds its why
     // and the PROV pair when rosetta-tagz wrote them (lib/provenance.js), and
     // a non-tag reference edge shows its type and weight.
-    const weight = edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight)
-      ? edge.attrs.weight
-      : 1;
-    const label = edge.layer === 'tag'
-      ? tagEdgeLabel(edge)
-      : isRefEdge
-        ? referenceEdgeLabel(edge)
-        : (edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer);
-    const link = { source, target, directed: !!edge.directed, role: edge.role, layer: edge.layer, label, _baseLabel: label, weight };
+    const weight =
+      edge.attrs && typeof edge.attrs.weight === 'number' && Number.isFinite(edge.attrs.weight) ? edge.attrs.weight : 1;
+    const label =
+      edge.layer === 'tag'
+        ? tagEdgeLabel(edge)
+        : isRefEdge
+          ? referenceEdgeLabel(edge)
+          : edge.label || (edge.attrs && edge.attrs.label) || edge.role || edge.layer;
+    const link = {
+      source,
+      target,
+      directed: !!edge.directed,
+      role: edge.role,
+      layer: edge.layer,
+      label,
+      _baseLabel: label,
+      weight,
+    };
     if (refType) link.refType = refType;
     if (edge.attrs) link.attrs = edge.attrs;
     // A discovered tag's source coherence ratio, for the panel's slider of
@@ -325,7 +364,12 @@ function feedToGraph(feed, config = {}) {
     const inferred = new Map();
     for (const edge of containmentEdges) {
       if (!articleSlugs.has(edge.source) && !inferred.has(edge.source)) {
-        const rawLabel = edge.attrs?.label || edge.source.replace(/^container:/, '').replace(/^tag:/, '').replace(/-/g, ' ');
+        const rawLabel =
+          edge.attrs?.label ||
+          edge.source
+            .replace(/^container:/, '')
+            .replace(/^tag:/, '')
+            .replace(/-/g, ' ');
         inferred.set(edge.source, {
           id: edge.source,
           label: rawLabel.toUpperCase(),
@@ -351,10 +395,14 @@ function feedToGraph(feed, config = {}) {
 // The centroid of the saved positions among a list of node states (entries
 // without a finite x and y count for nothing); null when none has one.
 function centroidOf(states) {
-  let n = 0; let x = 0; let y = 0;
+  let n = 0;
+  let x = 0;
+  let y = 0;
   for (const s of states || []) {
     if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.y)) continue;
-    n += 1; x += s.x; y += s.y;
+    n += 1;
+    x += s.x;
+    y += s.y;
   }
   return n ? { x: x / n, y: y / n } : null;
 }
@@ -371,7 +419,9 @@ function feedColorOf(d, sourceColorOf) {
 // The nodes drawn, by id.
 function nodesById(svg) {
   const byId = new Map();
-  svg.selectAll('.node').each((d) => { if (d) byId.set(d.id, d); });
+  svg.selectAll('.node').each((d) => {
+    if (d) byId.set(d.id, d);
+  });
   return byId;
 }
 
@@ -388,15 +438,23 @@ function tagEdgeEntries(links, byId) {
     if (!l || l.layer !== 'tag') continue;
     const s = typeof l.source === 'object' ? l.source : byId.get(l.source);
     const t = typeof l.target === 'object' ? l.target : byId.get(l.target);
-    const tag = t && t.type === 'tag' ? t : (s && s.type === 'tag' ? s : null);
+    const tag = t && t.type === 'tag' ? t : s && s.type === 'tag' ? s : null;
     const piece = tag === t ? s : t;
     if (!tag || !piece || piece.type !== 'article') continue;
-    const orig = l._origTarget !== undefined && l._origTarget !== null
-      ? (typeof l._origTarget === 'object' ? l._origTarget.id : l._origTarget)
-      : tag.id;
+    const orig =
+      l._origTarget !== undefined && l._origTarget !== null
+        ? typeof l._origTarget === 'object'
+          ? l._origTarget.id
+          : l._origTarget
+        : tag.id;
     out.push({
-      piece: piece.id, bubble: tag.id, tag: orig, ratio: l.sourceRatio === undefined ? null : l.sourceRatio,
-      link: l, pieceNode: piece, bubbleNode: tag,
+      piece: piece.id,
+      bubble: tag.id,
+      tag: orig,
+      ratio: l.sourceRatio === undefined ? null : l.sourceRatio,
+      link: l,
+      pieceNode: piece,
+      bubbleNode: tag,
     });
   }
   return out;
@@ -454,7 +512,10 @@ function paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf) {
 function publishTagCounts(counts, byTag = {}) {
   if (typeof window === 'undefined') return;
   const list = [...counts.values()].sort((a, b) => a - b);
-  const sig = `${list.join(',')}|${Object.keys(byTag).sort().map((k) => `${k}=${byTag[k]}`).join('\u0000')}`;
+  const sig = `${list.join(',')}|${Object.keys(byTag)
+    .sort()
+    .map((k) => `${k}=${byTag[k]}`)
+    .join('\u0000')}`;
   const prev = window.PostPipeGraphTags;
   if (prev && prev.sig === sig) return;
   window.PostPipeGraphTags = { sig, counts: list, byTag };
@@ -476,8 +537,7 @@ function publishTagCounts(counts, byTag = {}) {
 // that bar had never made them: such a tag is not counted at all, and a tag
 // counts only the pieces it shows on.
 function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces, minRatio = null) {
-  const isHiddenArticle = (d) =>
-    Boolean(d && d.type === 'article' && d._source && hiddenSet.has(d._source.id));
+  const isHiddenArticle = (d) => Boolean(d && d.type === 'article' && d._source && hiddenSet.has(d._source.id));
   const byId = nodesById(svg);
   const entries = tagEdgeEntries(svg.selectAll('.link').data(), byId);
   const view = minRatio === null || minRatio === undefined ? null : shownAt(entries, minRatio);
@@ -498,7 +558,7 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces, m
   for (const d of byId.values()) {
     if (d.type !== 'tag') continue;
     const bubble = d._groupedInto || d.id;
-    byTag[d.id] = view && view.hiddenTags.has(d.id) ? 0 : (counts.get(bubble) || 0);
+    byTag[d.id] = view && view.hiddenTags.has(d.id) ? 0 : counts.get(bubble) || 0;
   }
   publishTagCounts(counts, byTag);
   // A tag edge the ratio hides: one whose piece and bubble have no edge
@@ -507,23 +567,21 @@ function applyVisibility(svg, cardsLayer, hiddenSet, sourceColorOf, minPieces, m
   if (view) for (const e of entries) if (!view.pairs.has(pairKey(e.piece, e.bubble))) ratioHidden.add(e.link);
   // A member of a closed container stays hidden whatever its source, and so
   // does a tag collapsed into another at the depth chosen (_groupedInto).
-  const isHidden = (d) => Boolean(d && (
-    d._closedHidden || d._groupedInto || isHiddenArticle(d) || (d.type === 'tag' && hiddenTags.has(d.id))
-  ));
+  const isHidden = (d) =>
+    Boolean(
+      d && (d._closedHidden || d._groupedInto || isHiddenArticle(d) || (d.type === 'tag' && hiddenTags.has(d.id))),
+    );
 
-  svg.selectAll('.node')
-    .style('display', (d) => isHidden(d) ? 'none' : null);
+  svg.selectAll('.node').style('display', (d) => (isHidden(d) ? 'none' : null));
 
-  cardsLayer.selectAll('.node-card')
-    .style('display', (d) => isHidden(d) ? 'none' : null);
+  cardsLayer.selectAll('.node-card').style('display', (d) => (isHidden(d) ? 'none' : null));
 
-  svg.selectAll('.link, .link-hit')
-    .style('display', (l) => {
-      const sNode = typeof l.source === 'object' ? l.source : byId.get(l.source);
-      const tNode = typeof l.target === 'object' ? l.target : byId.get(l.target);
-      if (l._dupByGroup || ratioHidden.has(l) || isHidden(sNode) || isHidden(tNode)) return 'none';
-      return null;
-    });
+  svg.selectAll('.link, .link-hit').style('display', (l) => {
+    const sNode = typeof l.source === 'object' ? l.source : byId.get(l.source);
+    const tNode = typeof l.target === 'object' ? l.target : byId.get(l.target);
+    if (l._dupByGroup || ratioHidden.has(l) || isHidden(sNode) || isHidden(tNode)) return 'none';
+    return null;
+  });
 
   paintTagColors(svg, pieces, isHiddenArticle, sourceColorOf);
 }
@@ -539,30 +597,27 @@ function applyTimeFilter(svg, cardsLayer, filteredSet, minRatio = null) {
     return;
   }
 
-  cardsLayer.selectAll('.node-card')
-    .classed('dimmed', d => !filteredSet.has(d.id));
+  cardsLayer.selectAll('.node-card').classed('dimmed', (d) => !filteredSet.has(d.id));
 
   // A tag node follows its pieces here too: dimmed, as they are, once none
   // of them is in the span.
   const entries = tagEdgeEntries(svg.selectAll('.link').data(), nodesById(svg));
   const pieces = piecesByTag(entries, minRatio === null || minRatio === undefined ? null : shownAt(entries, minRatio));
-  svg.selectAll('.node')
-    .classed('dimmed', d => {
-      if (d.type === 'article') return !filteredSet.has(d.id);
-      if (d.type === 'tag') {
-        if (d._groupedInto) return false;
-        const list = pieces.get(d.id);
-        return Boolean(list && list.length) && !list.some((p) => filteredSet.has(p.id));
-      }
-      return false;
-    });
+  svg.selectAll('.node').classed('dimmed', (d) => {
+    if (d.type === 'article') return !filteredSet.has(d.id);
+    if (d.type === 'tag') {
+      if (d._groupedInto) return false;
+      const list = pieces.get(d.id);
+      return Boolean(list && list.length) && !list.some((p) => filteredSet.has(p.id));
+    }
+    return false;
+  });
 
-  svg.selectAll('.link')
-    .classed('dimmed', l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      return !filteredSet.has(sid) && !filteredSet.has(tid);
-    });
+  svg.selectAll('.link').classed('dimmed', (l) => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return !filteredSet.has(sid) && !filteredSet.has(tid);
+  });
 }
 
 // Where a site rests each container on its cover's art: { id: { x, y } },
@@ -601,27 +656,71 @@ function labelPositionOf(c) {
 // (makeCardSizeFor) are in levelOfDetail.js.
 
 export function GraphViewer({
-  feedData, onNodeSelect, hiddenSources, filteredArticleIds, viewState, layout: layoutProp, view, timeAxis, graphSettings,
-  colorOverrides, apiRef, onNodeFocus, contributions,
+  feedData,
+  onNodeSelect,
+  hiddenSources,
+  filteredArticleIds,
+  viewState,
+  layout: layoutProp,
+  view,
+  timeAxis,
+  graphSettings,
+  colorOverrides,
+  apiRef,
+  onNodeFocus,
+  contributions,
 }) {
   // The layout: the one the view entry names (src/views/index.js, when the
   // page mounts this as one of a site's views), else the layout prop, else
   // cluster (force).
-  const layout = (view && view.props && typeof view.props.layout === 'string' && view.props.layout) || layoutProp || 'force';
+  const layout =
+    (view && view.props && typeof view.props.layout === 'string' && view.props.layout) || layoutProp || 'force';
   // Visual parameters come from settings.json so they can be tuned without a
   // rebuild. The defaults here are the values they replaced, so a missing or
   // partial settings file still renders exactly as before rather than oddly.
   const GS = graphSettings || {};
-  const CARD = { width: 180, height: 140, hoverWidth: 200, hoverHeight: 160,
-    pinnedWidth: 230, pinnedHeight: 190, minWidth: 110, minHeight: 80,
-    maxWidth: 620, maxHeight: 520, glowPadding: 16, ...(GS.card || {}) };
-  const TAG = { fontSize: 22, padding: 11, maxWidth: 150, maxLines: 3,
-    cornerRadius: 9, opacity: 0.7, ...(GS.tag || {}) };
-  const AX = { dock: 'left', inset: 54, endPadding: 70, connectorOpacity: 0.45,
-    connectorWidth: 1.6, spineOpacity: 0.55, spineWidth: 3, tickFontSize: 13,
-    ...(GS.timeAxis || {}) };
-  const SIM = { linkDistance: 160, chargeStrength: -500, collidePadding: 10,
-    velocityDecay: 0.7, alphaDecay: 0.028, ...(GS.simulation || {}) };
+  const CARD = {
+    width: 180,
+    height: 140,
+    hoverWidth: 200,
+    hoverHeight: 160,
+    pinnedWidth: 230,
+    pinnedHeight: 190,
+    minWidth: 110,
+    minHeight: 80,
+    maxWidth: 620,
+    maxHeight: 520,
+    glowPadding: 16,
+    ...(GS.card || {}),
+  };
+  const TAG = {
+    fontSize: 22,
+    padding: 11,
+    maxWidth: 150,
+    maxLines: 3,
+    cornerRadius: 9,
+    opacity: 0.7,
+    ...(GS.tag || {}),
+  };
+  const AX = {
+    dock: 'left',
+    inset: 54,
+    endPadding: 70,
+    connectorOpacity: 0.45,
+    connectorWidth: 1.6,
+    spineOpacity: 0.55,
+    spineWidth: 3,
+    tickFontSize: 13,
+    ...(GS.timeAxis || {}),
+  };
+  const SIM = {
+    linkDistance: 160,
+    chargeStrength: -500,
+    collidePadding: 10,
+    velocityDecay: 0.7,
+    alphaDecay: 0.028,
+    ...(GS.simulation || {}),
+  };
   // A container's hull padding: containers.<id>.hull.padding, else
   // graph.hull.padding, else half a card for a hanging container and the
   // earlier fixed padding for the rest.
@@ -631,7 +730,7 @@ export function GraphViewer({
     const all = GS.hull && typeof GS.hull === 'object' ? Number(GS.hull.padding) : NaN;
     if (Number.isFinite(all)) return all;
     if (containerLayoutOf(c, GS) === 'hang') return CARD.width / 2;
-    return c && c.padding != null ? c.padding : (c && c.parent ? 42 : 75);
+    return c && c.padding != null ? c.padding : c && c.parent ? 42 : 75;
   };
   const containerRef = useRef(null);
   const svgRef = useRef(null);
@@ -639,21 +738,27 @@ export function GraphViewer({
 
   // Stable refs for callbacks so the simulation never rebuilds on prop change.
   const onNodeSelectRef = useRef(onNodeSelect);
-  useEffect(() => { onNodeSelectRef.current = onNodeSelect; }, [onNodeSelect]);
+  useEffect(() => {
+    onNodeSelectRef.current = onNodeSelect;
+  }, [onNodeSelect]);
   // The card the reader last opened on the graph: the node the settings
   // panel acts on when the reader is closed.
   const onNodeFocusRef = useRef(onNodeFocus);
-  useEffect(() => { onNodeFocusRef.current = onNodeFocus; }, [onNodeFocus]);
+  useEffect(() => {
+    onNodeFocusRef.current = onNodeFocus;
+  }, [onNodeFocus]);
   const focusedIdRef = useRef(null);
   const focusNode = (d) => {
     focusedIdRef.current = d ? d.id : null;
-    if (onNodeFocusRef.current) onNodeFocusRef.current(d ? (d.originalItem || d) : null);
+    if (onNodeFocusRef.current) onNodeFocusRef.current(d ? d.originalItem || d : null);
   };
 
   // Same reason as onNodeSelect: the store must be reachable from D3 handlers
   // without becoming a dependency that rebuilds the simulation.
   const viewStateRef = useRef(viewState);
-  useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
+  useEffect(() => {
+    viewStateRef.current = viewState;
+  }, [viewState]);
   // The reader's own colour for a feed, chosen in the panel, or null
   // (viewState.sourceColor; feedColorOf falls to the build's colour).
   const sourceColorOf = (sourceId) => {
@@ -731,9 +836,7 @@ export function GraphViewer({
   const applyTagPills = () => {
     if (!svgRef.current) return;
     const drawn = tagDrawingNow();
-    svgRef.current
-      .classed('tags-hidden', drawn === 'hidden')
-      .classed('tag-labels-hidden', drawn === 'marks');
+    svgRef.current.classed('tags-hidden', drawn === 'hidden').classed('tag-labels-hidden', drawn === 'marks');
   };
   // Readers' contributions (settings.contributions): counted on the cards,
   // and their connections drawn as their own edge layer, the readers
@@ -751,8 +854,9 @@ export function GraphViewer({
   // collapsed with others at the chosen depth keys on the group's concept
   // (_groupKey). Without rosetta-tagz, tag and topology nodes key by their own
   // synthetic id ('tag:<label>'), as they always did.
-  const persistKey = (d) => d._groupKey
-    || (d.type === 'tag' && d.concept ? 'concept:' + d.concept : ((d.originalItem && d.originalItem.id) || d.id));
+  const persistKey = (d) =>
+    d._groupKey ||
+    (d.type === 'tag' && d.concept ? 'concept:' + d.concept : (d.originalItem && d.originalItem.id) || d.id);
 
   // Where a node sits depends on the layout — a node has one place in a ring
   // and another on a timeline — so positions are filed per layout, and per
@@ -811,7 +915,14 @@ export function GraphViewer({
       );
     }
     if (!svgRef.current || !cardsLayerRef.current) return;
-    applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
+    applyVisibility(
+      svgRef.current,
+      d3.select(cardsLayerRef.current),
+      hiddenSourcesRef.current,
+      sourceColorOf,
+      minPiecesChosen(),
+      minRatioChosen(),
+    );
     if (relationsUpdateRef.current) relationsUpdateRef.current();
   }, [hiddenSources, feedData]);
 
@@ -834,7 +945,10 @@ export function GraphViewer({
     let seen = viewState.historyVersion || 0;
     return viewState.subscribe(() => {
       const v = viewState.historyVersion || 0;
-      if (v !== seen) { seen = v; setHistoryTick(v); }
+      if (v !== seen) {
+        seen = v;
+        setHistoryTick(v);
+      }
     });
   }, [viewState]);
 
@@ -855,7 +969,14 @@ export function GraphViewer({
       // A colour the reader gives a feed reaches its tag nodes as well, and
       // the pieces per tag chosen in the panel hides or shows tags.
       if (svgRef.current && cardsLayerRef.current) {
-        applyVisibility(svgRef.current, d3.select(cardsLayerRef.current), hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
+        applyVisibility(
+          svgRef.current,
+          d3.select(cardsLayerRef.current),
+          hiddenSourcesRef.current,
+          sourceColorOf,
+          minPiecesChosen(),
+          minRatioChosen(),
+        );
         // With a time span set, its dimming of tags follows the ratio too.
         const ratio = minRatioChosen();
         if (filteredIdsRef.current && ratio !== timeFilterRatioRef.current) {
@@ -915,7 +1036,9 @@ export function GraphViewer({
     d3.select(container).selectAll('svg').remove();
     d3.select(container).selectAll('.cards-layer').remove();
 
-    const svg = d3.select(container).append('svg')
+    const svg = d3
+      .select(container)
+      .append('svg')
       .attr('width', width)
       .attr('height', height)
       .style('position', 'absolute')
@@ -926,7 +1049,8 @@ export function GraphViewer({
     applyTagPills();
 
     const defs = svg.append('defs');
-    defs.append('marker')
+    defs
+      .append('marker')
       .attr('id', 'sequence-arrow')
       .attr('viewBox', '0 0 10 10')
       .attr('refX', 8)
@@ -939,7 +1063,8 @@ export function GraphViewer({
       .attr('fill', 'var(--gv-accent, #d4af37)');
     // The arrowhead on a line from a selected tag to a relative, landing on
     // the broader tag of a broader or broadMatch (see Relations below).
-    defs.append('marker')
+    defs
+      .append('marker')
       .attr('id', 'relation-arrow')
       .attr('class', 'relation-arrow')
       .attr('viewBox', '0 0 10 10')
@@ -955,7 +1080,9 @@ export function GraphViewer({
     // The two-layer architecture: SVG handles lines/bubbles, HTML handles cards.
     // Width/height 100% on the layer, but the transform container is 0x0
     // so Safari doesn't clip out-of-bounds accelerated children.
-    const cardsLayer = d3.select(container).append('div')
+    const cardsLayer = d3
+      .select(container)
+      .append('div')
       .attr('class', 'cards-layer')
       .style('position', 'absolute')
       .style('left', '0')
@@ -966,7 +1093,8 @@ export function GraphViewer({
 
     cardsLayerRef.current = cardsLayer.node();
 
-    const cardsTransform = cardsLayer.append('div')
+    const cardsTransform = cardsLayer
+      .append('div')
       .attr('class', 'cards-transform')
       .style('transform-origin', '0 0')
       .style('position', 'absolute')
@@ -999,9 +1127,8 @@ export function GraphViewer({
     // two fingers turn, the drawn translate is corrected so the point under
     // them stays put; when they lift, that translate becomes d3's own. Labels
     // and cards turn back by the same angle, so they stay upright.
-    let rotation = (viewStateRef.current && typeof viewStateRef.current.rotation === 'function')
-      ? viewStateRef.current.rotation()
-      : 0; // degrees
+    let rotation =
+      viewStateRef.current && typeof viewStateRef.current.rotation === 'function' ? viewStateRef.current.rotation() : 0; // degrees
     let rotGesture = null; // { theta0, a0, mx, my, started }
     let paintedRotation = 0;
     let positionsReady = false;
@@ -1014,7 +1141,10 @@ export function GraphViewer({
       view = viewFor(t);
       g.attr('transform', `translate(${view.x},${view.y}) rotate(${rotation}) scale(${view.k})`);
       if (cardsTransform) {
-        cardsTransform.style('transform', `translate3d(${view.x}px, ${view.y}px, 0px) rotate(${rotation}deg) scale(${view.k})`);
+        cardsTransform.style(
+          'transform',
+          `translate3d(${view.x}px, ${view.y}px, 0px) rotate(${rotation}deg) scale(${view.k})`,
+        );
       }
       if (container) container.style.setProperty('--gv-unrot', `${-rotation}deg`);
       if (paintedRotation !== rotation) {
@@ -1027,28 +1157,34 @@ export function GraphViewer({
 
     // One wheel click is one step of about 1.25x, however many pixels the
     // mouse reports (src/lib/wheelZoom.js); a trackpad's small deltas pass.
-    const zoom = d3.zoom().wheelDelta(wheelDelta).on('zoom', (event) => {
-      if (event.sourceEvent) { userMovedView = true; focusActive = false; }
-      paintView(event.transform);
-      const newScale = event.transform.k;
-      zoomScaleRef.current = newScale;
-      // Growing in place, every zoom moves where the containers are drawn.
-      if (positionsReady && GROW && growOn()) applyPositions();
-      if (positionsReady) scheduleRightsFade();
-      if (edgeLabelFor) placeEdgeLabel();
-      // The +N under a selected tag keeps its size on the screen.
-      if (relationsUpdateRef.current) relationsUpdateRef.current({ paintOnly: true });
-      // The rail is pinned to the window and the nodes are not, so every pan
-      // and zoom moves one end of every connector.
-      if (connectorUpdateRef.current) connectorUpdateRef.current();
-      if (positionsReady) publishWorld();
-      const newLod = getLOD(newScale);
-      if (newLod !== currentLodRef.current) {
-        currentLodRef.current = newLod;
-        renderAllArticleBodies();
-        redrawLinks();
-      }
-    });
+    const zoom = d3
+      .zoom()
+      .wheelDelta(wheelDelta)
+      .on('zoom', (event) => {
+        if (event.sourceEvent) {
+          userMovedView = true;
+          focusActive = false;
+        }
+        paintView(event.transform);
+        const newScale = event.transform.k;
+        zoomScaleRef.current = newScale;
+        // Growing in place, every zoom moves where the containers are drawn.
+        if (positionsReady && GROW && growOn()) applyPositions();
+        if (positionsReady) scheduleRightsFade();
+        if (edgeLabelFor) placeEdgeLabel();
+        // The +N under a selected tag keeps its size on the screen.
+        if (relationsUpdateRef.current) relationsUpdateRef.current({ paintOnly: true });
+        // The rail is pinned to the window and the nodes are not, so every pan
+        // and zoom moves one end of every connector.
+        if (connectorUpdateRef.current) connectorUpdateRef.current();
+        if (positionsReady) publishWorld();
+        const newLod = getLOD(newScale);
+        if (newLod !== currentLodRef.current) {
+          currentLodRef.current = newLod;
+          renderAllArticleBodies();
+          redrawLinks();
+        }
+      });
     // graph.zoomPivot 'art': every zoom is about one point on the cover's
     // art (opening.zoomPivot, published with the cover's frame), wherever the
     // pointer or the fingers are. d3.zoom passes each wheel step, pinch and
@@ -1111,12 +1247,14 @@ export function GraphViewer({
     // before d3.zoom's own touch handlers on the svg, so the angle is known
     // before d3 repaints the pinch.
     const touchAngle = (e) => {
-      const a = e.touches[0], b = e.touches[1];
-      return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180 / Math.PI;
+      const a = e.touches[0],
+        b = e.touches[1];
+      return (Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX) * 180) / Math.PI;
     };
     const touchMid = (e) => {
       const r = container.getBoundingClientRect();
-      const a = e.touches[0], b = e.touches[1];
+      const a = e.touches[0],
+        b = e.touches[1];
       return [(a.clientX + b.clientX) / 2 - r.left, (a.clientY + b.clientY) / 2 - r.top];
     };
     const ROTATE_DEADZONE = 10; // degrees of twist before a pinch also turns
@@ -1128,7 +1266,8 @@ export function GraphViewer({
     const onRotateMove = (e) => {
       if (!rotGesture || e.touches.length !== 2) return;
       const [mx, my] = touchMid(e);
-      rotGesture.mx = mx; rotGesture.my = my;
+      rotGesture.mx = mx;
+      rotGesture.my = my;
       const twist = angleDelta(touchAngle(e), rotGesture.a0);
       if (!rotGesture.started) {
         if (Math.abs(twist) < ROTATE_DEADZONE) return;
@@ -1163,7 +1302,8 @@ export function GraphViewer({
       if (!rotation && !rotGesture) return;
       rotGesture = null;
       const t = d3.zoomTransform(svg.node());
-      const cx = width / 2, cy = height / 2;
+      const cx = width / 2,
+        cy = height / 2;
       const p = screenToView(view, rotation, cx, cy);
       rotation = 0;
       if (record && viewStateRef.current && typeof viewStateRef.current.setRotation === 'function') {
@@ -1183,15 +1323,33 @@ export function GraphViewer({
     // own handlers, which ask the table whether to.
     function runAction(id, ctx = {}) {
       switch (id) {
-        case 'container.toggle': if (ctx.c) toggleContainer(ctx.c, ctx.closedNode); return;
-        case 'view.zoomInStep': zoomAboutCentre(ZOOM_STEP); return;
-        case 'view.zoomAtPoint': zoomAtPoint(ctx.x, ctx.y, ctx.shift ? 0.5 : 2); return;
-        case 'node.zoomToReadable': if (ctx.d) zoomToReadable(ctx.d, ctx.x, ctx.y); return;
-        case 'node.openReader': if (ctx.d) readCard(ctx.d); return;
-        case 'node.select': if (ctx.d && ctx.cardEl) togglePinned(ctx.d, ctx.cardEl); return;
-        case 'node.listen': if (ctx.d && ctx.cardEl) listenCard(ctx.d, ctx.cardEl); return;
-        case 'node.stopListening': if (ctx.d && ctx.cardEl) stopListeningCard(ctx.cardEl); return;
-        case 'view.deselect': deselect(); return;
+        case 'container.toggle':
+          if (ctx.c) toggleContainer(ctx.c, ctx.closedNode);
+          return;
+        case 'view.zoomInStep':
+          zoomAboutCentre(ZOOM_STEP);
+          return;
+        case 'view.zoomAtPoint':
+          zoomAtPoint(ctx.x, ctx.y, ctx.shift ? 0.5 : 2);
+          return;
+        case 'node.zoomToReadable':
+          if (ctx.d) zoomToReadable(ctx.d, ctx.x, ctx.y);
+          return;
+        case 'node.openReader':
+          if (ctx.d) readCard(ctx.d);
+          return;
+        case 'node.select':
+          if (ctx.d && ctx.cardEl) togglePinned(ctx.d, ctx.cardEl);
+          return;
+        case 'node.listen':
+          if (ctx.d && ctx.cardEl) listenCard(ctx.d, ctx.cardEl);
+          return;
+        case 'node.stopListening':
+          if (ctx.d && ctx.cardEl) stopListeningCard(ctx.cardEl);
+          return;
+        case 'view.deselect':
+          deselect();
+          return;
         default: // none
       }
     }
@@ -1223,7 +1381,10 @@ export function GraphViewer({
     function tapOrDouble(ev, single, double) {
       const at = pointOf(ev);
       const run = double || (() => runAction(actionFor('space', 'doubletap'), at));
-      tapGate.tap(at.x, at.y, single, () => { ghostsAfter(at); run(); });
+      tapGate.tap(at.x, at.y, single, () => {
+        ghostsAfter(at);
+        run();
+      });
     }
     // Once a double tap has run, the click and the double-click the browser
     // sends for it are not taps of their own. A phone sends them after the
@@ -1231,10 +1392,15 @@ export function GraphViewer({
     // may have put something new there (an opened act's cards), which they
     // would select, or double-tap again. Swallowed for a moment, there.
     let ghostGuard = null; // { t, x, y }
-    function ghostsAfter(at) { ghostGuard = { t: Date.now(), x: at.x, y: at.y }; }
+    function ghostsAfter(at) {
+      ghostGuard = { t: Date.now(), x: at.x, y: at.y };
+    }
     const onGhost = (e) => {
       if (!ghostGuard) return;
-      if (Date.now() - ghostGuard.t > 450) { ghostGuard = null; return; }
+      if (Date.now() - ghostGuard.t > 450) {
+        ghostGuard = null;
+        return;
+      }
       const [x, y] = screenPoint(e);
       if (Math.hypot(x - ghostGuard.x, y - ghostGuard.y) > DOUBLE_TAP_PX) return;
       if (e.type === 'dblclick') ghostGuard = null;
@@ -1286,7 +1452,10 @@ export function GraphViewer({
       if (!usesGesture(BINDINGS, 'longpress')) return () => {};
       const LONG_MS = Number.isFinite(GS.longPressMs) ? GS.longPressMs : 500;
       let press = null; // { id, cx, cy, timer }
-      const drop = () => { if (press) clearTimeout(press.timer); press = null; };
+      const drop = () => {
+        if (press) clearTimeout(press.timer);
+        press = null;
+      };
       const pressed = (el) => {
         const card = el && el.closest && el.closest('.node-card');
         if (card) {
@@ -1295,7 +1464,8 @@ export function GraphViewer({
         }
         const closedNode = el && el.closest && el.closest('.container-macro-node');
         const title = !closedNode && el && el.closest && el.closest('.container-badge');
-        if (closedNode || title) return { target: 'container', ctx: { c: (closedNode || title).__data__, closedNode: !!closedNode } };
+        if (closedNode || title)
+          return { target: 'container', ctx: { c: (closedNode || title).__data__, closedNode: !!closedNode } };
         return el && el.closest && el.closest('svg') === svg.node() ? { target: 'space', ctx: {} } : null;
       };
       const onDown = (e) => {
@@ -1305,7 +1475,9 @@ export function GraphViewer({
         if (!hit) return;
         const at = pointOf(e);
         press = {
-          id: e.pointerId, cx: e.clientX, cy: e.clientY,
+          id: e.pointerId,
+          cx: e.clientX,
+          cy: e.clientY,
           timer: setTimeout(() => {
             press = null;
             longPressAt = Date.now();
@@ -1315,8 +1487,12 @@ export function GraphViewer({
           }, LONG_MS),
         };
       };
-      const onMove = (e) => { if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.cx, e.clientY - press.cy) > 8) drop(); };
-      const onUp = (e) => { if (press && e.pointerId === press.id) drop(); };
+      const onMove = (e) => {
+        if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.cx, e.clientY - press.cy) > 8) drop();
+      };
+      const onUp = (e) => {
+        if (press && e.pointerId === press.id) drop();
+      };
       const onClick = (e) => {
         if (!longPressJustRan()) return;
         longPressAt = 0;
@@ -1357,8 +1533,11 @@ export function GraphViewer({
     // and from the label the ledger says the concept had before
     // (viewState.migrateNodeKeys copies, never overwrites, leaves the old).
     // Done before the restore below, which then reads the moved entries.
-    if (viewStateRef.current && typeof viewStateRef.current.migrateNodeKeys === 'function'
-      && migratedFeedRef.current !== feedData) {
+    if (
+      viewStateRef.current &&
+      typeof viewStateRef.current.migrateNodeKeys === 'function' &&
+      migratedFeedRef.current !== feedData
+    ) {
       migratedFeedRef.current = feedData;
       const pairs = migrationPairs(data.nodes, placeOf);
       if (pairs.length) viewStateRef.current.migrateNodeKeys(pairs);
@@ -1367,11 +1546,9 @@ export function GraphViewer({
     let positionsWereDegenerate = false;
     if (viewStateRef.current) {
       const restored = data.nodes
-        .map(d => viewStateRef.current.nodeState(positionKey(d)))
-        .filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
-      positionsWereDegenerate = layoutIsDegenerate(
-        restored, cardSizeFor({ hovered: false, pinned: false }),
-      );
+        .map((d) => viewStateRef.current.nodeState(positionKey(d)))
+        .filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+      positionsWereDegenerate = layoutIsDegenerate(restored, cardSizeFor({ hovered: false, pinned: false }));
     }
 
     if (viewStateRef.current && !positionsWereDegenerate) {
@@ -1379,7 +1556,8 @@ export function GraphViewer({
         const saved = viewStateRef.current.nodeState(positionKey(d));
         const savedSize = viewStateRef.current.nodeState(persistKey(d));
         if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
-          d.x = saved.x; d.y = saved.y;
+          d.x = saved.x;
+          d.y = saved.y;
           // Only a position the *reader* placed earns a hard pin. Pinning a
           // layout-generated one (saved.auto) freezes it against every force
           // including collide — so a stored arrangement with cards sitting on
@@ -1390,7 +1568,10 @@ export function GraphViewer({
           // around them normally. Seeding x/y without fx/fy keeps the
           // arrangement the reader is used to and still lets physics push
           // overlapping cards apart.
-          if (!saved.auto) { d.fx = saved.x; d.fy = saved.y; }
+          if (!saved.auto) {
+            d.fx = saved.x;
+            d.fy = saved.y;
+          }
         }
         if (RESIZE_ON && savedSize && typeof savedSize.w === 'number' && typeof savedSize.h === 'number') {
           d._size = { width: savedSize.w, height: savedSize.h };
@@ -1418,8 +1599,13 @@ export function GraphViewer({
           if (d.type !== 'tag' || !d.concept) continue;
           const own = viewStateRef.current.nodeState(positionKey(d));
           if (own && Number.isFinite(own.x) && Number.isFinite(own.y)) continue;
-          const c = centroidOf((membersOfTag.get(d.id) || []).map((p) => viewStateRef.current.nodeState(positionKey(p))));
-          if (c) { d.x = c.x; d.y = c.y; }
+          const c = centroidOf(
+            (membersOfTag.get(d.id) || []).map((p) => viewStateRef.current.nodeState(positionKey(p))),
+          );
+          if (c) {
+            d.x = c.x;
+            d.y = c.y;
+          }
         }
       }
     }
@@ -1441,7 +1627,6 @@ export function GraphViewer({
       }
     }
 
-
     // The reader's tightness (the panel's slider, kept as the viewState
     // preference 'tightness'): the link distance, the charge and the collide
     // padding scaled together (src/lib/tightness.js). Nothing chosen, or the
@@ -1462,19 +1647,29 @@ export function GraphViewer({
     // rather than by arithmetic. Fall back to the real card geometry.
     // At the tight end the padding is negative (cards may overlap a little),
     // so the radius is held at zero or above.
-    const collideRadius = (d) => (d._groupedInto ? 0 : Math.max(0, (d._r || (d.type === 'article'
-      ? Math.hypot(CARD.width, CARD.height) / 2
-      : d.size / 2)) + forces.collidePadding));
+    const collideRadius = (d) =>
+      d._groupedInto
+        ? 0
+        : Math.max(
+            0,
+            (d._r || (d.type === 'article' ? Math.hypot(CARD.width, CARD.height) / 2 : d.size / 2)) +
+              forces.collidePadding,
+          );
     // A tag collapsed into another (_groupedInto) takes no room and pushes
     // nothing.
     const chargeStrength = (d) => (d._groupedInto ? 0 : forces.chargeStrength);
 
-    const simulation = d3.forceSimulation()
-      .force('link', d3.forceLink().id(d => d.id).distance(forces.linkDistance))
+    const simulation = d3
+      .forceSimulation()
+      .force(
+        'link',
+        d3
+          .forceLink()
+          .id((d) => d.id)
+          .distance(forces.linkDistance),
+      )
       .force('charge', d3.forceManyBody().strength(chargeStrength))
-      .force('collide', d3.forceCollide()
-        .radius(collideRadius)
-        .strength(1).iterations(3))
+      .force('collide', d3.forceCollide().radius(collideRadius).strength(1).iterations(3))
       .force('center', d3.forceCenter(width / 2, height / 2))
       // Damping was heavy enough, and the run short enough, that collisions
       // never finished resolving before the simulation froze — nodes were
@@ -1502,7 +1697,9 @@ export function GraphViewer({
 
     // Roots (graph.roots): under everything else, hulls included, and never
     // touched by a pointer.
-    const rootsLayer = g.append('g').attr('class', 'roots-layer')
+    const rootsLayer = g
+      .append('g')
+      .attr('class', 'roots-layer')
       .attr('aria-hidden', 'true')
       .style('pointer-events', 'none');
 
@@ -1512,12 +1709,12 @@ export function GraphViewer({
     const containerChildren = new Map();
     const containerMembers = new Map();
 
-    for (const c of (data.containers || [])) {
+    for (const c of data.containers || []) {
       containerChildren.set(c.id, new Set());
       containerMembers.set(c.id, new Set());
     }
 
-    for (const edge of (data.containmentEdges || [])) {
+    for (const edge of data.containmentEdges || []) {
       if (containerChildren.has(edge.source) && containerChildren.has(edge.target)) {
         containerChildren.get(edge.source).add(edge.target);
       } else if (containerMembers.has(edge.source)) {
@@ -1547,9 +1744,11 @@ export function GraphViewer({
       return 0;
     });
 
-    const containerGroups = containersLayer.selectAll('.container-group')
+    const containerGroups = containersLayer
+      .selectAll('.container-group')
       .data(sortedContainers, (d) => d.id)
-      .enter().append('g')
+      .enter()
+      .append('g')
       .attr('class', 'container-group')
       .attr('data-container-id', (d) => d.id);
 
@@ -1562,26 +1761,28 @@ export function GraphViewer({
     };
     let palette = nodePaletteFor(GS, paletteChosen());
     const lookOf = (d) => (d && d._look) || containerLook(d, palette);
-    for (const c of (data.containers || [])) c._look = containerLook(c, palette);
+    for (const c of data.containers || []) c._look = containerLook(c, palette);
     // The cards inside the containers take its colour for their outlines.
     const paintCardOutlines = () => {
-      if (palette && String(palette.color).toLowerCase() !== 'none') container.style.setProperty('--pp-node-color', palette.color);
+      if (palette && String(palette.color).toLowerCase() !== 'none')
+        container.style.setProperty('--pp-node-color', palette.color);
       else container.style.removeProperty('--pp-node-color');
     };
     paintCardOutlines();
 
-    containerGroups.append('path')
+    containerGroups
+      .append('path')
       .attr('class', 'container-hull')
       .attr('stroke-width', (d) => d.strokeWidth || 1.5)
       .attr('stroke-dasharray', (d) => d.strokeDasharray || (d.parent ? null : '6 6'));
 
     // The sketchbook theme's second pencil pass round each container.
-    containerGroups.append('path')
-      .attr('class', 'container-hull-ghost');
+    containerGroups.append('path').attr('class', 'container-hull-ghost');
 
     // Whether the page wears the sketchbook theme: the pencil passes are
     // drawn only then.
-    let sketchOn = typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-theme') === 'sketchbook';
+    let sketchOn =
+      typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-theme') === 'sketchbook';
 
     // Containers closed from the start (graph.containersStart, or else
     // graph.initialCollapsed; closedState.js), overridden by any containers
@@ -1601,7 +1802,6 @@ export function GraphViewer({
     // roots start there.
     const containerAnchor = new Map();
 
-
     // A container's label: its title wrapped to a few lines, the member count
     // after the last line (unless graph.containerCount is false). Lines are placed explicitly around the origin so the
     // rendered block matches the rectangle the layout reserved for it.
@@ -1614,8 +1814,10 @@ export function GraphViewer({
       let currentLine = '';
       for (const w of words) {
         if (!currentLine) currentLine = w;
-        else if (currentLine.length + 1 + w.length > LABEL_WRAP) { lines.push(currentLine); currentLine = w; }
-        else currentLine += ' ' + w;
+        else if (currentLine.length + 1 + w.length > LABEL_WRAP) {
+          lines.push(currentLine);
+          currentLine = w;
+        } else currentLine += ' ' + w;
       }
       if (currentLine) lines.push(currentLine);
       return lines;
@@ -1637,13 +1839,15 @@ export function GraphViewer({
       const top = -total / 2;
       textSel.selectAll('*').remove();
       lines.forEach((line, i) => {
-        textSel.append('tspan')
+        textSel
+          .append('tspan')
           .attr('class', 'label-line')
           .attr('x', 0)
           .attr('y', `${top + (i + 0.5) * LABEL_LINE_H}em`)
           .text(line);
         if (SHOW_COUNT && i === nLines - 1) {
-          textSel.append('tspan')
+          textSel
+            .append('tspan')
             .attr('class', 'label-count')
             .attr('font-weight', '500')
             .attr('dx', '12px')
@@ -1655,7 +1859,8 @@ export function GraphViewer({
       if (status) {
         // y is in the tspan's own (smaller) em, hence the division.
         const yParent = top + nLines * LABEL_LINE_H + STATUS_GAP + (STATUS_SCALE * 1.3) / 2;
-        textSel.append('tspan')
+        textSel
+          .append('tspan')
           .attr('class', 'label-status')
           .attr('x', 0)
           .attr('font-size', `${STATUS_SCALE}em`)
@@ -1665,9 +1870,7 @@ export function GraphViewer({
           .text(status);
       }
     }
-    const labelMeasureCtx = typeof document !== 'undefined'
-      ? document.createElement('canvas').getContext('2d')
-      : null;
+    const labelMeasureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
     function titleFamily() {
       if (typeof document === 'undefined') return "'Atkinson', sans-serif";
       const v = getComputedStyle(document.documentElement).getPropertyValue('--pp-title-font').trim();
@@ -1698,7 +1901,8 @@ export function GraphViewer({
       return c.badgeColor || c.color || c.stroke || '#d4af37';
     }
 
-    const containerBadges = containerGroups.append('g')
+    const containerBadges = containerGroups
+      .append('g')
       .attr('class', 'container-badge')
       // The whole book's title: a page that sets the title elsewhere (a
       // cover, src/components/Opening) can leave this one undrawn.
@@ -1706,12 +1910,14 @@ export function GraphViewer({
       .style('touch-action', 'manipulation');
 
     // The title's text ignores the pointer, so this is what a tap lands on.
-    containerBadges.append('rect')
+    containerBadges
+      .append('rect')
       .attr('class', 'container-badge-hit')
       .attr('fill', 'transparent')
       .attr('pointer-events', 'all');
 
-    const containerBadgeTexts = containerBadges.append('text')
+    const containerBadgeTexts = containerBadges
+      .append('text')
       .attr('class', 'container-badge-text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
@@ -1719,8 +1925,8 @@ export function GraphViewer({
       .attr('fill', (d) => getContainerColor(d))
       .attr('opacity', 0.55)
       .attr('font-size', (d) => (!d.parent ? '64px' : '52px'));
-      
-    containerBadgeTexts.each(function(d) {
+
+    containerBadgeTexts.each(function (d) {
       buildWrappedLabel(d3.select(this), d);
     });
     // An open container's title in its own face (containers.<id>.labelFace),
@@ -1768,16 +1974,24 @@ export function GraphViewer({
     // Wearing the sketchbook from the start: measure the titles again once
     // their face has loaded.
     if (sketchOn && typeof document !== 'undefined' && document.fonts && document.fonts.load) {
-      document.fonts.load(`48px ${titleFamily()}`).then(() => {
-        if (!positionsReady || !svgRef.current) return;
-        relayoutContainers();
-        applyPositions();
-      }, () => {});
+      document.fonts.load(`48px ${titleFamily()}`).then(
+        () => {
+          if (!positionsReady || !svgRef.current) return;
+          relayoutContainers();
+          applyPositions();
+        },
+        () => {},
+      );
     }
-    if (themeObserver) themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-pp-mode', 'data-pp-theme'] });
+    if (themeObserver)
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-pp-mode', 'data-pp-theme'],
+      });
 
     // Collapsed container macro node (when container is closed, represented like a single node)
-    const containerMacroNodes = containerGroups.append('g')
+    const containerMacroNodes = containerGroups
+      .append('g')
       .attr('class', 'container-macro-node')
       .style('display', 'none')
       .style('touch-action', 'manipulation');
@@ -1786,13 +2000,12 @@ export function GraphViewer({
     // the container's color rather than a card, with larger text than a
     // chapter's; its look (and the open hull's) from paintLooks.
     const PILL = closedPillOf(GS);
-    containerMacroNodes.append('path')
-      .attr('class', 'container-macro-bg')
-      .attr('stroke-width', 2.2);
+    containerMacroNodes.append('path').attr('class', 'container-macro-bg').attr('stroke-width', 2.2);
 
     const PILL_SCALE = closedPillScaleOf(GS);
     const CLOSED_FONT = PILL.labelSize || Math.round((CARD.labelMaxFontSize || 26) * 1.6);
-    const containerMacroTexts = containerMacroNodes.append('text')
+    const containerMacroTexts = containerMacroNodes
+      .append('text')
       .attr('class', 'container-macro-text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
@@ -1806,19 +2019,25 @@ export function GraphViewer({
     // pass), and both titles' face and colour. Inline, over the theme's own
     // face for titles.
     function paintLooks() {
-      containerGroups.select('.container-hull')
+      containerGroups
+        .select('.container-hull')
         .style('fill', (d) => lookOf(d).open.fill)
         .style('fill-opacity', (d) => lookOf(d).open.fillOpacity)
         .style('stroke', (d) => lookOf(d).open.stroke);
-      containerGroups.select('.container-hull-ghost')
-        .style('stroke', (d) => lookOf(d).open.stroke);
-      containerGroups.select('.container-macro-bg')
+      containerGroups.select('.container-hull-ghost').style('stroke', (d) => lookOf(d).open.stroke);
+      containerGroups
+        .select('.container-macro-bg')
         .style('fill', (d) => lookOf(d).closed.fill)
         .style('fill-opacity', (d) => lookOf(d).closed.fillOpacity)
         .style('stroke', (d) => lookOf(d).closed.stroke)
-        .style('filter', (d) => (lookOf(d).closed.glow ? `drop-shadow(0 0 18px color-mix(in srgb, ${lookOf(d).closed.glow} 45%, transparent))` : 'none'));
+        .style('filter', (d) =>
+          lookOf(d).closed.glow
+            ? `drop-shadow(0 0 18px color-mix(in srgb, ${lookOf(d).closed.glow} 45%, transparent))`
+            : 'none',
+        );
       for (const sel of [containerMacroTexts, containerBadgeTexts]) {
-        sel.style('font-family', (d) => faceOf(d))
+        sel
+          .style('font-family', (d) => faceOf(d))
           .style('font-weight', (d) => (faceOf(d) ? '400' : null))
           .style('letter-spacing', (d) => (faceOf(d) ? '0' : null));
       }
@@ -1832,7 +2051,7 @@ export function GraphViewer({
       const next = nodePaletteFor(GS, paletteChosen());
       if ((next && next.id) === (palette && palette.id)) return;
       palette = next;
-      for (const c of (data.containers || [])) c._look = containerLook(c, palette);
+      for (const c of data.containers || []) c._look = containerLook(c, palette);
       paintLooks();
       paintCardOutlines();
     };
@@ -1843,17 +2062,24 @@ export function GraphViewer({
     function blobPath(id, hw, hh) {
       let seed = 0;
       for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) >>> 0;
-      const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      const rand = () => {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        return seed / 4294967296;
+      };
       if (PILL.shape === 'blob') return blobLine(irregularBlob(rand, hw, hh));
       const pts = [];
       const N = 14;
       for (let k = 0; k < N; k++) {
         const t = (k / N) * Math.PI * 2;
-        const c = Math.cos(t), sn = Math.sin(t);
+        const c = Math.cos(t),
+          sn = Math.sin(t);
         // superellipse, exponent 2.8: squarer than an ellipse, rounder than a card
         const e = 2 / 2.8;
         const wobble = 1 + (rand() - 0.5) * 0.08;
-        pts.push([Math.sign(c) * Math.pow(Math.abs(c), e) * hw * wobble, Math.sign(sn) * Math.pow(Math.abs(sn), e) * hh * wobble]);
+        pts.push([
+          Math.sign(c) * Math.pow(Math.abs(c), e) * hw * wobble,
+          Math.sign(sn) * Math.pow(Math.abs(sn), e) * hh * wobble,
+        ]);
       }
       return blobLine(pts);
     }
@@ -1874,28 +2100,34 @@ export function GraphViewer({
         corners.push([Math.cos(t) * r, Math.sin(t) * r]);
       }
       // Stretched to fill hw x hh.
-      const xs = corners.map((p) => p[0]), ys = corners.map((p) => p[1]);
-      const sx = hw / Math.max(...xs.map(Math.abs)), sy = hh / Math.max(...ys.map(Math.abs));
+      const xs = corners.map((p) => p[0]),
+        ys = corners.map((p) => p[1]);
+      const sx = hw / Math.max(...xs.map(Math.abs)),
+        sy = hh / Math.max(...ys.map(Math.abs));
       const pts = [];
       for (let k = 0; k < N; k++) {
-        const a = corners[k], b = corners[(k + 1) % N];
+        const a = corners[k],
+          b = corners[(k + 1) % N];
         const at = (f) => [(a[0] + (b[0] - a[0]) * f) * sx, (a[1] + (b[1] - a[1]) * f) * sy];
         pts.push(at(0.16), at(0.5), at(0.84));
       }
       return pts;
     }
 
-    containerMacroTexts.each(function(d) {
+    containerMacroTexts.each(function (d) {
       buildWrappedLabel(d3.select(this), d, { status: PILL.status, family: faceOf(d) });
     });
     // A closed label's own face: measured again once it has loaded.
     const pillFaces = [...new Set((data.containers || []).map(faceOf).filter(Boolean))];
     if (pillFaces.length && typeof document !== 'undefined' && document.fonts && document.fonts.load) {
-      Promise.all(pillFaces.map((f) => document.fonts.load(`48px ${f}`))).then(() => {
-        if (!positionsReady || !svgRef.current) return;
-        relayoutContainers();
-        applyPositions();
-      }, () => {});
+      Promise.all(pillFaces.map((f) => document.fonts.load(`48px ${f}`))).then(
+        () => {
+          if (!positionsReady || !svgRef.current) return;
+          relayoutContainers();
+          applyPositions();
+        },
+        () => {},
+      );
     }
 
     function updateMacroBounds() {
@@ -1916,115 +2148,121 @@ export function GraphViewer({
     updateMacroBounds();
 
     function createContainerDragHandler({ isCollapsed }) {
-      return d3.drag().clickDistance(5)
-        // Pointer positions in the graph's world, not the container's own
-        // group (which moves with it while it grows in place).
-        .container(() => g.node())
-        .filter((event) => {
-          if (event.ctrlKey) return false;
-          if (event.button !== undefined && event.button !== 0) return false;
-          return true;
-        })
-        .on('start', function (event, c) {
-          if (event.sourceEvent) event.sourceEvent.stopPropagation();
-          const startX = event.x;
-          const startY = event.y;
-          d3.select(this).datum()._dragState = {
-            startX,
-            startY,
-            lastX: startX,
-            lastY: startY,
-            totalMove: 0,
-            // Whether a drag on it moves it (the table's container drag).
-            moves: actionFor('container', 'drag') === 'node.move',
-          };
-        })
-        .on('drag', function (event, c) {
-          const state = d3.select(this).datum()._dragState;
-          if (!state) return;
-          const rawX = event.x - state.lastX;
-          const rawY = event.y - state.lastY;
-          state.lastX = event.x;
-          state.lastY = event.y;
-          state.totalMove += Math.hypot(rawX, rawY);
-          if (!state.moves) return;
-          // Grown in place (r times its size at the home view), a container
-          // is drawn moving 1/r of what its members move: they move r times
-          // the pointer, so it stays under it.
-          const r = growOn() ? view.k / homeK : 1;
-          const dx = rawX * r;
-          const dy = rawY * r;
-
-          const memberSlugs = getAllMemberSlugs(c.id);
-          // The anchored containers it carries carry their centres along.
-          if (!state.carried) {
-            const all = new Set(memberSlugs);
-            state.carried = [...ANCHORS.keys()].filter((cId) => {
-              const own = getAllMemberSlugs(cId);
-              return own.length && own.every((sl) => all.has(sl));
-            });
-          }
-          for (const cId of state.carried) {
-            const G = growCentreOf(cId);
-            if (G) growCentres.set(cId, { x: G.x + dx, y: G.y + dy });
-          }
-          for (const slug of memberSlugs) {
-            const node = nodeBySlug.get(slug);
-            if (node) {
-              node.x += dx;
-              node.y += dy;
-              node.fx = node.x;
-              node.fy = node.y;
-              if (viewStateRef.current) {
-                viewStateRef.current.setNodePosition(positionKey(node), node.x, node.y, { transient: true });
-              }
-            }
-          }
-          applyPositions();
-          if (connectorUpdateRef.current) connectorUpdateRef.current();
-        })
-        .on('end', function (event, c) {
-          const state = d3.select(this).datum()._dragState;
-          delete d3.select(this).datum()._dragState;
-          const totalMove = state ? state.totalMove : 0;
-
-          if (totalMove >= 4) {
+      return (
+        d3
+          .drag()
+          .clickDistance(5)
+          // Pointer positions in the graph's world, not the container's own
+          // group (which moves with it while it grows in place).
+          .container(() => g.node())
+          .filter((event) => {
+            if (event.ctrlKey) return false;
+            if (event.button !== undefined && event.button !== 0) return false;
+            return true;
+          })
+          .on('start', function (event, c) {
+            if (event.sourceEvent) event.sourceEvent.stopPropagation();
+            const startX = event.x;
+            const startY = event.y;
+            d3.select(this).datum()._dragState = {
+              startX,
+              startY,
+              lastX: startX,
+              lastY: startY,
+              totalMove: 0,
+              // Whether a drag on it moves it (the table's container drag).
+              moves: actionFor('container', 'drag') === 'node.move',
+            };
+          })
+          .on('drag', function (event, c) {
+            const state = d3.select(this).datum()._dragState;
+            if (!state) return;
+            const rawX = event.x - state.lastX;
+            const rawY = event.y - state.lastY;
+            state.lastX = event.x;
+            state.lastY = event.y;
+            state.totalMove += Math.hypot(rawX, rawY);
             if (!state.moves) return;
-            anchorsAuto = false;
+            // Grown in place (r times its size at the home view), a container
+            // is drawn moving 1/r of what its members move: they move r times
+            // the pointer, so it stays under it.
+            const r = growOn() ? view.k / homeK : 1;
+            const dx = rawX * r;
+            const dy = rawY * r;
+
             const memberSlugs = getAllMemberSlugs(c.id);
-            // The anchored containers it carried leave their anchors.
-            if (anchoredOffsetsReady) {
-              const carried = new Set(memberSlugs);
-              for (const cId of ANCHORS.keys()) {
+            // The anchored containers it carries carry their centres along.
+            if (!state.carried) {
+              const all = new Set(memberSlugs);
+              state.carried = [...ANCHORS.keys()].filter((cId) => {
                 const own = getAllMemberSlugs(cId);
-                if (own.length && own.every((sl) => carried.has(sl))) detach(cId);
-              }
+                return own.length && own.every((sl) => all.has(sl));
+              });
             }
-            const vs = viewStateRef.current;
+            for (const cId of state.carried) {
+              const G = growCentreOf(cId);
+              if (G) growCentres.set(cId, { x: G.x + dx, y: G.y + dy });
+            }
             for (const slug of memberSlugs) {
               const node = nodeBySlug.get(slug);
               if (node) {
+                node.x += dx;
+                node.y += dy;
                 node.fx = node.x;
                 node.fy = node.y;
-                if (vs) {
-                  vs.setNodePosition(positionKey(node), node.x, node.y, { transient: true });
+                if (viewStateRef.current) {
+                  viewStateRef.current.setNodePosition(positionKey(node), node.x, node.y, { transient: true });
                 }
               }
             }
-            if (vs) vs.commit();
             applyPositions();
-          } else {
-            // A tap (under 4px of movement) on the title or the closed node:
-            // what the table binds to a tap or a double tap on a container
-            // (by default a tap toggles it and a double tap zooms, or the
-            // other way round with collapseGesture 'doubletap').
-            if (longPressJustRan()) return;
-            const ctx = { c, closedNode: isCollapsed, ...pointOf(event.sourceEvent) };
-            tapOrDouble(event.sourceEvent,
-              () => runAction(actionFor('container', 'tap'), ctx),
-              () => runAction(actionFor('container', 'doubletap'), ctx));
-          }
-        });
+            if (connectorUpdateRef.current) connectorUpdateRef.current();
+          })
+          .on('end', function (event, c) {
+            const state = d3.select(this).datum()._dragState;
+            delete d3.select(this).datum()._dragState;
+            const totalMove = state ? state.totalMove : 0;
+
+            if (totalMove >= 4) {
+              if (!state.moves) return;
+              anchorsAuto = false;
+              const memberSlugs = getAllMemberSlugs(c.id);
+              // The anchored containers it carried leave their anchors.
+              if (anchoredOffsetsReady) {
+                const carried = new Set(memberSlugs);
+                for (const cId of ANCHORS.keys()) {
+                  const own = getAllMemberSlugs(cId);
+                  if (own.length && own.every((sl) => carried.has(sl))) detach(cId);
+                }
+              }
+              const vs = viewStateRef.current;
+              for (const slug of memberSlugs) {
+                const node = nodeBySlug.get(slug);
+                if (node) {
+                  node.fx = node.x;
+                  node.fy = node.y;
+                  if (vs) {
+                    vs.setNodePosition(positionKey(node), node.x, node.y, { transient: true });
+                  }
+                }
+              }
+              if (vs) vs.commit();
+              applyPositions();
+            } else {
+              // A tap (under 4px of movement) on the title or the closed node:
+              // what the table binds to a tap or a double tap on a container
+              // (by default a tap toggles it and a double tap zooms, or the
+              // other way round with collapseGesture 'doubletap').
+              if (longPressJustRan()) return;
+              const ctx = { c, closedNode: isCollapsed, ...pointOf(event.sourceEvent) };
+              tapOrDouble(
+                event.sourceEvent,
+                () => runAction(actionFor('container', 'tap'), ctx),
+                () => runAction(actionFor('container', 'doubletap'), ctx),
+              );
+            }
+          })
+      );
     }
     // Open a closed container (from its node), or toggle it (from its title).
     function toggleContainer(c, closedNode) {
@@ -2046,7 +2284,8 @@ export function GraphViewer({
       const out = [];
       const s = Math.max(8, step);
       for (let i = 0; i < poly.length; i++) {
-        const a = poly[i], b = poly[(i + 1) % poly.length];
+        const a = poly[i],
+          b = poly[(i + 1) % poly.length];
         out.push(a);
         const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
         const k = Math.floor(len / s);
@@ -2068,7 +2307,10 @@ export function GraphViewer({
     const depthOf = (c) => {
       let depth = 0;
       let p = c.parent;
-      while (p && containerById.has(p) && depth < 20) { depth++; p = containerById.get(p).parent; }
+      while (p && containerById.has(p) && depth < 20) {
+        depth++;
+        p = containerById.get(p).parent;
+      }
       return depth;
     };
     const LABEL_MIN = (graphSettings.labelSize && graphSettings.labelSize.min) || 32;
@@ -2076,17 +2318,20 @@ export function GraphViewer({
     const LABEL_NESTED = (graphSettings.labelSize && graphSettings.labelSize.nestedScale) || 0.75;
     const layoutMembers = () => {
       const m = new Map();
-      for (const c of (data.containers || [])) {
-        m.set(c.id, Array.from(containerMembers.get(c.id) || [])
-          .map((slug) => nodeBySlug.get(slug))
-          .filter(Boolean)
-          .map((n) => ({
-            id: n.id,
-            w: (n._size && n._size.width) || (n.type === 'article' ? CARD.width : n.size),
-            h: (n._size && n._size.height) || (n.type === 'article' ? CARD.height : n.size),
-            order: Number.isFinite(n.series_part) ? n.series_part : null,
-            date: n.date || '',
-          })));
+      for (const c of data.containers || []) {
+        m.set(
+          c.id,
+          Array.from(containerMembers.get(c.id) || [])
+            .map((slug) => nodeBySlug.get(slug))
+            .filter(Boolean)
+            .map((n) => ({
+              id: n.id,
+              w: (n._size && n._size.width) || (n.type === 'article' ? CARD.width : n.size),
+              h: (n._size && n._size.height) || (n.type === 'article' ? CARD.height : n.size),
+              order: Number.isFinite(n.series_part) ? n.series_part : null,
+              date: n.date || '',
+            })),
+        );
       }
       return m;
     };
@@ -2094,24 +2339,25 @@ export function GraphViewer({
     function computeContainerLayout() {
       if (!data.containers || data.containers.length === 0) return;
       const members = layoutMembers();
-      const run = () => containerLayout({
-        containers: data.containers,
-        members,
-        closed: closedContainers,
-        labelSize: (c) => labelBlockSize(c, c._fs || LABEL_MIN, { family: faceOf(c) }),
-        macroSize: (c) => ({ w: (c._macroHalfW || 130) * 2, h: (c._macroHalfH || 45) * 2 }),
-        options: {
-          spacing: graphSettings.spiral?.spacing ?? 20,
-          mode: layoutRef.current === 'radial' ? 'ring' : (graphSettings.spiral?.mode || 'path'),
-          startRadius: graphSettings.spiral?.startRadius,
-          direction: graphSettings.spiral?.direction,
-          gap: 28,
-          padding: hullPadOf,
-          layoutOf: (c) => (layoutRef.current === 'force' ? containerLayoutOf(c, GS) : null),
-          hangOf: (c) => ({ ...(GS.hang || {}), ...(c.hang || {}) }),
-          spiralOf,
-        },
-      });
+      const run = () =>
+        containerLayout({
+          containers: data.containers,
+          members,
+          closed: closedContainers,
+          labelSize: (c) => labelBlockSize(c, c._fs || LABEL_MIN, { family: faceOf(c) }),
+          macroSize: (c) => ({ w: (c._macroHalfW || 130) * 2, h: (c._macroHalfH || 45) * 2 }),
+          options: {
+            spacing: graphSettings.spiral?.spacing ?? 20,
+            mode: layoutRef.current === 'radial' ? 'ring' : graphSettings.spiral?.mode || 'path',
+            startRadius: graphSettings.spiral?.startRadius,
+            direction: graphSettings.spiral?.direction,
+            gap: 28,
+            padding: hullPadOf,
+            layoutOf: (c) => (layoutRef.current === 'force' ? containerLayoutOf(c, GS) : null),
+            hangOf: (c) => ({ ...(GS.hang || {}), ...(c.hang || {}) }),
+            spiralOf,
+          },
+        });
       // Two passes: the label's size depends on how wide its container ends
       // up, and the container's width depends on the label.
       for (const c of data.containers) c._fs = LABEL_MIN;
@@ -2125,7 +2371,11 @@ export function GraphViewer({
         // a column a card wide: no larger than fits there.
         if (info && info.hang) {
           const room = CARD.width + info.hang.gap;
-          for (let guard = 0; guard < 40 && c._fs > LABEL_MIN && labelBlockSize(c, c._fs, { family: faceOf(c) }).w > room; guard++) {
+          for (
+            let guard = 0;
+            guard < 40 && c._fs > LABEL_MIN && labelBlockSize(c, c._fs, { family: faceOf(c) }).w > room;
+            guard++
+          ) {
             c._fs = Math.max(LABEL_MIN, c._fs * 0.92);
           }
         }
@@ -2160,8 +2410,8 @@ export function GraphViewer({
       const crown = anchorWorld({ x: 0.5, y: coverFrame.crownY }, coverFrame.art, view, origin);
       return crown.y - a.y;
     }
-    const keepBelowUsed = () => [GS.spiral, ...(data.containers || []).map((c) => c.spiral)]
-      .some((s) => s && s.keepBelow === 'crown');
+    const keepBelowUsed = () =>
+      [GS.spiral, ...(data.containers || []).map((c) => c.spiral)].some((s) => s && s.keepBelow === 'crown');
 
     // Where each top-level container's frame currently sits: the mean offset
     // between its members' positions and their targets.
@@ -2169,32 +2419,46 @@ export function GraphViewer({
       // With anchored containers inside it, a top-level container's own frame
       // is the mean of theirs, so what else it holds stays among them.
       if (anchoredOffsetsReady && anchorsOn()) {
-        let ax = 0, ay = 0, an = 0;
+        let ax = 0,
+          ay = 0,
+          an = 0;
         for (const cId of ANCHORS.keys()) {
           const info = CL.containers.get(cId);
           if (!info || info.root !== rootId) continue;
           const o = containerOffset(cId);
-          if (o) { ax += o.x; ay += o.y; an++; }
+          if (o) {
+            ax += o.x;
+            ay += o.y;
+            an++;
+          }
         }
         if (an) return { x: ax / an, y: ay / an };
       }
-      let sx = 0, sy = 0, n = 0;
+      let sx = 0,
+        sy = 0,
+        n = 0;
       for (const [id, p] of CL.nodes) {
         if (p.root !== rootId) continue;
         const node = nodeBySlug.get(id);
         if (!node || !Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
-        sx += node.x - p.x; sy += node.y - p.y; n++;
+        sx += node.x - p.x;
+        sy += node.y - p.y;
+        n++;
       }
       return n ? { x: sx / n, y: sy / n } : null;
     }
 
     function containerOffset(cId) {
-      let sx = 0, sy = 0, n = 0;
+      let sx = 0,
+        sy = 0,
+        n = 0;
       for (const id of getAllMemberSlugs(cId)) {
         const p = CL.nodes.get(id);
         const node = nodeBySlug.get(id);
         if (!p || !node || !Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
-        sx += node.x - p.x; sy += node.y - p.y; n++;
+        sx += node.x - p.x;
+        sy += node.y - p.y;
+        n++;
       }
       return n ? { x: sx / n, y: sy / n } : null;
     }
@@ -2202,8 +2466,8 @@ export function GraphViewer({
     // Containers are laid out in cluster (spiral paths) and in ring (one ring
     // per container). The positional pull only matters in cluster: in ring
     // every node is placed outright.
-    const spiralOn = () => graphSettings.spiral?.enabled !== false
-      && (layoutRef.current === 'force' || layoutRef.current === 'radial');
+    const spiralOn = () =>
+      graphSettings.spiral?.enabled !== false && (layoutRef.current === 'force' || layoutRef.current === 'radial');
 
     // ── Anchors ────────────────────────────────────────────────────────────
     // A site can rest a container on its cover's art (containers[].anchor,
@@ -2217,11 +2481,17 @@ export function GraphViewer({
     // positions work as before; the anchors are part of their key.
     const ANCHORS = new Map(Object.entries(anchorsOf(feedData)).filter(([id]) => containerById.has(id)));
     let coverFrame = typeof window !== 'undefined' ? window.PostPipeCoverFrame || null : null;
-    const anchorsOn = () => ANCHORS.size > 0 && !!(coverFrame && coverFrame.art)
-      && spiralOn() && layoutRef.current === 'force' && CL.containers.size > 0;
+    const anchorsOn = () =>
+      ANCHORS.size > 0 &&
+      !!(coverFrame && coverFrame.art) &&
+      spiralOn() &&
+      layoutRef.current === 'force' &&
+      CL.containers.size > 0;
     // Each member's innermost anchored container.
     const anchoredOf = new Map();
-    for (const cId of [...ANCHORS.keys()].sort((a, b) => depthOf(containerById.get(b)) - depthOf(containerById.get(a)))) {
+    for (const cId of [...ANCHORS.keys()].sort(
+      (a, b) => depthOf(containerById.get(b)) - depthOf(containerById.get(a)),
+    )) {
       for (const slug of getAllMemberSlugs(cId)) if (!anchoredOf.has(slug)) anchoredOf.set(slug, cId);
     }
     anchoredOffsetsReady = true;
@@ -2259,7 +2529,9 @@ export function GraphViewer({
     // reader); a card dragged inside it does not move it.
     const growCentres = new Map();
     let growShifts = new Map();
-    function growOn() { return GROW && homeK > 0 && anchorsOn(); }
+    function growOn() {
+      return GROW && homeK > 0 && anchorsOn();
+    }
     // The world point under the pivot at the home view.
     function pivotWorld() {
       const k = homeK > 0 ? homeK : HOME_K;
@@ -2302,7 +2574,10 @@ export function GraphViewer({
       return NO_SHIFT;
     }
     // Where a node is drawn in the world.
-    const drawnAt = (n) => { const sh = shiftOfNode(n); return sh === NO_SHIFT ? n : { x: n.x + sh.x, y: n.y + sh.y }; };
+    const drawnAt = (n) => {
+      const sh = shiftOfNode(n);
+      return sh === NO_SHIFT ? n : { x: n.x + sh.x, y: n.y + sh.y };
+    };
     // The largest zoom the anchored containers can grow to before two of
     // them come within 16 px of each other (growCap), each at its centre
     // as placed (or as given in `centres`), open hulls with room for their
@@ -2316,9 +2591,19 @@ export function GraphViewer({
         if (!info || !c || hasClosedAncestor(c)) continue;
         const G = (centres && centres.get(cId)) || growCentreOf(cId);
         if (!G) continue;
-        const ox = G.x - info.center.x, oy = G.y - info.center.y;
+        const ox = G.x - info.center.x,
+          oy = G.y - info.center.y;
         const out = closedContainers.has(cId) ? 0 : 0.75 * HULL_PAD;
-        acts.push({ id: cId, centre: G, box: { x0: info.box.x0 + ox - out, y0: info.box.y0 + oy - out, x1: info.box.x1 + ox + out, y1: info.box.y1 + oy + out } });
+        acts.push({
+          id: cId,
+          centre: G,
+          box: {
+            x0: info.box.x0 + ox - out,
+            y0: info.box.y0 + oy - out,
+            x1: info.box.x1 + ox + out,
+            y1: info.box.y1 + oy + out,
+          },
+        });
       }
       return homeK * growCap(acts, { gap: 16, homeK });
     }
@@ -2333,7 +2618,7 @@ export function GraphViewer({
     // Move each anchored container, members and all, so its centre is on
     // its anchor; they stay there (pinned) until the reader moves them.
     const anchorsPending = new Set(); // fresh: placed when the art is known
-    let anchorsAuto = false;          // placed by the layout and not moved since
+    let anchorsAuto = false; // placed by the layout and not moved since
     // An anchored container stays pinned to its anchor (the anchor is its
     // centre, closed or open, through every opening and closing) until the
     // reader drags it; then it stays where it was dropped, until Reset. The
@@ -2367,7 +2652,10 @@ export function GraphViewer({
         for (const slug of getAllMemberSlugs(cId)) {
           if (anchoredOf.get(slug) !== cId) continue;
           const n = nodeBySlug.get(slug);
-          if (n && Number.isFinite(n.x) && Number.isFinite(n.y)) { n.fx = n.x; n.fy = n.y; }
+          if (n && Number.isFinite(n.x) && Number.isFinite(n.y)) {
+            n.fx = n.x;
+            n.fy = n.y;
+          }
         }
         dropsPending.set(cId, { x: st.x, y: st.y });
       } else {
@@ -2381,13 +2669,17 @@ export function GraphViewer({
         const c = centreOf(cId);
         if (!w || !c) continue;
         if (ANCHORS.has(cId)) growCentres.set(cId, { x: w.x, y: w.y });
-        const dx = w.x - c.x, dy = w.y - c.y;
+        const dx = w.x - c.x,
+          dy = w.y - c.y;
         for (const slug of getAllMemberSlugs(cId)) {
           const n = nodeBySlug.get(slug);
           if (!n || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
-          n.x += dx; n.y += dy;
-          n.fx = n.x; n.fy = n.y;
-          n.vx = 0; n.vy = 0;
+          n.x += dx;
+          n.y += dy;
+          n.fx = n.x;
+          n.fy = n.y;
+          n.vx = 0;
+          n.vy = 0;
         }
       }
     }
@@ -2401,8 +2693,10 @@ export function GraphViewer({
         const p = CL.nodes.get(slug);
         const n = nodeBySlug.get(slug);
         if (!p || !n || !Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
-        n.x = off.x + p.x; n.y = off.y + p.y;
-        n.vx = 0; n.vy = 0;
+        n.x = off.x + p.x;
+        n.y = off.y + p.y;
+        n.vx = 0;
+        n.vy = 0;
       }
     }
     // Open acts never overlap (actsApart.js): an open anchored container
@@ -2417,14 +2711,20 @@ export function GraphViewer({
         const info = CL.containers.get(cId);
         const c = targets.get(cId) || centreOf(cId);
         if (!info || !c) continue;
-        const ox = c.x - info.center.x, oy = c.y - info.center.y;
+        const ox = c.x - info.center.x,
+          oy = c.y - info.center.y;
         // An open hull's smoothed curve can reach a little past the box the
         // layout gives it (measured: up to 15 px at rest on a phone): a
         // margin of three quarters of the hull's padding allows for it.
         const out = closedContainers.has(cId) ? 0 : 0.75 * HULL_PAD;
         acts.push({
           id: cId,
-          box: { x0: info.box.x0 + ox - out, y0: info.box.y0 + oy - out, x1: info.box.x1 + ox + out, y1: info.box.y1 + oy + out },
+          box: {
+            x0: info.box.x0 + ox - out,
+            y0: info.box.y0 + oy - out,
+            x1: info.box.x1 + ox + out,
+            y1: info.box.y1 + oy + out,
+          },
           open: !closedContainers.has(cId),
           fixed: isDetached(cId),
           towards: spiralOf(containerById.get(cId)).openTowards,
@@ -2462,9 +2762,10 @@ export function GraphViewer({
     // closed or open, and its centre; and the zoom, k against the zoom the
     // graph rests at (homeK). 'graph:world' is sent whenever any of that may
     // have changed; the page draws at most once a frame.
-    const reachIds = () => (ANCHORS.size
-      ? [...ANCHORS.keys()]
-      : (data.containers || []).filter((c) => c.parent && !containerById.get(c.parent)?.parent).map((c) => c.id));
+    const reachIds = () =>
+      ANCHORS.size
+        ? [...ANCHORS.keys()]
+        : (data.containers || []).filter((c) => c.parent && !containerById.get(c.parent)?.parent).map((c) => c.id);
     const outlineCache = new WeakMap();
     function outlineOf(path) {
       const d = path.getAttribute('d') || '';
@@ -2474,8 +2775,13 @@ export function GraphViewer({
       try {
         const len = path.getTotalLength();
         const n = 72;
-        for (let i = 0; i < n; i++) { const q = path.getPointAtLength((len * i) / n); pts.push([q.x, q.y]); }
-      } catch { pts = []; }
+        for (let i = 0; i < n; i++) {
+          const q = path.getPointAtLength((len * i) / n);
+          pts.push([q.x, q.y]);
+        }
+      } catch {
+        pts = [];
+      }
       outlineCache.set(path, { d, pts });
       return pts;
     }
@@ -2510,8 +2816,12 @@ export function GraphViewer({
         const m = path.getScreenCTM();
         if (!m || local.length < 3) continue;
         const hull = local.map(([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }));
-        let cx = 0, cy = 0;
-        for (const q of hull) { cx += q.x; cy += q.y; }
+        let cx = 0,
+          cy = 0;
+        for (const q of hull) {
+          cx += q.x;
+          cy += q.y;
+        }
         const entry = { id, closed, hull, centre: { x: cx / hull.length, y: cy / hull.length } };
         // How far an anchored container is drawn from its anchor, in the
         // world (dragged, or pushed clear of another act): the cover's roots
@@ -2569,7 +2879,7 @@ export function GraphViewer({
         if (n.type === 'article') {
           return (Math.hypot(n._size?.width || CARD.width, n._size?.height || CARD.height) / 2) * (n._cardScale || 1);
         }
-        return (n._r || (n.size || 60) / 2);
+        return n._r || (n.size || 60) / 2;
       };
 
       function force(alpha) {
@@ -2579,7 +2889,9 @@ export function GraphViewer({
           const info = CL.containers.get(rootId);
           const off = rootOffset(rootId);
           if (!info || !off) continue;
-          const members = getAllMemberSlugs(rootId).map((s) => nodeBySlug.get(s)).filter((n) => n && Number.isFinite(n.x));
+          const members = getAllMemberSlugs(rootId)
+            .map((s) => nodeBySlug.get(s))
+            .filter((n) => n && Number.isFinite(n.x));
           circles.push({
             x: off.x + (info.box.x0 + info.box.x1) / 2,
             y: off.y + (info.box.y0 + info.box.y1) / 2,
@@ -2597,28 +2909,44 @@ export function GraphViewer({
         const spacing = graphSettings.containerSpacing !== undefined ? graphSettings.containerSpacing : -20;
         for (let i = 0; i < circles.length; i++) {
           for (let j = i + 1; j < circles.length; j++) {
-            const a = circles[i], b = circles[j];
-            const dx = b.x - a.x, dy = b.y - a.y;
+            const a = circles[i],
+              b = circles[j];
+            const dx = b.x - a.x,
+              dy = b.y - a.y;
             push(dx, dy, Math.hypot(dx, dy), a.r + b.r + spacing, (sx, sy) => {
-              for (const n of a.members) { n.vx -= sx; n.vy -= sy; }
-              for (const n of b.members) { n.vx += sx; n.vy += sy; }
+              for (const n of a.members) {
+                n.vx -= sx;
+                n.vy -= sy;
+              }
+              for (const n of b.members) {
+                n.vx += sx;
+                n.vy += sy;
+              }
             });
           }
         }
         const contained = new Set(CL.nodes.keys());
-        const loose = (simNodes.length ? simNodes : data.nodes)
-          .filter((n) => !contained.has(n.id) && Number.isFinite(n.x));
+        const loose = (simNodes.length ? simNodes : data.nodes).filter(
+          (n) => !contained.has(n.id) && Number.isFinite(n.x),
+        );
         for (const c of circles) {
           for (const n of loose) {
-            const dx = n.x - c.x, dy = n.y - c.y;
+            const dx = n.x - c.x,
+              dy = n.y - c.y;
             push(dx, dy, Math.hypot(dx, dy), c.r + getHalfSize(n), (sx, sy) => {
-              n.vx += sx; n.vy += sy;
-              for (const m of c.members) { m.vx -= sx * 0.2; m.vy -= sy * 0.2; }
+              n.vx += sx;
+              n.vy += sy;
+              for (const m of c.members) {
+                m.vx -= sx * 0.2;
+                m.vy -= sy * 0.2;
+              }
             });
           }
         }
       }
-      force.initialize = (_nodes) => { simNodes = _nodes; };
+      force.initialize = (_nodes) => {
+        simNodes = _nodes;
+      };
       return force;
     }
 
@@ -2681,12 +3009,9 @@ export function GraphViewer({
     let effMax = 0;
     function tuneLinkForce() {
       if (ewShown.mode === 'weighted') {
-        linkForce.distance((l) => linkDistance(
-          l._edgeWeight ? l._edgeWeight.eff : 0,
-          effMax,
-          forces.linkDistance,
-          ewShown.distanceSpread,
-        ));
+        linkForce.distance((l) =>
+          linkDistance(l._edgeWeight ? l._edgeWeight.eff : 0, effMax, forces.linkDistance, ewShown.distanceSpread),
+        );
         linkForce.strength((l) => {
           if (CL.nodes.size > 0) {
             const rs = rootOfNode(endId(l.source));
@@ -2696,10 +3021,14 @@ export function GraphViewer({
         });
       } else {
         linkForce.distance(forces.linkDistance);
-        linkForce.strength(CL.nodes.size > 0 ? (l) => {
-          const rs = rootOfNode(endId(l.source));
-          return rs && rs === rootOfNode(endId(l.target)) ? 0 : defaultLinkStrength(l);
-        } : defaultLinkStrength);
+        linkForce.strength(
+          CL.nodes.size > 0
+            ? (l) => {
+                const rs = rootOfNode(endId(l.source));
+                return rs && rs === rootOfNode(endId(l.target)) ? 0 : defaultLinkStrength(l);
+              }
+            : defaultLinkStrength,
+        );
       }
     }
     function computeLinkWeights(nextLinks, { setLinks = true } = {}) {
@@ -2709,10 +3038,9 @@ export function GraphViewer({
       for (const l of data.links) {
         const f = effectiveWeight(l, ctx);
         l._edgeWeight = f;
-        const base = l._baseLabel !== undefined ? l._baseLabel : (l.label || '');
-        l.label = ewShown.mode === 'weighted'
-          ? (base ? `${base}\n${edgeWeightLine(l, f)}` : edgeWeightLine(l, f))
-          : base;
+        const base = l._baseLabel !== undefined ? l._baseLabel : l.label || '';
+        l.label =
+          ewShown.mode === 'weighted' ? (base ? `${base}\n${edgeWeightLine(l, f)}` : edgeWeightLine(l, f)) : base;
       }
       effMax = 0;
       for (const l of activeLinks) {
@@ -2732,9 +3060,12 @@ export function GraphViewer({
     // return to cluster but nothing is set moving.
     tightnessUpdateRef.current = () => {
       const next = tightened(SIM, tightnessChosen(), CARD);
-      if (next.linkDistance === forces.linkDistance
-        && next.chargeStrength === forces.chargeStrength
-        && next.collidePadding === forces.collidePadding) return;
+      if (
+        next.linkDistance === forces.linkDistance &&
+        next.chargeStrength === forces.chargeStrength &&
+        next.collidePadding === forces.collidePadding
+      )
+        return;
       forces = next;
       tuneLinkForce();
       if (CL.nodes.size > 0) refreshContainerForces();
@@ -2770,8 +3101,10 @@ export function GraphViewer({
           const n = nodeBySlug.get(id);
           if (!n) continue;
           if (all || !Number.isFinite(n.x) || !Number.isFinite(n.y)) {
-            n.x = ox + p.x; n.y = oy + p.y;
-            n.vx = 0; n.vy = 0;
+            n.x = ox + p.x;
+            n.y = oy + p.y;
+            n.vx = 0;
+            n.vy = 0;
           }
         }
         cursor += (cursor === width / 2 ? w / 2 : w) + 200;
@@ -2841,7 +3174,9 @@ export function GraphViewer({
       const macroPos = (c) => {
         const f = framed(c);
         if (f) return { x: f.off.x + f.info.center.x, y: f.off.y + f.info.center.y };
-        const ns = getAllMemberSlugs(c.id).map((s) => nodeBySlug.get(s)).filter((n) => n && Number.isFinite(n.x));
+        const ns = getAllMemberSlugs(c.id)
+          .map((s) => nodeBySlug.get(s))
+          .filter((n) => n && Number.isFinite(n.x));
         return ns.length ? { x: d3.mean(ns, (n) => n.x), y: d3.mean(ns, (n) => n.y) } : null;
       };
 
@@ -2867,7 +3202,10 @@ export function GraphViewer({
         const gs = shiftOfContainer(c);
         group.attr('transform', gs.x || gs.y ? `translate(${gs.x}, ${gs.y})` : null);
         const drawn = (p) => (p && (gs.x || gs.y) ? { x: p.x + gs.x, y: p.y + gs.y } : p);
-        const local = (n) => { const q = drawnAt(n); return { x: q.x - gs.x, y: q.y - gs.y }; };
+        const local = (n) => {
+          const q = drawnAt(n);
+          return { x: q.x - gs.x, y: q.y - gs.y };
+        };
 
         if (isClosed) {
           const pos = macroPos(c);
@@ -2877,10 +3215,15 @@ export function GraphViewer({
           group.select('.container-hull').style('display', 'none');
           group.select('.container-hull-ghost').attr('d', '');
           group.select('.container-badge').style('display', 'none');
-          group.select('.container-macro-node')
+          group
+            .select('.container-macro-node')
             .style('display', null)
-            .attr('transform', `translate(${pos.x}, ${pos.y})${upright()}${PILL_SCALE !== 1 ? ` scale(${PILL_SCALE})` : ''}`)
-            .select('.label-count').text(containerCountText(GS, memberNodes.length));
+            .attr(
+              'transform',
+              `translate(${pos.x}, ${pos.y})${upright()}${PILL_SCALE !== 1 ? ` scale(${PILL_SCALE})` : ''}`,
+            )
+            .select('.label-count')
+            .text(containerCountText(GS, memberNodes.length));
           return;
         }
 
@@ -2897,7 +3240,7 @@ export function GraphViewer({
         const pad = hullPadOf(c);
 
         // Closed children are drawn as nodes; the hull wraps those.
-        for (const childId of (containerChildren.get(c.id) || [])) {
+        for (const childId of containerChildren.get(c.id) || []) {
           if (!closedContainers.has(childId)) continue;
           const childObj = containerById.get(childId);
           const cp0 = childObj && macroPos(childObj);
@@ -2928,7 +3271,7 @@ export function GraphViewer({
             [q.x - halfW, q.y - halfH],
             [q.x + halfW, q.y - halfH],
             [q.x + halfW, q.y + halfH],
-            [q.x - halfW, q.y + halfH]
+            [q.x - halfW, q.y + halfH],
           );
         }
 
@@ -2941,28 +3284,33 @@ export function GraphViewer({
           const lp = pad / 2;
           const inner = [];
           const walk = (id) => {
-            for (const ch of (containerChildren.get(id) || [])) {
+            for (const ch of containerChildren.get(id) || []) {
               if (closedContainers.has(ch)) continue;
               const chObj = containerById.get(ch);
               const fc = chObj && framed(chObj);
               const cs = chObj ? shiftOfContainer(chObj) : NO_SHIFT;
-              if (fc && labelPositionOf(chObj) !== 'hidden') inner.push({ L: fc.info.label, off: { x: fc.off.x + cs.x - gs.x, y: fc.off.y + cs.y - gs.y } });
+              if (fc && labelPositionOf(chObj) !== 'hidden')
+                inner.push({ L: fc.info.label, off: { x: fc.off.x + cs.x - gs.x, y: fc.off.y + cs.y - gs.y } });
               walk(ch);
             }
           };
           walk(c.id);
           for (const { L, off } of inner) {
             points.push(
-              [off.x + L.x0 - lp, off.y + L.y0 - lp], [off.x + L.x1 + lp, off.y + L.y0 - lp],
-              [off.x + L.x1 + lp, off.y + L.y1 + lp], [off.x + L.x0 - lp, off.y + L.y1 + lp]
+              [off.x + L.x0 - lp, off.y + L.y0 - lp],
+              [off.x + L.x1 + lp, off.y + L.y0 - lp],
+              [off.x + L.x1 + lp, off.y + L.y1 + lp],
+              [off.x + L.x0 - lp, off.y + L.y1 + lp],
             );
           }
           const L = f.info.label;
           labelAt = { x: f.off.x + (L.x0 + L.x1) / 2, y: f.off.y + (L.y0 + L.y1) / 2 };
           if (labelPos === 'center') {
             points.push(
-              [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp], [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
-              [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp], [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp]
+              [f.off.x + L.x0 - lp, f.off.y + L.y0 - lp],
+              [f.off.x + L.x1 + lp, f.off.y + L.y0 - lp],
+              [f.off.x + L.x1 + lp, f.off.y + L.y1 + lp],
+              [f.off.x + L.x0 - lp, f.off.y + L.y1 + lp],
             );
           }
         }
@@ -2997,8 +3345,12 @@ export function GraphViewer({
 
         const sizeHit = (size) => {
           const blk = labelBlockSize(c, size, { family: faceOf(c) });
-          badge.select('.container-badge-hit')
-            .attr('x', -blk.w / 2).attr('y', -blk.h / 2).attr('width', blk.w).attr('height', blk.h);
+          badge
+            .select('.container-badge-hit')
+            .attr('x', -blk.w / 2)
+            .attr('y', -blk.h / 2)
+            .attr('width', blk.w)
+            .attr('height', blk.h);
         };
 
         if (labelPos === 'hidden') {
@@ -3008,10 +3360,13 @@ export function GraphViewer({
         }
         if (labelPos === 'top') {
           // Centred across the hull, its top just inside the hull's top.
-          const size = labelAt ? fs : Math.max(LABEL_MIN, Math.min(LABEL_MAX, (d3.max(hull, (p) => p[0]) - d3.min(hull, (p) => p[0])) / 8));
+          const size = labelAt
+            ? fs
+            : Math.max(LABEL_MIN, Math.min(LABEL_MAX, (d3.max(hull, (p) => p[0]) - d3.min(hull, (p) => p[0])) / 8));
           const blk = labelBlockSize(c, size, { family: faceOf(c) });
           const minY = d3.min(hull, (p) => p[1]);
-          const x0 = d3.min(hull, (p) => p[0]), x1 = d3.max(hull, (p) => p[0]);
+          const x0 = d3.min(hull, (p) => p[0]),
+            x1 = d3.max(hull, (p) => p[0]);
           const at = { x: (x0 + x1) / 2, y: minY + pad * 0.5 + blk.h / 2 };
           badge.select('.container-badge-text').attr('font-size', `${size}px`);
           sizeHit(size);
@@ -3074,7 +3429,9 @@ export function GraphViewer({
     // The one way containers change state: a tap, the panel, or a program
     // calling the API all come through here.
     function containerState() {
-      return Object.fromEntries((data.containers || []).map((c) => [c.id, closedContainers.has(c.id) ? 'closed' : 'open']));
+      return Object.fromEntries(
+        (data.containers || []).map((c) => [c.id, closedContainers.has(c.id) ? 'closed' : 'open']),
+      );
     }
     function setContainersOpen(ids, open) {
       return setContainers(open ? { open: ids } : { close: ids });
@@ -3132,7 +3489,7 @@ export function GraphViewer({
       if (anchorsOn()) {
         const targets = anchorTargets();
         for (const cId of ANCHORS.keys()) {
-          const c = isDetached(cId) ? centreOf(cId) : (targets.get(cId) || centreOf(cId));
+          const c = isDetached(cId) ? centreOf(cId) : targets.get(cId) || centreOf(cId);
           if (c) centres.set(cId, c);
         }
       }
@@ -3149,7 +3506,8 @@ export function GraphViewer({
         centreMoves.push({ cId, x0: from ? from.x : c.x, y0: from ? from.y : c.y, x1: c.x, y1: c.y });
       }
       const placeCentres = (t) => {
-        for (const m of centreMoves) growCentres.set(m.cId, { x: m.x0 + (m.x1 - m.x0) * t, y: m.y0 + (m.y1 - m.y0) * t });
+        for (const m of centreMoves)
+          growCentres.set(m.cId, { x: m.x0 + (m.x1 - m.x0) * t, y: m.y0 + (m.y1 - m.y0) * t });
       };
       relaidCentres = centres;
       const moves = [];
@@ -3157,12 +3515,17 @@ export function GraphViewer({
         const n = nodeBySlug.get(id);
         const a = anchoredOf.get(id);
         if (!n || !Number.isFinite(n.x) || !a || !centres.has(a)) continue;
-        const c = centres.get(a), info = CL.containers.get(a);
+        const c = centres.get(a),
+          info = CL.containers.get(a);
         // Not laid out (inside a closed container): nothing to move to.
         if (!info) continue;
         moves.push({ n, x0: n.x, y0: n.y, x1: c.x - info.center.x + p.x, y1: c.y - info.center.y + p.y });
       }
-      if (!hasSettled && !moves.length) { placeCentres(1); simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart(); return; }
+      if (!hasSettled && !moves.length) {
+        placeCentres(1);
+        simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+        return;
+      }
       for (const [id, p] of CL.nodes) {
         const n = nodeBySlug.get(id);
         const off = anchors.get(p.root);
@@ -3173,18 +3536,23 @@ export function GraphViewer({
       }
       // Named, so a newer relayout replaces one still running, and neither
       // interrupts the layout-switch transition.
-      d3.transition('container-relayout').duration(600).ease(d3.easeCubicInOut)
+      d3.transition('container-relayout')
+        .duration(600)
+        .ease(d3.easeCubicInOut)
         .tween('container-relayout', () => (t) => {
           for (const m of moves) {
             m.n.x = m.x0 + (m.x1 - m.x0) * t;
             m.n.y = m.y0 + (m.y1 - m.y0) * t;
-            m.n.fx = m.n.x; m.n.fy = m.n.y;
+            m.n.fx = m.n.x;
+            m.n.fy = m.n.y;
           }
           placeCentres(t);
           applyPositions();
           if (connectorUpdateRef.current) connectorUpdateRef.current();
         })
-        .on('end', () => { if (!userMovedView) fitToViewport({ animate: true }); });
+        .on('end', () => {
+          if (!userMovedView) fitToViewport({ animate: true });
+        });
     }
 
     // Half the size a card is drawn at right now, so an edge ends at its edge.
@@ -3225,11 +3593,17 @@ export function GraphViewer({
 
       if (srcClosed) {
         const cp = containerCentroids.get(srcClosed);
-        if (cp) { sx = cp.x; sy = cp.y; }
+        if (cp) {
+          sx = cp.x;
+          sy = cp.y;
+        }
       }
       if (tgtClosed) {
         const cp = containerCentroids.get(tgtClosed);
-        if (cp) { tx = cp.x; ty = cp.y; }
+        if (cp) {
+          tx = cp.x;
+          ty = cp.y;
+        }
       }
 
       if (l.layer !== 'sequence') {
@@ -3251,7 +3625,7 @@ export function GraphViewer({
       const srcH = srcClosed ? 45 : srcHalf.h + 4;
       const rSrc = Math.min(
         Math.abs(cos) > 1e-4 ? srcW / Math.abs(cos) : Infinity,
-        Math.abs(sin) > 1e-4 ? srcH / Math.abs(sin) : Infinity
+        Math.abs(sin) > 1e-4 ? srcH / Math.abs(sin) : Infinity,
       );
 
       const tgtHalf = drawnHalf(l.target);
@@ -3259,7 +3633,7 @@ export function GraphViewer({
       const tgtH = tgtClosed ? 45 : tgtHalf.h + 4;
       const rTgt = Math.min(
         Math.abs(cos) > 1e-4 ? tgtW / Math.abs(cos) : Infinity,
-        Math.abs(sin) > 1e-4 ? tgtH / Math.abs(sin) : Infinity
+        Math.abs(sin) > 1e-4 ? tgtH / Math.abs(sin) : Infinity,
       );
 
       if (dist <= rSrc + rTgt) {
@@ -3313,7 +3687,8 @@ export function GraphViewer({
     function arrowFor(color) {
       if (!arrowIds.has(color)) {
         const id = 'edge-arrow-' + arrowIds.size;
-        defs.append('marker')
+        defs
+          .append('marker')
           .attr('id', id)
           .attr('viewBox', '0 0 10 10')
           .attr('refX', 9)
@@ -3347,11 +3722,13 @@ export function GraphViewer({
 
     // The hit area sits under the containers layer, so a container's title
     // always wins a tap over an edge passing near it; cards are above both.
-    const linkHits = g.insert('g', '.containers-layer')
+    const linkHits = g
+      .insert('g', '.containers-layer')
       .attr('class', 'link-hits')
       .selectAll('.link-hit')
       .data(data.links)
-      .enter().append('path')
+      .enter()
+      .append('path')
       .attr('class', (d) => (touchesTag(d) ? 'link-hit link-to-tag' : 'link-hit'))
       .attr('fill', 'none')
       .style('stroke', 'transparent')
@@ -3360,15 +3737,21 @@ export function GraphViewer({
       .style('cursor', 'default');
 
     // Render links (the moving bead on a sequence edge is drawn separately)
-    const links = g.selectAll('.link')
+    const links = g
+      .selectAll('.link')
       .data(data.links)
-      .enter().append('path')
-      .attr('class', (d) => [
-        'link',
-        d.layer ? `link-${d.layer}` : '',
-        d.role ? `link-role-${d.role}` : '',
-        touchesTag(d) ? 'link-to-tag' : '',
-      ].filter(Boolean).join(' '))
+      .enter()
+      .append('path')
+      .attr('class', (d) =>
+        [
+          'link',
+          d.layer ? `link-${d.layer}` : '',
+          d.role ? `link-role-${d.role}` : '',
+          touchesTag(d) ? 'link-to-tag' : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
       .attr('fill', 'none')
       .attr('data-label', (d) => d.label)
       .attr('marker-end', (d) => (d.directed ? `url(#${arrowFor(linkColor(d))})` : null))
@@ -3385,9 +3768,11 @@ export function GraphViewer({
     const relationHitsLayer = g.insert('g', '.containers-layer').attr('class', 'relation-hits');
 
     // The sketchbook theme's second pencil pass along each edge.
-    const linkGhosts = g.selectAll('.link-ghost')
+    const linkGhosts = g
+      .selectAll('.link-ghost')
       .data(data.links)
-      .enter().insert('path', '.link-sequence-pulse')
+      .enter()
+      .insert('path', '.link-sequence-pulse')
       .attr('class', (d) => (touchesTag(d) ? 'link-ghost link-to-tag' : 'link-ghost'))
       .style('stroke', (d) => linkColor(d));
     const ghostKey = (l) => `${endId(l.source)}>${endId(l.target)}`;
@@ -3396,9 +3781,11 @@ export function GraphViewer({
     }
 
     // Traveling single bead on sequence rail (matches act color)
-    const sequencePulses = g.selectAll('.link-sequence-pulse')
-      .data(data.links.filter(d => d.layer === 'sequence'))
-      .enter().append('path')
+    const sequencePulses = g
+      .selectAll('.link-sequence-pulse')
+      .data(data.links.filter((d) => d.layer === 'sequence'))
+      .enter()
+      .append('path')
       .attr('class', 'link-sequence-pulse')
       .attr('fill', 'none')
       .attr('pathLength', 100)
@@ -3416,14 +3803,14 @@ export function GraphViewer({
 
     // An edge's label: shown while the pointer is on the edge, or for a few
     // seconds after a tap. The same size on screen at any zoom.
-    const edgeLabel = g.append('g')
+    const edgeLabel = g
+      .append('g')
       .attr('class', 'edge-label')
       .style('pointer-events', 'none')
       .style('display', 'none');
-    const edgeLabelBg = edgeLabel.append('rect')
-      .attr('fill', 'rgba(15, 17, 26, 0.88)')
-      .attr('stroke-opacity', 0.6);
-    const edgeLabelText = edgeLabel.append('text')
+    const edgeLabelBg = edgeLabel.append('rect').attr('fill', 'rgba(15, 17, 26, 0.88)').attr('stroke-opacity', 0.6);
+    const edgeLabelText = edgeLabel
+      .append('text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('font-family', "'Atkinson', sans-serif")
@@ -3435,7 +3822,10 @@ export function GraphViewer({
     function placeEdgeLabel() {
       if (!edgeLabelFor || !edgeLabelEl) return;
       const len = edgeLabelEl.getTotalLength ? edgeLabelEl.getTotalLength() : 0;
-      if (!len) { edgeLabel.style('display', 'none'); return; }
+      if (!len) {
+        edgeLabel.style('display', 'none');
+        return;
+      }
       const p = edgeLabelEl.getPointAtLength(len / 2);
       const k = zoomScaleRef.current || 1;
       const fs = 13 / k;
@@ -3448,21 +3838,37 @@ export function GraphViewer({
         const lineH = fs * 1.35;
         edgeLabelText.attr('font-size', fs).style('fill', color).text(null);
         lines.forEach((line, i) => {
-          edgeLabelText.append('tspan').attr('x', 0).attr('y', (i - (lines.length - 1) / 2) * lineH).text(line);
+          edgeLabelText
+            .append('tspan')
+            .attr('x', 0)
+            .attr('y', (i - (lines.length - 1) / 2) * lineH)
+            .text(line);
         });
         const longest = lines.reduce((m, line) => Math.max(m, line.length), 0);
         const w = (longest * 0.62 + 1.4) * fs;
         const h = lineH * lines.length + fs * 0.7;
-        edgeLabelBg.attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h)
-          .attr('rx', fs * 0.6).style('stroke', color).attr('stroke-width', 1 / k);
+        edgeLabelBg
+          .attr('x', -w / 2)
+          .attr('y', -h / 2)
+          .attr('width', w)
+          .attr('height', h)
+          .attr('rx', fs * 0.6)
+          .style('stroke', color)
+          .attr('stroke-width', 1 / k);
         edgeLabel.attr('transform', `translate(${p.x}, ${p.y})${upright()}`).style('display', null);
         return;
       }
       edgeLabelText.attr('font-size', fs).style('fill', color).text(edgeLabelFor.label);
       const w = (edgeLabelFor.label.length * 0.62 + 1.4) * fs;
       const h = fs * 1.7;
-      edgeLabelBg.attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h)
-        .attr('rx', h / 2).style('stroke', color).attr('stroke-width', 1 / k);
+      edgeLabelBg
+        .attr('x', -w / 2)
+        .attr('y', -h / 2)
+        .attr('width', w)
+        .attr('height', h)
+        .attr('rx', h / 2)
+        .style('stroke', color)
+        .attr('stroke-width', 1 / k);
       edgeLabel.attr('transform', `translate(${p.x}, ${p.y})${upright()}`).style('display', null);
     }
     // A relation line's label (see Relations below) is lifted over the
@@ -3477,8 +3883,10 @@ export function GraphViewer({
       edgeLabelEl = el;
       // a label of several lines (a relation's, or a card-to-tag edge with
       // its why and provenance) is lifted over the cards that would cover it
-      if (l && (l.layer === 'relation' || String(l.label).includes('\n'))) { edgeLabel.raise(); edgeLabelLifted = true; }
-      else lowerEdgeLabel();
+      if (l && (l.layer === 'relation' || String(l.label).includes('\n'))) {
+        edgeLabel.raise();
+        edgeLabelLifted = true;
+      } else lowerEdgeLabel();
       placeEdgeLabel();
     }
     function lowerEdgeLabel() {
@@ -3496,182 +3904,199 @@ export function GraphViewer({
       lowerEdgeLabel();
     }
     linkHits
-      .on('mouseenter', function (event, l) { showEdgeLabel(l, this); })
-      .on('mouseleave', () => { if (!edgeLabelTimer) hideEdgeLabel(); })
+      .on('mouseenter', function (event, l) {
+        showEdgeLabel(l, this);
+      })
+      .on('mouseleave', () => {
+        if (!edgeLabelTimer) hideEdgeLabel();
+      })
       .on('click', function (event, l) {
         // A tap names the edge; it does not count as a tap on the canvas.
         event.stopPropagation();
         const el = this;
         tapOrDouble(event, () => {
           showEdgeLabel(l, el);
-          edgeLabelTimer = setTimeout(() => { edgeLabelTimer = null; hideEdgeLabel(); }, 2500);
+          edgeLabelTimer = setTimeout(() => {
+            edgeLabelTimer = null;
+            hideEdgeLabel();
+          }, 2500);
         });
       });
 
-
-    const nodes = g.selectAll('.node')
+    const nodes = g
+      .selectAll('.node')
       .data(data.nodes)
-      .enter().append('g')
+      .enter()
+      .append('g')
       .attr('class', (d) => (d.type === 'tag' ? 'node node-tag' : 'node'));
 
     // Under the selected tag, when it has more relatives than show: +N
     // brings in the rest, -N goes back to the strongest (see Relations
     // below). Over the bubbles, so a neighbour never covers it.
-    const relationMoreEl = g.append('g')
+    const relationMoreEl = g
+      .append('g')
       .attr('class', 'relation-more')
       .attr('role', 'button')
       .style('display', 'none')
       .style('cursor', 'pointer');
     relationMoreEl.append('rect').attr('class', 'relation-more-bg');
-    relationMoreEl.append('text')
+    relationMoreEl
+      .append('text')
       .attr('class', 'relation-more-text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central');
 
-    const dragHandler = d3.drag().clickDistance(5)
-        // Pointer positions in graph coordinates, through the view as drawn
-        // (zoom and rotation), for the HTML cards as much as the svg nodes.
-        .container(() => g.node())
-        // Under a mouse, moving a card and scrolling its text are different
-        // gestures — drag versus wheel. Under a thumb they are the same
-        // gesture, and drag would win every time, so a card's text could never
-        // be scrolled on a phone. A touch that starts inside the scrollable
-        // body is left to the browser, which the CSS has already told to pan
-        // vertically there; anywhere else on the card still moves it.
-        .filter((event) => {
-          if (event.ctrlKey) return false;
-          if (event.button !== undefined && event.button !== 0) return false;
-          const t = event.target;
-          // The listening strip's buttons and sliders are not handles.
-          if (t && t.closest && t.closest('[data-pp-listen]')) return false;
-          if (event.pointerType === 'touch' || event.type === 'touchstart') {
-            if (t && t.closest && t.closest('.rp-scroll')) return false;
-          }
-          return true;
-        })
-        .on('start', (event, d) => {
-          // Without this, a touch-drag on a node is ambiguous between "move
-          // this card" and "pan the canvas" — d3.zoom is bound to the same
-          // svg and listens for the same touch sequence on any descendant,
-          // since touch events bubble the way mouse events used by drag
-          // here do not conflict with it. Stopping the underlying touch
-          // event here is what lets a card win that race instead of the
-          // whole canvas panning under a finger that meant to drag one node.
-          if (event.sourceEvent) event.sourceEvent.stopPropagation();
+    const dragHandler = d3
+      .drag()
+      .clickDistance(5)
+      // Pointer positions in graph coordinates, through the view as drawn
+      // (zoom and rotation), for the HTML cards as much as the svg nodes.
+      .container(() => g.node())
+      // Under a mouse, moving a card and scrolling its text are different
+      // gestures — drag versus wheel. Under a thumb they are the same
+      // gesture, and drag would win every time, so a card's text could never
+      // be scrolled on a phone. A touch that starts inside the scrollable
+      // body is left to the browser, which the CSS has already told to pan
+      // vertically there; anywhere else on the card still moves it.
+      .filter((event) => {
+        if (event.ctrlKey) return false;
+        if (event.button !== undefined && event.button !== 0) return false;
+        const t = event.target;
+        // The listening strip's buttons and sliders are not handles.
+        if (t && t.closest && t.closest('[data-pp-listen]')) return false;
+        if (event.pointerType === 'touch' || event.type === 'touchstart') {
+          if (t && t.closest && t.closest('.rp-scroll')) return false;
+        }
+        return true;
+      })
+      .on('start', (event, d) => {
+        // Without this, a touch-drag on a node is ambiguous between "move
+        // this card" and "pan the canvas" — d3.zoom is bound to the same
+        // svg and listens for the same touch sequence on any descendant,
+        // since touch events bubble the way mouse events used by drag
+        // here do not conflict with it. Stopping the underlying touch
+        // event here is what lets a card win that race instead of the
+        // whole canvas panning under a finger that meant to drag one node.
+        if (event.sourceEvent) event.sourceEvent.stopPropagation();
 
-          // Bypass the simulation entirely. We don't restart d3-force —
-          // dragging directly updates this node's transform and its
-          // incident link endpoints below. Nothing else in the graph
-          // moves, period.
-          d.fx = d.x; d.fy = d.y;
-          d._dragFrom = { x: event.x, y: event.y };
-          d._dragMoved = false;
+        // Bypass the simulation entirely. We don't restart d3-force —
+        // dragging directly updates this node's transform and its
+        // incident link endpoints below. Nothing else in the graph
+        // moves, period.
+        d.fx = d.x;
+        d.fy = d.y;
+        d._dragFrom = { x: event.x, y: event.y };
+        d._dragMoved = false;
 
-          // What a drag on a card does is the table's (node.move, or
-          // node.resize from its edge, or nothing); a tag or topology bubble
-          // always moves. A drag that begins on the resize grip resizes
-          // instead of moving, when the table binds node.resize: same
-          // gesture, same handler; only the thing it changes differs.
-          const target = event.sourceEvent && event.sourceEvent.target;
-          const edge = Boolean(target && target.closest && target.closest('[data-resize="1"]'));
-          const action = d.type === 'article' ? actionFor(cardTarget(d), 'drag', { edge }) : 'node.move';
-          d._dragMoves = action === 'node.move';
-          d._resizing = action === 'node.resize';
-          if (d._resizing) {
-            const start = d._size || cardSizeFor({
+        // What a drag on a card does is the table's (node.move, or
+        // node.resize from its edge, or nothing); a tag or topology bubble
+        // always moves. A drag that begins on the resize grip resizes
+        // instead of moving, when the table binds node.resize: same
+        // gesture, same handler; only the thing it changes differs.
+        const target = event.sourceEvent && event.sourceEvent.target;
+        const edge = Boolean(target && target.closest && target.closest('[data-resize="1"]'));
+        const action = d.type === 'article' ? actionFor(cardTarget(d), 'drag', { edge }) : 'node.move';
+        d._dragMoves = action === 'node.move';
+        d._resizing = action === 'node.resize';
+        if (d._resizing) {
+          const start =
+            d._size ||
+            cardSizeFor({
               hovered: hoveredIdRef.current === d.id,
               pinned: pinnedIdsRef.current.has(d.id),
             });
-            d._resizeFrom = { w: start.width, h: start.height, x: event.x, y: event.y };
-          }
-        })
-        .on('drag', (event, d) => {
-          if (d._resizing) {
-            // The card is centred on the node, so the grip travels half as far
-            // as the edge it is pulling — hence the doubling.
-            const f = d._resizeFrom;
-            const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-            d._size = {
-              width: clamp(f.w + (event.x - f.x) * 2, CARD.minWidth, CARD.maxWidth),
-              height: clamp(f.h + (event.y - f.y) * 2, CARD.minHeight, CARD.maxHeight),
-            };
-            renderArticleBody(d);
-            if (viewStateRef.current) {
-              viewStateRef.current.setNodeSize(
-                persistKey(d), d._size.width, d._size.height, { transient: true },
-              );
-            }
-            updateContainers();
-            return;
-          }
-          if (!d._dragMoves) return;
-          // Under the click distance a press is a tap, not a drag: nothing
-          // moves and nothing is written, or the write re-renders the card
-          // mid-click and WebKit never delivers the click.
-          if (!d._dragMoved) {
-            const from = d._dragFrom || { x: event.x, y: event.y };
-            if (Math.hypot(event.x - from.x, event.y - from.y) < 5) return;
-            d._dragMoved = true;
-          }
-          d.x = event.x; d.y = event.y;
-          d.fx = event.x; d.fy = event.y;
+          d._resizeFrom = { w: start.width, h: start.height, x: event.x, y: event.y };
+        }
+      })
+      .on('drag', (event, d) => {
+        if (d._resizing) {
+          // The card is centred on the node, so the grip travels half as far
+          // as the edge it is pulling — hence the doubling.
+          const f = d._resizeFrom;
+          const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+          d._size = {
+            width: clamp(f.w + (event.x - f.x) * 2, CARD.minWidth, CARD.maxWidth),
+            height: clamp(f.h + (event.y - f.y) * 2, CARD.minHeight, CARD.maxHeight),
+          };
+          renderArticleBody(d);
           if (viewStateRef.current) {
-            viewStateRef.current.setNodePosition(persistKey(d), event.x, event.y, { transient: true });
-          }
-          const at = drawnAt(d);
-          nodes.filter(nd => nd.id === d.id)
-            .attr('transform', 'translate(' + at.x + ',' + at.y + ')' + upright());
-          if (articleNodes) {
-            articleNodes.filter(nd => nd.id === d.id)
-              .style('transform', `translate3d(${at.x}px, ${at.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`);
-          }
-          if (connectorUpdateRef.current) connectorUpdateRef.current();
-          links.each(function(l) {
-            const sid = typeof l.source === 'object' ? l.source.id : l.source;
-            const tid = typeof l.target === 'object' ? l.target.id : l.target;
-            if (sid === d.id || tid === d.id) {
-              l._path = linkPath(l, linkEndpoints(l));
-              d3.select(this).attr('d', l._path);
-            }
-          });
-          linkHits.attr('d', (l) => l._path || '');
-          redrawGhosts();
-          hideEdgeLabel();
-          sequencePulses.each(function(l) {
-            const sid = typeof l.source === 'object' ? l.source.id : l.source;
-            const tid = typeof l.target === 'object' ? l.target.id : l.target;
-            if (sid === d.id || tid === d.id) {
-              const ep = linkEndpoints(l);
-              d3.select(this).attr('d', linkPath(l, ep));
-            }
-          });
-          updateContainers();
-        })
-        .on('end', (event, d) => {
-          const vs = viewStateRef.current;
-          if (d._resizing) {
-            d._resizing = false;
-            // The resize is one history entry, like the drag.
-            if (vs) vs.commit();
-            updateContainers();
-            return;
-          }
-          d.fx = d.x; d.fy = d.y;
-          if (!d._dragMoved) return;
-          anchorsAuto = false;
-          // One history entry for the whole drag, not one per frame.
-          if (vs) {
-            vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
-            vs.commit();
+            viewStateRef.current.setNodeSize(persistKey(d), d._size.width, d._size.height, { transient: true });
           }
           updateContainers();
+          return;
+        }
+        if (!d._dragMoves) return;
+        // Under the click distance a press is a tap, not a drag: nothing
+        // moves and nothing is written, or the write re-renders the card
+        // mid-click and WebKit never delivers the click.
+        if (!d._dragMoved) {
+          const from = d._dragFrom || { x: event.x, y: event.y };
+          if (Math.hypot(event.x - from.x, event.y - from.y) < 5) return;
+          d._dragMoved = true;
+        }
+        d.x = event.x;
+        d.y = event.y;
+        d.fx = event.x;
+        d.fy = event.y;
+        if (viewStateRef.current) {
+          viewStateRef.current.setNodePosition(persistKey(d), event.x, event.y, { transient: true });
+        }
+        const at = drawnAt(d);
+        nodes.filter((nd) => nd.id === d.id).attr('transform', 'translate(' + at.x + ',' + at.y + ')' + upright());
+        if (articleNodes) {
+          articleNodes
+            .filter((nd) => nd.id === d.id)
+            .style(
+              'transform',
+              `translate3d(${at.x}px, ${at.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`,
+            );
+        }
+        if (connectorUpdateRef.current) connectorUpdateRef.current();
+        links.each(function (l) {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          if (sid === d.id || tid === d.id) {
+            l._path = linkPath(l, linkEndpoints(l));
+            d3.select(this).attr('d', l._path);
+          }
         });
-        
+        linkHits.attr('d', (l) => l._path || '');
+        redrawGhosts();
+        hideEdgeLabel();
+        sequencePulses.each(function (l) {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          if (sid === d.id || tid === d.id) {
+            const ep = linkEndpoints(l);
+            d3.select(this).attr('d', linkPath(l, ep));
+          }
+        });
+        updateContainers();
+      })
+      .on('end', (event, d) => {
+        const vs = viewStateRef.current;
+        if (d._resizing) {
+          d._resizing = false;
+          // The resize is one history entry, like the drag.
+          if (vs) vs.commit();
+          updateContainers();
+          return;
+        }
+        d.fx = d.x;
+        d.fy = d.y;
+        if (!d._dragMoved) return;
+        anchorsAuto = false;
+        // One history entry for the whole drag, not one per frame.
+        if (vs) {
+          vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });
+          vs.commit();
+        }
+        updateContainers();
+      });
+
     nodes.call(dragHandler);
 
-    const probe = svg.append('text')
-      .style('font-family', "'Atkinson', sans-serif")
-      .style('visibility', 'hidden');
+    const probe = svg.append('text').style('font-family', "'Atkinson', sans-serif").style('visibility', 'hidden');
 
     // Wrap a tag's bubble round its text with the same real gap on all four
     // sides.
@@ -3689,9 +4114,7 @@ export function GraphViewer({
     // this code controls rather than on a browser-computed central alignment.
     const TAG_FONT_FAMILY = "'Atkinson', sans-serif";
     const TAG_WEIGHT = 500;
-    const measureCtx = typeof document !== 'undefined'
-      ? document.createElement('canvas').getContext('2d')
-      : null;
+    const measureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 
     function inkOf(text, fontSize) {
       if (!measureCtx) return { width: text.length * fontSize * 0.5, ascent: fontSize * 0.7, descent: fontSize * 0.2 };
@@ -3707,7 +4130,7 @@ export function GraphViewer({
     const tagBubbles = [];
     function fitBubble(entry) {
       const { d, textEl, rectEl, lines, fontSize, lineH } = entry;
-      const inks = lines.map(l => inkOf(l, fontSize));
+      const inks = lines.map((l) => inkOf(l, fontSize));
 
       // Baselines one line-height apart, then shifted so the ink block is
       // centred on the node rather than the em block.
@@ -3718,7 +4141,7 @@ export function GraphViewer({
 
       const inkTop = top + shift;
       const inkBottom = bottom + shift;
-      const inkW = Math.max(...inks.map(i => i.width));
+      const inkW = Math.max(...inks.map((i) => i.width));
 
       textEl.selectAll('tspan').each(function (_, i) {
         d3.select(this).attr('y', rawBaselines[i] + shift);
@@ -3728,7 +4151,7 @@ export function GraphViewer({
         .attr('x', -inkW / 2 - TAG.padding)
         .attr('y', inkTop - TAG.padding)
         .attr('width', inkW + TAG.padding * 2)
-        .attr('height', (inkBottom - inkTop) + TAG.padding * 2);
+        .attr('height', inkBottom - inkTop + TAG.padding * 2);
 
       if (entry.formsEl) {
         const formsX = inkW / 2 + TAG.padding + 8;
@@ -3736,7 +4159,7 @@ export function GraphViewer({
         entry.formsEl.selectAll('tspan').attr('x', formsX);
       }
 
-      d._r = Math.hypot(inkW + TAG.padding * 2, (inkBottom - inkTop) + TAG.padding * 2) / 2;
+      d._r = Math.hypot(inkW + TAG.padding * 2, inkBottom - inkTop + TAG.padding * 2) / 2;
     }
 
     // A tag's label broken into the lines its bubble shows: whole as long as
@@ -3769,11 +4192,11 @@ export function GraphViewer({
           let bestSplit = 1;
           let bestCost = Infinity;
           for (let i = 1; i < pieces.length; i++) {
-            const cost = Math.max(
-              widthOf(join(pieces.slice(0, i))),
-              widthOf(join(pieces.slice(i))),
-            );
-            if (cost < bestCost) { bestCost = cost; bestSplit = i; }
+            const cost = Math.max(widthOf(join(pieces.slice(0, i))), widthOf(join(pieces.slice(i))));
+            if (cost < bestCost) {
+              bestCost = cost;
+              bestSplit = i;
+            }
           }
           lines = [join(pieces.slice(0, bestSplit)), join(pieces.slice(bestSplit))];
         }
@@ -3789,12 +4212,19 @@ export function GraphViewer({
     // A measurer for wrapTagLabel: a hidden text in the bubble's font, to be
     // removed by the caller.
     function tagProbe() {
-      const p = svg.append('text')
+      const p = svg
+        .append('text')
         .style('font-family', TAG_FONT_FAMILY)
         .style('visibility', 'hidden')
         .style('font-size', TAG.fontSize + 'px')
         .style('font-weight', '500');
-      return { widthOf: (t) => { p.text(t); return p.node().getComputedTextLength(); }, remove: () => p.remove() };
+      return {
+        widthOf: (t) => {
+          p.text(t);
+          return p.node().getComputedTextLength();
+        },
+        remove: () => p.remove(),
+      };
     }
 
     // The small lines beside a tag bubble (lib/tagForms.js: what each system
@@ -3808,13 +4238,18 @@ export function GraphViewer({
       return folded.length ? [d, ...folded].map((n) => n.label) : null;
     };
     function buildTagForms(el, d, fontSize) {
-      const formLines = d.type === 'tag'
-        ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items), { rtagz: feedData._rtagz, members: groupMembersOf(d) })
-        : [];
+      const formLines =
+        d.type === 'tag'
+          ? tagFormsLines(tagForms(feedData._rtagz, d.concept || d.label, feedData.items), {
+              rtagz: feedData._rtagz,
+              members: groupMembersOf(d),
+            })
+          : [];
       if (!formLines.length) return null;
       const formFontSize = Math.round(fontSize * 0.65);
       const formLineH = formFontSize * 1.25;
-      const formsEl = el.append('text')
+      const formsEl = el
+        .append('text')
         .attr('class', 'tag-forms')
         .attr('text-anchor', 'start')
         .attr('dominant-baseline', 'central')
@@ -3825,7 +4260,8 @@ export function GraphViewer({
         .style('pointer-events', 'none')
         .style('display', 'none');
       formLines.forEach((line, i) => {
-        formsEl.append('tspan')
+        formsEl
+          .append('tspan')
           .attr('y', (i - (formLines.length - 1) / 2) * formLineH)
           .text(line);
       });
@@ -3839,18 +4275,22 @@ export function GraphViewer({
     const MARK_R = tagMarkRadius({ graph: GS });
     const MARK_HIT_R = tagMarkHitRadius(MARK_R);
 
-    nodes.each(function(d) {
+    nodes.each(function (d) {
       const el = d3.select(this);
       if (d.type !== 'article') {
         const fontSize = TAG.fontSize;
 
         probe.style('font-size', fontSize + 'px').style('font-weight', '500');
-        const widthOf = (t) => { probe.text(t); return probe.node().getComputedTextLength(); };
+        const widthOf = (t) => {
+          probe.text(t);
+          return probe.node().getComputedTextLength();
+        };
 
         const lines = wrapTagLabel(d.label, widthOf);
         const effLineH = tagLineH(lines, fontSize);
 
-        const textEl = el.append('text')
+        const textEl = el
+          .append('text')
           .attr('text-anchor', 'middle')
           .attr('fill', '#1a1a2e')
           .style('font-family', TAG_FONT_FAMILY)
@@ -3861,9 +4301,16 @@ export function GraphViewer({
           textEl.append('tspan').attr('x', 0).text(line);
         });
 
-        const rectEl = el.insert('rect', 'text')
-          .attr('rx', TAG.cornerRadius).attr('ry', TAG.cornerRadius)
-          .attr('fill', 'var(--gv-' + (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') + ')')
+        const rectEl = el
+          .insert('rect', 'text')
+          .attr('rx', TAG.cornerRadius)
+          .attr('ry', TAG.cornerRadius)
+          .attr(
+            'fill',
+            'var(--gv-' +
+              (d.type === 'tag' ? 'tag-color' : d.type === 'topology' ? 'topology-color' : 'placeholder-color') +
+              ')',
+          )
           .attr('opacity', TAG.opacity);
 
         // A tag's dot and its hit circle, under the pill. Drawn only while
@@ -3873,10 +4320,7 @@ export function GraphViewer({
         // (paintTagColors) and opacity. A tap or a drag on either is one on
         // the tag node, as on its pill.
         if (d.type === 'tag') {
-          el.insert('circle', 'rect')
-            .attr('class', 'tag-mark-hit')
-            .attr('r', MARK_HIT_R)
-            .style('fill', 'transparent');
+          el.insert('circle', 'rect').attr('class', 'tag-mark-hit').attr('r', MARK_HIT_R).style('fill', 'transparent');
           el.insert('circle', 'rect')
             .attr('class', 'tag-mark')
             .attr('r', MARK_R)
@@ -3889,7 +4333,6 @@ export function GraphViewer({
         const entry = { d, el, textEl, rectEl, formsEl, lines, fontSize, lineH: effLineH };
         tagBubbles.push(entry);
         fitBubble(entry);
-
       } else {
         const rest = cardSizeFor({ hovered: false, pinned: false });
         d._r = Math.hypot(rest.width, rest.height) / 2;
@@ -3899,17 +4342,20 @@ export function GraphViewer({
     probe.remove();
 
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => {
-        tagBubbles.forEach(fitBubble);
-      }).catch(() => {});
+      document.fonts.ready
+        .then(() => {
+          tagBubbles.forEach(fitBubble);
+        })
+        .catch(() => {});
     }
 
     const reactRoots = new Map();
-    
-    let articleNodes = cardsTransform.selectAll('.node-card')
-      .data(data.nodes.filter(d => d.type === 'article'));
-      
-    const articleNodesEnter = articleNodes.enter().append('div')
+
+    let articleNodes = cardsTransform.selectAll('.node-card').data(data.nodes.filter((d) => d.type === 'article'));
+
+    const articleNodesEnter = articleNodes
+      .enter()
+      .append('div')
       .attr('class', 'node-card')
       .style('position', 'absolute')
       .style('left', '0')
@@ -3919,16 +4365,17 @@ export function GraphViewer({
       // No browser double-tap zoom on a card: two taps open the reader.
       .style('touch-action', 'manipulation')
       .call(dragHandler);
-      
+
     articleNodes = articleNodes.merge(articleNodesEnter);
 
     // A link node is a link for the keyboard too: it takes focus, and Enter
     // follows it.
-    articleNodesEnter.filter(d => !!d.link)
+    articleNodesEnter
+      .filter((d) => !!d.link)
       .attr('tabindex', 0)
       .attr('role', 'link')
       .attr('data-link-node', '')
-      .attr('aria-label', d => [d.title, d.subtitle, d.description].filter(Boolean).join('. '))
+      .attr('aria-label', (d) => [d.title, d.subtitle, d.description].filter(Boolean).join('. '))
       .on('keydown', (event, d) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
@@ -3936,7 +4383,7 @@ export function GraphViewer({
         followLink(d.originalItem || d, { settings: settingsForLinks() });
       });
 
-    articleNodesEnter.each(function(d) {
+    articleNodesEnter.each(function (d) {
       const root = createRoot(this);
       reactRoots.set(d.id, { root, wrapper: this, cardSelection: d3.select(this) });
     });
@@ -3961,21 +4408,22 @@ export function GraphViewer({
       const pinned = pinnedIdsRef.current.has(d.id);
       const lod = getLOD(zoomScaleRef.current);
       const defaultSize = cardSizeFor({ hovered, pinned });
-      const customSize = d._size || (d._customWidth && d._customHeight ? { width: d._customWidth, height: d._customHeight } : null);
+      const customSize =
+        d._size || (d._customWidth && d._customHeight ? { width: d._customWidth, height: d._customHeight } : null);
       const w = customSize ? customSize.width : defaultSize.width;
       const h = customSize ? customSize.height : defaultSize.height;
 
       entry.wrapper.style.width = w + 'px';
       entry.wrapper.style.height = h + 'px';
-      entry.wrapper.style.marginLeft = (-w / 2) + 'px';
-      entry.wrapper.style.marginTop = (-h / 2) + 'px';
+      entry.wrapper.style.marginLeft = -w / 2 + 'px';
+      entry.wrapper.style.marginTop = -h / 2 + 'px';
 
       const Lens = lensFor(d.kind);
       const vs = viewStateRef.current;
       const bms = vs ? vs.bookmarks(persistKey(d)) : [];
       // How far this viewer has read it (graph.readingProgress, default on).
-      const progress = GS.readingProgress !== false && vs && vs.readingProgress
-        ? vs.readingProgress(persistKey(d)) : null;
+      const progress =
+        GS.readingProgress !== false && vs && vs.readingProgress ? vs.readingProgress(persistKey(d)) : null;
       const contributionCount = contributionCountsFor().get(d.id) || 0;
       entry.root.render(
         React.createElement(Lens, {
@@ -4000,18 +4448,20 @@ export function GraphViewer({
           // The listening strip in an open card (settings.cards.listen).
           listen: LISTEN_IN_CARD,
           // No handles and no resizing unless the table binds node.resize.
-          onResize: RESIZE_ON ? ({ width: newW, height: newH }) => {
-            d._customWidth = newW;
-            d._customHeight = newH;
-            d._size = { width: newW, height: newH };
-            entry.wrapper.style.width = newW + 'px';
-            entry.wrapper.style.height = newH + 'px';
-            entry.wrapper.style.marginLeft = (-newW / 2) + 'px';
-            entry.wrapper.style.marginTop = (-newH / 2) + 'px';
-            d._r = Math.max(newW, newH) / 2;
-            renderArticleBody(d);
-          } : undefined,
-        })
+          onResize: RESIZE_ON
+            ? ({ width: newW, height: newH }) => {
+                d._customWidth = newW;
+                d._customHeight = newH;
+                d._size = { width: newW, height: newH };
+                entry.wrapper.style.width = newW + 'px';
+                entry.wrapper.style.height = newH + 'px';
+                entry.wrapper.style.marginLeft = -newW / 2 + 'px';
+                entry.wrapper.style.marginTop = -newH / 2 + 'px';
+                d._r = Math.max(newW, newH) / 2;
+                renderArticleBody(d);
+              }
+            : undefined,
+        }),
       );
       // Keep the collision radius on the resting footprint. Growing it on
       // hover would shove the neighbours away every time the cursor passed,
@@ -4023,7 +4473,9 @@ export function GraphViewer({
     articleNodes.on('wheel', (e) => e.stopPropagation());
 
     function renderAllArticleBodies() {
-      data.nodes.forEach(d => { if (d.type === 'article') renderArticleBody(d); });
+      data.nodes.forEach((d) => {
+        if (d.type === 'article') renderArticleBody(d);
+      });
     }
     renderAllArticleBodiesRef.current = renderAllArticleBodies;
 
@@ -4061,7 +4513,9 @@ export function GraphViewer({
           }
         } catch (_) {}
         if (!r || !r.ok) {
-          try { r = await fetch(d.url); } catch (_) {}
+          try {
+            r = await fetch(d.url);
+          } catch (_) {}
         }
         if (!r || !r.ok) {
           if (filename) r = await fetch('./' + filename);
@@ -4071,16 +4525,14 @@ export function GraphViewer({
       };
 
       const loading = tryFetch()
-        .then(html => {
+        .then((html) => {
           const doc = new DOMParser().parseFromString(html, 'text/html');
           const h1 = doc.querySelector('h1');
           if (h1) h1.remove();
           // The page's own rights footer is fixed to its window; inside a
           // card it drew outside the card. The page shows the line once.
           doc.querySelectorAll('.pp-rights').forEach((el) => el.remove());
-          const bodyHtml = doc.querySelector('body')
-            ? doc.querySelector('body').innerHTML
-            : html;
+          const bodyHtml = doc.querySelector('body') ? doc.querySelector('body').innerHTML : html;
           articleContentCache.set(d.id, bodyHtml);
           d._fullContent = bodyHtml;
         })
@@ -4088,7 +4540,9 @@ export function GraphViewer({
           articleContentCache.set(d.id, null);
           d._fullContent = null;
         })
-        .then(() => { articleContentLoading.delete(d.id); });
+        .then(() => {
+          articleContentLoading.delete(d.id);
+        });
       articleContentLoading.set(d.id, loading);
       return loading;
     }
@@ -4096,10 +4550,15 @@ export function GraphViewer({
     renderAllArticleBodies();
     // Restored open nodes: fetch their text and bring them to the front.
     pinnedIdsRef.current.forEach((id) => {
-      const d = data.nodes.find(nd => nd.id === id);
+      const d = data.nodes.find((nd) => nd.id === id);
       if (!d) return;
-      articleNodes.filter(nd => nd.id === id).raise().style('z-index', 10);
-      loadFullContent(d).then(() => { if (pinnedIdsRef.current.has(id)) renderArticleBody(d); });
+      articleNodes
+        .filter((nd) => nd.id === id)
+        .raise()
+        .style('z-index', 10);
+      loadFullContent(d).then(() => {
+        if (pinnedIdsRef.current.has(id)) renderArticleBody(d);
+      });
     });
     applyVisibility(svg, cardsLayer, hiddenSourcesRef.current, sourceColorOf, minPiecesChosen(), minRatioChosen());
 
@@ -4157,8 +4616,7 @@ export function GraphViewer({
           tapGate.cancel();
           return;
         }
-        const isPopout = target && (target.dataset?.popout === '1' ||
-                                    target.closest?.('[data-popout="1"]'));
+        const isPopout = target && (target.dataset?.popout === '1' || target.closest?.('[data-popout="1"]'));
         if (isPopout) {
           event.stopPropagation();
           if (onNodeSelectRef.current) {
@@ -4180,9 +4638,11 @@ export function GraphViewer({
         // and a double tap opens the reader, leaving the card as it was).
         const cardEl = event.currentTarget;
         const at = pointOf(event);
-        tapOrDouble(event,
+        tapOrDouble(
+          event,
           () => runAction(actionFor(cardTarget(d), 'tap'), { d, cardEl, ...at }),
-          () => cardDouble(d, cardEl, at));
+          () => cardDouble(d, cardEl, at),
+        );
       });
 
     let lastCardDouble = 0;
@@ -4203,7 +4663,11 @@ export function GraphViewer({
     function titleFontOf(d) {
       const entry = reactRoots.get(d.id);
       if (!entry) return 0;
-      try { flushSync(() => renderArticleBody(d)); } catch (_) { /* inside a render: as drawn */ }
+      try {
+        flushSync(() => renderArticleBody(d));
+      } catch (_) {
+        /* inside a render: as drawn */
+      }
       const el = entry.wrapper.querySelector('[data-card-title]');
       return el ? parseFloat(getComputedStyle(el).fontSize) || 0 : 0;
     }
@@ -4256,11 +4720,16 @@ export function GraphViewer({
       const transform = d3.zoomIdentity.translate(v.x + pan.x, v.y + pan.y).scale(v.k);
       userMovedView = true;
       focusActive = false;
-      svg.transition('key-zoom').duration(320).ease(d3.easeCubicOut)
+      svg
+        .transition('key-zoom')
+        .duration(320)
+        .ease(d3.easeCubicOut)
         .call(zoom.transform, transform, [px, py])
-        .on('end', () => setTimeout(() => {
-          if (titlePxOf(d) < READABLE_PX) zoomToReadable(d, fx, fy, round + 1);
-        }, 80));
+        .on('end', () =>
+          setTimeout(() => {
+            if (titlePxOf(d) < READABLE_PX) zoomToReadable(d, fx, fy, round + 1);
+          }, 80),
+        );
     }
     function readCard(d) {
       lastCardDouble = Date.now();
@@ -4281,8 +4750,8 @@ export function GraphViewer({
         focusNode(d);
         if (viewStateRef.current) viewStateRef.current.setNodePinned(persistKey(d), true);
         renderArticleBody(d);
-        nodes.filter(nd => nd.id === d.id).raise();
-        articleNodes.filter(nd => nd.id === d.id).raise();
+        nodes.filter((nd) => nd.id === d.id).raise();
+        articleNodes.filter((nd) => nd.id === d.id).raise();
         cardEl.style.zIndex = 10;
         // Fetch full article body so the pinned node becomes a mini-reader.
         // Re-render when content arrives, but only if this node is still
@@ -4301,7 +4770,10 @@ export function GraphViewer({
       const T = typeof window !== 'undefined' ? window.TTS : null;
       if (!T || d.link || d.type !== 'article') return;
       const bodyOf = () => cardEl.querySelector('.rp-scroll');
-      if (pinnedIdsRef.current.has(d.id)) { toggleListen(T, bodyOf()); return; }
+      if (pinnedIdsRef.current.has(d.id)) {
+        toggleListen(T, bodyOf());
+        return;
+      }
       togglePinned(d, cardEl);
       loadFullContent(d).then(() => {
         if (!pinnedIdsRef.current.has(d.id)) return;
@@ -4331,14 +4803,16 @@ export function GraphViewer({
     // is on it; its hit circle stays under the pointer meanwhile, so the
     // pill does not flicker off at the dot's edge.
     function updateTagForms() {
-      nodes.select('.tag-forms')
+      nodes
+        .select('.tag-forms')
         .style('display', (d) => (d && (d.id === activeTag || d.id === hoveredTag) ? null : 'none'));
       nodes.classed('tag-hover', (d) => Boolean(d && d.type === 'tag' && d.id === hoveredTag));
     }
     // Hover is a mouse's or a pen's: a finger does not hover, so a tap shows
     // a tag's pill by picking it (tag-shown, paintHighlight) and leaves no
     // hover behind when it lifts.
-    nodes.filter(d => d.type === 'tag')
+    nodes
+      .filter((d) => d.type === 'tag')
       .on('pointerenter', (event, d) => {
         if (event.pointerType === 'touch') return;
         hoveredTag = d.id;
@@ -4350,7 +4824,8 @@ export function GraphViewer({
           updateTagForms();
         }
       });
-    nodes.filter(d => d.type !== 'article')
+    nodes
+      .filter((d) => d.type !== 'article')
       .on('click', (event, d) => {
         event.stopPropagation();
         tapOrDouble(event, () => toggleTagHighlight(d));
@@ -4384,22 +4859,24 @@ export function GraphViewer({
       }
       const id = activeTag;
       const connected = new Set(
-        data.links.filter(l => {
-          const sid = typeof l.source === 'object' ? l.source.id : l.source;
-          const tid = typeof l.target === 'object' ? l.target.id : l.target;
-          return sid === id || tid === id;
-        }).map(l => {
-          const sid = typeof l.source === 'object' ? l.source.id : l.source;
-          const tid = typeof l.target === 'object' ? l.target.id : l.target;
-          return sid === id ? tid : sid;
-        })
+        data.links
+          .filter((l) => {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            return sid === id || tid === id;
+          })
+          .map((l) => {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            return sid === id ? tid : sid;
+          }),
       );
       connected.add(id);
       for (const r of relationShown) connected.add(r.id);
-      nodes.classed('dimmed', nd => !connected.has(nd.id));
-      nodes.classed('tag-active', nd => nd.id === id);
-      articleNodes.classed('dimmed', nd => !connected.has(nd.id));
-      links.classed('highlighted', l => {
+      nodes.classed('dimmed', (nd) => !connected.has(nd.id));
+      nodes.classed('tag-active', (nd) => nd.id === id);
+      articleNodes.classed('dimmed', (nd) => !connected.has(nd.id));
+      links.classed('highlighted', (l) => {
         const sid = typeof l.source === 'object' ? l.source.id : l.source;
         const tid = typeof l.target === 'object' ? l.target.id : l.target;
         return sid === id || tid === id;
@@ -4460,7 +4937,7 @@ export function GraphViewer({
     // gets no frames at all. A reader whose whole arrangement is already saved
     // needs no simulation — and would have got a graph stacked at the origin.
     function redrawLinks() {
-      links.each(function(l) {
+      links.each(function (l) {
         l._path = linkPath(l, linkEndpoints(l));
         d3.select(this).attr('d', l._path);
       });
@@ -4472,9 +4949,15 @@ export function GraphViewer({
     function applyPositions() {
       refreshGrow();
       redrawLinks();
-      nodes.attr('transform', (d) => { const q = drawnAt(d); return 'translate(' + q.x + ',' + q.y + ')' + upright(); });
+      nodes.attr('transform', (d) => {
+        const q = drawnAt(d);
+        return 'translate(' + q.x + ',' + q.y + ')' + upright();
+      });
       if (articleNodes) {
-        articleNodes.style('transform', (d) => { const q = drawnAt(d); return `translate3d(${q.x}px, ${q.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`; });
+        articleNodes.style('transform', (d) => {
+          const q = drawnAt(d);
+          return `translate3d(${q.x}px, ${q.y}px, 0px) rotate(var(--gv-unrot, 0deg))${d._cardScale && d._cardScale !== 1 ? ` scale(${d._cardScale})` : ''}`;
+        });
       }
       updateContainers();
       if (rootsUpdateRef.current) rootsUpdateRef.current();
@@ -4519,19 +5002,25 @@ export function GraphViewer({
     let readersList = [];
     function buildReaders() {
       readersLayer.selectAll('*').remove();
-      readersList = connectionEdges(contributionsRef.current).map((e) => {
-        const src = nodeBySlug.get(e.source);
-        const tgt = nodeBySlug.get(e.target);
-        if (!src || !tgt) return null;
-        const el = readersLayer.append('g').attr('class', 'readers-edge').attr('data-readers-edge', e.id);
-        el.append('title').text(`From a reader, ${e.author}: ${e.label}`);
-        return {
-          ...e,
-          l: { source: src, target: tgt, layer: 'contribution' },
-          el,
-          line: el.append('path').attr('class', 'readers-line link-contribution').attr('fill', 'none').attr('data-label', e.label),
-        };
-      }).filter(Boolean);
+      readersList = connectionEdges(contributionsRef.current)
+        .map((e) => {
+          const src = nodeBySlug.get(e.source);
+          const tgt = nodeBySlug.get(e.target);
+          if (!src || !tgt) return null;
+          const el = readersLayer.append('g').attr('class', 'readers-edge').attr('data-readers-edge', e.id);
+          el.append('title').text(`From a reader, ${e.author}: ${e.label}`);
+          return {
+            ...e,
+            l: { source: src, target: tgt, layer: 'contribution' },
+            el,
+            line: el
+              .append('path')
+              .attr('class', 'readers-line link-contribution')
+              .attr('fill', 'none')
+              .attr('data-label', e.label),
+          };
+        })
+        .filter(Boolean);
     }
     function paintReaders({ rebuild = false } = {}) {
       if (rebuild) buildReaders();
@@ -4568,7 +5057,9 @@ export function GraphViewer({
     // broader tag's bubble. What a line is (its type, weight and why) is said
     // only in the edge label, on hover or tap.
     const nodeElById = new Map();
-    nodes.each(function (d) { nodeElById.set(d.id, this); });
+    nodes.each(function (d) {
+      nodeElById.set(d.id, this);
+    });
     const bubbleOf = new Map(tagBubbles.map((e) => [e.d.id, e]));
     let relationsExpanded = false;
     let relationShown = []; // [{ id, l, line, hit }]
@@ -4620,7 +5111,7 @@ export function GraphViewer({
       const ly = ux * Math.sin(a) + uy * Math.cos(a);
       return Math.min(
         Math.abs(lx) > 1e-4 ? hw / Math.abs(lx) : Infinity,
-        Math.abs(ly) > 1e-4 ? hh / Math.abs(ly) : Infinity
+        Math.abs(ly) > 1e-4 ? hh / Math.abs(ly) : Infinity,
       );
     }
     function buildRelations(net) {
@@ -4629,7 +5120,10 @@ export function GraphViewer({
       relationHitsLayer.selectAll('*').remove();
       relationShown = [];
       relationMoreEl.style('display', 'none');
-      if (!net || !net.relatives.length) { relationsLayer.style('display', 'none'); return; }
+      if (!net || !net.relatives.length) {
+        relationsLayer.style('display', 'none');
+        return;
+      }
       relationsLayer.style('display', null);
       for (const r of net.relatives) {
         // A broader or broadMatch is drawn from the narrower tag's bubble to
@@ -4645,7 +5139,8 @@ export function GraphViewer({
           directed: r.broader !== null,
           label: relativeLabel(r),
         };
-        const line = relationsLayer.append('path')
+        const line = relationsLayer
+          .append('path')
           .attr('class', ['relation-line', ...types.map((t) => `relation-${t}`)].join(' '))
           .attr('fill', 'none')
           .attr('data-relation', r.id)
@@ -4654,7 +5149,8 @@ export function GraphViewer({
           // (a tag's name may hold spaces).
           .attr('data-relation-folded', r.members ? r.members.map((m) => m.id).join('|') : null)
           .attr('marker-end', l.directed ? 'url(#relation-arrow)' : null);
-        const hit = relationHitsLayer.append('path')
+        const hit = relationHitsLayer
+          .append('path')
           .attr('class', 'relation-hit')
           .attr('fill', 'none')
           .attr('data-relation', r.id)
@@ -4662,8 +5158,12 @@ export function GraphViewer({
           .style('stroke-width', '16px')
           .style('pointer-events', 'stroke')
           .style('cursor', 'default')
-          .on('mouseenter', function () { showEdgeLabel(l, this); })
-          .on('mouseleave', () => { if (!edgeLabelTimer) hideEdgeLabel(); })
+          .on('mouseenter', function () {
+            showEdgeLabel(l, this);
+          })
+          .on('mouseleave', () => {
+            if (!edgeLabelTimer) hideEdgeLabel();
+          })
           .on('click', function (event) {
             // A tap names the line, as it names an edge; it does not count
             // as a tap on the canvas.
@@ -4671,7 +5171,10 @@ export function GraphViewer({
             const el = this;
             tapOrDouble(event, () => {
               showEdgeLabel(l, el);
-              edgeLabelTimer = setTimeout(() => { edgeLabelTimer = null; hideEdgeLabel(); }, 2500);
+              edgeLabelTimer = setTimeout(() => {
+                edgeLabelTimer = null;
+                hideEdgeLabel();
+              }, 2500);
             });
           });
         relationShown.push({ id: r.id, l, line, hit });
@@ -4721,9 +5224,17 @@ export function GraphViewer({
         const label = relationMoreEl.select('text').text();
         const w = (label.length * 0.62 + 1.6) * fs;
         const h = fs * 1.6;
-        const below = (e ? (Number(e.rectEl.attr('y')) || 0) + (Number(e.rectEl.attr('height')) || 0) : TAG.fontSize) + h / 2 + 4 / k;
-        relationMoreEl.select('rect')
-          .attr('x', -w / 2).attr('y', -h / 2).attr('width', w).attr('height', h).attr('rx', h / 2)
+        const below =
+          (e ? (Number(e.rectEl.attr('y')) || 0) + (Number(e.rectEl.attr('height')) || 0) : TAG.fontSize) +
+          h / 2 +
+          4 / k;
+        relationMoreEl
+          .select('rect')
+          .attr('x', -w / 2)
+          .attr('y', -h / 2)
+          .attr('width', w)
+          .attr('height', h)
+          .attr('rx', h / 2)
           .attr('stroke-width', 1 / k);
         relationMoreEl.select('text').attr('font-size', fs);
         const q = drawnAt(a);
@@ -4747,9 +5258,14 @@ export function GraphViewer({
         const net = relationNet();
         const sig = net
           ? [
-            activeTag, chosenTag, relationsExpanded ? 'all' : 'strongest', net.more,
-            ...net.relatives.map((r) => `${r.id}>${r.broader || ''}${r.members ? `=${r.members.map((m) => m.id).join(',')}` : ''}`),
-          ].join('\u0000')
+              activeTag,
+              chosenTag,
+              relationsExpanded ? 'all' : 'strongest',
+              net.more,
+              ...net.relatives.map(
+                (r) => `${r.id}>${r.broader || ''}${r.members ? `=${r.members.map((m) => m.id).join(',')}` : ''}`,
+              ),
+            ].join('\u0000')
           : '';
         if (force || sig !== relationSig) {
           relationSig = sig;
@@ -4760,14 +5276,20 @@ export function GraphViewer({
       paintRelations();
     }
     function toggleRelationsExpanded(event) {
-      if (event) { event.stopPropagation(); event.preventDefault(); }
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
       relationsExpanded = !relationsExpanded;
       refreshRelations({ force: true });
     }
     relationMoreEl
       .attr('tabindex', 0)
       .on('click', (event) => toggleRelationsExpanded(event))
-      .on('dblclick', (event) => { event.stopPropagation(); event.preventDefault(); })
+      .on('dblclick', (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+      })
       .on('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') toggleRelationsExpanded(event);
       });
@@ -4787,7 +5309,9 @@ export function GraphViewer({
     if (ROOTS) {
       const memberOf = new Map();
       for (const [cId, members] of containerMembers) for (const slug of members) memberOf.set(slug, cId);
-      const seq = data.links.filter((l) => l.layer === 'sequence').map((l) => ({ source: endId(l.source), target: endId(l.target) }));
+      const seq = data.links
+        .filter((l) => l.layer === 'sequence')
+        .map((l) => ({ source: endId(l.source), target: endId(l.target) }));
       const top = (data.containers || []).find((c) => !c.parent);
       const seed = String(ROOTS.seed || (top && top.id) || 'roots');
       rootsList = rootSegments({ containers: data.containers || [], memberOf, sequence: seq }).map((seg) => {
@@ -4796,8 +5320,16 @@ export function GraphViewer({
           ...seg,
           shape: rootShape(seed + '|' + seg.key),
           el,
-          main: el.append('path').attr('class', 'root-main').attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke'),
-          fine: el.append('path').attr('class', 'root-fine').attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke'),
+          main: el
+            .append('path')
+            .attr('class', 'root-main')
+            .attr('fill', 'none')
+            .attr('vector-effect', 'non-scaling-stroke'),
+          fine: el
+            .append('path')
+            .attr('class', 'root-fine')
+            .attr('fill', 'none')
+            .attr('vector-effect', 'non-scaling-stroke'),
           state: 'hidden',
         };
       });
@@ -4817,10 +5349,13 @@ export function GraphViewer({
     function reachState(reach) {
       const vs = viewStateRef.current;
       if (!vs || !vs.readingProgress) return 'hidden';
-      const of = (slug) => { const n = nodeBySlug.get(slug); return n ? vs.readingProgress(persistKey(n)) : { seen: false, done: false }; };
+      const of = (slug) => {
+        const n = nodeBySlug.get(slug);
+        return n ? vs.readingProgress(persistKey(n)) : { seen: false, done: false };
+      };
       if (reach.node) {
         const p = of(reach.node);
-        return p.done ? 'done' : (p.seen || p.max > 0) ? 'seen' : 'hidden';
+        return p.done ? 'done' : p.seen || p.max > 0 ? 'seen' : 'hidden';
       }
       const ps = getAllMemberSlugs(reach.container).map(of);
       if (!ps.length || !ps.some((p) => p.seen || p.max > 0)) return 'hidden';
@@ -4831,7 +5366,8 @@ export function GraphViewer({
       if (!rootsList.length) return;
       for (const r of rootsList) {
         const state = reachState(r.reach);
-        const a = rootEnd(r.from), b = rootEnd(r.to);
+        const a = rootEnd(r.from),
+          b = rootEnd(r.to);
         if (state === 'hidden' || !a || !b) {
           r.el.style('display', 'none');
           if (state === 'hidden') r.state = 'hidden';
@@ -4845,13 +5381,20 @@ export function GraphViewer({
         // when the page opened is simply there.
         if (r.state === 'hidden' && rootsPainted) {
           for (const p of [r.main, r.fine]) {
-            p.attr('pathLength', 1).style('stroke-dasharray', '1 1').style('stroke-dashoffset', 1).style('transition', 'none');
+            p.attr('pathLength', 1)
+              .style('stroke-dasharray', '1 1')
+              .style('stroke-dashoffset', 1)
+              .style('transition', 'none');
             const node = p.node();
             if (node) node.getBoundingClientRect();
             p.style('transition', 'stroke-dashoffset 1.8s ease-out').style('stroke-dashoffset', 0);
           }
           setTimeout(() => {
-            for (const p of [r.main, r.fine]) p.attr('pathLength', null).style('stroke-dasharray', null).style('stroke-dashoffset', null).style('transition', null);
+            for (const p of [r.main, r.fine])
+              p.attr('pathLength', null)
+                .style('stroke-dasharray', null)
+                .style('stroke-dashoffset', null)
+                .style('transition', null);
           }, 1900);
         }
         r.state = state;
@@ -4860,12 +5403,30 @@ export function GraphViewer({
     }
     function scheduleRoots() {
       if (!rootsList.length || rootsFrame) return;
-      rootsFrame = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame(paintRoots) : setTimeout(paintRoots, 16);
+      rootsFrame =
+        typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame(paintRoots) : setTimeout(paintRoots, 16);
     }
     rootsUpdateRef.current = ROOTS ? scheduleRoots : null;
 
     let hasFitted = false;
-    graphRef.current = { data, nodes, articleNodes, links, applyPositions, svg, zoom, fitToViewport, simulation, axisLayer, g, updateContainers, ringTargets, recomputeContainers, toScreen, drawnAt };
+    graphRef.current = {
+      data,
+      nodes,
+      articleNodes,
+      links,
+      applyPositions,
+      svg,
+      zoom,
+      fitToViewport,
+      simulation,
+      axisLayer,
+      g,
+      updateContainers,
+      ringTargets,
+      recomputeContainers,
+      toScreen,
+      drawnAt,
+    };
     positionsReady = true;
 
     // The cover says where its art sits in the graph state (and again when
@@ -4924,7 +5485,10 @@ export function GraphViewer({
       for (const [id, p] of moved) {
         const d = nodeByIdForNudge.get(id);
         if (!d) continue;
-        d.x = p.x; d.y = p.y; d.vx = 0; d.vy = 0;
+        d.x = p.x;
+        d.y = p.y;
+        d.vx = 0;
+        d.vy = 0;
         if (d.fx != null) d.fx = p.x;
         if (d.fy != null) d.fy = p.y;
       }
@@ -4984,7 +5548,8 @@ export function GraphViewer({
       // the members a bubble stands for are in its forms, so a change of them
       // redraws it too
       const membersKey = (groupMembersOf(d) || []).join('\u0000');
-      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback) && entry.membersKey === membersKey) return;
+      if (d._shownLabel === shown && Boolean(entry.fallback) === Boolean(fallback) && entry.membersKey === membersKey)
+        return;
       entry.membersKey = membersKey;
       d._shownLabel = shown;
       entry.fallback = Boolean(fallback);
@@ -4992,7 +5557,9 @@ export function GraphViewer({
       const lines = wrapTagLabel(shown, p.widthOf);
       p.remove();
       textEl.selectAll('tspan').remove();
-      lines.forEach((line) => { textEl.append('tspan').attr('x', 0).text(line); });
+      lines.forEach((line) => {
+        textEl.append('tspan').attr('x', 0).text(line);
+      });
       entry.lines = lines;
       entry.lineH = tagLineH(lines, fontSize);
       el.classed('tag-fallback', entry.fallback);
@@ -5024,7 +5591,10 @@ export function GraphViewer({
           released = true;
           delete d._groupedInto;
           if (d._groupSaved) {
-            if (inForce) { d.fx = d._groupSaved.fx; d.fy = d._groupSaved.fy; }
+            if (inForce) {
+              d.fx = d._groupSaved.fx;
+              d.fy = d._groupSaved.fy;
+            }
             delete d._groupSaved;
           }
         }
@@ -5034,14 +5604,22 @@ export function GraphViewer({
           delete d._groupKey;
           if (d._preGroupPos) {
             const p = d._preGroupPos;
-            if (inForce) { d.x = p.x; d.y = p.y; d.fx = p.fx; d.fy = p.fy; }
+            if (inForce) {
+              d.x = p.x;
+              d.y = p.y;
+              d.fx = p.fx;
+              d.fy = p.fy;
+            }
             delete d._preGroupPos;
           }
         }
         if (released && !inForce && vs && vs.nodeState) {
           const saved = vs.nodeState(positionKey(d));
           if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-            d.x = saved.x; d.y = saved.y; d.fx = saved.x; d.fy = saved.y;
+            d.x = saved.x;
+            d.y = saved.y;
+            d.fx = saved.x;
+            d.fy = saved.y;
           }
         }
       }
@@ -5065,12 +5643,14 @@ export function GraphViewer({
       // bubble, whatever concept its label is read from (two tags mapped to
       // one vocabulary concept both show its label, each dashed or not on
       // its own), so depth 0 restores and never collapses.
-      for (const [gid, members] of (depthSteps(depth) > 0 ? groups : [])) {
+      for (const [gid, members] of depthSteps(depth) > 0 ? groups : []) {
         if (members.length === 1 && members[0].concept === gid) continue;
         hasGroups = true;
         const own = members.filter((d) => d.concept === gid);
         const pool = own.length ? own : members;
-        const rep = pool.slice().sort((a, b) => (pieceCountOf(b.id) - pieceCountOf(a.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+        const rep = pool
+          .slice()
+          .sort((a, b) => pieceCountOf(b.id) - pieceCountOf(a.id) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
         rep._preGroupPos = { x: rep.x, y: rep.y, fx: rep.fx, fy: rep.fy };
         rep._groupKey = 'concept:' + gid;
         const saved = vs && vs.nodeState ? vs.nodeState(placeOf(layoutRef.current) + rep._groupKey) : null;
@@ -5079,13 +5659,21 @@ export function GraphViewer({
           // and a tick puts x back to fx: a pinned representative moves only
           // through its pin. A reader-placed position pins it there; a
           // layout-made one (auto) moves the pin it already has.
-          rep.x = saved.x; rep.y = saved.y;
-          if (!saved.auto || rep.fx != null) { rep.fx = saved.x; rep.fy = saved.y; }
+          rep.x = saved.x;
+          rep.y = saved.y;
+          if (!saved.auto || rep.fx != null) {
+            rep.fx = saved.x;
+            rep.fy = saved.y;
+          }
         } else {
           const c = centroidOf(members);
           if (c) {
-            rep.x = c.x; rep.y = c.y;
-            if (rep.fx != null) { rep.fx = c.x; rep.fy = c.y; }
+            rep.x = c.x;
+            rep.y = c.y;
+            if (rep.fx != null) {
+              rep.fx = c.x;
+              rep.fy = c.y;
+            }
           }
         }
         const linkedToRep = new Set(tagLinks.filter((l) => endId(l.target) === rep.id).map((l) => endId(l.source)));
@@ -5093,7 +5681,8 @@ export function GraphViewer({
           if (d === rep) continue;
           d._groupedInto = rep.id;
           d._groupSaved = { fx: d.fx, fy: d.fy };
-          d.fx = d.x; d.fy = d.y;
+          d.fx = d.x;
+          d.fy = d.y;
           for (const l of tagLinks) {
             if (endId(l.target) !== d.id) continue;
             l._origTarget = l.target;
@@ -5136,7 +5725,10 @@ export function GraphViewer({
     // depth 0 is what was just drawn).
     if (tagEntries.length) {
       const first = schemeChosen();
-      if (first.scheme !== SITE_SCHEME || first.depth !== 0) { schemeShown = first; applyScheme(first); }
+      if (first.scheme !== SITE_SCHEME || first.depth !== 0) {
+        schemeShown = first;
+        applyScheme(first);
+      }
     }
 
     // Paint once now, from whatever positions were restored or seeded, so the
@@ -5162,7 +5754,12 @@ export function GraphViewer({
           const info = CL.containers.get(cId);
           const off = info && containerOffset(cId);
           if (!off || hasClosedAncestor(containerById.get(cId))) continue;
-          rects.push({ x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 });
+          rects.push({
+            x0: off.x + info.box.x0,
+            y0: off.y + info.box.y0,
+            x1: off.x + info.box.x1,
+            y1: off.y + info.box.y1,
+          });
         }
       }
       for (const rootId of CL.roots) {
@@ -5170,19 +5767,28 @@ export function GraphViewer({
         const off = rootOffset(rootId);
         if (!info || !off) continue;
         if (anchoredOn && getAllMemberSlugs(rootId).every((s) => anchoredOf.has(s))) continue;
-        if (getAllMemberSlugs(rootId).every((s) => hiddenSourcesRef.current.has(nodeBySlug.get(s)?._source?.id))) continue;
-        rects.push({ x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 });
+        if (getAllMemberSlugs(rootId).every((s) => hiddenSourcesRef.current.has(nodeBySlug.get(s)?._source?.id)))
+          continue;
+        rects.push({
+          x0: off.x + info.box.x0,
+          y0: off.y + info.box.y0,
+          x1: off.x + info.box.x1,
+          y1: off.y + info.box.y1,
+        });
       }
       for (const d of data.nodes) {
         if (d.type !== 'article' || CL.nodes.has(d.id) || !Number.isFinite(d.x)) continue;
         if (d._source && hiddenSourcesRef.current.has(d._source.id)) continue;
-        const w = (d._size?.width || CARD.width) / 2, h = (d._size?.height || CARD.height) / 2;
+        const w = (d._size?.width || CARD.width) / 2,
+          h = (d._size?.height || CARD.height) / 2;
         rects.push({ x0: d.x - w, y0: d.y - h, x1: d.x + w, y1: d.y + h });
       }
       if (!rects.length) return null;
       return {
-        x0: Math.min(...rects.map((r) => r.x0)), y0: Math.min(...rects.map((r) => r.y0)),
-        x1: Math.max(...rects.map((r) => r.x1)), y1: Math.max(...rects.map((r) => r.y1)),
+        x0: Math.min(...rects.map((r) => r.x0)),
+        y0: Math.min(...rects.map((r) => r.y0)),
+        x1: Math.max(...rects.map((r) => r.x1)),
+        y1: Math.max(...rects.map((r) => r.y1)),
       };
     }
 
@@ -5199,11 +5805,21 @@ export function GraphViewer({
       if (!info || !c || closedContainers.has(id) || hasClosedAncestor(c)) return null;
       const off = containerOffset(id);
       if (!off) return null;
-      const box = { x0: off.x + info.box.x0, y0: off.y + info.box.y0, x1: off.x + info.box.x1, y1: off.y + info.box.y1 };
+      const box = {
+        x0: off.x + info.box.x0,
+        y0: off.y + info.box.y0,
+        x1: off.x + info.box.x1,
+        y1: off.y + info.box.y1,
+      };
       const rootInfo = CL.containers.get(info.root);
       const rootOff = rootInfo && rootOffset(info.root);
       const root = rootOff
-        ? { x0: rootOff.x + rootInfo.box.x0, y0: rootOff.y + rootInfo.box.y0, x1: rootOff.x + rootInfo.box.x1, y1: rootOff.y + rootInfo.box.y1 }
+        ? {
+            x0: rootOff.x + rootInfo.box.x0,
+            y0: rootOff.y + rootInfo.box.y0,
+            x1: rootOff.x + rootInfo.box.x1,
+            y1: rootOff.y + rootInfo.box.y1,
+          }
         : null;
       // The layout says where the cards belong; a reader may have left some
       // elsewhere (and open ones are larger). The frame takes in where they
@@ -5216,9 +5832,12 @@ export function GraphViewer({
           if (!d || d.type !== 'article' || d._closedHidden || !Number.isFinite(d.x) || !Number.isFinite(d.y)) continue;
           const size = d._size || cardSizeFor({ hovered: false, pinned: pinnedIdsRef.current.has(d.id) });
           const s = d._cardScale || 1;
-          const hw = (size.width / 2) * s, hh = (size.height / 2) * s;
-          out.x0 = Math.min(out.x0, d.x - hw); out.x1 = Math.max(out.x1, d.x + hw);
-          out.y0 = Math.min(out.y0, d.y - hh); out.y1 = Math.max(out.y1, d.y + hh);
+          const hw = (size.width / 2) * s,
+            hh = (size.height / 2) * s;
+          out.x0 = Math.min(out.x0, d.x - hw);
+          out.x1 = Math.max(out.x1, d.x + hw);
+          out.y0 = Math.min(out.y0, d.y - hh);
+          out.y1 = Math.max(out.y1, d.y + hh);
         }
         return out;
       };
@@ -5234,7 +5853,8 @@ export function GraphViewer({
       const none = { top: 0, bottom: 0 };
       if (typeof document === 'undefined' || !containerRef.current) return none;
       const box = containerRef.current.getBoundingClientRect();
-      let top = 0, bottom = 0;
+      let top = 0,
+        bottom = 0;
       for (const el of document.querySelectorAll('[data-feeds], [data-settings-gear], [data-rights], [data-toolbar]')) {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) continue;
@@ -5257,20 +5877,39 @@ export function GraphViewer({
       // pivot's world point still under it all the way when the reader only
       // zoomed.
       const pivot = growOn() ? growPivot() : pivotPoint();
-      if (animate) svg.transition().duration(750).call(zoom.transform, transform, pivot || undefined);
+      if (animate)
+        svg
+          .transition()
+          .duration(750)
+          .call(zoom.transform, transform, pivot || undefined);
       else svg.call(zoom.transform, transform);
       publishWorld();
       return true;
     }
 
-    function fitToViewport({ animate = false, initialZoomOut = false, focus = true, resetRot = false, recordRot = false } = {}) {
+    function fitToViewport({
+      animate = false,
+      initialZoomOut = false,
+      focus = true,
+      resetRot = false,
+      recordRot = false,
+    } = {}) {
       if (focus && anchorsOn()) return applyHomeView(animate, { resetRot, recordRot });
       const fitted = fitTo({ animate, initialZoomOut, focus, resetRot, recordRot });
-      if (fitted && focus) { homeK = fitted; publishWorld(); }
+      if (fitted && focus) {
+        homeK = fitted;
+        publishWorld();
+      }
       return Boolean(fitted);
     }
 
-    function fitTo({ animate = false, initialZoomOut = false, focus = true, resetRot = false, recordRot = false } = {}) {
+    function fitTo({
+      animate = false,
+      initialZoomOut = false,
+      focus = true,
+      resetRot = false,
+      recordRot = false,
+    } = {}) {
       const ext = containerExtent();
       if (ext) {
         let w = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
@@ -5279,7 +5918,8 @@ export function GraphViewer({
         const inset = chromeInsets(h);
         h -= inset.top + inset.bottom;
         const margin = 24;
-        const fitScale = (r) => Math.min((w - margin * 2) / Math.max(r.x1 - r.x0, 1), (h - margin * 2) / Math.max(r.y1 - r.y0, 1), 1);
+        const fitScale = (r) =>
+          Math.min((w - margin * 2) / Math.max(r.x1 - r.x0, 1), (h - margin * 2) / Math.max(r.y1 - r.y0, 1), 1);
         const ff = focus ? focusFrame() : null;
         let frame = ext;
         let k = fitScale(ext);
@@ -5309,16 +5949,14 @@ export function GraphViewer({
         const ty = topAligned
           ? Math.max(inset.top + margin, margin + 32) - frame.y0 * k
           : inset.top + h / 2 - ((frame.y0 + frame.y1) / 2) * k;
-        const transform = d3.zoomIdentity
-          .translate(w / 2 - cx * k, ty)
-          .scale(k);
+        const transform = d3.zoomIdentity.translate(w / 2 - cx * k, ty).scale(k);
         // A frame is computed upright, so explicit framing brings the view upright.
         if (resetRot) resetRotation({ repaint: false, record: recordRot });
         if (animate) svg.transition().duration(750).call(zoom.transform, transform);
         else svg.call(zoom.transform, transform);
         return transform.k;
       }
-      const pts = data.nodes.filter(d => d.type === 'article');
+      const pts = data.nodes.filter((d) => d.type === 'article');
       if (pts.length < 2) return false;
       const pad = 140;
 
@@ -5347,8 +5985,8 @@ export function GraphViewer({
         const sorted = [...values].sort((a, b) => a - b);
         return [sorted[Math.floor(sorted.length * 0.1)], sorted[Math.ceil(sorted.length * 0.9) - 1]];
       };
-      const xsAll = pts.map(d => d.x);
-      const ysAll = pts.map(d => d.y);
+      const xsAll = pts.map((d) => d.x);
+      const ysAll = pts.map((d) => d.y);
       const [trimMinX, trimMaxX] = trimmedRange(xsAll);
       const [trimMinY, trimMaxY] = trimmedRange(ysAll);
       const minX = trimMinX - pad;
@@ -5380,10 +6018,7 @@ export function GraphViewer({
       // Kept clear of the page's own fixed controls, as a container frame is.
       const inset = chromeInsets(h);
       const room = Math.max(50, h - inset.top - inset.bottom);
-      let k = Math.max(
-        Math.min(w / Math.max(maxX - minX, 1), room / Math.max(maxY - minY, 1), 1),
-        MIN_SCALE,
-      );
+      let k = Math.max(Math.min(w / Math.max(maxX - minX, 1), room / Math.max(maxY - minY, 1), 1), MIN_SCALE);
       if (initialZoomOut) {
         if (positionsWereDegenerate) {
           // Force the maximum zoomed-out state so the user can watch the physics explode
@@ -5406,7 +6041,10 @@ export function GraphViewer({
 
     let hasSettled = false;
     // Containers closed from the start (settings.graph.initialCollapsed).
-    if (closedContainers.size) { applyClosedDisplay(); updateContainers(); }
+    if (closedContainers.size) {
+      applyClosedDisplay();
+      updateContainers();
+    }
     simulation.on('end', () => {
       hasSettled = true;
       // This simulation runs for the whole mount's lifetime regardless of
@@ -5420,7 +6058,11 @@ export function GraphViewer({
       if (layoutRef.current !== 'force') return;
       if (nudgeOpenCards()) applyPositions();
       openNudgeDone = true;
-      data.nodes.forEach(d => { d.fx = d.x; d.fy = d.y; d._forcePos = { x: d.x, y: d.y }; });
+      data.nodes.forEach((d) => {
+        d.fx = d.x;
+        d.fy = d.y;
+        d._forcePos = { x: d.x, y: d.y };
+      });
 
       // The layout the simulation settled on is itself an arrangement worth
       // remembering. It becomes the saved layout so a returning reader sees
@@ -5462,7 +6104,10 @@ export function GraphViewer({
     // it when the page is first actually looked at.
     const handleVisibility = () => {
       if (document.hidden) return;
-      if (!hasSettled) { simulation.alpha(0.8).restart(); return; }
+      if (!hasSettled) {
+        simulation.alpha(0.8).restart();
+        return;
+      }
       // Settled while there was nothing to settle into. Frame it now that
       // there is.
       if (!hasFitted) hasFitted = fitToViewport({ initialZoomOut: true });
@@ -5483,7 +6128,7 @@ export function GraphViewer({
     // re-centring on the graph: what hangs from the cover's art stays over
     // it. The wheel and a pinch zoom about the pointer and the fingers
     // (d3.zoom), or about the pivot too.
-    const zoomCentre = () => (growOn() ? growPivot() : (pivotPoint() || [width / 2, height / 2]));
+    const zoomCentre = () => (growOn() ? growPivot() : pivotPoint() || [width / 2, height / 2]);
     function zoomAboutCentre(ratio, animate = true) {
       if (!Number.isFinite(ratio) || ratio <= 0) return;
       const t = d3.zoomTransform(svg.node());
@@ -5496,7 +6141,8 @@ export function GraphViewer({
       const transform = d3.zoomIdentity.translate(v.x, v.y).scale(v.k);
       userMovedView = true;
       focusActive = false;
-      if (animate) svg.transition('key-zoom').duration(260).ease(d3.easeCubicOut).call(zoom.transform, transform, [px, py]);
+      if (animate)
+        svg.transition('key-zoom').duration(260).ease(d3.easeCubicOut).call(zoom.transform, transform, [px, py]);
       else svg.call(zoom.transform, transform);
     }
     // Zoom to fit: the whole graph on the screen, zoomed about the middle of
@@ -5525,29 +6171,53 @@ export function GraphViewer({
           const G = growCentreOf(cId);
           if (!G) continue;
           const sh = shiftOfContainer(c);
-          items.push({ box: { x0: b.left - box.left, y0: b.top - box.top, x1: b.right - box.left, y1: b.bottom - box.top }, at: (() => { const q = toScreen(G.x + sh.x, G.y + sh.y); return { x: q[0], y: q[1] }; })() });
+          items.push({
+            box: { x0: b.left - box.left, y0: b.top - box.top, x1: b.right - box.left, y1: b.bottom - box.top },
+            at: (() => {
+              const q = toScreen(G.x + sh.x, G.y + sh.y);
+              return { x: q[0], y: q[1] };
+            })(),
+          });
         }
         const r = growFitRatio(items, area);
-        if (r && r > 0.02) { zoomAboutCentre(r); return; }
+        if (r && r > 0.02) {
+          zoomAboutCentre(r);
+          return;
+        }
         applyHomeView(true, { resetRot: true, recordRot: true });
         return;
       }
       if (ext) {
-        const corners = [[ext.x0, ext.y0], [ext.x1, ext.y0], [ext.x0, ext.y1], [ext.x1, ext.y1]].map(([x, y]) => toScreen(x, y));
+        const corners = [
+          [ext.x0, ext.y0],
+          [ext.x1, ext.y0],
+          [ext.x0, ext.y1],
+          [ext.x1, ext.y1],
+        ].map(([x, y]) => toScreen(x, y));
         const box = {
-          x0: Math.min(...corners.map((c) => c[0])), x1: Math.max(...corners.map((c) => c[0])),
-          y0: Math.min(...corners.map((c) => c[1])), y1: Math.max(...corners.map((c) => c[1])),
+          x0: Math.min(...corners.map((c) => c[0])),
+          x1: Math.max(...corners.map((c) => c[0])),
+          y0: Math.min(...corners.map((c) => c[1])),
+          y1: Math.max(...corners.map((c) => c[1])),
         };
         const [px, py] = zoomCentre();
         const r = fitRatioAbout(box, px, py, area);
-        if (r && r > 0.02) { zoomAboutCentre(r); return; }
+        if (r && r > 0.02) {
+          zoomAboutCentre(r);
+          return;
+        }
       }
       fitToViewport({ animate: true, focus: false, resetRot: true, recordRot: true });
     };
     function nodeExtent() {
       const pts = data.nodes.filter((d) => !d._closedHidden && Number.isFinite(d.x));
       if (!pts.length) return null;
-      return { x0: d3.min(pts, (d) => d.x) - 40, y0: d3.min(pts, (d) => d.y) - 40, x1: d3.max(pts, (d) => d.x) + 40, y1: d3.max(pts, (d) => d.y) + 40 };
+      return {
+        x0: d3.min(pts, (d) => d.x) - 40,
+        y0: d3.min(pts, (d) => d.y) - 40,
+        x1: d3.max(pts, (d) => d.x) + 40,
+        y1: d3.max(pts, (d) => d.y) + 40,
+      };
     }
     // + and - zoom in and out about the middle of the viewport; not while
     // typing, not with a modifier held (those are the browser's own zoom),
@@ -5556,7 +6226,13 @@ export function GraphViewer({
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const tEl = e.target;
       if (tEl && (tEl.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tEl.tagName))) return;
-      if (typeof window !== 'undefined' && window.PostPipeCover && window.PostPipeCover.state && window.PostPipeCover.state !== 'graph') return;
+      if (
+        typeof window !== 'undefined' &&
+        window.PostPipeCover &&
+        window.PostPipeCover.state &&
+        window.PostPipeCover.state !== 'graph'
+      )
+        return;
       if (document.querySelector('[data-settings-panel]')) return;
       const inKey = e.key === '+' || e.key === '=';
       const outKey = e.key === '-' || e.key === '_';
@@ -5567,7 +6243,7 @@ export function GraphViewer({
     window.addEventListener('keydown', handleZoomKey);
 
     const handleUnpinAll = () => {
-      data.nodes.forEach(d => {
+      data.nodes.forEach((d) => {
         // A tag collapsed into another (_groupedInto) keeps the hold that
         // parks it, hidden, where it was; the unpin reaches it when it comes
         // back (its saved hold is cleared), as it reaches every other node now.
@@ -5592,7 +6268,9 @@ export function GraphViewer({
 
     const handleResetSizes = () => {
       const rest = cardSizeFor({ hovered: false, pinned: false });
-      data.nodes.forEach(d => { delete d._size; });
+      data.nodes.forEach((d) => {
+        delete d._size;
+      });
       const vs = viewStateRef.current;
       if (vs) {
         for (const d of data.nodes) {
@@ -5607,12 +6285,15 @@ export function GraphViewer({
       const vs = viewStateRef.current;
       if (vs && vs.resetLayout) vs.resetLayout();
       resetRotation({ repaint: false });
-      data.nodes.forEach(d => {
+      data.nodes.forEach((d) => {
         d.fx = null;
         d.fy = null;
         delete d._forcePos;
       });
-      if (anchorsOn()) { placeAnchors(); applyPositions(); }
+      if (anchorsOn()) {
+        placeAnchors();
+        applyPositions();
+      }
       simulation.alpha(0.8).restart();
       fitToViewport({ animate: true });
     };
@@ -5642,8 +6323,12 @@ export function GraphViewer({
       links.classed('highlighted', false);
       pinnedIdsRef.current.clear();
       data.nodes.forEach((d) => {
-        delete d._size; delete d._customWidth; delete d._customHeight; delete d._forcePos;
-        d.fx = null; d.fy = null;
+        delete d._size;
+        delete d._customWidth;
+        delete d._customHeight;
+        delete d._forcePos;
+        d.fx = null;
+        d.fy = null;
       });
       closedContainers.clear();
       for (const id of initiallyClosed()) closedContainers.add(id);
@@ -5698,7 +6383,10 @@ export function GraphViewer({
       const dy = (inset.top + (height - inset.bottom)) / 2 - sy;
       userMovedView = true;
       focusActive = false;
-      svg.transition('key-zoom').duration(320).ease(d3.easeCubicOut)
+      svg
+        .transition('key-zoom')
+        .duration(320)
+        .ease(d3.easeCubicOut)
         .call(zoom.transform, d3.zoomIdentity.translate(t.x + dx, t.y + dy).scale(t.k));
     };
 
@@ -5751,7 +6439,8 @@ export function GraphViewer({
       window.removeEventListener('postpipe:cover', onCoverRest);
       window.removeEventListener('resize', onCoverRest);
       if (rightsFrame && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rightsFrame);
-      if (window.PostPipeGraphWorld && window.PostPipeGraphWorld.snapshot === worldSnapshot) delete window.PostPipeGraphWorld;
+      if (window.PostPipeGraphWorld && window.PostPipeGraphWorld.snapshot === worldSnapshot)
+        delete window.PostPipeGraphWorld;
       window.removeEventListener('graph:zoom-to-fit', handleZoomToFit);
       window.removeEventListener('keydown', handleZoomKey);
       window.removeEventListener('graph:unpin-all', handleUnpinAll);
@@ -5789,7 +6478,10 @@ export function GraphViewer({
   function drawAxis(g, axis) {
     g.axisLayer.selectAll('*').remove();
     connectorUpdateRef.current = null;
-    if (!axis.on) { axisFittedRef.current = false; return; }
+    if (!axis.on) {
+      axisFittedRef.current = false;
+      return;
+    }
 
     const el = containerRef.current;
     const W = el ? el.clientWidth : window.innerWidth;
@@ -5803,9 +6495,7 @@ export function GraphViewer({
     // Where the rail sits, in screen pixels. Dragging it moves it along the
     // edge it is docked to; nothing else about it changes.
     const offset = Number.isFinite(axis.offset) ? axis.offset : AX.inset;
-    const railPos = (dock === 'right') ? W - offset
-      : (dock === 'bottom') ? H - offset
-      : offset;
+    const railPos = dock === 'right' ? W - offset : dock === 'bottom' ? H - offset : offset;
 
     const length = Math.max((vertical ? H : W) - pad * 2, 120);
     const origin = vertical ? { x: railPos, y: pad } : { x: pad, y: railPos };
@@ -5830,10 +6520,12 @@ export function GraphViewer({
       const anchors = geo.anchors[d.id];
       if (!anchors || !anchors.length) return;
       anchors.forEach((a2) => {
-        const line = conn.append('line')
+        const line = conn
+          .append('line')
           .attr('class', 'time-connector')
           .attr('data-node', d.id)
-          .attr('x1', a2.x).attr('y1', a2.y)
+          .attr('x1', a2.x)
+          .attr('y1', a2.y)
           .attr('stroke', (d._source && d._source.color) || '#7f8ea3')
           .attr('stroke-width', AX.connectorWidth)
           .attr('stroke-opacity', AX.connectorOpacity);
@@ -5858,38 +6550,49 @@ export function GraphViewer({
     connectorUpdateRef.current = updateConnectors;
     updateConnectors();
 
-    const rail = root.append('g').attr('class', 'time-spine').style('cursor', vertical ? 'ew-resize' : 'ns-resize');
+    const rail = root
+      .append('g')
+      .attr('class', 'time-spine')
+      .style('cursor', vertical ? 'ew-resize' : 'ns-resize');
 
     // A backing strip, so the rail reads as a fixed edge of the window rather
     // than a line that happens to be lying on top of the graph.
     const strip = 34;
-    rail.append('rect')
+    rail
+      .append('rect')
       .attr('x', vertical ? railPos - strip / 2 : 0)
       .attr('y', vertical ? 0 : railPos - strip / 2)
       .attr('width', vertical ? strip : W)
       .attr('height', vertical ? H : strip)
       .attr('fill', 'rgba(18,20,28,0.82)');
 
-    rail.append('line')
-      .attr('x1', geo.from.x).attr('y1', geo.from.y)
-      .attr('x2', geo.to.x).attr('y2', geo.to.y)
+    rail
+      .append('line')
+      .attr('x1', geo.from.x)
+      .attr('y1', geo.from.y)
+      .attr('x2', geo.to.x)
+      .attr('y2', geo.to.y)
       .attr('stroke', 'rgba(255,255,255,' + AX.spineOpacity + ')')
       .attr('stroke-width', AX.spineWidth);
 
     const TICK_FONT = AX.tickFontSize;
-    const labelRoom = geo.ticks.length > 1
-      ? Math.hypot(geo.ticks[1].x - geo.ticks[0].x, geo.ticks[1].y - geo.ticks[0].y)
-      : Infinity;
+    const labelRoom =
+      geo.ticks.length > 1 ? Math.hypot(geo.ticks[1].x - geo.ticks[0].x, geo.ticks[1].y - geo.ticks[0].y) : Infinity;
     const needed = vertical ? TICK_FONT * 1.7 : TICK_FONT * 4.2;
     const labelEvery = Math.max(1, Math.ceil(needed / Math.max(labelRoom, 1)));
 
     geo.ticks.forEach((t, ti) => {
-      rail.append('line')
-        .attr('x1', t.x).attr('y1', t.y)
-        .attr('x2', t.x + (vertical ? 9 : 0)).attr('y2', t.y + (vertical ? 0 : -9))
-        .attr('stroke', 'rgba(255,255,255,0.45)').attr('stroke-width', 1.5);
+      rail
+        .append('line')
+        .attr('x1', t.x)
+        .attr('y1', t.y)
+        .attr('x2', t.x + (vertical ? 9 : 0))
+        .attr('y2', t.y + (vertical ? 0 : -9))
+        .attr('stroke', 'rgba(255,255,255,0.45)')
+        .attr('stroke-width', 1.5);
       if (ti % labelEvery !== 0) return;
-      rail.append('text')
+      rail
+        .append('text')
         .attr('x', t.x + (vertical ? 13 : 0))
         .attr('y', t.y + (vertical ? 0 : -14))
         .attr('text-anchor', vertical ? 'start' : 'middle')
@@ -5907,27 +6610,33 @@ export function GraphViewer({
     // mid-drag.
     let from = null;
     let delta = 0;
-    rail.call(d3.drag()
-      .on('start', (event) => { from = vertical ? event.x : event.y; delta = 0; })
-      .on('drag', (event) => {
-        if (from === null) return;
-        delta = (vertical ? event.x : event.y) - from;
-        rail.attr('transform', vertical ? 'translate(' + delta + ',0)' : 'translate(0,' + delta + ')');
-        conn.selectAll('line').attr(vertical ? 'x1' : 'y1', function () {
-          return Number(d3.select(this).attr(vertical ? 'x1' : 'y1'));
-        });
-        connected.forEach(({ anchor, line }) => {
-          if (vertical) line.attr('x1', anchor.x + delta);
-          else line.attr('y1', anchor.y + delta);
-        });
-      })
-      .on('end', () => {
-        if (from !== null && delta && viewStateRef.current) {
-          const moved = (dock === 'right' || dock === 'bottom') ? offset - delta : offset + delta;
-          viewStateRef.current.setTimeAxis({ offset: Math.max(20, moved), moved: true });
-        }
-        from = null;
-      }));
+    rail.call(
+      d3
+        .drag()
+        .on('start', (event) => {
+          from = vertical ? event.x : event.y;
+          delta = 0;
+        })
+        .on('drag', (event) => {
+          if (from === null) return;
+          delta = (vertical ? event.x : event.y) - from;
+          rail.attr('transform', vertical ? 'translate(' + delta + ',0)' : 'translate(0,' + delta + ')');
+          conn.selectAll('line').attr(vertical ? 'x1' : 'y1', function () {
+            return Number(d3.select(this).attr(vertical ? 'x1' : 'y1'));
+          });
+          connected.forEach(({ anchor, line }) => {
+            if (vertical) line.attr('x1', anchor.x + delta);
+            else line.attr('y1', anchor.y + delta);
+          });
+        })
+        .on('end', () => {
+          if (from !== null && delta && viewStateRef.current) {
+            const moved = dock === 'right' || dock === 'bottom' ? offset - delta : offset + delta;
+            viewStateRef.current.setTimeAxis({ offset: Math.max(20, moved), moved: true });
+          }
+          from = null;
+        }),
+    );
   }
 
   // Switching layout moves nodes; it does not rebuild the graph. Everything
@@ -5960,8 +6669,13 @@ export function GraphViewer({
       if (placed.length < g.data.nodes.length * 0.5) {
         g.data.nodes.forEach((d) => {
           const saved = vs && vs.nodeState(placeOf('force') + persistKey(d));
-          if (saved && !saved.auto) { d.fx = saved.x; d.fy = saved.y; }
-          else { d.fx = null; d.fy = null; }
+          if (saved && !saved.auto) {
+            d.fx = saved.x;
+            d.fy = saved.y;
+          } else {
+            d.fx = null;
+            d.fy = null;
+          }
         });
         g.simulation.alpha(1).restart();
         return;
@@ -5972,22 +6686,23 @@ export function GraphViewer({
     // hidden: it takes no place in the ring or on the timeline, is not moved,
     // and keeps the hold that parks it (ungroupAll reads it back).
     const shown = g.data.nodes.filter((d) => !d._groupedInto);
-    const computed = layout === 'force'
-      ? Object.fromEntries(shown.map(d => [
-          d.id,
-          d._forcePos || (vs && vs.nodeState(placeOf('force') + persistKey(d))) || { x: d.x, y: d.y },
-        ]))
-      : (layout === 'radial' && g.ringTargets && g.ringTargets())
-        || computeLayout(layout, shown, { cardW: rest.width, cardH: rest.height });
+    const computed =
+      layout === 'force'
+        ? Object.fromEntries(
+            shown.map((d) => [
+              d.id,
+              d._forcePos || (vs && vs.nodeState(placeOf('force') + persistKey(d))) || { x: d.x, y: d.y },
+            ]),
+          )
+        : (layout === 'radial' && g.ringTargets && g.ringTargets()) ||
+          computeLayout(layout, shown, { cardW: rest.width, cardH: rest.height });
     if (!computed) return;
 
-    const startPositions = new Map(g.data.nodes.map(d => [d.id, { x: d.x, y: d.y }]));
+    const startPositions = new Map(g.data.nodes.map((d) => [d.id, { x: d.x, y: d.y }]));
 
     shown.forEach((d) => {
       const saved = vs && vs.nodeState(placeOf(layout) + persistKey(d));
-      const target = (saved && typeof saved.x === 'number' && !saved.auto)
-        ? { x: saved.x, y: saved.y }
-        : computed[d.id];
+      const target = saved && typeof saved.x === 'number' && !saved.auto ? { x: saved.x, y: saved.y } : computed[d.id];
       if (!target) return;
       d.targetX = target.x;
       d.targetY = target.y;
@@ -6009,7 +6724,7 @@ export function GraphViewer({
       .duration(transitionDuration)
       .ease(transitionEase)
       .tween('layout-transition', () => {
-        const interpolators = g.data.nodes.map(d => {
+        const interpolators = g.data.nodes.map((d) => {
           const start = startPositions.get(d.id) || { x: d.x, y: d.y };
           const endX = typeof d.targetX === 'number' ? d.targetX : d.x;
           const endY = typeof d.targetY === 'number' ? d.targetY : d.y;
@@ -6030,7 +6745,7 @@ export function GraphViewer({
         };
       })
       .on('end', () => {
-        g.data.nodes.forEach(d => {
+        g.data.nodes.forEach((d) => {
           if (typeof d.targetX === 'number') d.x = d.targetX;
           if (typeof d.targetY === 'number') d.y = d.targetY;
           delete d.targetX;
@@ -6047,11 +6762,5 @@ export function GraphViewer({
     return () => clearTimeout(t);
   }, [layout]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={styles.graphContainer}
-      data-graph-root
-    />
-  );
+  return <div ref={containerRef} className={styles.graphContainer} data-graph-root />;
 }

@@ -24,8 +24,15 @@ function page() {
   const synth = {
     getVoices: () => DEVICE_VOICES,
     addEventListener: () => {},
-    cancel: () => { current = null; }, pause: () => {}, resume: () => {},
-    speak(utt) { current = utt; spoken.push(utt.text); },
+    cancel: () => {
+      current = null;
+    },
+    pause: () => {},
+    resume: () => {},
+    speak(utt) {
+      current = utt;
+      spoken.push(utt.text);
+    },
   };
   const NodeFilter = { SHOW_TEXT: 4, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2, FILTER_SKIP: 3 };
   const document = {
@@ -45,23 +52,52 @@ function page() {
   };
   const sandbox = {
     console: { info() {}, log() {}, warn() {}, error() {} },
-    setTimeout, clearTimeout, Promise,
+    setTimeout,
+    clearTimeout,
+    Promise,
     speechSynthesis: synth,
-    SpeechSynthesisUtterance: function (text) { this.text = text; },
-    document, NodeFilter,
+    SpeechSynthesisUtterance: function (text) {
+      this.text = text;
+    },
+    document,
+    NodeFilter,
   };
   sandbox.window = sandbox;
-  sandbox.TTS_CONFIG = { exposedEngines: ['browser'], defaultEngine: 'browser', lang: 'en', preferredVoices: ['Samantha'], fallback: 'off' };
+  sandbox.TTS_CONFIG = {
+    exposedEngines: ['browser'],
+    defaultEngine: 'browser',
+    lang: 'en',
+    preferredVoices: ['Samantha'],
+    fallback: 'off',
+  };
   vm.createContext(sandbox);
   vm.runInContext(TTS_SRC, sandbox);
-  const finish = async () => { const u = current; current = null; if (u) u.onend(); await tick(); };
+  const finish = async () => {
+    const u = current;
+    current = null;
+    if (u) u.onend();
+    await tick();
+  };
   return { T: sandbox.TTS, spoken, finish };
 }
 
 // A body of text: the reader's, or a card's.
 function body(name) {
-  const container = { name, tagName: 'DIV', scrollTop: 0, getBoundingClientRect: () => ({ top: 0, height: 600 }), scrollTo() {} };
-  const p = { tagName: 'P', parentElement: container, style: { removeProperty() {} }, dataset: {}, getBoundingClientRect: () => ({ top: 0, height: 20 }), closest: () => null };
+  const container = {
+    name,
+    tagName: 'DIV',
+    scrollTop: 0,
+    getBoundingClientRect: () => ({ top: 0, height: 600 }),
+    scrollTo() {},
+  };
+  const p = {
+    tagName: 'P',
+    parentElement: container,
+    style: { removeProperty() {} },
+    dataset: {},
+    getBoundingClientRect: () => ({ top: 0, height: 20 }),
+    closest: () => null,
+  };
   container._textNodes = [{ nodeType: 3, textContent: `${name} one. ${name} two.`, parentElement: p }];
   return container;
 }
@@ -83,7 +119,7 @@ test('play() says where it reads and what it does; stop() clears both', async ()
   assert.deepStrictEqual(spoken, ['reader one.']);
   T.pause();
   assert.strictEqual(T.state(), 'paused');
-  assert.strictEqual(T.target(), reader, 'paused, it is still the reader\'s');
+  assert.strictEqual(T.target(), reader, "paused, it is still the reader's");
   T.resume();
   assert.strictEqual(T.state(), 'playing');
   await finish();
@@ -111,7 +147,11 @@ test('a play on another container ends the reading going and reads there, once',
   await finish();
   await finish();
   await tick();
-  assert.deepStrictEqual(spoken, ['card one.', 'reader one.', 'reader two.'], 'the card\'s loop does not read on beside the reader\'s');
+  assert.deepStrictEqual(
+    spoken,
+    ['card one.', 'reader one.', 'reader two.'],
+    "the card's loop does not read on beside the reader's",
+  );
   assert.strictEqual(T.state(), 'stopped');
 });
 
@@ -153,6 +193,9 @@ test('set() says what changed, so every view of the voice follows', () => {
   T.set('speed', 1.5);
   T.set('voice', 'Samantha');
   // Through JSON: the events are objects of the sandbox's realm.
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(heard)), [{ key: 'speed', value: 1.5 }, { key: 'voice', value: 'Samantha' }]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(heard)), [
+    { key: 'speed', value: 1.5 },
+    { key: 'voice', value: 'Samantha' },
+  ]);
   assert.strictEqual(T.get('speed'), 1.5);
 });

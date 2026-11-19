@@ -13,20 +13,32 @@ test('order score: by score descending, ties by id, deterministic', () => {
   const flat = normalisePreset({ name: 'flat', weights: {} });
   const flow = orderFlow(scoreSubfield(all(), flat));
   assert.ok(flow.items.every((it) => it.score === 1));
-  assert.deepEqual(flow.items.map((it) => it.id), [C(1), C(2), C(3), C(4), C(5), C(6)]);
+  assert.deepEqual(
+    flow.items.map((it) => it.id),
+    [C(1), C(2), C(3), C(4), C(5), C(6)],
+  );
   const a = JSON.stringify(orderFlow(scoreSubfield(all(), normalisePreset(byWeightPreset()))));
   const b = JSON.stringify(orderFlow(scoreSubfield(all(), normalisePreset(byWeightPreset()))));
   assert.equal(a, b);
   const scores = JSON.parse(a).items.map((it) => it.score);
   for (let i = 1; i < scores.length; i++) assert.ok(scores[i - 1] >= scores[i]);
-  assert.deepEqual(JSON.parse(a).items.map((it) => it.rank), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(
+    JSON.parse(a).items.map((it) => it.rank),
+    [1, 2, 3, 4, 5, 6],
+  );
 });
 
 test('order: each item carries its tagz and step; a seam is flagged when hops exceed the seam switch or the card is unreachable', () => {
   const flow = orderFlow(scoreSubfield(all(), normalisePreset(byWeightPreset())));
   const first = flow.items[0];
   assert.deepEqual(first.step, { from: null, hops: null, shared: [], seam: false });
-  assert.deepEqual(flow.items.find((it) => it.id === C(1)).tagz.map((t) => [t.id, t.label, t.weight, t.origin]), [['c_alpha', 'alpha', 1, 'explicit'], ['c_beta', 'beta', 0.5, 'discovered']]);
+  assert.deepEqual(
+    flow.items.find((it) => it.id === C(1)).tagz.map((t) => [t.id, t.label, t.weight, t.origin]),
+    [
+      ['c_alpha', 'alpha', 1, 'explicit'],
+      ['c_beta', 'beta', 0.5, 'discovered'],
+    ],
+  );
   const six = flow.items.find((it) => it.id === C(6));
   assert.equal(six.step.hops, null);
   assert.equal(six.step.seam, true);
@@ -66,12 +78,18 @@ test('order: stability holds a previous order unless scores differ by more than 
   const [a, b] = previous.items;
   nudged.cards.find((c) => c.id === b.id).score = a.score + 0.01 * range;
   const held = orderFlow(nudged, { previous, stability: 0.05 });
-  assert.deepEqual(held.items.slice(0, 2).map((it) => it.id), [a.id, b.id]);
+  assert.deepEqual(
+    held.items.slice(0, 2).map((it) => it.id),
+    [a.id, b.id],
+  );
   assert.equal(held.summary.switches.previous, true);
   // Over the threshold, it passes.
   nudged.cards.find((c) => c.id === b.id).score = a.score + 0.2 * range;
   const passed = orderFlow(nudged, { previous, stability: 0.05 });
-  assert.deepEqual(passed.items.slice(0, 2).map((it) => it.id), [b.id, a.id]);
+  assert.deepEqual(
+    passed.items.slice(0, 2).map((it) => it.id),
+    [b.id, a.id],
+  );
   // Without a previous flow the nudge sorts as scores say.
   const plain = orderFlow(nudged);
   assert.equal(plain.items[0].id, b.id);
@@ -98,7 +116,9 @@ test('order walkStart: newest by calendar with a tie broken by index, undated on
   assert.deepEqual(cal.summary.start, { id: C(2), title: 'Card two', rule: 'newest', source: 'Journal' });
 
   // Under session clock, lowest index (c1 at index 0) wins regardless of calendar date or score.
-  const sessScored = scoreSubfield(select(feed, { mode: 'all' }), normalisePreset(byNeighbourhoodPreset()), { switches: { recencyClock: 'session' } });
+  const sessScored = scoreSubfield(select(feed, { mode: 'all' }), normalisePreset(byNeighbourhoodPreset()), {
+    switches: { recencyClock: 'session' },
+  });
   const sess = orderFlow(sessScored, { mode: 'walk', walkStart: 'newest' });
   assert.equal(sess.items[0].id, C(1));
   assert.deepEqual(sess.summary.start, { id: C(1), title: 'Card one', rule: 'newest', source: 'Journal' });
@@ -151,6 +171,9 @@ test('order --start and score mode: explicit start wins over walkStart, unknown 
 
   const scoreHeaviest = orderFlow(scored, { mode: 'score', walkStart: 'heaviest' });
   const scoreNewest = orderFlow(scored, { mode: 'score', walkStart: 'newest', walkStartSource: 'Wire' });
-  assert.deepEqual(scoreNewest.items.map((it) => it.id), scoreHeaviest.items.map((it) => it.id));
+  assert.deepEqual(
+    scoreNewest.items.map((it) => it.id),
+    scoreHeaviest.items.map((it) => it.id),
+  );
   assert.equal(scoreNewest.summary.start, null);
 });

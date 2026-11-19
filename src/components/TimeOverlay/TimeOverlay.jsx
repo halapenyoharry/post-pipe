@@ -19,7 +19,7 @@ export function TimeOverlay({ feedData, onFilterChange }) {
     let minDate = null;
     let maxDate = null;
 
-    feedData.items.forEach(item => {
+    feedData.items.forEach((item) => {
       const dateStr = item.date_published || item.date;
       if (!dateStr) return;
       const d = new Date(dateStr);
@@ -57,7 +57,7 @@ export function TimeOverlay({ feedData, onFilterChange }) {
         { label: 'Wk 2', id: `${monthKey}-w2`, range: [8, 14], articleSlugs: [] },
         { label: 'Wk 3', id: `${monthKey}-w3`, range: [15, 21], articleSlugs: [] },
         { label: 'Wk 4', id: `${monthKey}-w4`, range: [22, 28], articleSlugs: [] },
-        { label: 'Wk 5', id: `${monthKey}-w5`, range: [29, 31], articleSlugs: [] }
+        { label: 'Wk 5', id: `${monthKey}-w5`, range: [29, 31], articleSlugs: [] },
       ];
 
       const monthArticleSlugs = [];
@@ -67,7 +67,7 @@ export function TimeOverlay({ feedData, onFilterChange }) {
         if (date.getFullYear() === y && date.getMonth() === m) {
           monthArticleSlugs.push(slug);
           const day = date.getDate();
-          const targetWeek = weeks.find(w => day >= w.range[0] && day <= w.range[1]);
+          const targetWeek = weeks.find((w) => day >= w.range[0] && day <= w.range[1]);
           if (targetWeek) {
             targetWeek.articleSlugs.push(slug);
           }
@@ -80,7 +80,7 @@ export function TimeOverlay({ feedData, onFilterChange }) {
         monthIndex: m,
         monthName: MONTH_NAMES[m],
         articleSlugs: monthArticleSlugs,
-        weeks
+        weeks,
       });
 
       // Advance by 1 month
@@ -94,7 +94,7 @@ export function TimeOverlay({ feedData, onFilterChange }) {
       months,
       totalItems: itemsWithDates.length,
       minYear: startYear,
-      maxYear: endYear
+      maxYear: endYear,
     };
   }, [feedData]);
 
@@ -162,14 +162,20 @@ export function TimeOverlay({ feedData, onFilterChange }) {
               <div
                 className={styles.monthHeader}
                 onClick={() => handleSelectMonth(m)}
-                title={isEmpty ? 'No articles published this month' : `Filter to ${m.monthName} ${m.year} (${m.articleSlugs.length})`}
+                title={
+                  isEmpty
+                    ? 'No articles published this month'
+                    : `Filter to ${m.monthName} ${m.year} (${m.articleSlugs.length})`
+                }
               >
                 <div className={styles.monthName}>
                   {m.monthName}
                   {isYearTransition && <span className={styles.yearTag}>{m.year}</span>}
                 </div>
                 <div className={`${styles.monthMeta} ${m.articleSlugs.length > 0 ? styles.hasItems : ''}`}>
-                  {m.articleSlugs.length > 0 ? `${m.articleSlugs.length} post${m.articleSlugs.length > 1 ? 's' : ''}` : '0 posts'}
+                  {m.articleSlugs.length > 0
+                    ? `${m.articleSlugs.length} post${m.articleSlugs.length > 1 ? 's' : ''}`
+                    : '0 posts'}
                 </div>
               </div>
 
@@ -177,7 +183,7 @@ export function TimeOverlay({ feedData, onFilterChange }) {
               <div className={styles.branchArea}>
                 <div className={styles.branchLine} />
                 <div className={styles.weeksRow}>
-                  {m.weeks.map(w => {
+                  {m.weeks.map((w) => {
                     const count = w.articleSlugs.length;
                     const isWeekActive = activeFilterId === w.id;
                     return (

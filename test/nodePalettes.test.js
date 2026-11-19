@@ -14,15 +14,20 @@ const GS = {
 };
 
 test('nodePalettesOf: the valid ones in order, each with its label, fillOpacity within 0 and 1', () => {
-  const list = nodePalettesOf({ nodePalettes: [
-    ...GS.nodePalettes,
-    { id: 'teal', color: '#fff' },            // a second teal: left out
-    { id: 'nocolour', label: 'x' },           // no colour: left out
-    { color: '#123456' },                     // no id: left out
-    { id: 'plain', color: '#123456', fillOpacity: 7 },
-    { id: 'bad', color: 'red;}' },            // not a colour
-  ] });
-  assert.deepStrictEqual(list.map((p) => p.id), ['teal', 'berry', 'plain']);
+  const list = nodePalettesOf({
+    nodePalettes: [
+      ...GS.nodePalettes,
+      { id: 'teal', color: '#fff' }, // a second teal: left out
+      { id: 'nocolour', label: 'x' }, // no colour: left out
+      { color: '#123456' }, // no id: left out
+      { id: 'plain', color: '#123456', fillOpacity: 7 },
+      { id: 'bad', color: 'red;}' }, // not a colour
+    ],
+  });
+  assert.deepStrictEqual(
+    list.map((p) => p.id),
+    ['teal', 'berry', 'plain'],
+  );
   assert.equal(list[2].label, 'plain', 'its id when it has no label');
   assert.equal(list[2].fillOpacity, 1);
   assert.equal(list[2].labelColor, '');
@@ -39,7 +44,9 @@ test('nodePaletteFor: the one chosen, else the first; none without palettes', ()
 
 test('containerLook with a palette: outline and fill in its colour, the fill at its opacity, the labels in its label colour, the face kept', () => {
   const c = {
-    badgeColor: '#d4af37', stroke: 'rgba(212, 175, 55, 0.75)', fill: 'rgba(212, 175, 55, 0.07)',
+    badgeColor: '#d4af37',
+    stroke: 'rgba(212, 175, 55, 0.75)',
+    fill: 'rgba(212, 175, 55, 0.07)',
     look: { fill: '#00a7a4', fillOpacity: 0.5, stroke: '#00a7a4', labelFace: 'Dela Gothic One', labelColor: '#66cfcb' },
   };
   const berry = containerLook(c, nodePaletteFor(GS, 'berry'));
@@ -49,7 +56,11 @@ test('containerLook with a palette: outline and fill in its colour, the fill at 
   // Without a label colour, the labels in the palette's colour.
   assert.equal(containerLook(c, { color: '#123456', fillOpacity: 0.2 }).label.color, '#123456');
   // A container with no look of its own takes the palette too.
-  assert.deepStrictEqual(containerLook({ badgeColor: '#eb5e28' }, nodePaletteFor(GS, 'teal')).open, { fill: '#00a7a4', fillOpacity: 0.35, stroke: '#00a7a4' });
+  assert.deepStrictEqual(containerLook({ badgeColor: '#eb5e28' }, nodePaletteFor(GS, 'teal')).open, {
+    fill: '#00a7a4',
+    fillOpacity: 0.35,
+    stroke: '#00a7a4',
+  });
   // No palette: its own look, as before.
   assert.equal(containerLook(c, null).closed.fillOpacity, 0.5);
 });

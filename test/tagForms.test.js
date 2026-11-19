@@ -79,9 +79,7 @@ test('rtagz summary present: returns canonical, flags, items, ordered systems, s
       },
       {
         system: 'My Posts',
-        spellings: [
-          { label: 'artificial intelligence', count: 5 },
-        ],
+        spellings: [{ label: 'artificial intelligence', count: 5 }],
       },
     ],
     rank: [
@@ -171,9 +169,7 @@ test('fallback from references when feed._rtagz is absent', () => {
     pinned: false,
     discovered: false,
     items: 1,
-    forms: [
-      { system: 'ScienceDaily', spellings: [{ label: 'AI', count: 1 }] },
-    ],
+    forms: [{ system: 'ScienceDaily', spellings: [{ label: 'AI', count: 1 }] }],
     rank: [],
   });
   assert.deepStrictEqual(tagFormsLines(fromItems), ['ScienceDaily writes AI']);
@@ -207,7 +203,9 @@ const RTAGZ_SKOS = {
         'My Posts': { 'artificial intelligence': 5 },
         ScienceDaily: { 'A.I.': 2, AI: 9 },
       },
-      rank: [{ label: 'Artificial Intelligence', score: 0.81, parts: { freq: 0.7, cover: 1, trust: 0.9, quality: 0.8 } }],
+      rank: [
+        { label: 'Artificial Intelligence', score: 0.81, parts: { freq: 0.7, cover: 1, trust: 0.9, quality: 0.8 } },
+      ],
       id: 'c_ai',
       inScheme: ['My Posts', 'ScienceDaily', 'site'],
       prefLabel: { 'My Posts': 'artificial intelligence', ScienceDaily: 'AI', site: 'Artificial Intelligence' },
@@ -241,7 +239,13 @@ test('an rtagz summary in SKOS: the same concept by id and by canonical, with it
     discovered: false,
     items: 14,
     forms: [
-      { system: 'ScienceDaily', spellings: [{ label: 'AI', count: 9 }, { label: 'A.I.', count: 2 }] },
+      {
+        system: 'ScienceDaily',
+        spellings: [
+          { label: 'AI', count: 9 },
+          { label: 'A.I.', count: 2 },
+        ],
+      },
       { system: 'My Posts', spellings: [{ label: 'artificial intelligence', count: 5 }] },
     ],
     rank: [{ label: 'Artificial Intelligence', score: 0.81, parts: { freq: 0.7, cover: 1, trust: 0.9, quality: 0.8 } }],
@@ -255,8 +259,12 @@ test('an rtagz summary in SKOS: the same concept by id and by canonical, with it
   // as before, then the label in each scheme and the mappings (named in full
   // in the tests below, with the schemes' names).
   assert.deepStrictEqual(tagFormsLines(byId), [
-    'ScienceDaily writes AI, A.I.', 'My Posts writes artificial intelligence', 'named by coverage',
-    'in site: Artificial Intelligence', 'in My Posts: artificial intelligence', 'in ScienceDaily: AI',
+    'ScienceDaily writes AI, A.I.',
+    'My Posts writes artificial intelligence',
+    'named by coverage',
+    'in site: Artificial Intelligence',
+    'in My Posts: artificial intelligence',
+    'in ScienceDaily: AI',
     'exactMatch iptc-mediatopics:20000763 · weight 1',
   ]);
 
@@ -275,13 +283,12 @@ test('an rtagz summary in SKOS: the same concept by id and by canonical, with it
   assert.strictEqual(RTAGZ_SKOS.concepts[0].mappings[0].type, 'exactMatch');
 });
 
-test('the tag detail: the label in each scheme, the site\'s own named by the site\'s title, one line per scheme', () => {
+test("the tag detail: the label in each scheme, the site's own named by the site's title, one line per scheme", () => {
   const lines = tagFormsLines(tagForms(RTAGZ_SKOS, 'c_ai'), { rtagz: RTAGZ_SKOS });
-  assert.deepStrictEqual(lines.filter((l) => l.startsWith('in ')), [
-    'in A Site: Artificial Intelligence',
-    'in My Posts: artificial intelligence',
-    'in ScienceDaily: AI',
-  ]);
+  assert.deepStrictEqual(
+    lines.filter((l) => l.startsWith('in ')),
+    ['in A Site: Artificial Intelligence', 'in My Posts: artificial intelligence', 'in ScienceDaily: AI'],
+  );
   // the feed itself works as well as its summary
   assert.deepStrictEqual(tagFormsLines(tagForms(RTAGZ_SKOS, 'c_ai'), { rtagz: { _rtagz: RTAGZ_SKOS } }), lines);
 });
@@ -293,8 +300,15 @@ test('the tag detail: each mapping with its type and weight, the target named by
     concepts: [
       ...RTAGZ_SKOS.concepts,
       {
-        canonical: 'magnetic', pinned: false, discovered: true, items: 3, forms: { discovered: { magnetic: 3 } }, rank: [],
-        id: 'c_magnetic', inScheme: ['discovered', 'site'], prefLabel: { discovered: 'magnetic', site: 'magnetic' },
+        canonical: 'magnetic',
+        pinned: false,
+        discovered: true,
+        items: 3,
+        forms: { discovered: { magnetic: 3 } },
+        rank: [],
+        id: 'c_magnetic',
+        inScheme: ['discovered', 'site'],
+        prefLabel: { discovered: 'magnetic', site: 'magnetic' },
         mappings: [
           { type: 'closeMatch', target: 'c_ai', weight: 0.55, why: 'probably the same' },
           { type: 'relatedMatch', target: 'c_nowhere' },
@@ -305,13 +319,17 @@ test('the tag detail: each mapping with its type and weight, the target named by
   const ai = tagFormsLines(tagForms(withExternal, 'c_ai'), { rtagz: withExternal });
   assert.ok(ai.includes('exactMatch artificial intelligence (IPTC Media Topics) · weight 1'), ai.join(' | '));
   const magnetic = tagFormsLines(tagForms(withExternal, 'c_magnetic'), { rtagz: withExternal });
-  assert.deepStrictEqual(magnetic, [
-    'discovered writes magnetic',
-    'in A Site: magnetic',
-    'in discovered: magnetic',
-    'closeMatch Artificial Intelligence · weight 0.55',
-    'relatedMatch c_nowhere',
-  ], 'a concept with only a mapping to say is shown; a target the feed does not name is shown as written');
+  assert.deepStrictEqual(
+    magnetic,
+    [
+      'discovered writes magnetic',
+      'in A Site: magnetic',
+      'in discovered: magnetic',
+      'closeMatch Artificial Intelligence · weight 0.55',
+      'relatedMatch c_nowhere',
+    ],
+    'a concept with only a mapping to say is shown; a target the feed does not name is shown as written',
+  );
 });
 
 test('the tag detail: a bubble standing for several tags at the depth chosen names its members', () => {

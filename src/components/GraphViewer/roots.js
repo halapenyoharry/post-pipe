@@ -18,7 +18,7 @@ function hashString(str) {
 function rng(seed) {
   let a = seed >>> 0;
   return function () {
-    a = (a + 0x6D2B79F5) >>> 0;
+    a = (a + 0x6d2b79f5) >>> 0;
     let t = a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -52,7 +52,11 @@ function rootShape(seedKey) {
     };
     const nForks = r() < 0.6 ? 1 + Math.floor(r() * 2) : 0;
     for (let k = 0; k < nForks; k++) {
-      b.forks.push({ t: between(0.35, 0.8), angle: (r() < 0.5 ? -1 : 1) * between(0.4, 0.9), length: between(0.35, 0.6) });
+      b.forks.push({
+        t: between(0.35, 0.8),
+        angle: (r() < 0.5 ? -1 : 1) * between(0.4, 0.9),
+        length: between(0.35, 0.6),
+      });
     }
     branches.push(b);
   }
@@ -63,9 +67,11 @@ const fmt = (n) => (Math.round(n * 10) / 10).toString();
 
 // The main line as points, from p0 to p1.
 function mainPoints(p0, p1, shape, steps) {
-  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const dx = p1.x - p0.x,
+    dy = p1.y - p0.y;
   const len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len;
+  const nx = -dy / len,
+    ny = dx / len;
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -90,11 +96,12 @@ function pathFrom(pts) {
 function rootletPoints(origin, heading, angle, length, bend, steps = 6) {
   const pts = [];
   let a = heading + angle;
-  let x = origin[0], y = origin[1];
+  let x = origin[0],
+    y = origin[1];
   pts.push([x, y]);
   const step = length / steps;
   for (let i = 1; i <= steps; i++) {
-    a += (bend / steps);
+    a += bend / steps;
     x += Math.cos(a) * step;
     y += Math.sin(a) * step;
     pts.push([x, y]);
@@ -137,7 +144,13 @@ function rootPath(p0, p1, shape) {
 function rootSegments({ containers = [], memberOf = new Map(), sequence = [] }) {
   const segs = [];
   for (const c of containers) {
-    if (c.parent) segs.push({ key: `c:${c.parent}>${c.id}`, from: { container: c.parent }, to: { container: c.id }, reach: { container: c.id } });
+    if (c.parent)
+      segs.push({
+        key: `c:${c.parent}>${c.id}`,
+        from: { container: c.parent },
+        to: { container: c.id },
+        reach: { container: c.id },
+      });
   }
   const incoming = new Set(sequence.map((e) => e.target));
   const starts = new Set();
@@ -147,7 +160,12 @@ function rootSegments({ containers = [], memberOf = new Map(), sequence = [] }) 
     if (c) segs.push({ key: `s:${c}>${s}`, from: { container: c }, to: { node: s }, reach: { node: s } });
   }
   for (const e of sequence) {
-    segs.push({ key: `e:${e.source}>${e.target}`, from: { node: e.source }, to: { node: e.target }, reach: { node: e.target } });
+    segs.push({
+      key: `e:${e.source}>${e.target}`,
+      from: { node: e.source },
+      to: { node: e.target },
+      reach: { node: e.target },
+    });
   }
   return segs;
 }

@@ -10,7 +10,7 @@ const CARD = { width: 180, height: 140 };
 
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg || ''} ${a} vs ${b}`);
 
-test('the middle is the site\'s values exactly, and only the three force settings come back', () => {
+test("the middle is the site's values exactly, and only the three force settings come back", () => {
   const r = tightened(SIM, 0.5, CARD);
   assert.deepStrictEqual(r, { linkDistance: 160, chargeStrength: -500, collidePadding: 10 });
 });
@@ -22,7 +22,7 @@ test('loose: longer links, stronger charge, twice the padding', () => {
   close(r.collidePadding, 20, 'padding');
 });
 
-test('tight: short links, weak charge, and a negative padding of a quarter of the card\'s shorter side', () => {
+test("tight: short links, weak charge, and a negative padding of a quarter of the card's shorter side", () => {
   const r = tightened(SIM, 1, CARD);
   close(r.linkDistance, 160 * 0.45, 'link');
   close(r.chargeStrength, -500 * 0.35, 'charge');
@@ -44,13 +44,16 @@ test('in between: continuous and monotone from loose to tight', () => {
   close(tightened(SIM, 0.75, CARD).collidePadding, (10 - 35) / 2);
 });
 
-test('a site\'s own numbers are what gets scaled', () => {
+test("a site's own numbers are what gets scaled", () => {
   const r = tightened({ linkDistance: 200, chargeStrength: -800, collidePadding: 4 }, 1, { width: 300, height: 100 });
   close(r.linkDistance, 90);
   close(r.chargeStrength, -280);
   close(r.collidePadding, -25);
-  assert.deepStrictEqual(tightened({ linkDistance: 200, chargeStrength: -800, collidePadding: 4 }, 0.5, CARD),
-    { linkDistance: 200, chargeStrength: -800, collidePadding: 4 });
+  assert.deepStrictEqual(tightened({ linkDistance: 200, chargeStrength: -800, collidePadding: 4 }, 0.5, CARD), {
+    linkDistance: 200,
+    chargeStrength: -800,
+    collidePadding: 4,
+  });
 });
 
 test('out of range or not a number: clamped, or the middle', () => {
@@ -64,7 +67,7 @@ test('out of range or not a number: clamped, or the middle', () => {
   assert.deepStrictEqual(tightened(SIM, 7, CARD), tightened(SIM, 1, CARD));
 });
 
-test('missing settings fall back to the engine\'s defaults', () => {
+test("missing settings fall back to the engine's defaults", () => {
   assert.deepStrictEqual(tightened(null, 0.5, null), { linkDistance: 160, chargeStrength: -500, collidePadding: 10 });
   close(tightened({}, 1).collidePadding, -35);
 });

@@ -7,12 +7,20 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  openingConfig, coverGeometry, inkSpan, widestInkRow, lastInkRow, fitTitle, titleLayout, rootsBrightnessAt,
+  openingConfig,
+  coverGeometry,
+  inkSpan,
+  widestInkRow,
+  lastInkRow,
+  fitTitle,
+  titleLayout,
+  rootsBrightnessAt,
 } = require('../src/lib/opening');
 
 const SITE = {
   opening: {
-    enabled: true, mode: 'two-state',
+    enabled: true,
+    mode: 'two-state',
     art: { artState: 'a.png', graphState: 'g.png' },
     byline: { text: 'by someone', gap: 0.1 },
     crownY: 0.63,
@@ -23,8 +31,25 @@ const SITE = {
     graph: { artStateOpacity: 0, rootsFit: 'width' },
     title: {
       fit: 'width',
-      art: { lines: [{ x: 0.27, y: 0.45, width: 0.46, spans: [{ text: 'Morning', size: 0.14 }] }, { x: 0.27, y: 0.5, width: 0.47, spans: [{ text: 'River', size: 0.13 }] }] },
-      graph: { lines: [{ x: 0.1, y: 0.61, width: 0.75, spans: [{ text: 'The', size: 0.03, rise: 0.03 }, { text: ' Epic', size: 0.06 }] }] },
+      art: {
+        lines: [
+          { x: 0.27, y: 0.45, width: 0.46, spans: [{ text: 'Morning', size: 0.14 }] },
+          { x: 0.27, y: 0.5, width: 0.47, spans: [{ text: 'River', size: 0.13 }] },
+        ],
+      },
+      graph: {
+        lines: [
+          {
+            x: 0.1,
+            y: 0.61,
+            width: 0.75,
+            spans: [
+              { text: 'The', size: 0.03, rise: 0.03 },
+              { text: ' Epic', size: 0.06 },
+            ],
+          },
+        ],
+      },
     },
   },
   topBar: { band: { color: 'rgba(150, 150, 150, 0.16)' } },
@@ -57,10 +82,16 @@ test('settings: fit, sideMargin, rootsFit, returnAbove, topBarInArt and the band
 
 test('ink: its columns over some rows, its widest row, its last row', () => {
   // 6 x 4: row 0 ink at x 2; row 2 ink from x 1 to 4; row 3 none.
-  const w = 6, h = 4;
+  const w = 6,
+    h = 4;
   const px = new Uint8ClampedArray(w * h * 4);
-  const ink = (x, y, a = 255) => { px[(y * w + x) * 4 + 3] = a; };
-  ink(2, 0); ink(1, 2); ink(4, 2); ink(3, 1, 20);
+  const ink = (x, y, a = 255) => {
+    px[(y * w + x) * 4 + 3] = a;
+  };
+  ink(2, 0);
+  ink(1, 2);
+  ink(4, 2);
+  ink(3, 1, 20);
   assert.deepStrictEqual(inkSpan(px, w, h, 0, 0.5), { l: 2 / 6, r: 3 / 6 });
   assert.deepStrictEqual(inkSpan(px, w, h, 0, 1), { l: 1 / 6, r: 5 / 6 });
   assert.equal(inkSpan(px, w, h, 0.75, 1), null);
@@ -88,7 +119,10 @@ test('roots fit width: the widest row of roots edge to edge in the graph state, 
   const c = openingConfig(SITE);
   const view = { vw: 390, vh: 844, art: ART, ink: INK, controls: 52 };
   const g = coverGeometry(c, view, 1);
-  assert.ok(close(g.art.left + INK.roots.l * g.art.width, 0) && close(g.art.left + INK.roots.r * g.art.width, 390), 'roots edge to edge');
+  assert.ok(
+    close(g.art.left + INK.roots.l * g.art.width, 0) && close(g.art.left + INK.roots.r * g.art.width, 390),
+    'roots edge to edge',
+  );
   assert.ok(close(g.art.top + INK.graph * g.art.height, 58), 'the small plant 6 px under the band');
   const a = coverGeometry(c, view, 0);
   const mid = coverGeometry(c, view, 0.5);
@@ -99,7 +133,8 @@ test('roots fit width: the widest row of roots edge to edge in the graph state, 
   assert.ok(desk.art.width * (INK.roots.r - INK.roots.l) < 1280);
   // Without fit or rootsFit, one scale throughout, as before.
   const plain = openingConfig({ opening: { ...SITE.opening, fit: undefined, graph: { artOffset: 0.33 } } });
-  const p0 = coverGeometry(plain, view, 0), p1 = coverGeometry(plain, view, 1);
+  const p0 = coverGeometry(plain, view, 0),
+    p1 = coverGeometry(plain, view, 1);
   assert.equal(p0.art.scale, p1.art.scale);
   assert.equal(p0.art.left, (390 - p0.art.width) / 2);
 });
@@ -115,13 +150,23 @@ test('title fit width: each line scaled to its width as measured; the byline set
   const c = openingConfig(SITE);
   // As drawn at their set sizes: Morning 400 px, River 500 px, the graph line 700 px.
   const fitted = fitTitle(c.title, { art: [400, 500], graph: [700] }, ART.w);
-  const k0 = (0.46 * 1045) / 400, k1 = (0.47 * 1045) / 500, kg = (0.75 * 1045) / 700;
+  const k0 = (0.46 * 1045) / 400,
+    k1 = (0.47 * 1045) / 500,
+    kg = (0.75 * 1045) / 700;
   assert.ok(close(fitted.art.lines[0].spans[0].size, 0.14 * k0));
   assert.ok(close(fitted.art.lines[1].spans[0].size, 0.13 * k1));
   assert.ok(close(fitted.graph.lines[0].spans[1].size, 0.06 * kg));
   assert.equal(fitted.graph.lines[0].spans[0].rise, 0.03, 'a rise is kept');
-  assert.equal(fitTitle(c.title, { art: [0, 500], graph: [] }, ART.w).art.lines[0], c.title.art.lines[0], 'unmeasured lines keep their sizes');
-  assert.equal(fitTitle({ ...c.title, fit: null }, { art: [1, 1], graph: [1] }, ART.w).art, c.title.art, 'off without fit');
+  assert.equal(
+    fitTitle(c.title, { art: [0, 500], graph: [] }, ART.w).art.lines[0],
+    c.title.art.lines[0],
+    'unmeasured lines keep their sizes',
+  );
+  assert.equal(
+    fitTitle({ ...c.title, fit: null }, { art: [1, 1], graph: [1] }, ART.w).art,
+    c.title.art,
+    'off without fit',
+  );
   const box = { left: 0, top: 0, width: 400, height: 808 };
   assert.ok(close(titleLayout(fitted.art, box).lines[1].width, 0.47 * 400));
   // The byline: 9 px wide per px of its size.
@@ -137,11 +182,15 @@ test('title fit width: each line scaled to its width as measured; the byline set
   }
 });
 
-test('byline graphScale: in the graph state a share of that title\'s size, not a line\'s width; the art state as before', () => {
+test("byline graphScale: in the graph state a share of that title's size, not a line's width; the art state as before", () => {
   const c = openingConfig({ opening: { ...SITE.opening, byline: { ...SITE.opening.byline, graphScale: 0.25 } } });
   assert.equal(c.byline.graphScale, 0.25);
   assert.equal(openingConfig(SITE).byline.graphScale, null, 'unset: none');
-  assert.equal(openingConfig({ opening: { ...SITE.opening, byline: { ...SITE.opening.byline, graphScale: -1 } } }).byline.graphScale, null);
+  assert.equal(
+    openingConfig({ opening: { ...SITE.opening, byline: { ...SITE.opening.byline, graphScale: -1 } } }).byline
+      .graphScale,
+    null,
+  );
   const fitted = fitTitle(c.title, { art: [400, 500], graph: [700] }, ART.w);
   const conf = { ...c, title: fitted };
   const at = (p) => coverGeometry(conf, { vw: 390, vh: 844, art: ART, ink: INK, controls: 52, perPx: 9 }, p);
@@ -154,9 +203,12 @@ test('byline graphScale: in the graph state a share of that title\'s size, not a
   const gl = fitted.graph.lines[0];
   const titleSize = Math.max(...gl.spans.map((sp) => sp.size)) * g1.art.width;
   assert.ok(close(g1.byline.size, 0.25 * titleSize), `${g1.byline.size} against ${0.25 * titleSize}`);
-  assert.ok(g1.byline.size * 9 < gl.width * g1.art.width * 0.5, 'well under the line\'s width');
-  assert.ok(close(g1.byline.x, g1.art.left + gl.x * g1.art.width), 'at the line\'s left edge');
-  assert.ok(close(g1.byline.y, g1.art.top + gl.y * g1.art.height + 0.1 * titleSize), 'gap of the title\'s size under its baseline');
+  assert.ok(g1.byline.size * 9 < gl.width * g1.art.width * 0.5, "well under the line's width");
+  assert.ok(close(g1.byline.x, g1.art.left + gl.x * g1.art.width), "at the line's left edge");
+  assert.ok(
+    close(g1.byline.y, g1.art.top + gl.y * g1.art.height + 0.1 * titleSize),
+    "gap of the title's size under its baseline",
+  );
   // On the way, between the two.
   const half = at(0.5);
   assert.ok(half.byline.size < g0.byline.size && half.byline.size > g1.byline.size);
@@ -169,21 +221,28 @@ test('graph.rootsBrightness: as drawn in the art state, the set brightness in th
   assert.equal(rootsBrightnessAt(c, 1), 0.55);
   assert.ok(close(rootsBrightnessAt(c, 0.5), 0.775));
   assert.equal(rootsBrightnessAt(openingConfig(SITE), 1), 1, 'unset: as drawn');
-  assert.equal(openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: -3 } } }).graph.rootsBrightness, 0);
+  assert.equal(
+    openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: -3 } } }).graph.rootsBrightness,
+    0,
+  );
   assert.equal(openingConfig({ opening: { ...SITE.opening, graph: { rootsBrightness: 9 } } }).graph.rootsBrightness, 2);
 });
 
-test('graph.footRoom: on a wide screen the graph state\'s picture leaves that much free under its foot; a phone, fitted to its width, keeps its size', () => {
+test("graph.footRoom: on a wide screen the graph state's picture leaves that much free under its foot; a phone, fitted to its width, keeps its size", () => {
   const base = openingConfig(SITE);
   const room = openingConfig({ opening: { ...SITE.opening, graph: { ...SITE.opening.graph, footRoom: 60 } } });
   assert.equal(room.graph.footRoom, 60);
   assert.equal(base.graph.footRoom, 0);
   const desk = { vw: 1280, vh: 800, art: ART, ink: INK, controls: 52 };
-  const g0 = coverGeometry(base, desk, 1), g1 = coverGeometry(room, desk, 1);
+  const g0 = coverGeometry(base, desk, 1),
+    g1 = coverGeometry(room, desk, 1);
   const footOf = (g) => g.art.top + INK.bottom * g.art.height;
   // The small plant stays under the band, so the foot comes up by the room.
   assert.ok(close(footOf(g0) - footOf(g1), 60, 1e-6), `foot ${footOf(g0)} -> ${footOf(g1)}`);
   assert.ok(g1.art.width < g0.art.width, 'smaller on a wide screen');
   const phone = { vw: 390, vh: 844, art: ART, ink: INK, controls: 52 };
-  assert.ok(close(coverGeometry(base, phone, 1).art.width, coverGeometry(room, phone, 1).art.width), 'a phone, fitted to its width, as it was');
+  assert.ok(
+    close(coverGeometry(base, phone, 1).art.width, coverGeometry(room, phone, 1).art.width),
+    'a phone, fitted to its width, as it was',
+  );
 });

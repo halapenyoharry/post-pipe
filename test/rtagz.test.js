@@ -89,20 +89,24 @@ test('rtagz: record writing handles untagged items, shared urls, duplicate feed 
   assert.strictEqual(systems['Journal (https://journal2.test/atom)'].sourceId, 'https://journal2.test/atom');
 
   // HTML reduction on post-1
-  const post1Item = records.find((r) => r.type === 'item' && r.source === 'Posts' && r.id === 'https://example.test/post-1.html');
+  const post1Item = records.find(
+    (r) => r.type === 'item' && r.source === 'Posts' && r.id === 'https://example.test/post-1.html',
+  );
   assert.ok(post1Item);
   assert.strictEqual(post1Item.text, "Notes on artificial intelligence & human memory. 'quoted' A");
   assert.strictEqual(post1Item.color, '#2ecc71');
 
   // Ignored tag "untagged" left out
-  const post1Tags = records.filter((r) => r.type === 'tag' && r.source === 'Posts' && r.item === 'https://example.test/post-1.html');
+  const post1Tags = records.filter(
+    (r) => r.type === 'tag' && r.source === 'Posts' && r.item === 'https://example.test/post-1.html',
+  );
   assert.deepStrictEqual(
     post1Tags.map((t) => ({ label: t.label, weight: t.weight, origin: t.origin })),
     [
       { label: 'act-1', weight: 1, origin: 'explicit' },
       { label: 'artificial intelligence', weight: 1, origin: 'explicit' },
       { label: 'AI', weight: 1, origin: 'explicit' },
-    ]
+    ],
   );
 
   // Item with no tags (wire-2) has an item record and zero tag records
@@ -134,7 +138,7 @@ test('rtagz: overrides merging combines site overrides with container pins, site
   });
 });
 
-test('rtagz: build config carries the site\'s concept schemes and ledger as absolute paths', () => {
+test("rtagz: build config carries the site's concept schemes and ledger as absolute paths", () => {
   const siteRoot = path.join(os.tmpdir(), 'postpipe-rtagz-site');
   const warned = [];
   const origWarn = console.warn;
@@ -186,8 +190,11 @@ test('rtagz: build config carries the site\'s concept schemes and ledger as abso
   // No site root: no ledger key, so nothing lands in post-pipe's own folder.
   assert.ok(!('ledger' in buildConfig({})), 'ledger omitted without a site root');
   // the SKOS switches (settings.rtagz.skos) pass through as rtz-build's skos block: base and lang only
-  assert.ok(!('skos' in buildConfig({})), 'absent: rosetta-tagz\'s defaults');
-  assert.deepStrictEqual(buildConfig({ skos: { base: 'https://site.test/skos/', lang: 'en-GB', other: 1 } }).skos, { base: 'https://site.test/skos/', lang: 'en-GB' });
+  assert.ok(!('skos' in buildConfig({})), "absent: rosetta-tagz's defaults");
+  assert.deepStrictEqual(buildConfig({ skos: { base: 'https://site.test/skos/', lang: 'en-GB', other: 1 } }).skos, {
+    base: 'https://site.test/skos/',
+    lang: 'en-GB',
+  });
   assert.deepStrictEqual(buildConfig({ skos: { lang: null } }).skos, { lang: null }, 'null lang: plain literals');
   assert.strictEqual(buildConfig({ skos: false }).skos, false, 'false: no SKOS files');
   assert.ok(!('skos' in buildConfig({ skos: { other: 1 } })), 'nothing it knows: nothing passed');
@@ -198,8 +205,14 @@ test('rtagz: build config carries the site\'s concept schemes and ledger as abso
   const queued = buildConfig({ discover: 'queue', queue: '/site/rtagz-queue.json' });
   assert.strictEqual(queued.discover, 'queue');
   assert.strictEqual(queued.queue, '/site/rtagz-queue.json');
-  assert.ok(!('queue' in buildConfig({ discover: 'queue' })), 'no path given: rosetta-tagz puts the queue beside the overrides it was given');
-  assert.ok(!('queue' in buildConfig({ discover: true, queue: '/site/rtagz-queue.json' })), 'a queue path means nothing without the queue state');
+  assert.ok(
+    !('queue' in buildConfig({ discover: 'queue' })),
+    'no path given: rosetta-tagz puts the queue beside the overrides it was given',
+  );
+  assert.ok(
+    !('queue' in buildConfig({ discover: true, queue: '/site/rtagz-queue.json' })),
+    'a queue path means nothing without the queue state',
+  );
 });
 
 test('rtagz: the settings block is read from rtagz, and from stone, its name before 2026-10-31, with one logged line', () => {
@@ -214,7 +227,10 @@ test('rtagz: the settings block is read from rtagz, and from stone, its name bef
     assert.strictEqual(rtagzSettings({ title: 'no block' }), undefined);
     assert.strictEqual(rtagzSettings(null), undefined);
     assert.strictEqual(warned.length, 0);
-    assert.deepStrictEqual(rtagzSettings({ stone: { enabled: true, discover: true } }), { enabled: true, discover: true });
+    assert.deepStrictEqual(rtagzSettings({ stone: { enabled: true, discover: true } }), {
+      enabled: true,
+      discover: true,
+    });
     assert.strictEqual(warned.length, 1);
     assert.match(warned[0], /^rtagz: the settings key "stone" is now "rtagz"/);
   } finally {
@@ -244,18 +260,25 @@ test('rtagz: a site holding only stone.ledger.json or stone.overrides.json has t
     assert.strictEqual(warned.length, 1);
 
     // A ledger the settings name is used as named, whatever is in the site.
-    assert.strictEqual(buildConfig({ siteRoot, ledger: 'stone.ledger.json' }).ledger, path.join(siteRoot, 'stone.ledger.json'));
+    assert.strictEqual(
+      buildConfig({ siteRoot, ledger: 'stone.ledger.json' }).ledger,
+      path.join(siteRoot, 'stone.ledger.json'),
+    );
     assert.strictEqual(warned.length, 1);
 
     // Only the former overrides file: its decisions reach rtz-build.
     fs.writeFileSync(path.join(siteRoot, 'stone.overrides.json'), JSON.stringify({ ignore: ['untagged'] }), 'utf8');
     const engine = path.join(siteRoot, 'engine');
     fs.mkdirSync(path.join(engine, 'bin'), { recursive: true });
-    fs.writeFileSync(path.join(engine, 'bin', 'rtz-build'), `
+    fs.writeFileSync(
+      path.join(engine, 'bin', 'rtz-build'),
+      `
       const fs = require('fs');
       fs.writeFileSync('universe.json', ${JSON.stringify(JSON.stringify(UNIVERSE_FIXTURE))});
       fs.writeFileSync('build.json', JSON.stringify({ built: '2026-10-31T12:00:00Z', stages: [] }));
-    `, 'utf8');
+    `,
+      'utf8',
+    );
     const cacheDir = path.join(siteRoot, 'cache');
     const res = await runRtagzPhase(cloneResults(), { rtagz: { enabled: true, engine }, siteRoot, cacheDir });
     assert.ok(res.ran, 'rosetta-tagz ran');
@@ -305,7 +328,7 @@ test('rtagz: write-back from canned universe orders tags, resolves folded items,
       stages: [],
       ledger: { path: '/sites/fixture/rtagz-ids.json', minted: 4, reused: 0, retired: 0, splits: 0, merges: 0 },
     },
-    { siteTitle: 'Fixture Site' }
+    { siteTitle: 'Fixture Site' },
   );
 
   // 1. Folded item in Posts (post-1) was folded into ScienceWire::wire-1 in universe.json,
@@ -449,8 +472,18 @@ test('rtagz: write-back from canned universe orders tags, resolves folded items,
   //    then the schemes and what the universe said about relations, mappings,
   //    untagged items, external concepts and the ledger.
   assert.deepStrictEqual(Object.keys(summary), [
-    'built', 'systems', 'concepts', 'unjoined', 'skippedDuplicateIds',
-    'schemes', 'relations', 'relationList', 'mappings', 'untagged', 'external', 'ledger',
+    'built',
+    'systems',
+    'concepts',
+    'unjoined',
+    'skippedDuplicateIds',
+    'schemes',
+    'relations',
+    'relationList',
+    'mappings',
+    'untagged',
+    'external',
+    'ledger',
   ]);
 
   //    schemes: the universe's list, the site scheme labelled with the site's
@@ -508,11 +541,13 @@ test('rtagz: write-back from canned universe orders tags, resolves folded items,
   //    joined, keeps the id and source rosetta-tagz gave.
   assert.deepStrictEqual(summary.untagged, {
     count: 1,
-    items: [{
-      id: 'j-unjoined',
-      source: 'Journal',
-      why: ['no phrase recurs across Journal items', 'best candidate "short note" below minDf 2'],
-    }],
+    items: [
+      {
+        id: 'j-unjoined',
+        source: 'Journal',
+        why: ['no phrase recurs across Journal items', 'best candidate "short note" below minDf 2'],
+      },
+    ],
   });
 
   assert.deepStrictEqual(summary.external, UNIVERSE_FIXTURE.external);
@@ -530,24 +565,32 @@ test('rtagz: write-back from canned universe orders tags, resolves folded items,
     site: 'Artificial Intelligence',
   });
   assert.deepStrictEqual(aiConcept.altLabel, { Posts: ['AI'] });
-  assert.deepStrictEqual(aiConcept.mappings, [{
-    type: 'exactMatch',
-    target: 'iptc-mediatopics:20000763',
-    weight: 1,
-    why: 'label "artificial intelligence" matches the vocabulary\'s prefLabel',
-  }]);
+  assert.deepStrictEqual(aiConcept.mappings, [
+    {
+      type: 'exactMatch',
+      target: 'iptc-mediatopics:20000763',
+      weight: 1,
+      why: 'label "artificial intelligence" matches the vocabulary\'s prefLabel',
+    },
+  ]);
   assert.ok(!('broader' in aiConcept), 'c_ai has nothing broader');
   //    The ledger's word on the concept, as the universe carries it.
   assert.deepStrictEqual(aiConcept.ledger, { since: '2026-10-22T12:00:00.000Z', event: 'minted' });
 
   const mlConcept = summary.concepts.find((c) => c.id === 'c_machine_learning');
-  assert.deepStrictEqual(mlConcept.ledger, { since: '2026-10-20T12:00:00.000Z', event: 'reused', previousLabel: 'machine learning' });
-  assert.deepStrictEqual(mlConcept.mappings, [{
-    type: 'broadMatch',
-    target: 'iptc-mediatopics:20000763',
-    weight: 0.56,
-    why: 'related to Artificial Intelligence, which matches artificial intelligence exactly',
-  }]);
+  assert.deepStrictEqual(mlConcept.ledger, {
+    since: '2026-10-20T12:00:00.000Z',
+    event: 'reused',
+    previousLabel: 'machine learning',
+  });
+  assert.deepStrictEqual(mlConcept.mappings, [
+    {
+      type: 'broadMatch',
+      target: 'iptc-mediatopics:20000763',
+      weight: 0.56,
+      why: 'related to Artificial Intelligence, which matches artificial intelligence exactly',
+    },
+  ]);
   assert.ok(!('altLabel' in mlConcept), 'an empty altLabel is not written');
 
   const nhConcept = summary.concepts.find((c) => c.id === 'u_neural_hardware');
@@ -556,7 +599,17 @@ test('rtagz: write-back from canned universe orders tags, resolves folded items,
   assert.ok(!('mappings' in nhConcept));
 
   const act1Concept = summary.concepts.find((c) => c.id === 'c_act_1');
-  assert.deepStrictEqual(Object.keys(act1Concept), ['canonical', 'pinned', 'discovered', 'items', 'forms', 'rank', 'id', 'inScheme', 'prefLabel']);
+  assert.deepStrictEqual(Object.keys(act1Concept), [
+    'canonical',
+    'pinned',
+    'discovered',
+    'items',
+    'forms',
+    'rank',
+    'id',
+    'inScheme',
+    'prefLabel',
+  ]);
   assert.ok(!('ledger' in act1Concept) && !('ledger' in nhConcept), 'no ledger where the universe has none');
 });
 
@@ -569,9 +622,23 @@ function universeWithoutSkos() {
   delete u.schemes;
   delete u.external;
   delete u.untagged;
-  for (const r of u.relations) { delete r.skos; delete r.why; delete r.wasDerivedFrom; delete r.wasGeneratedBy; }
-  for (const c of u.concepts) { delete c.inScheme; delete c.prefLabel; delete c.altLabel; delete c.ledger; }
-  for (const it of u.items) for (const t of it.tags) { delete t.wasDerivedFrom; delete t.wasGeneratedBy; }
+  for (const r of u.relations) {
+    delete r.skos;
+    delete r.why;
+    delete r.wasDerivedFrom;
+    delete r.wasGeneratedBy;
+  }
+  for (const c of u.concepts) {
+    delete c.inScheme;
+    delete c.prefLabel;
+    delete c.altLabel;
+    delete c.ledger;
+  }
+  for (const it of u.items)
+    for (const t of it.tags) {
+      delete t.wasDerivedFrom;
+      delete t.wasGeneratedBy;
+    }
   return u;
 }
 
@@ -579,13 +646,23 @@ test('rtagz: a universe from the current engine (no SKOS, no PROV) adds only the
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const { summary } = applyUniverse(
-    results, resultSystems, systems, skippedDuplicateIds,
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
     universeWithoutSkos(),
     { built: '2026-10-22T12:00:00.000Z', stages: [] },
-    { siteTitle: 'Fixture Site' }
+    { siteTitle: 'Fixture Site' },
   );
 
-  assert.deepStrictEqual(Object.keys(summary), ['built', 'systems', 'concepts', 'unjoined', 'skippedDuplicateIds', 'schemes']);
+  assert.deepStrictEqual(Object.keys(summary), [
+    'built',
+    'systems',
+    'concepts',
+    'unjoined',
+    'skippedDuplicateIds',
+    'schemes',
+  ]);
   assert.deepStrictEqual(summary.schemes, [
     { id: 'site', label: 'Fixture Site', kind: 'site' },
     { id: 'Posts', label: 'Posts', kind: 'system', sourceId: 'local://~/Posts' },
@@ -593,19 +670,59 @@ test('rtagz: a universe from the current engine (no SKOS, no PROV) adds only the
     { id: 'Journal', label: 'Journal', kind: 'system', sourceId: 'https://journal.test/atom' },
   ]);
   for (const c of summary.concepts) {
-    assert.deepStrictEqual(Object.keys(c), ['canonical', 'pinned', 'discovered', 'items', 'forms', 'rank', 'id'], c.canonical);
+    assert.deepStrictEqual(
+      Object.keys(c),
+      ['canonical', 'pinned', 'discovered', 'items', 'forms', 'rank', 'id'],
+      c.canonical,
+    );
   }
 
   const post1 = results[0].items[0];
   assert.deepStrictEqual(post1.tags, ['act-1', 'Artificial Intelligence', 'Machine Learning']);
-  assert.deepStrictEqual(post1._references.filter((r) => r.type === 'tag'), [
-    { type: 'tag', value: 'act-1', concept: 'c_act_1', origin: 'explicit', weight: 1, systems: ['Posts'], forms: { Posts: ['act-1'] }, via: 'known', why: null },
-    { type: 'tag', value: 'Artificial Intelligence', concept: 'c_ai', origin: 'explicit', weight: 1, systems: ['Posts', 'ScienceWire'], forms: { Posts: ['artificial intelligence', 'AI'], ScienceWire: ['A.I.'] }, via: 'known', why: null },
-    { type: 'tag', value: 'Machine Learning', concept: 'c_machine_learning', origin: 'explicit', weight: 1, systems: ['ScienceWire'], forms: { ScienceWire: ['Machine Learning'] }, via: 'known', why: null },
-  ]);
+  assert.deepStrictEqual(
+    post1._references.filter((r) => r.type === 'tag'),
+    [
+      {
+        type: 'tag',
+        value: 'act-1',
+        concept: 'c_act_1',
+        origin: 'explicit',
+        weight: 1,
+        systems: ['Posts'],
+        forms: { Posts: ['act-1'] },
+        via: 'known',
+        why: null,
+      },
+      {
+        type: 'tag',
+        value: 'Artificial Intelligence',
+        concept: 'c_ai',
+        origin: 'explicit',
+        weight: 1,
+        systems: ['Posts', 'ScienceWire'],
+        forms: { Posts: ['artificial intelligence', 'AI'], ScienceWire: ['A.I.'] },
+        via: 'known',
+        why: null,
+      },
+      {
+        type: 'tag',
+        value: 'Machine Learning',
+        concept: 'c_machine_learning',
+        origin: 'explicit',
+        weight: 1,
+        systems: ['ScienceWire'],
+        forms: { ScienceWire: ['Machine Learning'] },
+        via: 'known',
+        why: null,
+      },
+    ],
+  );
   const wire2 = results[1].items[1];
   for (const ref of wire2._references) {
-    assert.ok(!('prefLabel' in ref) && !('wasDerivedFrom' in ref) && !('wasGeneratedBy' in ref), 'no null-valued SKOS or PROV fields');
+    assert.ok(
+      !('prefLabel' in ref) && !('wasDerivedFrom' in ref) && !('wasGeneratedBy' in ref),
+      'no null-valued SKOS or PROV fields',
+    );
   }
 });
 
@@ -613,14 +730,36 @@ test('rtagz: untagged items come back on post-pipe ids through the join rule, a 
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const universe = {
-    concepts: [{
-      id: 'c_x', canonical: 'X', pinned: false, discovered: false, n: 1, nEmergent: 0,
-      variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }], rank: [],
-    }],
+    concepts: [
+      {
+        id: 'c_x',
+        canonical: 'X',
+        pinned: false,
+        discovered: false,
+        n: 1,
+        nEmergent: 0,
+        variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }],
+        rank: [],
+      },
+    ],
     items: [
       // post-1 (Posts) folds into this ScienceWire copy of the same article; neither carries a tag.
-      { key: 'ScienceWire::wire-1', source: 'ScienceWire', url: 'https://www.EXAMPLE.test/shared-article/?utm=1#top', title: 'Thinking With Artificial Intelligence', tags: [] },
-      { key: 'Posts::https://example.test/post-2.html', source: 'Posts', url: 'https://example.test/post-2.html', title: 'On Machine Learning and Systems', tags: [{ c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' }] },
+      {
+        key: 'ScienceWire::wire-1',
+        source: 'ScienceWire',
+        url: 'https://www.EXAMPLE.test/shared-article/?utm=1#top',
+        title: 'Thinking With Artificial Intelligence',
+        tags: [],
+      },
+      {
+        key: 'Posts::https://example.test/post-2.html',
+        source: 'Posts',
+        url: 'https://example.test/post-2.html',
+        title: 'On Machine Learning and Systems',
+        tags: [
+          { c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' },
+        ],
+      },
     ],
     relations: [],
     untagged: [
@@ -628,7 +767,15 @@ test('rtagz: untagged items come back on post-pipe ids through the join rule, a 
       { key: 'Journal::j-1', source: 'Journal', why: 'one reason, as a string' },
     ],
   };
-  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, { built: 'x', stages: [] }, { siteTitle: 'Fixture Site' });
+  const { summary } = applyUniverse(
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
+    universe,
+    { built: 'x', stages: [] },
+    { siteTitle: 'Fixture Site' },
+  );
   assert.deepStrictEqual(summary.untagged, {
     count: 3,
     items: [
@@ -637,37 +784,80 @@ test('rtagz: untagged items come back on post-pipe ids through the join rule, a 
       { id: 'j-1', source: 'Journal', why: ['one reason, as a string'] },
     ],
   });
-  assert.ok(!('relations' in summary) && !('relationList' in summary) && !('mappings' in summary) && !('external' in summary) && !('ledger' in summary));
+  assert.ok(
+    !('relations' in summary) &&
+      !('relationList' in summary) &&
+      !('mappings' in summary) &&
+      !('external' in summary) &&
+      !('ledger' in summary),
+  );
 });
 
-test('rtagz: a concept\'s own mappings[] win over the relations, and only an exactMatch lends a reference the external label', () => {
+test("rtagz: a concept's own mappings[] win over the relations, and only an exactMatch lends a reference the external label", () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const universe = {
     concepts: [
       {
-        id: 'c_ai', canonical: 'Artificial Intelligence', n: 1, nEmergent: 0, variants: [], rank: [],
+        id: 'c_ai',
+        canonical: 'Artificial Intelligence',
+        n: 1,
+        nEmergent: 0,
+        variants: [],
+        rank: [],
         prefLabel: { site: 'Artificial Intelligence', Journal: 'AI' },
         mappings: [{ type: 'exactMatch', target: 'voc:1', weight: 0.9, why: 'same label' }],
       },
       {
-        id: 'c_machine_learning', canonical: 'Machine Learning', n: 1, nEmergent: 0, variants: [], rank: [],
+        id: 'c_machine_learning',
+        canonical: 'Machine Learning',
+        n: 1,
+        nEmergent: 0,
+        variants: [],
+        rank: [],
         prefLabel: { site: 'Machine Learning', Journal: 'ML' },
         mappings: [{ type: 'closeMatch', target: 'voc:1', weight: 0.5 }, { type: 'bad' }],
       },
     ],
-    items: [{
-      key: 'Journal::j-1', source: 'Journal', url: 'https://journal.test/ml-review', title: 'Review of Machine Learning',
-      tags: [
-        { c: 'c_ai', w: 1, origin: 'explicit', raw: [{ l: 'AI', n: 'ai', s: 'Journal' }], sys: ['Journal'], via: 'known' },
-        { c: 'c_machine_learning', w: 1, origin: 'explicit', raw: [{ l: 'ML', n: 'ml', s: 'Journal' }], sys: ['Journal'], via: 'known' },
-      ],
-    }],
+    items: [
+      {
+        key: 'Journal::j-1',
+        source: 'Journal',
+        url: 'https://journal.test/ml-review',
+        title: 'Review of Machine Learning',
+        tags: [
+          {
+            c: 'c_ai',
+            w: 1,
+            origin: 'explicit',
+            raw: [{ l: 'AI', n: 'ai', s: 'Journal' }],
+            sys: ['Journal'],
+            via: 'known',
+          },
+          {
+            c: 'c_machine_learning',
+            w: 1,
+            origin: 'explicit',
+            raw: [{ l: 'ML', n: 'ml', s: 'Journal' }],
+            sys: ['Journal'],
+            via: 'known',
+          },
+        ],
+      },
+    ],
     // A relation that says otherwise is not consulted for a concept that carries its own mappings.
     relations: [{ a: 'c_ai', b: 'voc:2', type: 'closeMatch', weight: 0.4, skos: true }],
     external: { 'voc:1': { scheme: 'voc', prefLabel: 'One', broader: [] }, 'voc:2': { prefLabel: 'Two', broader: [] } },
   };
-  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, { built: 'x', stages: [] }, { siteTitle: 'Fixture Site' });
+  const { summary } = applyUniverse(
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
+    universe,
+    { built: 'x', stages: [] },
+    { siteTitle: 'Fixture Site' },
+  );
 
   const ai = summary.concepts.find((c) => c.id === 'c_ai');
   assert.deepStrictEqual(ai.mappings, [{ type: 'exactMatch', target: 'voc:1', weight: 0.9, why: 'same label' }]);
@@ -687,9 +877,14 @@ test('rtagz: a concept\'s own mappings[] win over the relations, and only an exa
 // results, for reading relations back through the summary.
 function twoConceptUniverse(relations, extra = {}) {
   const concept = (id, canonical, system, label, more = {}) => ({
-    id, canonical, n: 1, nEmergent: 0, rank: [],
+    id,
+    canonical,
+    n: 1,
+    nEmergent: 0,
+    rank: [],
     variants: [{ label: canonical, count: 1, formsBySource: { [system]: { [label]: 1 } } }],
-    inScheme: [system, 'site'], prefLabel: { [system]: label, site: canonical },
+    inScheme: [system, 'site'],
+    prefLabel: { [system]: label, site: canonical },
     ...more,
   });
   return {
@@ -697,13 +892,32 @@ function twoConceptUniverse(relations, extra = {}) {
       concept('c_ai', 'Artificial Intelligence', 'Journal', 'AI', extra.ai || {}),
       concept('c_machine_learning', 'Machine Learning', 'Posts', 'machine-learning', extra.ml || {}),
     ],
-    items: [{
-      key: 'Journal::j-1', source: 'Journal', url: 'https://journal.test/ml-review', title: 'Review of Machine Learning',
-      tags: [
-        { c: 'c_ai', w: 1, origin: 'explicit', raw: [{ l: 'AI', n: 'ai', s: 'Journal' }], sys: ['Journal'], via: 'known' },
-        { c: 'c_machine_learning', w: 1, origin: 'explicit', raw: [{ l: 'ML', n: 'ml', s: 'Journal' }], sys: ['Journal'], via: 'known' },
-      ],
-    }],
+    items: [
+      {
+        key: 'Journal::j-1',
+        source: 'Journal',
+        url: 'https://journal.test/ml-review',
+        title: 'Review of Machine Learning',
+        tags: [
+          {
+            c: 'c_ai',
+            w: 1,
+            origin: 'explicit',
+            raw: [{ l: 'AI', n: 'ai', s: 'Journal' }],
+            sys: ['Journal'],
+            via: 'known',
+          },
+          {
+            c: 'c_machine_learning',
+            w: 1,
+            origin: 'explicit',
+            raw: [{ l: 'ML', n: 'ml', s: 'Journal' }],
+            sys: ['Journal'],
+            via: 'known',
+          },
+        ],
+      },
+    ],
     relations,
     ...(extra.universe || {}),
   };
@@ -712,18 +926,25 @@ function twoConceptUniverse(relations, extra = {}) {
 function summaryOf(universe, manifest = { built: 'x', stages: [] }) {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
-  return applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, manifest, { siteTitle: 'Fixture Site' }).summary;
+  return applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, manifest, {
+    siteTitle: 'Fixture Site',
+  }).summary;
 }
 
 test('rtagz: an empty mappings[] or broader[] on a concept is no answer, and the relations are read', () => {
-  const summary = summaryOf(twoConceptUniverse([
-    { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true, why: 'same label' },
-    { a: 'c_ai', b: 'c_machine_learning', type: 'broader', weight: 0.9, skos: true },
-  ], {
-    ai: { mappings: [] },
-    ml: { broader: [] },
-    universe: { external: { 'voc:1': { scheme: 'voc', prefLabel: 'One', broader: [] } } },
-  }));
+  const summary = summaryOf(
+    twoConceptUniverse(
+      [
+        { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true, why: 'same label' },
+        { a: 'c_ai', b: 'c_machine_learning', type: 'broader', weight: 0.9, skos: true },
+      ],
+      {
+        ai: { mappings: [] },
+        ml: { broader: [] },
+        universe: { external: { 'voc:1': { scheme: 'voc', prefLabel: 'One', broader: [] } } },
+      },
+    ),
+  );
   const ai = summary.concepts.find((c) => c.id === 'c_ai');
   assert.deepStrictEqual(ai.mappings, [{ type: 'exactMatch', target: 'voc:1', weight: 1, why: 'same label' }]);
   const ml = summary.concepts.find((c) => c.id === 'c_machine_learning');
@@ -731,32 +952,53 @@ test('rtagz: an empty mappings[] or broader[] on a concept is no answer, and the
   assert.deepStrictEqual(summary.mappings, { exactMatch: 1 });
 });
 
-test('rtagz: a mapping listed twice is read once, and a match between two of rosetta-tagz\'s own concepts across schemes is a mapping on the first', () => {
+test("rtagz: a mapping listed twice is read once, and a match between two of rosetta-tagz's own concepts across schemes is a mapping on the first", () => {
   // broadMatch is written as broader is: a is the broader concept (AI).
-  const summary = summaryOf(twoConceptUniverse([
-    { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
-    { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
-    { a: 'c_ai', b: 'c_machine_learning', type: 'broadMatch', weight: 0.7, skos: true, why: 'every Posts item with machine-learning also carries AI' },
-    { a: 'c_machine_learning', b: 'c_ai', type: 'closeMatch', weight: 0.5, skos: true },
-    { a: 'c_machine_learning', b: 'c_ai', type: 'related', weight: 0.4, skos: true },
-    // The same symmetric pairs the other way round: once each in the list.
-    { a: 'c_ai', b: 'c_machine_learning', type: 'closeMatch', weight: 0.5, skos: true },
-    { a: 'c_ai', b: 'c_machine_learning', type: 'related', weight: 0.9, skos: true, why: 'later' },
-    // Not SKOS: ignored.
-    { a: 'c_machine_learning', b: 'c_ai', type: 'near', weight: 0.4, skos: false },
-  ], {
-    ai: { mappings: [
-      { type: 'closeMatch', target: 'voc:2', weight: 0.5 },
-      { type: 'closeMatch', target: 'voc:2', weight: 0.5 },
-    ] },
-    universe: { external: { 'voc:1': { scheme: 'voc', prefLabel: 'One', broader: [] }, 'voc:2': { scheme: 'voc', prefLabel: 'Two', broader: [] } } },
-  }));
+  const summary = summaryOf(
+    twoConceptUniverse(
+      [
+        { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
+        { a: 'c_ai', b: 'voc:1', type: 'exactMatch', weight: 1, skos: true },
+        {
+          a: 'c_ai',
+          b: 'c_machine_learning',
+          type: 'broadMatch',
+          weight: 0.7,
+          skos: true,
+          why: 'every Posts item with machine-learning also carries AI',
+        },
+        { a: 'c_machine_learning', b: 'c_ai', type: 'closeMatch', weight: 0.5, skos: true },
+        { a: 'c_machine_learning', b: 'c_ai', type: 'related', weight: 0.4, skos: true },
+        // The same symmetric pairs the other way round: once each in the list.
+        { a: 'c_ai', b: 'c_machine_learning', type: 'closeMatch', weight: 0.5, skos: true },
+        { a: 'c_ai', b: 'c_machine_learning', type: 'related', weight: 0.9, skos: true, why: 'later' },
+        // Not SKOS: ignored.
+        { a: 'c_machine_learning', b: 'c_ai', type: 'near', weight: 0.4, skos: false },
+      ],
+      {
+        ai: {
+          mappings: [
+            { type: 'closeMatch', target: 'voc:2', weight: 0.5 },
+            { type: 'closeMatch', target: 'voc:2', weight: 0.5 },
+          ],
+        },
+        universe: {
+          external: {
+            'voc:1': { scheme: 'voc', prefLabel: 'One', broader: [] },
+            'voc:2': { scheme: 'voc', prefLabel: 'Two', broader: [] },
+          },
+        },
+      },
+    ),
+  );
   const ai = summary.concepts.find((c) => c.id === 'c_ai');
-  assert.deepStrictEqual(ai.mappings, [{ type: 'closeMatch', target: 'voc:2', weight: 0.5 }], 'a concept\'s own list, read once');
+  assert.deepStrictEqual(
+    ai.mappings,
+    [{ type: 'closeMatch', target: 'voc:2', weight: 0.5 }],
+    "a concept's own list, read once",
+  );
   const ml = summary.concepts.find((c) => c.id === 'c_machine_learning');
-  assert.deepStrictEqual(ml.mappings, [
-    { type: 'closeMatch', target: 'c_ai', weight: 0.5 },
-  ]);
+  assert.deepStrictEqual(ml.mappings, [{ type: 'closeMatch', target: 'c_ai', weight: 0.5 }]);
   assert.ok(!('broader' in ml), 'a broadMatch is a mapping, not a broader concept');
   // Counts are over the relations as written, each mapping once, mappings apart from relations.
   assert.deepStrictEqual(summary.mappings, { exactMatch: 1, broadMatch: 1, closeMatch: 2 });
@@ -766,17 +1008,32 @@ test('rtagz: a mapping listed twice is read once, and a match between two of ros
   // weighs), a cross-scheme mapping among them; the exactMatch to the
   // vocabulary and the near relation are not in it.
   assert.deepStrictEqual(summary.relationList, [
-    { a: 'c_ai', b: 'c_machine_learning', type: 'broadMatch', weight: 0.7, why: 'every Posts item with machine-learning also carries AI' },
+    {
+      a: 'c_ai',
+      b: 'c_machine_learning',
+      type: 'broadMatch',
+      weight: 0.7,
+      why: 'every Posts item with machine-learning also carries AI',
+    },
     { a: 'c_machine_learning', b: 'c_ai', type: 'closeMatch', weight: 0.5 },
     { a: 'c_machine_learning', b: 'c_ai', type: 'related', weight: 0.4 },
   ]);
 });
 
 test('rtagz: a concept flagged discovered with no inScheme still puts the discovered scheme on the list, and a bare scheme list is filled in', () => {
-  const summary = summaryOf(twoConceptUniverse([], {
-    ai: { discovered: true, inScheme: undefined, prefLabel: undefined },
-    universe: { schemes: [{ id: 'Posts' }, { id: 'discovered' }, { id: 'site' }, { id: 'voc', label: 'A Vocabulary', path: '/x/voc.json' }] },
-  }));
+  const summary = summaryOf(
+    twoConceptUniverse([], {
+      ai: { discovered: true, inScheme: undefined, prefLabel: undefined },
+      universe: {
+        schemes: [
+          { id: 'Posts' },
+          { id: 'discovered' },
+          { id: 'site' },
+          { id: 'voc', label: 'A Vocabulary', path: '/x/voc.json' },
+        ],
+      },
+    }),
+  );
   assert.deepStrictEqual(summary.schemes, [
     { id: 'Posts', label: 'Posts', kind: 'system', sourceId: 'local://~/Posts' },
     { id: 'discovered', label: 'discovered', kind: 'discovered' },
@@ -792,7 +1049,8 @@ test('rtagz: a concept flagged discovered with no inScheme still puts the discov
 
 test('rtagz: untagged is read from build.json when the universe lacks it, and an empty untagged list or external map writes nothing', () => {
   const fromManifest = summaryOf(twoConceptUniverse([]), {
-    built: 'x', stages: [],
+    built: 'x',
+    stages: [],
     untagged: [{ key: 'Journal::j-unjoined', source: 'Journal', why: ['no phrase recurs'] }],
   });
   assert.deepStrictEqual(fromManifest.untagged, {
@@ -800,62 +1058,169 @@ test('rtagz: untagged is read from build.json when the universe lacks it, and an
     items: [{ id: 'j-unjoined', source: 'Journal', why: ['no phrase recurs'] }],
   });
 
-  const empty = summaryOf(twoConceptUniverse([], { universe: { untagged: [], external: {} } }), { built: 'x', stages: [], untagged: [] });
+  const empty = summaryOf(twoConceptUniverse([], { universe: { untagged: [], external: {} } }), {
+    built: 'x',
+    stages: [],
+    untagged: [],
+  });
   assert.ok(!('untagged' in empty), 'an empty untagged list is not written');
   assert.ok(!('external' in empty), 'an empty external map is not written');
 });
 
-test('rtagz: build.json\'s untagged report carries the bar, the count, each card\'s reasons and its tags under the bar, and each untagged card\'s own references say why its list is empty', () => {
+test("rtagz: build.json's untagged report carries the bar, the count, each card's reasons and its tags under the bar, and each untagged card's own references say why its list is empty", () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const universe = {
     concepts: [
-      { id: 'c_x', canonical: 'X', pinned: false, discovered: false, n: 1, nEmergent: 0, variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }], rank: [] },
-      { id: 'c_killed', canonical: 'killed', pinned: false, discovered: true, n: 0, nEmergent: 1, sourceRatio: 1.514, variants: [{ label: 'killed', count: 1, formsBySource: { discovered: { killed: 1 } } }], rank: [] },
+      {
+        id: 'c_x',
+        canonical: 'X',
+        pinned: false,
+        discovered: false,
+        n: 1,
+        nEmergent: 0,
+        variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }],
+        rank: [],
+      },
+      {
+        id: 'c_killed',
+        canonical: 'killed',
+        pinned: false,
+        discovered: true,
+        n: 0,
+        nEmergent: 1,
+        sourceRatio: 1.514,
+        variants: [{ label: 'killed', count: 1, formsBySource: { discovered: { killed: 1 } } }],
+        rank: [],
+      },
     ],
     items: [
-      { key: 'ScienceWire::wire-1', source: 'ScienceWire', url: 'https://www.EXAMPLE.test/shared-article/?utm=1#top', title: 'Thinking With Artificial Intelligence',
-        tags: [{ c: 'c_killed', w: 0.4, origin: 'discovered', raw: [], sys: ['ScienceWire'], via: 'unmapped', why: 'recurs in 2 of 9 items', sourceRatio: 1.514 }] },
-      { key: 'Posts::https://example.test/post-2.html', source: 'Posts', url: 'https://example.test/post-2.html', title: 'On Machine Learning and Systems', tags: [{ c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' }] },
+      {
+        key: 'ScienceWire::wire-1',
+        source: 'ScienceWire',
+        url: 'https://www.EXAMPLE.test/shared-article/?utm=1#top',
+        title: 'Thinking With Artificial Intelligence',
+        tags: [
+          {
+            c: 'c_killed',
+            w: 0.4,
+            origin: 'discovered',
+            raw: [],
+            sys: ['ScienceWire'],
+            via: 'unmapped',
+            why: 'recurs in 2 of 9 items',
+            sourceRatio: 1.514,
+          },
+        ],
+      },
+      {
+        key: 'Posts::https://example.test/post-2.html',
+        source: 'Posts',
+        url: 'https://example.test/post-2.html',
+        title: 'On Machine Learning and Systems',
+        tags: [
+          { c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' },
+        ],
+      },
     ],
     relations: [],
   };
   const candidates = { phrases: 5, single: 4, underFloor: [{ phrase: 'crisis', sourceRatio: 0.983 }] };
   const manifest = {
-    built: 'x', stages: [],
+    built: 'x',
+    stages: [],
     untagged: {
-      bar: 1.6, count: 2, none: 1,
+      bar: 1.6,
+      count: 2,
+      none: 1,
       items: [
-        { key: 'ScienceWire::wire-1', source: 'ScienceWire', id: 'wire-1', title: 'Thinking', reason: 'underBar', reasons: ['underBar', 'underFloor'],
-          why: ['only tagz under the 1.6× source coherence bar: killed 1.514', 'phrases under the 1× floor: crisis 0.983'],
-          under: [{ concept: 'c_killed', label: 'killed', origin: 'discovered', sourceRatio: 1.514 }], candidates },
-        { key: 'Journal::j-gone', source: 'Journal', id: 'j-gone', title: 'Gone', reason: 'noRecurring', reasons: ['noRecurring'], why: ['none of its 3 candidate phrases recurs on another item'], under: [] },
+        {
+          key: 'ScienceWire::wire-1',
+          source: 'ScienceWire',
+          id: 'wire-1',
+          title: 'Thinking',
+          reason: 'underBar',
+          reasons: ['underBar', 'underFloor'],
+          why: [
+            'only tagz under the 1.6× source coherence bar: killed 1.514',
+            'phrases under the 1× floor: crisis 0.983',
+          ],
+          under: [{ concept: 'c_killed', label: 'killed', origin: 'discovered', sourceRatio: 1.514 }],
+          candidates,
+        },
+        {
+          key: 'Journal::j-gone',
+          source: 'Journal',
+          id: 'j-gone',
+          title: 'Gone',
+          reason: 'noRecurring',
+          reasons: ['noRecurring'],
+          why: ['none of its 3 candidate phrases recurs on another item'],
+          under: [],
+        },
       ],
     },
   };
   // a reference an earlier build left on post-1 says nothing about this build
-  const post1 = results.find((r) => r.config && r.config.title === 'Posts').items.find((i) => i.id === 'https://example.test/post-1.html');
+  const post1 = results
+    .find((r) => r.config && r.config.title === 'Posts')
+    .items.find((i) => i.id === 'https://example.test/post-1.html');
   post1._references = [...(post1._references || []), { type: 'untagged', why: ['stale'] }];
-  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, manifest, { siteTitle: 'Fixture Site' });
+  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, manifest, {
+    siteTitle: 'Fixture Site',
+  });
   const why = manifest.untagged.items[0].why;
   const under = manifest.untagged.items[0].under;
   assert.deepStrictEqual(summary.untagged, {
     bar: 1.6,
     count: 3,
     items: [
-      { id: 'https://example.test/post-1.html', source: 'Posts', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under, candidates },
-      { id: 'wire-1', source: 'ScienceWire', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under, candidates },
-      { id: 'j-gone', source: 'Journal', why: ['none of its 3 candidate phrases recurs on another item'], reason: 'noRecurring', reasons: ['noRecurring'], under: [] },
+      {
+        id: 'https://example.test/post-1.html',
+        source: 'Posts',
+        why,
+        reason: 'underBar',
+        reasons: ['underBar', 'underFloor'],
+        under,
+        candidates,
+      },
+      {
+        id: 'wire-1',
+        source: 'ScienceWire',
+        why,
+        reason: 'underBar',
+        reasons: ['underBar', 'underFloor'],
+        under,
+        candidates,
+      },
+      {
+        id: 'j-gone',
+        source: 'Journal',
+        why: ['none of its 3 candidate phrases recurs on another item'],
+        reason: 'noRecurring',
+        reasons: ['noRecurring'],
+        under: [],
+      },
     ],
     none: 1,
   });
   const wire1 = results.find((r) => r.config && r.config.title === 'ScienceWire').items.find((i) => i.id === 'wire-1');
   for (const item of [post1, wire1]) {
     const notes = item._references.filter((r) => r.type === 'untagged');
-    assert.deepStrictEqual(notes, [{ type: 'untagged', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under }], 'one note, this build\'s, without the candidate lists');
-    assert.deepStrictEqual(item.tags, ['killed'], 'nothing is forced onto it: it keeps exactly the tag rosetta-tagz gave, under the bar');
+    assert.deepStrictEqual(
+      notes,
+      [{ type: 'untagged', why, reason: 'underBar', reasons: ['underBar', 'underFloor'], under }],
+      "one note, this build's, without the candidate lists",
+    );
+    assert.deepStrictEqual(
+      item.tags,
+      ['killed'],
+      'nothing is forced onto it: it keeps exactly the tag rosetta-tagz gave, under the bar',
+    );
   }
-  const post2 = results.find((r) => r.config && r.config.title === 'Posts').items.find((i) => i.id === 'https://example.test/post-2.html');
+  const post2 = results
+    .find((r) => r.config && r.config.title === 'Posts')
+    .items.find((i) => i.id === 'https://example.test/post-2.html');
   assert.ok(!post2._references.some((r) => r.type === 'untagged'), 'a tagged card gets no note');
 });
 
@@ -901,7 +1266,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
     {
       const entries = entriesFromResults(cloneResults());
       const { res, lines } = await captureWarn(() =>
-        loadCorpus(entries, { colorCachePath, rtagz: { enabled: false }, siteRoot: tmpDir })
+        loadCorpus(entries, { colorCachePath, rtagz: { enabled: false }, siteRoot: tmpDir }),
       );
       assert.strictEqual(lines.length, 0);
       assert.strictEqual(res.rtagz, undefined);
@@ -918,7 +1283,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
           colorCachePath,
           rtagz: { enabled: true, engine: missingEngine },
           siteRoot: tmpDir,
-        })
+        }),
       );
       assert.strictEqual(lines.length, 1);
       assert.match(lines[0], /^rtagz: engine not found at .*, tags left as written$/);
@@ -934,7 +1299,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
       fs.writeFileSync(
         path.join(failEngine, 'bin', 'rtz-build'),
         'process.stderr.write("boom\\n"); process.exit(2);\n',
-        'utf8'
+        'utf8',
       );
       const entries = entriesFromResults(cloneResults());
       const { res, lines } = await captureWarn(() =>
@@ -943,7 +1308,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
           rtagz: { enabled: true, engine: failEngine },
           siteRoot: tmpDir,
           cacheDir: path.join(tmpDir, 'cache-fail'),
-        })
+        }),
       );
       assert.strictEqual(lines.length, 1);
       assert.match(lines[0], /^rtagz: .*tags left as written$/);
@@ -956,11 +1321,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
     {
       const slowEngine = path.join(tmpDir, 'engine-slow');
       fs.mkdirSync(path.join(slowEngine, 'bin'), { recursive: true });
-      fs.writeFileSync(
-        path.join(slowEngine, 'bin', 'rtz-build'),
-        'setInterval(() => {}, 1000);\n',
-        'utf8'
-      );
+      fs.writeFileSync(path.join(slowEngine, 'bin', 'rtz-build'), 'setInterval(() => {}, 1000);\n', 'utf8');
       const entries = entriesFromResults(cloneResults());
       const { res, lines } = await captureWarn(() =>
         loadCorpus(entries, {
@@ -968,7 +1329,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
           rtagz: { enabled: true, engine: slowEngine, timeoutMs: 80 },
           siteRoot: tmpDir,
           cacheDir: path.join(tmpDir, 'cache-slow'),
-        })
+        }),
       );
       assert.strictEqual(lines.length, 1);
       assert.match(lines[0], /timed out after 80ms.*, tags left as written/);
@@ -980,23 +1341,35 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
     {
       const skosEngine = path.join(tmpDir, 'engine-skos');
       fs.mkdirSync(path.join(skosEngine, 'bin'), { recursive: true });
-      fs.writeFileSync(path.join(skosEngine, 'bin', 'rtz-build'), `
+      fs.writeFileSync(
+        path.join(skosEngine, 'bin', 'rtz-build'),
+        `
         const fs = require('fs');
         fs.writeFileSync('universe.json', ${JSON.stringify(JSON.stringify(UNIVERSE_FIXTURE))});
         fs.writeFileSync('build.json', JSON.stringify({ built: '2026-10-22T12:00:00Z', stages: [] }));
         fs.writeFileSync('skos.ttl', '@prefix skos: <http://www.w3.org/2004/02/skos/core#> .\\n');
-      `, 'utf8');
+      `,
+        'utf8',
+      );
       const cacheDir = path.join(tmpDir, 'cache-skos');
       fs.mkdirSync(cacheDir, { recursive: true });
       fs.writeFileSync(path.join(cacheDir, 'skos.jsonld'), '{"stale": true}', 'utf8');
       const entries = entriesFromResults(cloneResults());
       const { res, lines } = await captureWarn(() =>
-        loadCorpus(entries, { colorCachePath, rtagz: { enabled: true, engine: skosEngine }, siteRoot: tmpDir, cacheDir })
+        loadCorpus(entries, {
+          colorCachePath,
+          rtagz: { enabled: true, engine: skosEngine },
+          siteRoot: tmpDir,
+          cacheDir,
+        }),
       );
       assert.strictEqual(lines.length, 0);
       assert.ok(res.rtagz, 'rosetta-tagz ran');
-      assert.ok(!fs.existsSync(path.join(cacheDir, 'skos.jsonld')), 'last build\'s skos.jsonld removed before the build');
-      assert.ok(fs.existsSync(path.join(cacheDir, 'skos.ttl')), 'this build\'s skos.ttl kept');
+      assert.ok(
+        !fs.existsSync(path.join(cacheDir, 'skos.jsonld')),
+        "last build's skos.jsonld removed before the build",
+      );
+      assert.ok(fs.existsSync(path.join(cacheDir, 'skos.ttl')), "this build's skos.ttl kept");
     }
 
     // 6. container tag not canonical after build -> logs 1 line naming the tag, raw tags
@@ -1021,7 +1394,7 @@ test('rtagz: skip paths (disabled, missing engine, non-zero exit, timeout, conta
           containment: [{ id: 'container:act-1', tag: 'act-1' }],
           siteRoot: tmpDir,
           cacheDir: path.join(tmpDir, 'cache-guard'),
-        })
+        }),
       );
       assert.strictEqual(lines.length, 1);
       assert.match(lines[0], /container tag "act-1" is not canonical after build, tags left as written/);
@@ -1086,7 +1459,10 @@ test('rtagz: real engine integration builds universe.json and merges concepts ac
     const post1 = items.find((i) => i.id === 'https://example.test/post-1.html');
     assert.ok(post1.tags.includes('act-1'), 'pinned container tag act-1 preserved on item');
     // ...and resolved to its concept at corpus time, the concept post-1's reference names
-    assert.ok(rtagz.containers && typeof rtagz.containers['act-1'] === 'string', 'the container tag is resolved to a concept id');
+    assert.ok(
+      rtagz.containers && typeof rtagz.containers['act-1'] === 'string',
+      'the container tag is resolved to a concept id',
+    );
     const actRef = post1._references.find((r) => r.type === 'tag' && r.value === 'act-1');
     assert.strictEqual(actRef.concept, rtagz.containers['act-1']);
 
@@ -1094,20 +1470,28 @@ test('rtagz: real engine integration builds universe.json and merges concepts ac
     // concept has its id, the schemes list the site and every tag-system, every
     // tag reference names a summary concept whose canonical is its value, and
     // a prefLabel, where the engine writes one, names the site scheme with the value.
-    assert.ok(rtagz.concepts.every((c) => typeof c.id === 'string' && c.id), 'every summary concept carries its id');
+    assert.ok(
+      rtagz.concepts.every((c) => typeof c.id === 'string' && c.id),
+      'every summary concept carries its id',
+    );
     assert.ok(Array.isArray(rtagz.schemes), 'summary carries schemes');
     const schemeIds = rtagz.schemes.map((s) => s.id);
     for (const id of ['site', 'Posts', 'ScienceWire', 'Journal']) {
       assert.ok(schemeIds.includes(id), `scheme ${id} present`);
     }
-    assert.ok(rtagz.schemes.every((s) => typeof s.label === 'string' && s.label && typeof s.kind === 'string' && s.kind));
+    assert.ok(
+      rtagz.schemes.every((s) => typeof s.label === 'string' && s.label && typeof s.kind === 'string' && s.kind),
+    );
     const canonicalById = new Map(rtagz.concepts.map((c) => [c.id, c.canonical]));
     for (const item of items) {
       for (const ref of item._references || []) {
         if (ref.type !== 'tag' || !ref.concept) continue;
         assert.strictEqual(canonicalById.get(ref.concept), ref.value, `${item.id}: ${ref.concept}`);
         if (ref.prefLabel) assert.strictEqual(ref.prefLabel.site, ref.value);
-        assert.ok(ref.prefLabel !== null && ref.wasDerivedFrom !== null && ref.wasGeneratedBy !== null, 'never null-valued');
+        assert.ok(
+          ref.prefLabel !== null && ref.wasDerivedFrom !== null && ref.wasGeneratedBy !== null,
+          'never null-valued',
+        );
       }
     }
   } finally {
@@ -1115,12 +1499,19 @@ test('rtagz: real engine integration builds universe.json and merges concepts ac
   }
 });
 
-test('rtagz: a discovered tag\'s sourceRatio reaches its reference, its tag edge and its concept, and only where the universe gives one', () => {
+test("rtagz: a discovered tag's sourceRatio reaches its reference, its tag edge and its concept, and only where the universe gives one", () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const concept = (id, canonical, more = {}) => ({
-    id, canonical, pinned: false, discovered: false, n: 1, nEmergent: 0,
-    variants: [{ label: canonical, count: 1, formsBySource: { Journal: { [canonical]: 1 } } }], rank: [], ...more,
+    id,
+    canonical,
+    pinned: false,
+    discovered: false,
+    n: 1,
+    nEmergent: 0,
+    variants: [{ label: canonical, count: 1, formsBySource: { Journal: { [canonical]: 1 } } }],
+    rank: [],
+    ...more,
   });
   const universe = {
     concepts: [
@@ -1129,19 +1520,68 @@ test('rtagz: a discovered tag\'s sourceRatio reaches its reference, its tag edge
       concept('c_instead', 'instead', { discovered: true, sourceRatio: 1.008 }),
       concept('c_odd', 'odd', { discovered: true, sourceRatio: 'high' }),
     ],
-    items: [{
-      key: 'Journal::j-1', source: 'Journal', url: 'https://journal.test/ml-review', title: 'Review of Machine Learning',
-      tags: [
-        { c: 'c_ml', w: 1, origin: 'explicit', raw: [{ l: 'ML', n: 'ml', s: 'Journal' }], sys: ['Journal'], via: 'known' },
-        { c: 'c_cancer', w: 0.4, origin: 'discovered', raw: [{ l: 'cancer', n: 'cancer', s: 'discovered' }], sys: ['Journal'], via: 'discovered', why: 'recurs', sourceRatio: 2.964 },
-        { c: 'c_instead', w: 0.3, origin: 'discovered', raw: [{ l: 'instead', n: 'instead', s: 'discovered' }], sys: ['Journal'], via: 'discovered', why: 'recurs', sourceRatio: 1.008 },
-        { c: 'c_odd', w: 0.2, origin: 'discovered', raw: [{ l: 'odd', n: 'odd', s: 'discovered' }], sys: ['Journal'], via: 'discovered', why: 'recurs', sourceRatio: 'high' },
-      ],
-    }],
+    items: [
+      {
+        key: 'Journal::j-1',
+        source: 'Journal',
+        url: 'https://journal.test/ml-review',
+        title: 'Review of Machine Learning',
+        tags: [
+          {
+            c: 'c_ml',
+            w: 1,
+            origin: 'explicit',
+            raw: [{ l: 'ML', n: 'ml', s: 'Journal' }],
+            sys: ['Journal'],
+            via: 'known',
+          },
+          {
+            c: 'c_cancer',
+            w: 0.4,
+            origin: 'discovered',
+            raw: [{ l: 'cancer', n: 'cancer', s: 'discovered' }],
+            sys: ['Journal'],
+            via: 'discovered',
+            why: 'recurs',
+            sourceRatio: 2.964,
+          },
+          {
+            c: 'c_instead',
+            w: 0.3,
+            origin: 'discovered',
+            raw: [{ l: 'instead', n: 'instead', s: 'discovered' }],
+            sys: ['Journal'],
+            via: 'discovered',
+            why: 'recurs',
+            sourceRatio: 1.008,
+          },
+          {
+            c: 'c_odd',
+            w: 0.2,
+            origin: 'discovered',
+            raw: [{ l: 'odd', n: 'odd', s: 'discovered' }],
+            sys: ['Journal'],
+            via: 'discovered',
+            why: 'recurs',
+            sourceRatio: 'high',
+          },
+        ],
+      },
+    ],
     relations: [],
   };
-  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, { built: 'x', stages: [] }, { siteTitle: 'Fixture Site' });
-  const item = results.find((r) => r.feedMeta.id === 'journal' || r.feedMeta.title === 'Journal').items.find((i) => i.id === 'j-1');
+  const { summary } = applyUniverse(
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
+    universe,
+    { built: 'x', stages: [] },
+    { siteTitle: 'Fixture Site' },
+  );
+  const item = results
+    .find((r) => r.feedMeta.id === 'journal' || r.feedMeta.title === 'Journal')
+    .items.find((i) => i.id === 'j-1');
   const refs = new Map(item._references.filter((r) => r.type === 'tag').map((r) => [r.value, r]));
   assert.strictEqual(refs.get('cancer').sourceRatio, 2.964);
   assert.strictEqual(refs.get('instead').sourceRatio, 1.008);
@@ -1157,55 +1597,135 @@ test('rtagz: a discovered tag\'s sourceRatio reaches its reference, its tag edge
   const tagEdge = (label) => edges.find((e) => e.layer === 'tag' && e.target === `tag:${label}`);
   assert.strictEqual(tagEdge('cancer').attrs.sourceRatio, 2.964);
   assert.strictEqual(tagEdge('instead').attrs.sourceRatio, 1.008);
-  assert.deepStrictEqual(tagEdge('ML').attrs, { concept: 'c_ml', weight: 1, origin: 'explicit' }, 'an explicit tag\'s attrs are as before');
+  assert.deepStrictEqual(
+    tagEdge('ML').attrs,
+    { concept: 'c_ml', weight: 1, origin: 'explicit' },
+    "an explicit tag's attrs are as before",
+  );
   assert.ok(!('sourceRatio' in tagEdge('odd').attrs));
 });
 
-test('rtagz: a card that ends with no tagz carries untaggedBecause from the report and the site\'s switches; a tagged card never does, and a stale line goes', () => {
+test("rtagz: a card that ends with no tagz carries untaggedBecause from the report and the site's switches; a tagged card never does, and a stale line goes", () => {
   const results = cloneResults();
   const { systems, resultSystems, skippedDuplicateIds } = buildRecords(results, mergeOverrides(OVERRIDES_FIXTURE, []));
   const universe = {
     concepts: [
-      { id: 'c_x', canonical: 'X', pinned: false, discovered: false, n: 1, nEmergent: 0, variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }], rank: [] },
+      {
+        id: 'c_x',
+        canonical: 'X',
+        pinned: false,
+        discovered: false,
+        n: 1,
+        nEmergent: 0,
+        variants: [{ label: 'X', count: 1, formsBySource: { Posts: { X: 1 } } }],
+        rank: [],
+      },
     ],
     items: [
-      { key: 'ScienceWire::wire-2', source: 'ScienceWire', url: 'https://wire.test/orphan-1', title: 'Breakthrough in Artificial Intelligence Hardware', tags: [] },
-      { key: 'Posts::https://example.test/post-2.html', source: 'Posts', url: 'https://example.test/post-2.html', title: 'On Machine Learning and Systems', tags: [{ c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' }] },
+      {
+        key: 'ScienceWire::wire-2',
+        source: 'ScienceWire',
+        url: 'https://wire.test/orphan-1',
+        title: 'Breakthrough in Artificial Intelligence Hardware',
+        tags: [],
+      },
+      {
+        key: 'Posts::https://example.test/post-2.html',
+        source: 'Posts',
+        url: 'https://example.test/post-2.html',
+        title: 'On Machine Learning and Systems',
+        tags: [
+          { c: 'c_x', w: 1, origin: 'explicit', raw: [{ l: 'X', n: 'x', s: 'Posts' }], sys: ['Posts'], via: 'known' },
+        ],
+      },
     ],
     relations: [],
   };
   const report = (reasons, candidates) => ({
-    built: 'x', stages: [],
-    untagged: { bar: 1.6, count: 1, none: 1, items: [{ key: 'ScienceWire::wire-2', source: 'ScienceWire', id: 'wire-2', title: 'Breakthrough', reason: reasons[0], reasons, why: ['…'], under: [], ...(candidates ? { candidates } : {}) }] },
+    built: 'x',
+    stages: [],
+    untagged: {
+      bar: 1.6,
+      count: 1,
+      none: 1,
+      items: [
+        {
+          key: 'ScienceWire::wire-2',
+          source: 'ScienceWire',
+          id: 'wire-2',
+          title: 'Breakthrough',
+          reason: reasons[0],
+          reasons,
+          why: ['…'],
+          under: [],
+          ...(candidates ? { candidates } : {}),
+        },
+      ],
+    },
   });
-  const wire2 = () => results.find((r) => r.config && r.config.title === 'ScienceWire').items.find((i) => i.id === 'wire-2');
-  const post2 = () => results.find((r) => r.config && r.config.title === 'Posts').items.find((i) => i.id === 'https://example.test/post-2.html');
+  const wire2 = () =>
+    results.find((r) => r.config && r.config.title === 'ScienceWire').items.find((i) => i.id === 'wire-2');
+  const post2 = () =>
+    results
+      .find((r) => r.config && r.config.title === 'Posts')
+      .items.find((i) => i.id === 'https://example.test/post-2.html');
   wire2().untaggedBecause = 'stale, from an earlier build';
   post2().untaggedBecause = 'stale, from an earlier build';
 
-  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['noDiscovery']), { siteTitle: 'Fixture Site', discover: false, emerge: true });
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['noDiscovery']), {
+    siteTitle: 'Fixture Site',
+    discover: false,
+    emerge: true,
+  });
   assert.deepStrictEqual(wire2().tags, []);
   assert.strictEqual(wire2().untaggedBecause, 'source gave none, discovery off');
   assert.ok(!('untaggedBecause' in post2()), 'a tagged card carries no line, and the stale one went');
 
   const queued = { phrases: 5, single: 2, queued: [{ phrase: 'neural hardware', score: 2.8, sourceRatio: 2.1 }] };
-  const { summary } = applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['queued'], queued), { siteTitle: 'Fixture Site', discover: 'queue', emerge: true });
+  const { summary } = applyUniverse(
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
+    universe,
+    report(['queued'], queued),
+    { siteTitle: 'Fixture Site', discover: 'queue', emerge: true },
+  );
   assert.strictEqual(wire2().untaggedBecause, 'source gave none, candidates queued (1)');
   assert.deepStrictEqual(summary.untagged.items[0].candidates, queued, 'the queued candidates stay in the summary');
-  assert.ok(!wire2()._references.find((r) => r.type === 'untagged').candidates, 'and off the card\'s own note, as before');
+  assert.ok(
+    !wire2()._references.find((r) => r.type === 'untagged').candidates,
+    "and off the card's own note, as before",
+  );
 
-  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['noRecurring'], { phrases: 5, single: 5 }), { siteTitle: 'Fixture Site', discover: true, emerge: true });
+  applyUniverse(
+    results,
+    resultSystems,
+    systems,
+    skippedDuplicateIds,
+    universe,
+    report(['noRecurring'], { phrases: 5, single: 5 }),
+    { siteTitle: 'Fixture Site', discover: true, emerge: true },
+  );
   assert.strictEqual(wire2().untaggedBecause, 'source gave none, nothing recurred');
-  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['functionWord', 'tooCommon']), { siteTitle: 'Fixture Site', discover: true, emerge: true });
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['functionWord', 'tooCommon']), {
+    siteTitle: 'Fixture Site',
+    discover: true,
+    emerge: true,
+  });
   assert.strictEqual(wire2().untaggedBecause, 'emerge found no concept');
-  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['functionWord', 'tooCommon']), { siteTitle: 'Fixture Site', discover: true, emerge: false });
+  applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, report(['functionWord', 'tooCommon']), {
+    siteTitle: 'Fixture Site',
+    discover: true,
+    emerge: false,
+  });
   assert.strictEqual(wire2().untaggedBecause, 'source gave none, every phrase refused');
 
   // without rosetta-tagz nothing writes the line (the phase does not run), and the summary never carries it
   assert.ok(!('untaggedBecause' in summary));
 });
 
-test('rtagz: the real engine in queue mode writes the queue beside the site\'s overrides, attaches no discovered tag, and every card with no tagz says why', async (t) => {
+test("rtagz: the real engine in queue mode writes the queue beside the site's overrides, attaches no discovered tag, and every card with no tagz says why", async (t) => {
   const envEngine = process.env.POSTPIPE_RTAGZ_ENGINE;
   const engineDir = envEngine || path.join(__dirname, '..', 'rosetta-tagz');
   if (!fs.existsSync(path.join(engineDir, 'bin', 'rtz-build'))) {
@@ -1220,7 +1740,14 @@ test('rtagz: the real engine in queue mode writes the queue beside the site\'s o
       colorCachePath: path.join(tmpDir, 'colors.json'),
       siteRoot: tmpDir,
       cacheDir,
-      rtagz: { enabled: true, engine: engineDir, overrides: 'rtagz-overrides.json', emerge: true, discover: 'queue', timeoutMs: 30000 },
+      rtagz: {
+        enabled: true,
+        engine: engineDir,
+        overrides: 'rtagz-overrides.json',
+        emerge: true,
+        discover: 'queue',
+        timeoutMs: 30000,
+      },
     });
     assert.ok(rtagz, 'the phase ran');
     const queuePath = path.join(tmpDir, 'rtagz-queue.json');
@@ -1228,14 +1755,23 @@ test('rtagz: the real engine in queue mode writes the queue beside the site\'s o
     const queue = JSON.parse(fs.readFileSync(queuePath, 'utf8'));
     assert.strictEqual(queue.schema, 'rosetta-tagz/queue@1');
     assert.ok(Array.isArray(queue.candidates));
-    assert.deepStrictEqual(rtagz.queue, { path: queuePath, candidates: queue.candidates.length }, 'the summary says where the queue is and how long');
+    assert.deepStrictEqual(
+      rtagz.queue,
+      { path: queuePath, candidates: queue.candidates.length },
+      'the summary says where the queue is and how long',
+    );
     const config = JSON.parse(fs.readFileSync(path.join(cacheDir, 'rtz.config.json'), 'utf8'));
     assert.strictEqual(config.discover, 'queue');
     assert.strictEqual(config.queue, queuePath);
     for (const item of items) {
-      for (const ref of item._references || []) assert.ok(!(ref.type === 'tag' && ref.origin === 'discovered'), `${item.id}: no discovered tag in queue mode`);
+      for (const ref of item._references || [])
+        assert.ok(!(ref.type === 'tag' && ref.origin === 'discovered'), `${item.id}: no discovered tag in queue mode`);
       if (item.tags.length === 0) {
-        assert.match(item.untaggedBecause, /^(source gave none, (discovery off|nothing recurred|candidates queued \(\d+\)|every phrase refused)|emerge found no concept)$/, item.id);
+        assert.match(
+          item.untaggedBecause,
+          /^(source gave none, (discovery off|nothing recurred|candidates queued \(\d+\)|every phrase refused)|emerge found no concept)$/,
+          item.id,
+        );
       } else {
         assert.ok(!('untaggedBecause' in item), `${item.id} has tagz`);
       }

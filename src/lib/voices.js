@@ -14,14 +14,19 @@
 // there as window.PPVoices) and the tests use them here.
 
 function langOf(lang) {
-  return String(lang || '').toLowerCase().split(/[-_]/)[0];
+  return String(lang || '')
+    .toLowerCase()
+    .split(/[-_]/)[0];
 }
 
 // The voice's name without what the device appends about its language
 // ("Microsoft Aria Online (Natural) - English (United States)", "Eddy
 // (English (United States))"); a plain note such as "(Enhanced)" stays.
 function voiceName(v) {
-  return String((v && v.name) || '').split(' - ')[0].replace(/\s*\([^()]*\([^()]*\)\)\s*$/, '').trim();
+  return String((v && v.name) || '')
+    .split(' - ')[0]
+    .replace(/\s*\([^()]*\([^()]*\)\)\s*$/, '')
+    .trim();
 }
 
 // The region of a voice's lang ("en-GB" → "United Kingdom"), or '' for none.
@@ -30,7 +35,9 @@ function regionName(lang, displayNames) {
   const code = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : '';
   if (!/^[A-Z]{2}$|^\d{3}$/.test(code)) return '';
   try {
-    const dn = displayNames || (typeof Intl !== 'undefined' && Intl.DisplayNames ? new Intl.DisplayNames(['en'], { type: 'region' }) : null);
+    const dn =
+      displayNames ||
+      (typeof Intl !== 'undefined' && Intl.DisplayNames ? new Intl.DisplayNames(['en'], { type: 'region' }) : null);
     return (dn && dn.of(code)) || code;
   } catch (_) {
     return code;
@@ -41,7 +48,8 @@ function regionName(lang, displayNames) {
 function languageName(lang) {
   const code = langOf(lang) || 'en';
   try {
-    const dn = typeof Intl !== 'undefined' && Intl.DisplayNames ? new Intl.DisplayNames(['en'], { type: 'language' }) : null;
+    const dn =
+      typeof Intl !== 'undefined' && Intl.DisplayNames ? new Intl.DisplayNames(['en'], { type: 'language' }) : null;
     return (dn && dn.of(code)) || code;
   } catch (_) {
     return code;
@@ -79,12 +87,23 @@ function voiceList(all, { lang = 'en', preferred = [], max = Infinity, displayNa
   const taken = new Set(google);
   const picked = [];
   for (const name of preferred || []) {
-    const pool = byLanguageThenLabel(have.filter((v) => !taken.has(v)), want, displayNames);
+    const pool = byLanguageThenLabel(
+      have.filter((v) => !taken.has(v)),
+      want,
+      displayNames,
+    );
     const exact = pool.find((v) => v.name === name);
     const start = exact || pool.find((v) => v.name.indexOf(name) === 0);
-    if (start) { picked.push(start); taken.add(start); }
+    if (start) {
+      picked.push(start);
+      taken.add(start);
+    }
   }
-  const rest = byLanguageThenLabel(have.filter((v) => !taken.has(v)), want, displayNames);
+  const rest = byLanguageThenLabel(
+    have.filter((v) => !taken.has(v)),
+    want,
+    displayNames,
+  );
   const cap = Number.isFinite(max) && max > 0 ? max : Infinity;
   return [...google, ...picked, ...rest].slice(0, cap).map((v) => ({ voice: v, label: voiceLabel(v, displayNames) }));
 }
@@ -97,7 +116,7 @@ function defaultVoice(all, opts = {}) {
   const want = langOf(opts.lang) || 'en';
   const list = voiceList(all, opts);
   const mine = list.find((e) => langOf(e.voice.lang) === want);
-  return (mine || list[0]) ? (mine || list[0]).voice.name : null;
+  return mine || list[0] ? (mine || list[0]).voice.name : null;
 }
 
 // The picker's groups, one per language: the page's language first, then
@@ -112,12 +131,14 @@ function voiceGroups(entries, { lang = 'en' } = {}) {
     if (!groups.has(code)) groups.set(code, { code, label: languageName(code), voices: [] });
     groups.get(code).voices.push(e);
   }
-  return [...groups.values()].sort((a, b) => {
-    const am = a.code === want ? 0 : 1;
-    const bm = b.code === want ? 0 : 1;
-    if (am !== bm) return am - bm;
-    return a.label.localeCompare(b.label);
-  }).map(({ label, voices }) => ({ label, voices }));
+  return [...groups.values()]
+    .sort((a, b) => {
+      const am = a.code === want ? 0 : 1;
+      const bm = b.code === want ? 0 : 1;
+      if (am !== bm) return am - bm;
+      return a.label.localeCompare(b.label);
+    })
+    .map(({ label, voices }) => ({ label, voices }));
 }
 
 module.exports = { voiceList, defaultVoice, voiceGroups, voiceLabel, voiceName, regionName, languageName, langOf };

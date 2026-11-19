@@ -57,56 +57,96 @@ function writeSiteCopy(file, copy) {
 }
 
 // customColor keeps the colour phase from looking up a home page.
-const entryWith = (savedCopy, xmlUrl = URL_A) => ({ adapter: RssAdapter, config: { id: xmlUrl, title: 'Feed A', xmlUrl, customColor: '#336699', savedCopy } });
+const entryWith = (savedCopy, xmlUrl = URL_A) => ({
+  adapter: RssAdapter,
+  config: { id: xmlUrl, title: 'Feed A', xmlUrl, customColor: '#336699', savedCopy },
+});
 
 const engineAt = (at) => ({ url: URL_A, fetchedAt: at, body: 'engine' });
 const siteAt = (at) => ({ url: URL_A, fetchedAt: at, body: 'site' });
 
-test('the newer copy: the engine\'s when it is newer', () => {
+test("the newer copy: the engine's when it is newer", () => {
   const copies = copiesNewestFirst(engineAt('2026-11-04T10:00:00Z'), siteAt('2026-11-01T10:00:00Z'));
-  assert.deepStrictEqual(copies.map((c) => [c.from, c.body]), [['engine', 'engine'], ['site', 'site']]);
+  assert.deepStrictEqual(
+    copies.map((c) => [c.from, c.body]),
+    [
+      ['engine', 'engine'],
+      ['site', 'site'],
+    ],
+  );
 });
 
-test('the newer copy: the site\'s when it is newer', () => {
+test("the newer copy: the site's when it is newer", () => {
   const copies = copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), siteAt('2026-11-04T10:00:00Z'));
-  assert.deepStrictEqual(copies.map((c) => c.from), ['site', 'engine']);
+  assert.deepStrictEqual(
+    copies.map((c) => c.from),
+    ['site', 'engine'],
+  );
 });
 
 test('the newer copy: only one of them is the one', () => {
-  assert.deepStrictEqual(copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), null).map((c) => c.from), ['engine']);
-  assert.deepStrictEqual(copiesNewestFirst(null, siteAt('2026-11-01T10:00:00Z')).map((c) => c.from), ['site']);
+  assert.deepStrictEqual(
+    copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), null).map((c) => c.from),
+    ['engine'],
+  );
+  assert.deepStrictEqual(
+    copiesNewestFirst(null, siteAt('2026-11-01T10:00:00Z')).map((c) => c.from),
+    ['site'],
+  );
 });
 
 test('the newer copy: neither, none', () => {
   assert.deepStrictEqual(copiesNewestFirst(null, null), []);
 });
 
-test('the newer copy: a dated copy before an undated one; the same date keeps the site\'s first', () => {
-  assert.deepStrictEqual(copiesNewestFirst(engineAt(null), siteAt('2026-11-01T10:00:00Z')).map((c) => c.from), ['site', 'engine']);
-  assert.deepStrictEqual(copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), siteAt('not a date')).map((c) => c.from), ['engine', 'site']);
-  assert.deepStrictEqual(copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), siteAt('2026-11-01T10:00:00Z')).map((c) => c.from), ['site', 'engine']);
-  assert.deepStrictEqual(copiesNewestFirst(engineAt(null), siteAt(null)).map((c) => c.from), ['site', 'engine']);
+test("the newer copy: a dated copy before an undated one; the same date keeps the site's first", () => {
+  assert.deepStrictEqual(
+    copiesNewestFirst(engineAt(null), siteAt('2026-11-01T10:00:00Z')).map((c) => c.from),
+    ['site', 'engine'],
+  );
+  assert.deepStrictEqual(
+    copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), siteAt('not a date')).map((c) => c.from),
+    ['engine', 'site'],
+  );
+  assert.deepStrictEqual(
+    copiesNewestFirst(engineAt('2026-11-01T10:00:00Z'), siteAt('2026-11-01T10:00:00Z')).map((c) => c.from),
+    ['site', 'engine'],
+  );
+  assert.deepStrictEqual(
+    copiesNewestFirst(engineAt(null), siteAt(null)).map((c) => c.from),
+    ['site', 'engine'],
+  );
 });
 
-test('a failed fetch with no copy on this machine: the cards come from the site\'s saved copy, marked stale and saying which copy', async () => {
+test("a failed fetch with no copy on this machine: the cards come from the site's saved copy, marked stale and saying which copy", async () => {
   const s = scratch();
   try {
     const file = s.saved('a.json');
-    writeSiteCopy(file, { url: URL_A, fetchedAt: '2026-11-03T09:00:00.000Z', body: rss(['one', 'two'], 'Tue, 03 Nov 2026 08:00:00 GMT') });
+    writeSiteCopy(file, {
+      url: URL_A,
+      fetchedAt: '2026-11-03T09:00:00.000Z',
+      body: rss(['one', 'two'], 'Tue, 03 Nov 2026 08:00:00 GMT'),
+    });
     const fetch = failing();
     const out = await loadCorpus([entryWith(file)], s.opts({ fetchText: fetch }));
     assert.strictEqual(fetch.calls.length, 1, 'one fetch, no retry');
-    assert.deepStrictEqual(out.items.map((it) => it.title), ['two', 'one'], 'the saved copy\'s cards');
+    assert.deepStrictEqual(
+      out.items.map((it) => it.title),
+      ['two', 'one'],
+      "the saved copy's cards",
+    );
     const src = out.sources[0];
     assert.strictEqual(src.ok, true, 'its items are in the corpus');
-    assert.strictEqual(src.stale, true, 'stale exactly as from the engine\'s copy');
+    assert.strictEqual(src.stale, true, "stale exactly as from the engine's copy");
     assert.strictEqual(src.copyDate, '2026-11-03T09:00:00.000Z');
     assert.strictEqual(src.copyFrom, 'site');
     assert.strictEqual(src.fetchedAt, '2026-11-03T09:00:00.000Z', 'when the copy was fetched');
-    assert.strictEqual(src.feedUpdated, '2026-11-03T08:00:00.000Z', 'the copy\'s own lastBuildDate');
+    assert.strictEqual(src.feedUpdated, '2026-11-03T08:00:00.000Z', "the copy's own lastBuildDate");
     assert.strictEqual(src.error, 'fetch failed (ECONNREFUSED)');
     assert.strictEqual(readLastGood(URL_A, s.lastGood), null, 'the failed build wrote no copy on this machine');
-  } finally { s.done(); }
+  } finally {
+    s.done();
+  }
 });
 
 test('both copies: the newer by fetchedAt is used, whichever it is', async () => {
@@ -116,12 +156,20 @@ test('both copies: the newer by fetchedAt is used, whichever it is', async () =>
     writeSiteCopy(file, { url: URL_A, fetchedAt: '2026-11-03T09:00:00.000Z', body: rss(['site one']) });
     writeLastGood(URL_A, rss(['engine one']), '2026-11-04T09:00:00.000Z', s.lastGood);
     let out = await loadCorpus([entryWith(file)], s.opts({ fetchText: failing() }));
-    assert.deepStrictEqual([out.sources[0].copyFrom, out.items[0].title, out.sources[0].copyDate], ['engine', 'engine one', '2026-11-04T09:00:00.000Z']);
+    assert.deepStrictEqual(
+      [out.sources[0].copyFrom, out.items[0].title, out.sources[0].copyDate],
+      ['engine', 'engine one', '2026-11-04T09:00:00.000Z'],
+    );
 
     writeSiteCopy(file, { url: URL_A, fetchedAt: '2026-11-05T09:00:00.000Z', body: rss(['site two']) });
     out = await loadCorpus([entryWith(file)], s.opts({ fetchText: failing() }));
-    assert.deepStrictEqual([out.sources[0].copyFrom, out.items[0].title, out.sources[0].copyDate], ['site', 'site two', '2026-11-05T09:00:00.000Z']);
-  } finally { s.done(); }
+    assert.deepStrictEqual(
+      [out.sources[0].copyFrom, out.items[0].title, out.sources[0].copyDate],
+      ['site', 'site two', '2026-11-05T09:00:00.000Z'],
+    );
+  } finally {
+    s.done();
+  }
 });
 
 test('the newer copy that cannot be read gives way to the other', async () => {
@@ -132,8 +180,13 @@ test('the newer copy that cannot be read gives way to the other', async () => {
     writeLastGood(URL_A, rss(['engine one']), '2026-11-01T09:00:00.000Z', s.lastGood);
     const out = await loadCorpus([entryWith(file)], s.opts({ fetchText: failing() }));
     assert.strictEqual(out.sources[0].copyFrom, 'engine');
-    assert.deepStrictEqual(out.items.map((it) => it.title), ['engine one']);
-  } finally { s.done(); }
+    assert.deepStrictEqual(
+      out.items.map((it) => it.title),
+      ['engine one'],
+    );
+  } finally {
+    s.done();
+  }
 });
 
 test('the outline names the copy: one fetched from another address is still used for it', async () => {
@@ -146,7 +199,9 @@ test('the outline names the copy: one fetched from another address is still used
     assert.strictEqual(out.sources[0].id, elsewhere);
     assert.strictEqual(out.sources[0].copyFrom, 'site');
     assert.strictEqual(out.items.length, 1);
-  } finally { s.done(); }
+  } finally {
+    s.done();
+  }
 });
 
 test('a saved copy that is missing or not a copy is no copy: no items, the error carried', async () => {
@@ -162,33 +217,57 @@ test('a saved copy that is missing or not a copy is no copy: no items, the error
     fs.writeFileSync(s.saved('garbled.json'), '{ not json');
     assert.strictEqual(readSavedCopy(s.saved('garbled.json')), null);
     assert.strictEqual(readSavedCopy(null), null);
-  } finally { s.done(); }
+  } finally {
+    s.done();
+  }
 });
 
-test('an ordinary build never writes the site\'s copy; a build asked to (saveCopies) writes it from its good fetch', async () => {
+test("an ordinary build never writes the site's copy; a build asked to (saveCopies) writes it from its good fetch", async () => {
   const s = scratch();
   try {
     const file = s.saved('a.json');
-    await loadCorpus([entryWith(file)], s.opts({ fetchText: answering(rss(['one'])), now: () => new Date('2026-11-05T10:00:00Z') }));
-    assert.strictEqual(fs.existsSync(file), false, 'an ordinary build leaves the site\'s folder alone');
+    await loadCorpus(
+      [entryWith(file)],
+      s.opts({ fetchText: answering(rss(['one'])), now: () => new Date('2026-11-05T10:00:00Z') }),
+    );
+    assert.strictEqual(fs.existsSync(file), false, "an ordinary build leaves the site's folder alone");
 
-    await loadCorpus([entryWith(file)], s.opts({ fetchText: answering(rss(['one', 'two'])), saveCopies: true, now: () => new Date('2026-11-05T11:00:00Z') }));
-    assert.deepStrictEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { url: URL_A, fetchedAt: '2026-11-05T11:00:00.000Z', body: rss(['one', 'two']) },
-      'the same JSON as a last good copy');
-    assert.strictEqual(readLastGood(URL_A, s.lastGood).fetchedAt, '2026-11-05T11:00:00.000Z', 'and the engine keeps its own as ever');
+    await loadCorpus(
+      [entryWith(file)],
+      s.opts({
+        fetchText: answering(rss(['one', 'two'])),
+        saveCopies: true,
+        now: () => new Date('2026-11-05T11:00:00Z'),
+      }),
+    );
+    assert.deepStrictEqual(
+      JSON.parse(fs.readFileSync(file, 'utf8')),
+      { url: URL_A, fetchedAt: '2026-11-05T11:00:00.000Z', body: rss(['one', 'two']) },
+      'the same JSON as a last good copy',
+    );
+    assert.strictEqual(
+      readLastGood(URL_A, s.lastGood).fetchedAt,
+      '2026-11-05T11:00:00.000Z',
+      'and the engine keeps its own as ever',
+    );
 
     const before = fs.readFileSync(file, 'utf8');
     const out = await loadCorpus([entryWith(file)], s.opts({ fetchText: failing(), saveCopies: true }));
     assert.strictEqual(fs.readFileSync(file, 'utf8'), before, 'a failed fetch leaves the saved copy as it was');
     assert.strictEqual(out.sources[0].stale, true);
-  } finally { s.done(); }
+  } finally {
+    s.done();
+  }
 });
 
 test('feeds.opml: savedCopy on an outline names the file, relative to the site', () => {
-  const opml = (body) => `<?xml version="1.0"?><opml version="2.0"><head><title>t</title></head><body>${body}</body></opml>`;
-  const [a, b] = parseOpml(opml(`
+  const opml = (body) =>
+    `<?xml version="1.0"?><opml version="2.0"><head><title>t</title></head><body>${body}</body></opml>`;
+  const [a, b] = parseOpml(
+    opml(`
     <outline text="A" type="rss" xmlUrl="https://feeds.example/a.xml" savedCopy=" saved/a.json "/>
-    <outline text="B" type="rss" xmlUrl="https://feeds.example/b.xml"/>`));
+    <outline text="B" type="rss" xmlUrl="https://feeds.example/b.xml"/>`),
+  );
   assert.strictEqual(a.savedCopy, 'saved/a.json');
   assert.strictEqual(b.savedCopy, null);
 });

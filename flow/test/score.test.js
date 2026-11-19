@@ -12,7 +12,20 @@ const card = (scored, n) => scored.cards.find((c) => c.id === C(n));
 test('score: every feature is bounded to 0..1 and named', () => {
   const scored = scoreSubfield(all(), normalisePreset(byWeightPreset()));
   const names = featureNames(all(), normalisePreset(byWeightPreset()));
-  assert.deepEqual(names, ['tag.site', 'tag.Journal', 'tag.Wire', 'tag.discovered', 'tag.shared', 'rel.related', 'degree', 'recency', 'source', 'read', 'pin', 'distance']);
+  assert.deepEqual(names, [
+    'tag.site',
+    'tag.Journal',
+    'tag.Wire',
+    'tag.discovered',
+    'tag.shared',
+    'rel.related',
+    'degree',
+    'recency',
+    'source',
+    'read',
+    'pin',
+    'distance',
+  ]);
   for (const c of scored.cards) {
     assert.deepEqual(Object.keys(c.terms), names);
     for (const [name, t] of Object.entries(c.terms)) {
@@ -80,13 +93,20 @@ test('score: recency by calendar decays from the newest dated card with the half
 });
 
 test('score: source is the preset weight by title, 1 unnamed; read and pin come from the state, else 0', () => {
-  const preset = normalisePreset({ ...byWeightPreset(), weights: { ...byWeightPreset().weights, source: { Wire: 2 } } });
+  const preset = normalisePreset({
+    ...byWeightPreset(),
+    weights: { ...byWeightPreset().weights, source: { Wire: 2 } },
+  });
   const scored = scoreSubfield(all(), preset);
   assert.deepEqual(card(scored, 1).terms.source, { x: 1, w: 1, term: 1 });
   assert.deepEqual(card(scored, 4).terms.source, { x: 1, w: 2, term: 2 });
   assert.equal(card(scored, 1).terms.read.x, 0);
   assert.equal(card(scored, 1).terms.pin.x, 0);
-  const state = { version: 1, reading: { [C(1)]: { seenAt: 1, done: true }, [C(2)]: { seenAt: 1 } }, nodes: { c3: { pinned: true } } };
+  const state = {
+    version: 1,
+    reading: { [C(1)]: { seenAt: 1, done: true }, [C(2)]: { seenAt: 1 } },
+    nodes: { c3: { pinned: true } },
+  };
   const withState = scoreSubfield(all(), preset, { state });
   assert.equal(card(withState, 1).terms.read.x, 1);
   assert.equal(card(withState, 2).terms.read.x, 0.5);
@@ -100,7 +120,10 @@ test('score: tag.shared, rel.<type> and distance are 0 without a position, and r
     assert.equal(c.terms['rel.related'].x, 0);
     assert.equal(c.terms.distance.x, 0);
   }
-  const around = scoreSubfield(select(syntheticFeed(), { mode: 'around', id: C(1), hops: 1 }), normalisePreset(byNeighbourhoodPreset()));
+  const around = scoreSubfield(
+    select(syntheticFeed(), { mode: 'around', id: C(1), hops: 1 }),
+    normalisePreset(byNeighbourhoodPreset()),
+  );
   // c2 shares alpha (1 of c1's 1.5 tag weight); c3 shares beta at the smaller weight 0.5.
   assert.ok(Math.abs(card(around, 2).terms['tag.shared'].x - 1 / 1.5) < 1e-12);
   assert.ok(Math.abs(card(around, 3).terms['tag.shared'].x - 0.5 / 1.5) < 1e-12);
@@ -128,10 +151,16 @@ test('preset: shape is checked', () => {
   assert.throws(() => normalisePreset({}), /no name/);
   assert.throws(() => normalisePreset({ name: 'x' }), /no weights/);
   assert.throws(() => normalisePreset({ name: 'x', weights: { degree: 'heavy' } }), /not a number/);
-  assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { degreePenalty: 'cube' } }), /degreePenalty/);
+  assert.throws(
+    () => normalisePreset({ name: 'x', weights: {}, switches: { degreePenalty: 'cube' } }),
+    /degreePenalty/,
+  );
   assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { tagMeasure: 'count' } }), /tagMeasure/);
   assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { walkStart: 'oldest' } }), /walkStart/);
-  assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { walkStartSource: 42 } }), /walkStartSource/);
+  assert.throws(
+    () => normalisePreset({ name: 'x', weights: {}, switches: { walkStartSource: 42 } }),
+    /walkStartSource/,
+  );
   assert.throws(() => normalisePreset({ name: 'x', weights: {}, switches: { other: 1 } }), /unknown switch/);
   const p = normalisePreset({ name: 'x', weights: { degree: 1 } });
   assert.deepEqual(p.weights, { degree: 1, source: {} });

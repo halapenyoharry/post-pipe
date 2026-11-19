@@ -15,11 +15,27 @@ function fakeTTS() {
     calls,
     state: () => state,
     target: () => target,
-    play(body, opts) { calls.push(['play', body, opts]); target = body; state = 'playing'; },
-    pause() { calls.push(['pause']); state = 'paused'; },
-    resume() { calls.push(['resume']); state = 'playing'; },
-    stop() { calls.push(['stop']); state = 'stopped'; target = null; },
-    _set(s) { state = s; },
+    play(body, opts) {
+      calls.push(['play', body, opts]);
+      target = body;
+      state = 'playing';
+    },
+    pause() {
+      calls.push(['pause']);
+      state = 'paused';
+    },
+    resume() {
+      calls.push(['resume']);
+      state = 'playing';
+    },
+    stop() {
+      calls.push(['stop']);
+      state = 'stopped';
+      target = null;
+    },
+    _set(s) {
+      state = s;
+    },
   };
 }
 

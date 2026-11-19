@@ -15,8 +15,10 @@ test('the default header has no kicker and keeps the byline', () => {
 
 test('the kicker fills its tokens, number in words, and can drop the byline', () => {
   const s = { ...site, reader: { header: { kicker: ['Chapter {N_words}', '{book}', 'by {author}'], byline: false } } };
-  assert.deepStrictEqual(readerHeader(s, { title: 'T', series_part: 1 }),
-    { kicker: 'Chapter One — A Book — by some author', byline: false });
+  assert.deepStrictEqual(readerHeader(s, { title: 'T', series_part: 1 }), {
+    kicker: 'Chapter One — A Book — by some author',
+    byline: false,
+  });
   assert.strictEqual(readerHeader(s, { series_part: 21 }).kicker, 'Chapter Twenty-one — A Book — by some author');
   const digits = { ...site, reader: { header: { kicker: 'Chapter {n} of {book}' } } };
   assert.strictEqual(readerHeader(digits, { series_part: 7 }).kicker, 'Chapter 7 of A Book');

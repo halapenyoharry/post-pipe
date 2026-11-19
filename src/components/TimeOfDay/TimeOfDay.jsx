@@ -14,7 +14,8 @@ import { config as todConfig, ambienceFor } from '../../lib/timeOfDay';
  * (viewState preference timeOfDay: false).
  */
 function useMode() {
-  const read = () => (typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-mode')) || 'dark';
+  const read = () =>
+    (typeof document !== 'undefined' && document.documentElement.getAttribute('data-pp-mode')) || 'dark';
   const [mode, setMode] = useState(read);
   useEffect(() => {
     const obs = new MutationObserver(() => setMode(read()));
@@ -48,7 +49,11 @@ export function TimeOfDay({ item, settings, viewState }) {
     if (key === last.current) return;
     last.current = key;
     const back = 1 - front;
-    setLayers((ls) => { const n = ls.slice(); n[back] = amb; return n; });
+    setLayers((ls) => {
+      const n = ls.slice();
+      n[back] = amb;
+      return n;
+    });
     // One frame later, so the new layer exists at opacity 0 before it fades.
     const id = requestAnimationFrame(() => requestAnimationFrame(() => setFront(back)));
     return () => cancelAnimationFrame(id);
@@ -58,7 +63,8 @@ export function TimeOfDay({ item, settings, viewState }) {
     const root = document.documentElement;
     if (amb) {
       root.setAttribute('data-pp-tod', amb.time);
-      if (amb.season) root.setAttribute('data-pp-season', amb.season); else root.removeAttribute('data-pp-season');
+      if (amb.season) root.setAttribute('data-pp-season', amb.season);
+      else root.removeAttribute('data-pp-season');
     } else {
       root.removeAttribute('data-pp-tod');
       root.removeAttribute('data-pp-season');

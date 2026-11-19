@@ -70,7 +70,11 @@ function newTabMode(settings) {
 
 // The link resolved against the page it is followed from.
 function resolveLink(href, base) {
-  try { return new URL(href, base).href; } catch (_) { return href; }
+  try {
+    return new URL(href, base).href;
+  } catch (_) {
+    return href;
+  }
 }
 
 // Where a link opens: '_blank' (a new tab) or '_self' (this tab), for the
@@ -102,20 +106,23 @@ function followLink(item, { settings = null, win = typeof window !== 'undefined'
   return { href, target };
 }
 
-const escapeHtml = (s) => String(s ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;');
+const escapeHtml = (s) =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
 // The page for a link node: it sends the visitor straight on, and shows the
 // title, the blurb and the link for anyone whose browser does not.
 function redirectPage({ title = '', href = '', blurb = '', head = '' } = {}) {
   const t = escapeHtml(title);
   const h = escapeHtml(href);
-  return `<!doctype html>\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<title>${t}</title><meta http-equiv="refresh" content="0; url=${h}"><link rel="canonical" href="${h}">${head ? '\n' + head : ''}</head>`
-    + `<body><h1>${t}</h1>${blurb ? `\n<p>${escapeHtml(blurb)}</p>` : ''}\n<p><a href="${h}">${h}</a></p></body></html>\n`;
+  return (
+    `<!doctype html>\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<title>${t}</title><meta http-equiv="refresh" content="0; url=${h}"><link rel="canonical" href="${h}">${head ? '\n' + head : ''}</head>` +
+    `<body><h1>${t}</h1>${blurb ? `\n<p>${escapeHtml(blurb)}</p>` : ''}\n<p><a href="${h}">${h}</a></p></body></html>\n`
+  );
 }
 
 // graph.intro with its format: { text, format } or null when empty.
@@ -139,10 +146,25 @@ function introHtml(intro, render) {
       .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
       .trim();
   }
-  return intro.text.split(/\n\s*\n/).map((p) => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
+  return intro.text
+    .split(/\n\s*\n/)
+    .map((p) => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`)
+    .join('');
 }
 
 module.exports = {
-  linkFromFrontMatter, blurbFromFrontMatter, hasBodyText, isLinkContent, isLinkItem, isLinkFeedItem, linkOf,
-  newTabMode, resolveLink, linkTarget, followLink, redirectPage, introConfig, introHtml,
+  linkFromFrontMatter,
+  blurbFromFrontMatter,
+  hasBodyText,
+  isLinkContent,
+  isLinkItem,
+  isLinkFeedItem,
+  linkOf,
+  newTabMode,
+  resolveLink,
+  linkTarget,
+  followLink,
+  redirectPage,
+  introConfig,
+  introHtml,
 };

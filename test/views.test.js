@@ -32,24 +32,48 @@ test('an entry names the layout it draws with, or none', () => {
   assert.strictEqual(viewLayout(null), '');
 });
 
-test('settings: the listed views in the site\'s order; absent or empty is the default, cluster alone', () => {
+test("settings: the listed views in the site's order; absent or empty is the default, cluster alone", () => {
   assert.deepStrictEqual(DEFAULT_VIEWS, ['cluster']);
-  assert.deepStrictEqual(siteViews({}, REGISTRY).map((v) => v.id), ['cluster']);
-  assert.deepStrictEqual(siteViews(null, REGISTRY).map((v) => v.id), ['cluster']);
-  assert.deepStrictEqual(siteViews({ views: [] }, REGISTRY).map((v) => v.id), ['cluster']);
-  assert.deepStrictEqual(siteViews({ views: 'ring' }, REGISTRY).map((v) => v.id), ['cluster']);
-  assert.deepStrictEqual(siteViews({ views: ['ring', 'cluster'] }, REGISTRY).map((v) => v.id), ['ring', 'cluster']);
-  assert.deepStrictEqual(siteViews({ views: ['cluster', 'ring', 'json-trees'] }, REGISTRY).map((v) => v.id), ['cluster', 'ring', 'json-trees']);
+  assert.deepStrictEqual(
+    siteViews({}, REGISTRY).map((v) => v.id),
+    ['cluster'],
+  );
+  assert.deepStrictEqual(
+    siteViews(null, REGISTRY).map((v) => v.id),
+    ['cluster'],
+  );
+  assert.deepStrictEqual(
+    siteViews({ views: [] }, REGISTRY).map((v) => v.id),
+    ['cluster'],
+  );
+  assert.deepStrictEqual(
+    siteViews({ views: 'ring' }, REGISTRY).map((v) => v.id),
+    ['cluster'],
+  );
+  assert.deepStrictEqual(
+    siteViews({ views: ['ring', 'cluster'] }, REGISTRY).map((v) => v.id),
+    ['ring', 'cluster'],
+  );
+  assert.deepStrictEqual(
+    siteViews({ views: ['cluster', 'ring', 'json-trees'] }, REGISTRY).map((v) => v.id),
+    ['cluster', 'ring', 'json-trees'],
+  );
 });
 
 test('settings: an unknown id is skipped with one logged line; each id once; nothing known falls back to the default', () => {
   const lines = [];
   const log = (l) => lines.push(l);
-  assert.deepStrictEqual(siteViews({ views: ['cluster', 'spiral', 'ring', 'cluster', 'orbit', 7, null] }, REGISTRY, log).map((v) => v.id), ['cluster', 'ring']);
+  assert.deepStrictEqual(
+    siteViews({ views: ['cluster', 'spiral', 'ring', 'cluster', 'orbit', 7, null] }, REGISTRY, log).map((v) => v.id),
+    ['cluster', 'ring'],
+  );
   assert.strictEqual(lines.length, 1);
   assert.match(lines[0], /unknown views skipped: spiral, orbit/);
   const more = [];
-  assert.deepStrictEqual(siteViews({ views: ['spiral'] }, REGISTRY, (l) => more.push(l)).map((v) => v.id), ['cluster']);
+  assert.deepStrictEqual(
+    siteViews({ views: ['spiral'] }, REGISTRY, (l) => more.push(l)).map((v) => v.id),
+    ['cluster'],
+  );
   assert.deepStrictEqual(more, ['[post-pipe] settings.views: unknown view skipped: spiral']);
   const quiet = [];
   siteViews({ views: ['cluster', 'ring'] }, REGISTRY, (l) => quiet.push(l));
@@ -72,16 +96,36 @@ test('the ?view= parameter picks a listed view; an unlisted or absent one picks 
 
 test('the view in force: the chosen one, else the first listed; the layout picker moves it to the view drawn with that layout', () => {
   const listed = siteViews({ views: ['ring', 'cluster'] }, REGISTRY);
-  assert.strictEqual(currentView(listed, { view: null, layout: 'force' }), REGISTRY[1], 'no choice yet: the first listed, whatever the layout');
+  assert.strictEqual(
+    currentView(listed, { view: null, layout: 'force' }),
+    REGISTRY[1],
+    'no choice yet: the first listed, whatever the layout',
+  );
   assert.strictEqual(currentView(listed, {}), REGISTRY[1]);
   assert.strictEqual(currentView(listed, { view: 'cluster', layout: 'force' }), REGISTRY[0]);
-  assert.strictEqual(currentView(listed, { view: 'cluster', layout: 'radial' }), REGISTRY[1], 'the picker set ring\'s layout');
+  assert.strictEqual(
+    currentView(listed, { view: 'cluster', layout: 'radial' }),
+    REGISTRY[1],
+    "the picker set ring's layout",
+  );
   assert.strictEqual(currentView(listed, { view: 'ring', layout: 'force' }), REGISTRY[0]);
-  assert.strictEqual(currentView(listed, { view: 'json-trees', layout: 'radial' }), REGISTRY[1], 'a choice the site no longer lists');
+  assert.strictEqual(
+    currentView(listed, { view: 'json-trees', layout: 'radial' }),
+    REGISTRY[1],
+    'a choice the site no longer lists',
+  );
   const one = siteViews({ views: ['cluster'] }, REGISTRY);
-  assert.strictEqual(currentView(one, { view: 'cluster', layout: 'radial' }), REGISTRY[0], 'one view: it stays, the layout is the reader\'s');
+  assert.strictEqual(
+    currentView(one, { view: 'cluster', layout: 'radial' }),
+    REGISTRY[0],
+    "one view: it stays, the layout is the reader's",
+  );
   const trees = siteViews({ views: ['cluster', 'json-trees'] }, REGISTRY);
-  assert.strictEqual(currentView(trees, { view: 'json-trees', layout: 'radial' }), REGISTRY[2], 'a view with no layout is not moved by the picker');
+  assert.strictEqual(
+    currentView(trees, { view: 'json-trees', layout: 'radial' }),
+    REGISTRY[2],
+    'a view with no layout is not moved by the picker',
+  );
   assert.strictEqual(currentView([], { view: 'cluster' }), null);
 });
 
@@ -102,18 +146,26 @@ test('viewState remembers the view: setView keeps the id and its layout in one s
   assert.strictEqual(b.undo(), true);
   assert.deepStrictEqual([b.state.view, b.state.layout], ['ring', 'radial'], 'one undo takes back both');
   b.setView('json-trees');
-  assert.deepStrictEqual([b.state.view, b.state.layout], ['json-trees', 'radial'], 'a view with no layout leaves the layout');
+  assert.deepStrictEqual(
+    [b.state.view, b.state.layout],
+    ['json-trees', 'radial'],
+    'a view with no layout leaves the layout',
+  );
   b.setView('cluster', 'force', { silent: true });
   assert.deepStrictEqual([b.state.view, b.state.layout], ['cluster', 'force']);
   assert.strictEqual(b.undo(), true);
-  assert.deepStrictEqual([b.state.view, b.state.layout], ['ring', 'radial'], 'the silent step was not in history; the undo took back the step before it');
+  assert.deepStrictEqual(
+    [b.state.view, b.state.layout],
+    ['ring', 'radial'],
+    'the silent step was not in history; the undo took back the step before it',
+  );
   b.resetLayout();
-  assert.deepStrictEqual([b.state.view, b.state.layout], [null, 'force'], 'Reset: the site\'s first view again');
+  assert.deepStrictEqual([b.state.view, b.state.layout], [null, 'force'], "Reset: the site's first view again");
   b.setView('', 'radial');
   assert.strictEqual(b.state.view, null, 'an empty id is no choice');
 });
 
-test('a reader\'s older saved state, without a view, loads with none chosen', async () => {
+test("a reader's older saved state, without a view, loads with none chosen", async () => {
   const backend = memoryBackend();
   const a = createViewState({ backend, debounceMs: 0, corpusId: 'c' });
   await a.ready();
@@ -127,5 +179,9 @@ test('a reader\'s older saved state, without a view, loads with none chosen', as
   assert.strictEqual(b.state.view, null);
   assert.strictEqual(b.state.layout, 'radial');
   const listed = siteViews({ views: ['cluster', 'ring'] }, REGISTRY);
-  assert.strictEqual(currentView(listed, b.state), REGISTRY[0], 'no choice: the first listed; the page then puts its layout in force');
+  assert.strictEqual(
+    currentView(listed, b.state),
+    REGISTRY[0],
+    'no choice: the first listed; the page then puts its layout in force',
+  );
 });

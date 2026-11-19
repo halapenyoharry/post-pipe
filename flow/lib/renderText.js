@@ -16,7 +16,9 @@ function seamLine(item, byId) {
   const from = byId.get(item.step.from);
   const fromRank = from ? `#${from.rank}` : item.step.from;
   if (item.step.hops === null) return `-- seam: not reachable from ${fromRank} in the subfield --`;
-  const shared = item.step.shared.length ? `shares ${item.step.shared.length} tag${item.step.shared.length === 1 ? '' : 'z'}` : 'no tag shared';
+  const shared = item.step.shared.length
+    ? `shares ${item.step.shared.length} tag${item.step.shared.length === 1 ? '' : 'z'}`
+    : 'no tag shared';
   return `-- seam: ${item.step.hops} hops from ${fromRank}, ${shared} --`;
 }
 
@@ -41,17 +43,21 @@ export function renderText(flow, { full = 20 } = {}) {
 
   const lines = [];
   const mean = Number.isFinite(s.meanHops) ? `${fmt(s.meanHops, 2)} hops per step on average` : 'no reachable steps';
-  const start = s.start && s.start.rule && s.start.rule !== 'heaviest'
-    ? `, start ${s.start.title || s.start.id} (${s.start.rule})`
-    : '';
+  const start =
+    s.start && s.start.rule && s.start.rule !== 'heaviest'
+      ? `, start ${s.start.title || s.start.id} (${s.start.rule})`
+      : '';
   lines.push(`flow ${s.preset || ''}: ${s.cards} cards, mode ${s.mode}${start}, ${s.seams} seams, ${mean}`);
   const weights = Object.entries(s.weights || {})
     .filter(([k, v]) => k !== 'source' && Number.isFinite(v) && v !== 0)
     .map(([k, v]) => `${k} ${v}`);
   const src = s.weights && s.weights.source;
-  const srcText = src && typeof src === 'object' && Object.keys(src).length
-    ? Object.entries(src).map(([t, w]) => `source ${t} ${w}`).join(' · ')
-    : `source ${typeof src === 'number' ? src : 1} (every source)`;
+  const srcText =
+    src && typeof src === 'object' && Object.keys(src).length
+      ? Object.entries(src)
+          .map(([t, w]) => `source ${t} ${w}`)
+          .join(' · ')
+      : `source ${typeof src === 'number' ? src : 1} (every source)`;
   lines.push(`weights: ${[...weights, srcText].join(' · ')}`);
   lines.push('');
 
@@ -62,7 +68,9 @@ export function renderText(flow, { full = 20 } = {}) {
       lines.push(`#${it.rank}  ${fmt(it.score, 3)}  ${it.title}  [${labels.join(' · ')}]`);
       return;
     }
-    lines.push(`#${it.rank}  ${fmt(it.score, 3)}  ${it.title}  ${it.id}  ${it.source || ''}  ${dateOf(it)}`.replace(/\s+$/, ''));
+    lines.push(
+      `#${it.rank}  ${fmt(it.score, 3)}  ${it.title}  ${it.id}  ${it.source || ''}  ${dateOf(it)}`.replace(/\s+$/, ''),
+    );
     const top = (it.top || []).slice(0, 3).map((name) => `${name} ${fmt(it.terms[name].term, 2)}`);
     if (top.length) lines.push(`    ${top.join(' · ')}`);
     for (const t of it.tagz || []) {

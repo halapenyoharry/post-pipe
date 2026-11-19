@@ -63,7 +63,20 @@ test('cli: the neighbourhood preset walks; --around and --set select; switches o
   const set = run('flow-select', ['--set', 'https://example.test/c4,https://example.test/c5'], feed);
   assert.equal(JSON.parse(set.out).cards.length, 2);
 
-  const scored = run('flow-score', ['--preset', preset('by-neighbourhood'), '--degree-penalty', 'none', '--half-life', '10', '--tag-measure', 'weight'], around.out);
+  const scored = run(
+    'flow-score',
+    [
+      '--preset',
+      preset('by-neighbourhood'),
+      '--degree-penalty',
+      'none',
+      '--half-life',
+      '10',
+      '--tag-measure',
+      'weight',
+    ],
+    around.out,
+  );
   assert.equal(scored.code, 0, scored.err);
   const p = JSON.parse(scored.out).preset;
   assert.equal(p.switches.degreePenalty, 'none');

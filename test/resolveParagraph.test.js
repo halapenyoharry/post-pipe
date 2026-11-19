@@ -3,10 +3,7 @@ const assert = require('node:assert');
 const { resolveParagraph, normalize } = require('../src/lib/resolveParagraph');
 
 test('normalize lowercases, collapses whitespace, and strips punctuation', () => {
-  assert.strictEqual(
-    normalize('  Hello,  World! "This is—a test."  '),
-    'hello world this isa test'
-  );
+  assert.strictEqual(normalize('  Hello,  World! "This is—a test."  '), 'hello world this isa test');
   assert.strictEqual(normalize(''), '');
   assert.strictEqual(normalize(null), '');
 });
@@ -42,11 +39,7 @@ test('rule 2: returns first matching paragraph if text shifted away from para', 
 });
 
 test('rule 3: returns min(para, paragraphTexts.length - 1) if quote not found', () => {
-  const texts = [
-    'Paragraph zero text.',
-    'Paragraph one text.',
-    'Paragraph two text.',
-  ];
+  const texts = ['Paragraph zero text.', 'Paragraph one text.', 'Paragraph two text.'];
 
   // Quote modified beyond recognition
   const idx = resolveParagraph(texts, {

@@ -122,40 +122,52 @@ test('effectiveWeight: combines raw weight, symmetric degree penalty, recency fl
   close(fSqrt.eff, 1 * (1 / Math.sqrt(12)) * 0.6 * 1.5);
 
   // NLP tag edge (raw = 0.7), raw > 1 clamped to 1, missing weight -> 1
-  const fNlp = effectiveWeight({ source: 'c1', target: 'tag:beta', layer: 'tag', weight: 0.7 }, {
-    degrees,
-    nodeById: nodes,
-    newestMs: newest,
-  });
+  const fNlp = effectiveWeight(
+    { source: 'c1', target: 'tag:beta', layer: 'tag', weight: 0.7 },
+    {
+      degrees,
+      nodeById: nodes,
+      newestMs: newest,
+    },
+  );
   close(fNlp.raw, 0.7);
   close(fNlp.degreeFactor, 1 / Math.sqrt(2 * 2));
   close(fNlp.recencyFactor, 1);
 
-  const fClamped = effectiveWeight({ source: 'c1', target: 'tag:beta', layer: 'tag', weight: 2.5 }, {
-    degrees,
-    nodeById: nodes,
-    newestMs: newest,
-  });
+  const fClamped = effectiveWeight(
+    { source: 'c1', target: 'tag:beta', layer: 'tag', weight: 2.5 },
+    {
+      degrees,
+      nodeById: nodes,
+      newestMs: newest,
+    },
+  );
   close(fClamped.raw, 1);
 
   // Card-to-card authored link: recency x is the mean of both cards' x ((1 + 0.5)/2 = 0.75)
-  const fCardCard = effectiveWeight({ source: 'c1', target: 'c2', layer: 'reference', refType: 'authored' }, {
-    degrees,
-    nodeById: nodes,
-    newestMs: newest,
-    settings: { degreePenalty: 'none', recencyFloor: 0.2, weights: { authored: 0.8 } },
-  });
+  const fCardCard = effectiveWeight(
+    { source: 'c1', target: 'c2', layer: 'reference', refType: 'authored' },
+    {
+      degrees,
+      nodeById: nodes,
+      newestMs: newest,
+      settings: { degreePenalty: 'none', recencyFloor: 0.2, weights: { authored: 0.8 } },
+    },
+  );
   close(fCardCard.degreeFactor, 1 / Math.sqrt(4 * 9));
   close(fCardCard.recencyFactor, 0.2 + 0.8 * 0.75);
   close(fCardCard.typeWeight, 0.8);
 
   // Tag-to-tag relation: neither end is a card -> recencyFactor = 1
-  const fTagTag = effectiveWeight({ source: 'tag:alpha', target: 'tag:beta', layer: 'broader', weight: 0.85 }, {
-    degrees,
-    nodeById: nodes,
-    newestMs: newest,
-    settings: { degreePenalty: 'log', weights: { broader: 0.5 } },
-  });
+  const fTagTag = effectiveWeight(
+    { source: 'tag:alpha', target: 'tag:beta', layer: 'broader', weight: 0.85 },
+    {
+      degrees,
+      nodeById: nodes,
+      newestMs: newest,
+      settings: { degreePenalty: 'log', weights: { broader: 0.5 } },
+    },
+  );
   close(fTagTag.raw, 0.85);
   close(fTagTag.degreeFactor, 1 / Math.sqrt(Math.log1p(16) * Math.log1p(4)));
   close(fTagTag.recencyFactor, 1);
@@ -260,8 +272,24 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
         _source: { id: 'src-a', title: 'Source A' },
         tags: ['alpha', 'beta'],
         _references: [
-          { type: 'tag', concept: 'concept:alpha', value: 'alpha', weight: 1, origin: 'explicit', why: 'frontmatter', prefLabel: { site: 'alpha', disciplines: 'Alpha studies' } },
-          { type: 'tag', concept: 'concept:beta', value: 'beta', weight: 0.8, origin: 'explicit', why: 'frontmatter', prefLabel: { site: 'beta', disciplines: 'Beta craft' } },
+          {
+            type: 'tag',
+            concept: 'concept:alpha',
+            value: 'alpha',
+            weight: 1,
+            origin: 'explicit',
+            why: 'frontmatter',
+            prefLabel: { site: 'alpha', disciplines: 'Alpha studies' },
+          },
+          {
+            type: 'tag',
+            concept: 'concept:beta',
+            value: 'beta',
+            weight: 0.8,
+            origin: 'explicit',
+            why: 'frontmatter',
+            prefLabel: { site: 'beta', disciplines: 'Beta craft' },
+          },
         ],
       },
       {
@@ -272,8 +300,24 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
         _source: { id: 'src-a', title: 'Source A' },
         tags: ['alpha', 'gamma'],
         _references: [
-          { type: 'tag', concept: 'concept:alpha', value: 'alpha', weight: 0.6, origin: 'nlp', why: 'tfidf', prefLabel: { site: 'alpha', disciplines: 'Alpha studies' } },
-          { type: 'tag', concept: 'concept:gamma', value: 'gamma', weight: 0.5, origin: 'nlp', why: 'tfidf', prefLabel: { site: 'gamma' } },
+          {
+            type: 'tag',
+            concept: 'concept:alpha',
+            value: 'alpha',
+            weight: 0.6,
+            origin: 'nlp',
+            why: 'tfidf',
+            prefLabel: { site: 'alpha', disciplines: 'Alpha studies' },
+          },
+          {
+            type: 'tag',
+            concept: 'concept:gamma',
+            value: 'gamma',
+            weight: 0.5,
+            origin: 'nlp',
+            why: 'tfidf',
+            prefLabel: { site: 'gamma' },
+          },
         ],
       },
       {
@@ -284,7 +328,15 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
         _source: { id: 'src-b', title: 'Source B' },
         tags: ['beta'],
         _references: [
-          { type: 'tag', concept: 'concept:beta', value: 'beta', weight: 1, origin: 'explicit', why: 'frontmatter', prefLabel: { site: 'beta', disciplines: 'Beta craft' } },
+          {
+            type: 'tag',
+            concept: 'concept:beta',
+            value: 'beta',
+            weight: 1,
+            origin: 'explicit',
+            why: 'frontmatter',
+            prefLabel: { site: 'beta', disciplines: 'Beta craft' },
+          },
         ],
       },
       {
@@ -305,7 +357,13 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
       { source: 'https://example.test/c3', target: 'tag:beta', layer: 'tag', weight: 1 },
       { source: 'tag:alpha', target: 'tag:beta', layer: 'related', weight: 0.7, why: 'co-occurs' },
       { source: 'tag:beta', target: 'tag:gamma', layer: 'broader', weight: 0.9, why: 'skos:broader' },
-      { source: 'https://example.test/c1', target: 'https://example.test/c3', layer: 'authored', weight: 1, why: 'link in body' },
+      {
+        source: 'https://example.test/c1',
+        target: 'https://example.test/c3',
+        layer: 'authored',
+        weight: 1,
+        why: 'link in body',
+      },
       { source: 'container:book', target: 'https://example.test/c1', layer: 'containment', role: 'contains' },
     ],
   };
@@ -323,11 +381,14 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
   const rankById = new Map(feed.items.map((it, idx) => [it.id, idx]));
 
   const presetPath = path.join(os.tmpdir(), 'pp-ew-flow-preset.json');
-  fs.writeFileSync(presetPath, JSON.stringify({
-    name: 'ew-parity-contract',
-    description: 'Equality contract preset',
-    weights: { degree: 1, recency: 1 },
-  }));
+  fs.writeFileSync(
+    presetPath,
+    JSON.stringify({
+      name: 'ew-parity-contract',
+      description: 'Equality contract preset',
+      weights: { degree: 1, recency: 1 },
+    }),
+  );
 
   for (const degreePenalty of DEGREE_PENALTIES) {
     for (const recencyClock of RECENCY_CLOCKS) {
@@ -335,10 +396,14 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
         process.execPath,
         [
           flowScoreBin,
-          '--preset', presetPath,
-          '--degree-penalty', degreePenalty,
-          '--recency-clock', recencyClock,
-          '--half-life', '180',
+          '--preset',
+          presetPath,
+          '--degree-penalty',
+          degreePenalty,
+          '--recency-clock',
+          recencyClock,
+          '--half-life',
+          '180',
         ],
         {
           input: subfieldJson,
@@ -356,11 +421,7 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
       for (const card of scored.cards) {
         const pen = penalty(degRaw.get(card.id) || 0, degreePenalty);
         const expectedDegX = maxPen > 0 ? pen / maxPen : 0;
-        close(
-          expectedDegX,
-          card.terms.degree.x,
-          `degree.x parity (${degreePenalty}, ${recencyClock}) on ${card.id}`,
-        );
+        close(expectedDegX, card.terms.degree.x, `degree.x parity (${degreePenalty}, ${recencyClock}) on ${card.id}`);
 
         const expectedRecX = recencyX(card.date, newestMs, {
           clock: recencyClock,
@@ -368,11 +429,7 @@ test('contract with flow-score: layout edgeWeight penalty, degreesOf, and recenc
           rankIndex: rankById.get(card.id),
           count,
         });
-        close(
-          expectedRecX,
-          card.terms.recency.x,
-          `recency.x parity (${degreePenalty}, ${recencyClock}) on ${card.id}`,
-        );
+        close(expectedRecX, card.terms.recency.x, `recency.x parity (${degreePenalty}, ${recencyClock}) on ${card.id}`);
       }
     }
   }

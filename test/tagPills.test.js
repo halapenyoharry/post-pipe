@@ -9,10 +9,19 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const {
-  PREF, LABELS_PREF, MARK_RADIUS, MARK_HIT_RADIUS,
-  siteShowsTags, showTagsChosen, showTagsPrefFor,
-  siteShowsTagLabels, showTagLabelsChosen, showTagLabelsPrefFor,
-  tagDrawing, tagMarkRadius, tagMarkHitRadius,
+  PREF,
+  LABELS_PREF,
+  MARK_RADIUS,
+  MARK_HIT_RADIUS,
+  siteShowsTags,
+  showTagsChosen,
+  showTagsPrefFor,
+  siteShowsTagLabels,
+  showTagLabelsChosen,
+  showTagLabelsPrefFor,
+  tagDrawing,
+  tagMarkRadius,
+  tagMarkHitRadius,
 } = require('../src/lib/tagPills');
 const { createViewState, memoryBackend } = require('../src/lib/viewState');
 const { layoutKey } = require('../src/components/GraphViewer/layoutKey');

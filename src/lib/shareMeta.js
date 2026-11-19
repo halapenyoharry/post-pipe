@@ -17,8 +17,11 @@
 
 function escAttr(s) {
   return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function absolute(base, src) {
@@ -61,7 +64,8 @@ function iconLinks(site) {
   const rel = (p) => escAttr('./' + String(p).replace(/^\.?\//, ''));
   if (I.ico) out.push(`<link rel="icon" href="${rel(I.ico)}" sizes="48x48">`);
   if (I.svg) out.push(`<link rel="icon" type="image/svg+xml" href="${rel(I.svg)}">`);
-  if (I.png) out.push(`<link rel="icon" type="image/png" sizes="${escAttr(I.png_sizes || '192x192')}" href="${rel(I.png)}">`);
+  if (I.png)
+    out.push(`<link rel="icon" type="image/png" sizes="${escAttr(I.png_sizes || '192x192')}" href="${rel(I.png)}">`);
   if (I.apple_touch) out.push(`<link rel="apple-touch-icon" href="${rel(I.apple_touch)}">`);
   return out.join('\n');
 }

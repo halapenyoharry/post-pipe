@@ -59,7 +59,11 @@ function writeCopy(file, url, body, fetchedAt) {
     return true;
   } catch (err) {
     console.warn(`[aggregator] could not keep a copy of ${url} in ${file}: ${err.message}`);
-    try { fs.unlinkSync(tmp); } catch (_) { /* nothing was written */ }
+    try {
+      fs.unlinkSync(tmp);
+    } catch (_) {
+      /* nothing was written */
+    }
     return false;
   }
 }

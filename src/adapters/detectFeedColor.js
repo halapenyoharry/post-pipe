@@ -59,8 +59,9 @@ async function scrapeThemeColor(url) {
   const html = await fetchText(url, { timeoutMs: 8000 });
   // Read just the <head>; case-insensitive; allow single or double quotes.
   const head = html.slice(0, 32_768);
-  const m = head.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["']([^"']+)["']/i)
-        || head.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']theme-color["']/i);
+  const m =
+    head.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["']([^"']+)["']/i) ||
+    head.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']theme-color["']/i);
   return m ? m[1].trim() : null;
 }
 
@@ -126,7 +127,13 @@ function hueOf(color) {
   const hex = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
   if (hex) {
     const v = hex[1];
-    const full = v.length === 3 ? v.split('').map((ch) => ch + ch).join('') : v;
+    const full =
+      v.length === 3
+        ? v
+            .split('')
+            .map((ch) => ch + ch)
+            .join('')
+        : v;
     r = parseInt(full.slice(0, 2), 16);
     g = parseInt(full.slice(2, 4), 16);
     b = parseInt(full.slice(4, 6), 16);
@@ -136,16 +143,18 @@ function hueOf(color) {
     [r, g, b] = rgb.slice(1, 4).map(Number);
   }
 
-  r /= 255; g /= 255; b /= 255;
+  r /= 255;
+  g /= 255;
+  b /= 255;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const delta = max - min;
   if (delta === 0) return null; // greyscale has no hue to separate on
 
   let hue;
-  if (max === r)      hue = ((g - b) / delta) % 6;
+  if (max === r) hue = ((g - b) / delta) % 6;
   else if (max === g) hue = (b - r) / delta + 2;
-  else                hue = (r - g) / delta + 4;
+  else hue = (r - g) / delta + 4;
   hue *= 60;
   return (hue + 360) % 360;
 }

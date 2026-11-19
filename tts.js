@@ -63,12 +63,18 @@
   // a sentence that ends after that (its promise resolves late) does not read
   // on into the new reading's sentences beside it.
   let run = 0;
-  let params = {};  // current parameter values (speed, pitch, voice, quality, etc.)
+  let params = {}; // current parameter values (speed, pitch, voice, quality, etc.)
 
   // ── Events ─────────────────────────────────────────────────────────────────
   const listeners = {};
   function emit(event, data) {
-    (listeners[event] || []).forEach(fn => { try { fn(data); } catch(e) { console.error(e); } });
+    (listeners[event] || []).forEach((fn) => {
+      try {
+        fn(data);
+      } catch (e) {
+        console.error(e);
+      }
+    });
   }
 
   // ── Sentence extraction ────────────────────────────────────────────────────
@@ -98,7 +104,7 @@
         // pill the reader draws over it for a card hidden in the graph.
         if (parent.closest && parent.closest('[data-pp-not-text]')) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
-      }
+      },
     });
 
     let currentBlockElement = null;
@@ -124,7 +130,10 @@
 
     let node;
     while ((node = walker.nextNode())) {
-      if (node.nodeType === 1) { currentBlockText += ' '; continue; }
+      if (node.nodeType === 1) {
+        currentBlockText += ' ';
+        continue;
+      }
       if (node.textContent.trim().length === 0 && currentBlockText.length === 0) continue;
       const block = getBlockParent(node);
       if (block !== currentBlockElement) {
@@ -146,7 +155,7 @@
     if (idx < 0 || idx >= sentences.length) return;
     const s = sentences[idx];
     if (!s.block) return;
-    
+
     highlightBlock = s.block;
     highlightBlock.dataset.originalBg = highlightBlock.style.backgroundColor || '';
     highlightBlock.style.backgroundColor = 'rgba(100, 255, 218, 0.15)';
@@ -174,7 +183,7 @@
     // Defensive sweep: ensure no orphaned <mark class="tts-active"> elements remain in DOM
     try {
       const marks = document.querySelectorAll('mark.tts-active');
-      marks.forEach(m => {
+      marks.forEach((m) => {
         const p = m.parentNode;
         if (p) {
           while (m.firstChild) p.insertBefore(m.firstChild, m);
@@ -182,15 +191,19 @@
           p.normalize();
         }
       });
-    } catch (e) { /* ignore cleanup errors */ }
+    } catch (e) {
+      /* ignore cleanup errors */
+    }
   }
 
   // ── Voice fallback ─────────────────────────────────────────────────────────
-  let lastFallback = null;   // { from, to, error, note, at } since the reader chose a voice
-  let failedVoices = [];     // [{ engine, voice }] found failing since play began
+  let lastFallback = null; // { from, to, error, note, at } since the reader chose a voice
+  let failedVoices = []; // [{ engine, voice }] found failing since play began
   let restartOnResume = false; // paused while a fallback was being tried
 
-  function fallbackApi() { return window.PPVoiceFallback || null; }
+  function fallbackApi() {
+    return window.PPVoiceFallback || null;
+  }
 
   function errorMessage(e) {
     const FB = fallbackApi();
@@ -201,9 +214,11 @@
   function voiceLabelOf(engineId, voiceId) {
     const eng = registry[engineId];
     try {
-      const v = eng && eng.voices ? eng.voices().find(x => x.id === voiceId) : null;
+      const v = eng && eng.voices ? eng.voices().find((x) => x.id === voiceId) : null;
       return (v && v.label) || voiceId;
-    } catch (e) { return voiceId; }
+    } catch (e) {
+      return voiceId;
+    }
   }
 
   function engineLabelOf(engineId) {
@@ -215,17 +230,27 @@
     const eng = registry[current.engine];
     const caps = (eng && eng.capabilities) || {};
     let voices = [];
-    try { voices = eng && eng.voices ? eng.voices() : []; } catch (e) { voices = []; }
+    try {
+      voices = eng && eng.voices ? eng.voices() : [];
+    } catch (e) {
+      voices = [];
+    }
     const b = registry.browser && isExposed('browser') ? registry.browser : null;
     let browser = null;
     if (b) {
-      const listed = (() => { try { return b.voices ? b.voices() : []; } catch (e) { return []; } })();
+      const listed = (() => {
+        try {
+          return b.voices ? b.voices() : [];
+        } catch (e) {
+          return [];
+        }
+      })();
       const device = b.deviceVoice ? b.deviceVoice() : null;
       browser = {
         defaultVoice: (b.capabilities && b.capabilities.voice && b.capabilities.voice.default) || null,
         // The device's own voice by name when the picker lists it, so the
         // picker can show it; else unnamed.
-        deviceVoice: device && listed.some(v => v.id === device) ? device : null,
+        deviceVoice: device && listed.some((v) => v.id === device) ? device : null,
       };
     }
     return FB.fallbackPlan({
@@ -292,9 +317,9 @@
 
     // Prefetch current sentence FIRST so it gets enqueued to the worker before the next sentence!
     if (activeEngine.prefetch) {
-      activeEngine.prefetch(sentences[sentenceIndex].text, params).catch(()=>{});
+      activeEngine.prefetch(sentences[sentenceIndex].text, params).catch(() => {});
       if (sentenceIndex + 1 < sentences.length) {
-        activeEngine.prefetch(sentences[sentenceIndex + 1].text, params).catch(()=>{});
+        activeEngine.prefetch(sentences[sentenceIndex + 1].text, params).catch(() => {});
       }
     }
 
@@ -303,7 +328,12 @@
     try {
       if (FB) {
         const current = { engine: activeId, voice: params.voice || null };
-        const r = await FB.speakWithFallback({ text: text, current: current, plan: () => planFor(FB, current), speak: speakIn });
+        const r = await FB.speakWithFallback({
+          text: text,
+          current: current,
+          plan: () => planFor(FB, current),
+          speak: speakIn,
+        });
         if (r.fellBack) adoptFallback(FB, current, r);
       } else {
         await activeEngine.speak(text, params);
@@ -331,9 +361,19 @@
     if (engineLoading) {
       // Wait for it
       return new Promise((resolve, reject) => {
-        const onReady = () => { off('ready', onReady); off('initFailed', onErr); resolve(); };
-        const onErr = (e) => { off('ready', onReady); off('initFailed', onErr); reject(e); };
-        const off = (evt, fn) => { listeners[evt] = (listeners[evt]||[]).filter(f => f !== fn); };
+        const onReady = () => {
+          off('ready', onReady);
+          off('initFailed', onErr);
+          resolve();
+        };
+        const onErr = (e) => {
+          off('ready', onReady);
+          off('initFailed', onErr);
+          reject(e);
+        };
+        const off = (evt, fn) => {
+          listeners[evt] = (listeners[evt] || []).filter((f) => f !== fn);
+        };
         (listeners.ready = listeners.ready || []).push(onReady);
         (listeners.initFailed = listeners.initFailed || []).push(onErr);
       });
@@ -409,8 +449,8 @@
 
     engines: function () {
       return Object.values(registry)
-        .filter(e => isExposed(e.id))
-        .map(e => ({
+        .filter((e) => isExposed(e.id))
+        .map((e) => ({
           id: e.id,
           label: e.label,
           capabilities: e.capabilities,
@@ -420,7 +460,7 @@
     // Everything registered, exposed or not. For a host that wants to offer a
     // hidden engine deliberately — a build where the reader owns the key.
     allEngines: function () {
-      return Object.values(registry).map(e => ({
+      return Object.values(registry).map((e) => ({
         id: e.id,
         label: e.label,
         exposed: isExposed(e.id),
@@ -453,7 +493,9 @@
       emit('capabilitiesChanged', caps);
     },
 
-    selected: function () { return activeId; },
+    selected: function () {
+      return activeId;
+    },
 
     capabilities: function () {
       return activeEngine ? activeEngine.capabilities : {};
@@ -507,7 +549,7 @@
         if (FB && playing) {
           const current = { engine: activeId, voice: params.voice || null };
           const plan = planFor(FB, current, true);
-          const next = plan.find(c => c.engine !== current.engine && registry[c.engine]);
+          const next = plan.find((c) => c.engine !== current.engine && registry[c.engine]);
           if (next) {
             adoptFallback(FB, current, { used: next, error: e, tried: [current] });
             emit('state', 'playing');
@@ -540,7 +582,9 @@
       }
     },
 
-    stop: function () { stopAll(); },
+    stop: function () {
+      stopAll();
+    },
 
     set: function (key, value) {
       params[key] = value;
@@ -551,9 +595,13 @@
       emit('paramChanged', { key: key, value: value });
     },
 
-    get: function (key) { return params[key]; },
+    get: function (key) {
+      return params[key];
+    },
 
-    params: function () { return Object.assign({}, params); },
+    params: function () {
+      return Object.assign({}, params);
+    },
 
     voices: function () {
       if (!activeEngine || !activeEngine.voices) return [];
@@ -565,11 +613,15 @@
     },
 
     off: function (event, fn) {
-      if (listeners[event]) listeners[event] = listeners[event].filter(f => f !== fn);
+      if (listeners[event]) listeners[event] = listeners[event].filter((f) => f !== fn);
     },
 
-    isPlaying: function () { return playing; },
-    isPaused: function () { return paused; },
+    isPlaying: function () {
+      return playing;
+    },
+    isPaused: function () {
+      return paused;
+    },
     // What the reading is doing, as the 'state' event says it.
     state: function () {
       if (paused) return 'paused';
@@ -577,12 +629,18 @@
       return 'stopped';
     },
     // Where it is reading (or paused): the container given to play(), else null.
-    target: function () { return readingContainer; },
+    target: function () {
+      return readingContainer;
+    },
 
     // The last time another voice took over since the reader chose one:
     // { from, to, error, note, at } ({ engine, voice } each), or null.
-    lastFallback: function () { return lastFallback; },
-    clearFallback: function () { lastFallback = null; },
+    lastFallback: function () {
+      return lastFallback;
+    },
+    clearFallback: function () {
+      lastFallback = null;
+    },
   };
 
   // ─── Built-in engine: Browser (Web Speech API) ─────────────────────────────
@@ -596,7 +654,9 @@
     let resolveSpeak = null;
     let cachedVoices = [];
 
-    function refreshVoices() { cachedVoices = synth.getVoices(); }
+    function refreshVoices() {
+      cachedVoices = synth.getVoices();
+    }
     synth.addEventListener('voiceschanged', refreshVoices);
     refreshVoices();
 
@@ -610,18 +670,28 @@
     // tested in test/voices.test.js); the copy below is for a page without
     // PPVoices (an embed) and must do the same.
     const DEFAULT_PREFERRED = [
-      'Samantha', 'Daniel', 'Karen', 'Moira', 'Tessa',
-      'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Guy',
+      'Samantha',
+      'Daniel',
+      'Karen',
+      'Moira',
+      'Tessa',
+      'Microsoft Aria',
+      'Microsoft Jenny',
+      'Microsoft Guy',
     ];
     function voiceOptions() {
       const cfg = window.TTS_CONFIG || {};
-      const preferred = Array.isArray(cfg.preferredVoices) && cfg.preferredVoices.length
-        ? cfg.preferredVoices : DEFAULT_PREFERRED;
+      const preferred =
+        Array.isArray(cfg.preferredVoices) && cfg.preferredVoices.length ? cfg.preferredVoices : DEFAULT_PREFERRED;
       const max = Number.isFinite(cfg.maxVoices) && cfg.maxVoices > 0 ? cfg.maxVoices : Infinity;
       const lang = cfg.lang || (typeof navigator !== 'undefined' && navigator.language) || 'en';
       return { lang, preferred, max };
     }
-    function langOf(lang) { return String(lang || '').toLowerCase().split(/[-_]/)[0]; }
+    function langOf(lang) {
+      return String(lang || '')
+        .toLowerCase()
+        .split(/[-_]/)[0];
+    }
     function orderVoices(voices, want) {
       return voices.slice().sort((a, b) => {
         const am = langOf(a.lang) === want ? 0 : 1;
@@ -634,18 +704,33 @@
       const opts = voiceOptions();
       if (window.PPVoices) return window.PPVoices.voiceList(all, opts);
       const want = langOf(opts.lang) || 'en';
-      const have = (all || []).filter(v => v && v.name);
-      const google = orderVoices(have.filter(v => /^google\b/i.test(v.name)), want);
+      const have = (all || []).filter((v) => v && v.name);
+      const google = orderVoices(
+        have.filter((v) => /^google\b/i.test(v.name)),
+        want,
+      );
       const taken = google.slice();
       const picked = [];
       for (const name of opts.preferred) {
-        const pool = orderVoices(have.filter(v => taken.indexOf(v) === -1), want);
-        const exact = pool.find(v => v.name === name);
-        const start = exact || pool.find(v => v.name.indexOf(name) === 0);
-        if (start) { picked.push(start); taken.push(start); }
+        const pool = orderVoices(
+          have.filter((v) => taken.indexOf(v) === -1),
+          want,
+        );
+        const exact = pool.find((v) => v.name === name);
+        const start = exact || pool.find((v) => v.name.indexOf(name) === 0);
+        if (start) {
+          picked.push(start);
+          taken.push(start);
+        }
       }
-      const rest = orderVoices(have.filter(v => taken.indexOf(v) === -1), want);
-      return google.concat(picked, rest).slice(0, opts.max).map(v => ({ voice: v, label: v.name }));
+      const rest = orderVoices(
+        have.filter((v) => taken.indexOf(v) === -1),
+        want,
+      );
+      return google
+        .concat(picked, rest)
+        .slice(0, opts.max)
+        .map((v) => ({ voice: v, label: v.name }));
     }
 
     // The first voice in that order that speaks the page's language (in
@@ -655,24 +740,24 @@
       const opts = voiceOptions();
       if (window.PPVoices && window.PPVoices.defaultVoice) return window.PPVoices.defaultVoice(allVoices, opts);
       const want = langOf(opts.lang) || 'en';
-      const list = voiceEntries(allVoices).map(e => e.voice);
-      const mine = list.find(v => langOf(v.lang) === want);
-      return (mine || list[0]) ? (mine || list[0]).name : null;
+      const list = voiceEntries(allVoices).map((e) => e.voice);
+      const mine = list.find((v) => langOf(v.lang) === want);
+      return mine || list[0] ? (mine || list[0]).name : null;
     }
 
     window.TTS.register({
       id: 'browser',
       label: 'Browser (Device)',
       capabilities: {
-        speed:  { type: 'range', min: 0.5, max: 3, step: 0.1, default: 1, label: 'Speed' },
-        pitch:  { type: 'range', min: 0, max: 2, step: 0.1, default: 1, label: 'Pitch' },
+        speed: { type: 'range', min: 0.5, max: 3, step: 0.1, default: 1, label: 'Speed' },
+        pitch: { type: 'range', min: 0, max: 2, step: 0.1, default: 1, label: 'Pitch' },
         volume: { type: 'range', min: 0, max: 1, step: 0.1, default: 1, label: 'Volume' },
-        voice:  {
+        voice: {
           type: 'voice',
           get default() {
             return findDefaultBrowserVoice(synth ? synth.getVoices() : []);
           },
-          label: 'Voice'
+          label: 'Voice',
         },
       },
 
@@ -682,7 +767,7 @@
       },
 
       voices: function () {
-        return voiceEntries(synth.getVoices()).map(e => ({
+        return voiceEntries(synth.getVoices()).map((e) => ({
           id: e.voice.name,
           label: e.label,
           lang: e.voice.lang,
@@ -691,7 +776,7 @@
 
       // The device's own default voice by name, or null.
       deviceVoice: function () {
-        const v = synth.getVoices().find(x => x.default);
+        const v = synth.getVoices().find((x) => x.default);
         return v ? v.name : null;
       },
 
@@ -706,7 +791,7 @@
           const utt = new SpeechSynthesisUtterance(text);
           if (p.voice) {
             const all = synth.getVoices();
-            const match = all.find(v => v.name === p.voice);
+            const match = all.find((v) => v.name === p.voice);
             if (match) utt.voice = match;
             else if (all.length) {
               const missing = new Error('the voice "' + p.voice + '" is not on this device');
@@ -718,7 +803,10 @@
           utt.rate = p.speed || 1;
           utt.pitch = p.pitch || 1;
           utt.volume = p.volume !== undefined ? p.volume : 1;
-          utt.onend = () => { currentUtterance = null; resolve(); };
+          utt.onend = () => {
+            currentUtterance = null;
+            resolve();
+          };
           utt.onerror = (e) => {
             currentUtterance = null;
             const code = (e && e.error) || 'failed';
@@ -733,9 +821,20 @@
         });
       },
 
-      pause: function () { synth.pause(); },
-      resume: function () { synth.resume(); },
-      stop: function () { synth.cancel(); currentUtterance = null; if (resolveSpeak) { resolveSpeak(); resolveSpeak = null; } },
+      pause: function () {
+        synth.pause();
+      },
+      resume: function () {
+        synth.resume();
+      },
+      stop: function () {
+        synth.cancel();
+        currentUtterance = null;
+        if (resolveSpeak) {
+          resolveSpeak();
+          resolveSpeak = null;
+        }
+      },
     });
   })();
 
@@ -763,7 +862,9 @@
     }
 
     function pcmToWav(pcmBuffer) {
-      const numChannels = 1, sampleRate = 24000, bitDepth = 16;
+      const numChannels = 1,
+        sampleRate = 24000,
+        bitDepth = 16;
       const byteRate = sampleRate * numChannels * (bitDepth / 8);
       const blockAlign = numChannels * (bitDepth / 8);
       const dataLen = pcmBuffer.byteLength;
@@ -772,11 +873,19 @@
       const write = (off, str) => [...str].forEach((c, i) => view.setUint8(off + i, c.charCodeAt(0)));
       const writeU32 = (off, v) => view.setUint32(off, v, true);
       const writeU16 = (off, v) => view.setUint16(off, v, true);
-      write(0, 'RIFF'); writeU32(4, 36 + dataLen); write(8, 'WAVE');
-      write(12, 'fmt '); writeU32(16, 16); writeU16(20, 1);
-      writeU16(22, numChannels); writeU32(24, sampleRate); writeU32(28, byteRate);
-      writeU16(32, blockAlign); writeU16(34, bitDepth);
-      write(36, 'data'); writeU32(40, dataLen);
+      write(0, 'RIFF');
+      writeU32(4, 36 + dataLen);
+      write(8, 'WAVE');
+      write(12, 'fmt ');
+      writeU32(16, 16);
+      writeU16(20, 1);
+      writeU16(22, numChannels);
+      writeU32(24, sampleRate);
+      writeU32(28, byteRate);
+      writeU16(32, blockAlign);
+      writeU16(34, bitDepth);
+      write(36, 'data');
+      writeU32(40, dataLen);
       new Uint8Array(buffer).set(new Uint8Array(pcmBuffer), 44);
       return buffer;
     }
@@ -789,15 +898,15 @@
         contents: [{ parts: [{ text }] }],
         generationConfig: {
           responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
-        }
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+        },
       };
       let attempts = 0;
       while (attempts < 3) {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
         });
         const json = await res.json();
         const b64 = json?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -820,7 +929,10 @@
         currentSource = ctx.createBufferSource();
         currentSource.buffer = audioBuffer;
         currentSource.connect(ctx.destination);
-        currentSource.onended = () => { currentSource = null; resolve(); };
+        currentSource.onended = () => {
+          currentSource = null;
+          resolve();
+        };
         pausedBuffer = audioBuffer;
         startedAt = ctx.currentTime;
         pausedAt = 0;
@@ -841,30 +953,32 @@
           default: defaultModel,
           options: [
             { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash' },
-            { value: 'gemini-2.5-pro-preview-tts',   label: 'Gemini 2.5 Pro' },
-            { value: 'gemini-3.1-flash-tts-preview',  label: 'Gemini 3.1 Flash' }
-          ]
-        }
+            { value: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro' },
+            { value: 'gemini-3.1-flash-tts-preview', label: 'Gemini 3.1 Flash' },
+          ],
+        },
       },
 
-      init: async function(params) {
+      init: async function (params) {
         if (!apiKey) throw new Error('Gemini TTS: no API key. Set GEMINI_API_KEY in auth/.env and rebuild.');
         getAudioCtx();
       },
 
-      speak: async function(text, params) {
+      speak: async function (text, params) {
         if (paused) {
-          await new Promise(r => { resumeResolve = r; });
+          await new Promise((r) => {
+            resumeResolve = r;
+          });
         }
         const pcm = await fetchAudio(text, params);
         await playBuffer(pcm);
       },
 
-      voices: function() {
-        return voiceList.map(v => ({ id: v.id, label: v.label, lang: v.lang }));
+      voices: function () {
+        return voiceList.map((v) => ({ id: v.id, label: v.label, lang: v.lang }));
       },
 
-      pause: function() {
+      pause: function () {
         if (!audioCtx || !currentSource) return;
         pausedAt = audioCtx.currentTime - startedAt;
         currentSource.stop();
@@ -872,7 +986,7 @@
         paused = true;
       },
 
-      resume: function() {
+      resume: function () {
         if (!paused || !pausedBuffer) return;
         const ctx = getAudioCtx();
         currentSource = ctx.createBufferSource();
@@ -880,19 +994,31 @@
         currentSource.connect(ctx.destination);
         startedAt = ctx.currentTime - pausedAt;
         currentSource.start(0, pausedAt);
-        currentSource.onended = () => { currentSource = null; };
+        currentSource.onended = () => {
+          currentSource = null;
+        };
         paused = false;
-        if (resumeResolve) { resumeResolve(); resumeResolve = null; }
+        if (resumeResolve) {
+          resumeResolve();
+          resumeResolve = null;
+        }
       },
 
-      stop: function() {
-        if (currentSource) { try { currentSource.stop(); } catch(e) {} currentSource = null; }
+      stop: function () {
+        if (currentSource) {
+          try {
+            currentSource.stop();
+          } catch (e) {}
+          currentSource = null;
+        }
         paused = false;
         pausedBuffer = null;
         pausedAt = 0;
-        if (resumeResolve) { resumeResolve(); resumeResolve = null; }
-      }
+        if (resumeResolve) {
+          resumeResolve();
+          resumeResolve = null;
+        }
+      },
     });
   })();
-
 })();

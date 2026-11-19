@@ -90,105 +90,149 @@ import { groupSourcesByFolder, toggleFolderSources } from '../../lib/sourceFolde
  * copy's date and age; with no copy, the pill is struck through, its popover
  * saying why. The pill's title says only what a tap does.
  */
-export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showCount = true, pages = [], onOpenPage, links = [], subscribe = null, resume = null, onResume, order = null, showAddButton = true, intro = '', controls = null, showSources = true, staleAge = false, autodiscover = true, groupByFolder = false, views = [], currentView = null, onSelectView }) {
+export function FeedZ({
+  sources,
+  hiddenSources,
+  onToggleSource,
+  viewState,
+  showCount = true,
+  pages = [],
+  onOpenPage,
+  links = [],
+  subscribe = null,
+  resume = null,
+  onResume,
+  order = null,
+  showAddButton = true,
+  intro = '',
+  controls = null,
+  showSources = true,
+  staleAge = false,
+  autodiscover = true,
+  groupByFolder = false,
+  views = [],
+  currentView = null,
+  onSelectView,
+}) {
   const barRef = useRef(null);
   const hasPages = Array.isArray(pages) && pages.length > 0;
   const hasLinks = Array.isArray(links) && links.length > 0;
   const viewList = Array.isArray(views) ? views.filter((v) => v && v.id) : [];
   const hasViews = viewList.length > 1;
   const fit = !!controls;
-  useLayoutEffect(() => { if (fit && barRef.current) fitRow(barRef.current); });
+  useLayoutEffect(() => {
+    if (fit && barRef.current) fitRow(barRef.current);
+  });
   useEffect(() => {
     if (!fit) return undefined;
-    const run = () => { if (barRef.current) fitRow(barRef.current); };
+    const run = () => {
+      if (barRef.current) fitRow(barRef.current);
+    };
     window.addEventListener('resize', run);
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) document.fonts.ready.then(run);
     return () => window.removeEventListener('resize', run);
   }, [fit]);
   if (showSources === false) sources = [];
-  if ((!sources || sources.length === 0) && !hasPages && !hasLinks && !subscribe && !resume && !intro && !controls && !hasViews) return null;
+  if (
+    (!sources || sources.length === 0) &&
+    !hasPages &&
+    !hasLinks &&
+    !subscribe &&
+    !resume &&
+    !intro &&
+    !controls &&
+    !hasViews
+  )
+    return null;
 
   const hidden = hiddenSources || new Set();
 
   // The buttons after the source pills, in the site's order (topBar.order,
   // src/lib/topBar.js topBarOrder); without one, resume, pages, links, then
   // the sign-up.
-  const buttonOrder = Array.isArray(order) && order.length ? order : [
-    ...(resume ? ['resume'] : []),
-    ...(hasPages ? pages.map((p) => `page:${p.id}`) : []),
-    ...(hasLinks ? links.map((l) => `link:${l.id}`) : []),
-    ...(subscribe ? ['subscribe'] : []),
-  ];
+  const buttonOrder =
+    Array.isArray(order) && order.length
+      ? order
+      : [
+          ...(resume ? ['resume'] : []),
+          ...(hasPages ? pages.map((p) => `page:${p.id}`) : []),
+          ...(hasLinks ? links.map((l) => `link:${l.id}`) : []),
+          ...(subscribe ? ['subscribe'] : []),
+        ];
   const renderPage = (pg) => (
-      <button
-          key={pg.id}
-          type="button"
-          className={`${styles.pill} ${styles.pagePill} ${pg.icon && !pg.showLabel ? styles.iconOnly : ''}`}
-          data-top-pages
-          data-top-page={pg.id}
-          data-has-icon={pg.icon ? '' : undefined}
-          aria-label={pg.icon ? pg.label : undefined}
-          title={pg.item && pg.item.title ? pg.item.title : pg.label}
-          onClick={() => onOpenPage && onOpenPage(pg.item)}
-        >
-          {pg.icon && <Icon body={pg.icon} size={15} className={styles.pillIcon} />}
-          {pg.showLabel !== false && <span className={`${styles.title} ${styles.pageLabel}`}>{pg.label}</span>}
-        </button>
+    <button
+      key={pg.id}
+      type="button"
+      className={`${styles.pill} ${styles.pagePill} ${pg.icon && !pg.showLabel ? styles.iconOnly : ''}`}
+      data-top-pages
+      data-top-page={pg.id}
+      data-has-icon={pg.icon ? '' : undefined}
+      aria-label={pg.icon ? pg.label : undefined}
+      title={pg.item && pg.item.title ? pg.item.title : pg.label}
+      onClick={() => onOpenPage && onOpenPage(pg.item)}
+    >
+      {pg.icon && <Icon body={pg.icon} size={15} className={styles.pillIcon} />}
+      {pg.showLabel !== false && <span className={`${styles.title} ${styles.pageLabel}`}>{pg.label}</span>}
+    </button>
   );
   const renderLink = (l) => (
-      <a
-          key={l.id}
-          href={l.href}
-          className={`${styles.pill} ${styles.pagePill} ${styles.linkPill} ${l.icon && !l.showLabel ? styles.iconOnly : ''}`}
-          data-top-link={l.id}
-          data-has-icon={l.icon ? '' : undefined}
-          aria-label={l.label}
-          title={l.label}
-          {...(l.newTab ? { target: '_blank', rel: 'noopener' } : {})}
-        >
-          {l.icon && <Icon body={l.icon} size={15} className={styles.pillIcon} />}
-          {l.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{l.label}</span>}
-        </a>
+    <a
+      key={l.id}
+      href={l.href}
+      className={`${styles.pill} ${styles.pagePill} ${styles.linkPill} ${l.icon && !l.showLabel ? styles.iconOnly : ''}`}
+      data-top-link={l.id}
+      data-has-icon={l.icon ? '' : undefined}
+      aria-label={l.label}
+      title={l.label}
+      {...(l.newTab ? { target: '_blank', rel: 'noopener' } : {})}
+    >
+      {l.icon && <Icon body={l.icon} size={15} className={styles.pillIcon} />}
+      {l.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{l.label}</span>}
+    </a>
   );
   // topBar.resume: opens the reader where this reader was, or at the start.
-  const renderResume = () => (resume ? (
-    <button
-      key="resume"
-      type="button"
-      className={`${styles.pill} ${styles.pagePill} ${resume.icon && !resume.showLabel ? styles.iconOnly : ''}`}
-      data-top-resume
-      data-has-icon={resume.icon ? '' : undefined}
-      aria-label={resume.label}
-      title={resume.label}
-      onClick={() => onResume && onResume()}
-    >
-      {resume.icon && <Icon body={resume.icon} size={15} className={styles.pillIcon} />}
-      {resume.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{resume.label}</span>}
-    </button>
-  ) : null);
+  const renderResume = () =>
+    resume ? (
+      <button
+        key="resume"
+        type="button"
+        className={`${styles.pill} ${styles.pagePill} ${resume.icon && !resume.showLabel ? styles.iconOnly : ''}`}
+        data-top-resume
+        data-has-icon={resume.icon ? '' : undefined}
+        aria-label={resume.label}
+        title={resume.label}
+        onClick={() => onResume && onResume()}
+      >
+        {resume.icon && <Icon body={resume.icon} size={15} className={styles.pillIcon} />}
+        {resume.showLabel && <span className={`${styles.title} ${styles.pageLabel}`}>{resume.label}</span>}
+      </button>
+    ) : null;
 
   // The view switch (settings.views): one plain button per view in the pill
   // style, the one in force marked; only when the site lists more than one.
-  const renderViews = () => (hasViews ? (
-    <span key="views" className={styles.views} data-top-views role="group" aria-label="View">
-      {viewList.map((v) => {
-        const on = v.id === currentView;
-        return (
-          <button
-            key={v.id}
-            type="button"
-            className={`${styles.pill} ${styles.pagePill} ${on ? styles.pillOn : ''}`}
-            data-top-view={v.id}
-            aria-pressed={on}
-            title={v.label || v.id}
-            onClick={() => { if (!on && onSelectView) onSelectView(v.id); }}
-          >
-            <span className={`${styles.title} ${styles.pageLabel}`}>{v.label || v.id}</span>
-          </button>
-        );
-      })}
-    </span>
-  ) : null);
+  const renderViews = () =>
+    hasViews ? (
+      <span key="views" className={styles.views} data-top-views role="group" aria-label="View">
+        {viewList.map((v) => {
+          const on = v.id === currentView;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              className={`${styles.pill} ${styles.pagePill} ${on ? styles.pillOn : ''}`}
+              data-top-view={v.id}
+              aria-pressed={on}
+              title={v.label || v.id}
+              onClick={() => {
+                if (!on && onSelectView) onSelectView(v.id);
+              }}
+            >
+              <span className={`${styles.title} ${styles.pageLabel}`}>{v.label || v.id}</span>
+            </button>
+          );
+        })}
+      </span>
+    ) : null;
 
   const renderSourcePill = (src) => (
     <FeedPill
@@ -210,24 +254,32 @@ export function FeedZ({ sources, hiddenSources, onToggleSource, viewState, showC
 
   return (
     <div ref={barRef} className={styles.bar} data-feeds>
-      {groupByFolder ? groupSourcesByFolder(sources || []).map((group) => (
-        <React.Fragment key={group.folder || '__root__'}>
-          {group.folder && (
-            <FolderPill
-              group={group}
-              allHidden={group.sources.length > 0 && group.sources.every((s) => hidden.has(s.id))}
-              onToggle={() => handleToggleFolder(group.folder)}
-              showCount={showCount}
-            />
-          )}
-          {group.sources.map(renderSourcePill)}
-        </React.Fragment>
-      )) : (sources || []).map(renderSourcePill)}
+      {groupByFolder
+        ? groupSourcesByFolder(sources || []).map((group) => (
+            <React.Fragment key={group.folder || '__root__'}>
+              {group.folder && (
+                <FolderPill
+                  group={group}
+                  allHidden={group.sources.length > 0 && group.sources.every((s) => hidden.has(s.id))}
+                  onToggle={() => handleToggleFolder(group.folder)}
+                  showCount={showCount}
+                />
+              )}
+              {group.sources.map(renderSourcePill)}
+            </React.Fragment>
+          ))
+        : (sources || []).map(renderSourcePill)}
       {buttonOrder.map((k) => {
         if (k === 'resume') return renderResume();
         if (k === 'subscribe') return subscribe ? <Subscribe key="subscribe" config={subscribe} /> : null;
-        if (k.startsWith('page:')) { const pg = pages.find((p) => `page:${p.id}` === k); return pg ? renderPage(pg) : null; }
-        if (k.startsWith('link:')) { const l = links.find((x) => `link:${x.id}` === k); return l ? renderLink(l) : null; }
+        if (k.startsWith('page:')) {
+          const pg = pages.find((p) => `page:${p.id}` === k);
+          return pg ? renderPage(pg) : null;
+        }
+        if (k.startsWith('link:')) {
+          const l = links.find((x) => `link:${x.id}` === k);
+          return l ? renderLink(l) : null;
+        }
         return null;
       })}
       {renderViews()}
@@ -296,7 +348,9 @@ function FolderPill({ group, allHidden, onToggle, showCount }) {
       onClick={onToggle}
       title={action}
     >
-      <span className={styles.folderPrefix} aria-hidden="true">/</span>
+      <span className={styles.folderPrefix} aria-hidden="true">
+        /
+      </span>
       <span className={styles.title}>{group.folder}</span>
       {showCount && <span className={styles.count}>{group.itemCount}</span>}
     </button>
@@ -327,8 +381,15 @@ export function FeedPill({ source, hidden, onToggle, viewState, showCount, stale
         data-source-pill
         data-source-stale={stale ? '' : undefined}
         data-source-failed={failed ? '' : undefined}
-        onClick={() => { if (!popover.swallowClick()) onToggle(); }}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        onClick={() => {
+          if (!popover.swallowClick()) onToggle();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
         role="button"
         tabIndex={0}
         title={action}
@@ -340,10 +401,18 @@ export function FeedPill({ source, hidden, onToggle, viewState, showCount, stale
         <span className={styles.title}>{title}</span>
         {showCount && <span className={styles.count}>{source.itemCount}</span>}
         {stale && (
-          <span className={styles.staleMark} data-stale-mark
-            role="img" aria-label={status.age ? `not fetched, the copy is ${status.age.long}` : 'not fetched, an earlier copy'}>
+          <span
+            className={styles.staleMark}
+            data-stale-mark
+            role="img"
+            aria-label={status.age ? `not fetched, the copy is ${status.age.long}` : 'not fetched, an earlier copy'}
+          >
             <span aria-hidden="true">!</span>
-            {staleAge && status.age && <span className={styles.staleAge} aria-hidden="true" data-stale-age>{status.age.short}</span>}
+            {staleAge && status.age && (
+              <span className={styles.staleAge} aria-hidden="true" data-stale-age>
+                {status.age.short}
+              </span>
+            )}
           </span>
         )}
       </div>
@@ -364,9 +433,9 @@ export function FeedPill({ source, hidden, onToggle, viewState, showCount, stale
 }
 
 // The source pill's popover (sourceLines): its timings.
-const POPOVER_HOVER_MS = 350;   // a mouse resting on the pill this long shows it
-const POPOVER_LEAVE_MS = 150;   // time to move the mouse from the pill onto it
-const POPOVER_HOLD_MS = 500;    // a finger held this long is a dwell...
+const POPOVER_HOVER_MS = 350; // a mouse resting on the pill this long shows it
+const POPOVER_LEAVE_MS = 150; // time to move the mouse from the pill onto it
+const POPOVER_HOLD_MS = 500; // a finger held this long is a dwell...
 const POPOVER_HOLD_SLOP_PX = 8; // ...moving less than this
 const POPOVER_LINGER_MS = 4000; // after a dwell, it stays this long once the finger lifts
 
@@ -381,19 +450,36 @@ const POPOVER_LINGER_MS = 4000; // after a dwell, it stays this long once the fi
 function usePillPopover(enabled, pillRef, popoverRef) {
   const [why, setWhy] = useState({ hover: false, focus: false, hold: false, dismissed: false });
   const timers = useRef({});
-  const press = useRef(null);   // a finger's press in progress: { id, x, y }
-  const held = useRef(false);   // that press became a dwell
+  const press = useRef(null); // a finger's press in progress: { id, x, y }
+  const held = useRef(false); // that press became a dwell
   const lastPress = useRef(0);
 
-  const update = (patch) => setWhy((w) => {
-    const next = { ...w, ...patch };
-    // Once nothing holds it open, an Escape is forgotten.
-    if (!next.hover && !next.focus && !next.hold) next.dismissed = false;
-    return next;
-  });
-  const clear = (name) => { if (timers.current[name]) { clearTimeout(timers.current[name]); timers.current[name] = null; } };
-  const after = (name, ms, fn) => { clear(name); timers.current[name] = setTimeout(() => { timers.current[name] = null; fn(); }, ms); };
-  useEffect(() => () => { for (const k of Object.keys(timers.current)) clear(k); }, []);
+  const update = (patch) =>
+    setWhy((w) => {
+      const next = { ...w, ...patch };
+      // Once nothing holds it open, an Escape is forgotten.
+      if (!next.hover && !next.focus && !next.hold) next.dismissed = false;
+      return next;
+    });
+  const clear = (name) => {
+    if (timers.current[name]) {
+      clearTimeout(timers.current[name]);
+      timers.current[name] = null;
+    }
+  };
+  const after = (name, ms, fn) => {
+    clear(name);
+    timers.current[name] = setTimeout(() => {
+      timers.current[name] = null;
+      fn();
+    }, ms);
+  };
+  useEffect(
+    () => () => {
+      for (const k of Object.keys(timers.current)) clear(k);
+    },
+    [],
+  );
 
   const open = enabled && !why.dismissed && (why.hover || why.focus || why.hold);
 
@@ -401,11 +487,16 @@ function usePillPopover(enabled, pillRef, popoverRef) {
   // the pill and the popover.
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') update({ dismissed: true }); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') update({ dismissed: true });
+    };
     const onDown = (e) => {
       const t = e.target;
-      if ((pillRef.current && pillRef.current.contains(t)) || (popoverRef.current && popoverRef.current.contains(t))) return;
-      clear('hover'); clear('leave'); clear('linger');
+      if ((pillRef.current && pillRef.current.contains(t)) || (popoverRef.current && popoverRef.current.contains(t)))
+        return;
+      clear('hover');
+      clear('leave');
+      clear('linger');
       update({ hover: false, hold: false });
     };
     window.addEventListener('keydown', onKey);
@@ -417,7 +508,10 @@ function usePillPopover(enabled, pillRef, popoverRef) {
   }, [open]);
 
   const onDot = (t) => !!(t && t.closest && t.closest('[data-feed-dot]'));
-  const leaveSoon = () => { clear('hover'); after('leave', POPOVER_LEAVE_MS, () => update({ hover: false })); };
+  const leaveSoon = () => {
+    clear('hover');
+    after('leave', POPOVER_LEAVE_MS, () => update({ hover: false }));
+  };
   const endPress = () => {
     press.current = null;
     clear('hold');
@@ -434,41 +528,73 @@ function usePillPopover(enabled, pillRef, popoverRef) {
       clear('leave');
       // The dot keeps its own hover (its colour ring); the popover is the
       // rest of the pill's.
-      if (onDot(e.target)) { clear('hover'); update({ hover: false }); return; }
+      if (onDot(e.target)) {
+        clear('hover');
+        update({ hover: false });
+        return;
+      }
       if (!why.hover && !timers.current.hover) after('hover', POPOVER_HOVER_MS, () => update({ hover: true }));
     },
-    onPointerLeave: (e) => { if (e.pointerType === 'mouse') leaveSoon(); },
+    onPointerLeave: (e) => {
+      if (e.pointerType === 'mouse') leaveSoon();
+    },
     onPointerDown: (e) => {
       held.current = false;
       if (e.pointerType === 'mouse') return;
       lastPress.current = Date.now();
       clear('linger');
-      if (onDot(e.target)) { press.current = null; update({ hold: false }); return; }
+      if (onDot(e.target)) {
+        press.current = null;
+        update({ hold: false });
+        return;
+      }
       press.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-      after('hold', POPOVER_HOLD_MS, () => { held.current = true; update({ hold: true, dismissed: false }); });
+      after('hold', POPOVER_HOLD_MS, () => {
+        held.current = true;
+        update({ hold: true, dismissed: false });
+      });
     },
     onPointerMove: (e) => {
       const p = press.current;
       if (!p || e.pointerId !== p.id || held.current) return;
-      if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > POPOVER_HOLD_SLOP_PX) { press.current = null; clear('hold'); }
+      if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > POPOVER_HOLD_SLOP_PX) {
+        press.current = null;
+        clear('hold');
+      }
     },
-    onPointerUp: (e) => { if (press.current && e.pointerId === press.current.id) endPress(); },
-    onPointerCancel: (e) => { if (press.current && e.pointerId === press.current.id) endPress(); },
+    onPointerUp: (e) => {
+      if (press.current && e.pointerId === press.current.id) endPress();
+    },
+    onPointerCancel: (e) => {
+      if (press.current && e.pointerId === press.current.id) endPress();
+    },
     // A long press opens no menu (Chrome on Android sends contextmenu).
-    onContextMenu: (e) => { if (press.current || held.current) e.preventDefault(); },
+    onContextMenu: (e) => {
+      if (press.current || held.current) e.preventDefault();
+    },
     // The keyboard's focus shows it; a tap or click that focuses the pill
     // does not (it is not :focus-visible).
     onFocus: (e) => {
       if (e.target !== e.currentTarget) return;
       let keyboard;
-      try { keyboard = e.currentTarget.matches(':focus-visible'); } catch (_) { keyboard = Date.now() - lastPress.current > 1000; }
+      try {
+        keyboard = e.currentTarget.matches(':focus-visible');
+      } catch (_) {
+        keyboard = Date.now() - lastPress.current > 1000;
+      }
       if (keyboard) update({ focus: true });
     },
-    onBlur: (e) => { if (e.target === e.currentTarget) update({ focus: false }); },
+    onBlur: (e) => {
+      if (e.target === e.currentTarget) update({ focus: false });
+    },
   };
   const popoverHandlers = {
-    onPointerEnter: (e) => { if (e.pointerType === 'mouse') clear('leave'); },
-    onPointerLeave: (e) => { if (e.pointerType === 'mouse') leaveSoon(); },
+    onPointerEnter: (e) => {
+      if (e.pointerType === 'mouse') clear('leave');
+    },
+    onPointerLeave: (e) => {
+      if (e.pointerType === 'mouse') leaveSoon();
+    },
   };
   // The click a browser sends when a dwell's finger lifts is not a tap.
   const swallowClick = () => {
@@ -516,7 +642,9 @@ function SourcePopover({ id, popoverRef, anchorRef, open, action, lines, handler
       {...handlers}
     >
       {lines.map((line, i) => (
-        <span key={i} className={styles.popoverLine} data-source-popover-line>{line}</span>
+        <span key={i} className={styles.popoverLine} data-source-popover-line>
+          {line}
+        </span>
       ))}
     </div>,
     document.body,
@@ -525,10 +653,7 @@ function SourcePopover({ id, popoverRef, anchorRef, open, action, lines, handler
 
 // A curated spread of hues, not a full wheel — easy to hit on a touch
 // screen, wide enough to actually distinguish feeds from each other.
-const RING_COLORS = [
-  '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
-  '#1abc9c', '#3498db', '#9b59b6', '#e84393',
-];
+const RING_COLORS = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#3498db', '#9b59b6', '#e84393'];
 
 // Dwell duration before hovering the dot opens the ring on its own, for
 // anyone who doesn't want to click/tap at all.
@@ -538,7 +663,12 @@ function FeedDot({ color, sourceId, viewState }) {
   const [ringOpen, setRingOpen] = useState(false);
   const dwellTimer = useRef(null);
 
-  useEffect(() => () => { if (dwellTimer.current) clearTimeout(dwellTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (dwellTimer.current) clearTimeout(dwellTimer.current);
+    },
+    [],
+  );
 
   const openRing = (e) => {
     e.stopPropagation();
@@ -553,7 +683,10 @@ function FeedDot({ color, sourceId, viewState }) {
     dwellTimer.current = setTimeout(() => setRingOpen(true), DWELL_MS);
   };
   const handleMouseLeave = () => {
-    if (dwellTimer.current) { clearTimeout(dwellTimer.current); dwellTimer.current = null; }
+    if (dwellTimer.current) {
+      clearTimeout(dwellTimer.current);
+      dwellTimer.current = null;
+    }
   };
 
   const pick = (c, e) => {
@@ -580,10 +713,7 @@ function FeedDot({ color, sourceId, viewState }) {
       onClick={openRing}
       onTouchEnd={openRing}
     >
-      <span
-        className={`${styles.dot} ${ringOpen ? styles.dotActive : ''}`}
-        aria-hidden="true"
-      />
+      <span className={`${styles.dot} ${ringOpen ? styles.dotActive : ''}`} aria-hidden="true" />
       {ringOpen && (
         <>
           <span className={styles.ringBackdrop} onClick={closeRing} onTouchEnd={closeRing} />
@@ -598,7 +728,7 @@ function FeedDot({ color, sourceId, viewState }) {
                   key={c}
                   type="button"
                   className={`${styles.swatch} ${c.toLowerCase() === String(color).toLowerCase() ? styles.swatchCurrent : ''}`}
-                  style={{ left: (dx - 8) + 'px', top: (dy - 8) + 'px', background: c }}
+                  style={{ left: dx - 8 + 'px', top: dy - 8 + 'px', background: c }}
                   onClick={(e) => pick(c, e)}
                   title={c}
                 />
@@ -646,7 +776,10 @@ function AddPill({ autodiscover = true }) {
           setPendingUrl((cur) => (cur === submitted ? found.url : cur));
         } else if (found.kind === 'page') {
           setPendingUrl((cur) => {
-            if (cur === submitted) { setPendingKind('page'); setPendingTitle(found.title || ''); }
+            if (cur === submitted) {
+              setPendingKind('page');
+              setPendingTitle(found.title || '');
+            }
             return cur;
           });
         }
@@ -662,11 +795,7 @@ function AddPill({ autodiscover = true }) {
   return (
     <>
       {!open ? (
-        <button
-          className={`${styles.pill} ${styles.addPill}`}
-          onClick={() => setOpen(true)}
-          title="Add a feed"
-        >
+        <button className={`${styles.pill} ${styles.addPill}`} onClick={() => setOpen(true)} title="Add a feed">
           <span className={styles.plus}>+</span>
         </button>
       ) : (
@@ -678,22 +807,22 @@ function AddPill({ autodiscover = true }) {
             className={styles.addInput}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Escape') close(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') close();
+            }}
           />
-          <button
-            type="button"
-            className={styles.addClose}
-            onClick={close}
-            title="Cancel"
-            aria-label="Cancel"
-          >×</button>
+          <button type="button" className={styles.addClose} onClick={close} title="Cancel" aria-label="Cancel">
+            ×
+          </button>
           <button
             type="submit"
             className={`${styles.addSubmit} ${urlIsValid ? styles.ready : ''}`}
             disabled={!urlIsValid}
             title={urlIsValid ? 'Continue' : 'Enter a URL first'}
             aria-label="Add feed"
-          >+</button>
+          >
+            +
+          </button>
         </form>
       )}
       {pendingUrl && (
@@ -729,27 +858,32 @@ function AddResultPanel({ url, kind = 'feed', pageTitle = '', onKind, onDismiss 
     try {
       await navigator.clipboard.writeText(text);
       setCopied(label);
-      setTimeout(() => setCopied(c => c === label ? '' : c), 1500);
-    } catch (_) { /* clipboard denied; user can copy manually */ }
+      setTimeout(() => setCopied((c) => (c === label ? '' : c)), 1500);
+    } catch (_) {
+      /* clipboard denied; user can copy manually */
+    }
   };
 
   return (
     <div className={styles.resultPanel}>
-      <button
-        className={styles.resultClose}
-        onClick={onDismiss}
-        title="Dismiss"
-        aria-label="Dismiss"
-      >×</button>
-      <div className={styles.resultTitle} data-add-kind={isPage ? 'page' : 'feed'}>{isPage ? 'Add this page' : 'Add this feed'}</div>
-      <div className={styles.resultUrl} title={url}>{url}</div>
+      <button className={styles.resultClose} onClick={onDismiss} title="Dismiss" aria-label="Dismiss">
+        ×
+      </button>
+      <div className={styles.resultTitle} data-add-kind={isPage ? 'page' : 'feed'}>
+        {isPage ? 'Add this page' : 'Add this feed'}
+      </div>
+      <div className={styles.resultUrl} title={url}>
+        {url}
+      </div>
       {isPage && (
         <div className={styles.resultHint} data-add-no-feed>
           No feed was found at this address, so it is listed as one page: one card, in its place by its tags.
           {typeof onKind === 'function' && (
             <>
               {' '}
-              <button type="button" className={styles.resultLink} onClick={() => onKind('feed')}>Add it as a feed anyway</button>
+              <button type="button" className={styles.resultLink} onClick={() => onKind('feed')}>
+                Add it as a feed anyway
+              </button>
             </>
           )}
         </div>
@@ -767,8 +901,7 @@ function AddResultPanel({ url, kind = 'feed', pageTitle = '', onKind, onDismiss 
           </button>
         </div>
         <div className={styles.resultHint}>
-          Paste in your terminal — it appends to feeds.opml and rebuilds.
-          Then refresh this page.
+          Paste in your terminal — it appends to feeds.opml and rebuilds. Then refresh this page.
         </div>
       </div>
 
@@ -784,8 +917,8 @@ function AddResultPanel({ url, kind = 'feed', pageTitle = '', onKind, onDismiss 
           </button>
         </div>
         <div className={styles.resultHint}>
-          Paste before <code className={styles.codeInline}>&lt;/body&gt;</code>{' '}
-          in feeds.opml, then run <code className={styles.codeInline}>node generate-index.js</code>.
+          Paste before <code className={styles.codeInline}>&lt;/body&gt;</code> in feeds.opml, then run{' '}
+          <code className={styles.codeInline}>node generate-index.js</code>.
         </div>
       </div>
     </div>

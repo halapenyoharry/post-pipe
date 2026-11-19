@@ -30,8 +30,14 @@ function listenState(T, body) {
 function toggleListen(T, body, opts) {
   if (!T || !body) return null;
   const s = listenState(T, body);
-  if (s === 'playing' || s === 'loading') { T.pause(); return 'pause'; }
-  if (s === 'paused') { T.resume(); return 'resume'; }
+  if (s === 'playing' || s === 'loading') {
+    T.pause();
+    return 'pause';
+  }
+  if (s === 'paused') {
+    T.resume();
+    return 'resume';
+  }
   T.play(body, Object.assign({ scrollContainer: body }, opts || {}));
   return 'play';
 }

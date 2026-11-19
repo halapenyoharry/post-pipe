@@ -4,7 +4,10 @@ const { dimensionLabels } = require('../src/lib/dimensionLabels');
 
 test('the engine keeps its own names', () => {
   const d = dimensionLabels({});
-  assert.deepStrictEqual(d.map((x) => x.label), ['published', 'commits', 'narrative', 'chronology']);
+  assert.deepStrictEqual(
+    d.map((x) => x.label),
+    ['published', 'commits', 'narrative', 'chronology'],
+  );
   assert.match(d[1].title, /commit/);
 });
 
@@ -18,7 +21,7 @@ test('a site renames commits to revisions everywhere the word shows', () => {
   assert.strictEqual(t[1].title, 'Every draft');
 });
 
-test('the group of dimensions has a reader-facing name: dimensions by default, the site\'s otherwise', () => {
+test("the group of dimensions has a reader-facing name: dimensions by default, the site's otherwise", () => {
   const { dimensionGroupLabel } = require('../src/lib/dimensionLabels');
   assert.equal(dimensionGroupLabel({}), 'dimensions');
   assert.equal(dimensionGroupLabel(null), 'dimensions');

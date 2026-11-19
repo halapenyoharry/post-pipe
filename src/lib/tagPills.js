@@ -97,8 +97,10 @@ function tagDrawing(showPref, labelsPref, settings) {
 // MARK_RADIUS.
 function tagMarkRadius(settings) {
   const tag = tagBlockOf(settings);
-  const r = tag && tag.markRadius !== null && tag.markRadius !== '' && tag.markRadius !== undefined
-    ? Number(tag.markRadius) : NaN;
+  const r =
+    tag && tag.markRadius !== null && tag.markRadius !== '' && tag.markRadius !== undefined
+      ? Number(tag.markRadius)
+      : NaN;
   return Number.isFinite(r) && r > 0 ? r : MARK_RADIUS;
 }
 
@@ -109,8 +111,17 @@ function tagMarkHitRadius(r) {
 }
 
 module.exports = {
-  PREF, LABELS_PREF, MARK_RADIUS, MARK_HIT_RADIUS,
-  siteShowsTags, showTagsChosen, showTagsPrefFor,
-  siteShowsTagLabels, showTagLabelsChosen, showTagLabelsPrefFor,
-  tagDrawing, tagMarkRadius, tagMarkHitRadius,
+  PREF,
+  LABELS_PREF,
+  MARK_RADIUS,
+  MARK_HIT_RADIUS,
+  siteShowsTags,
+  showTagsChosen,
+  showTagsPrefFor,
+  siteShowsTagLabels,
+  showTagLabelsChosen,
+  showTagLabelsPrefFor,
+  tagDrawing,
+  tagMarkRadius,
+  tagMarkHitRadius,
 };

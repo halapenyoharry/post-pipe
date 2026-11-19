@@ -7,7 +7,11 @@
 import { slugOf, round } from './io.js';
 
 function esc(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function n(v) {
@@ -44,7 +48,10 @@ export function pathSegments(placed) {
       step: i,
       from: prev.item.id,
       to: item.id,
-      x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+      x1: a.x,
+      y1: a.y,
+      x2: b.x,
+      y2: b.y,
       length: Math.hypot(b.x - a.x, b.y - a.y),
       seam: Boolean(item.step && item.step.seam),
     });
@@ -60,7 +67,9 @@ export function pathStats(flow, positions) {
   const total = lengths.reduce((a, b) => a + b, 0);
   const halfDiagonal = Math.hypot(vp.width, vp.height) / 2;
   const median = lengths.length
-    ? (lengths.length % 2 ? lengths[(lengths.length - 1) / 2] : (lengths[lengths.length / 2 - 1] + lengths[lengths.length / 2]) / 2)
+    ? lengths.length % 2
+      ? lengths[(lengths.length - 1) / 2]
+      : (lengths[lengths.length / 2 - 1] + lengths[lengths.length / 2]) / 2
     : null;
   return {
     preset: flow.summary && flow.summary.preset,
@@ -83,7 +92,8 @@ export function pathStats(flow, positions) {
 /** The overlay as an SVG string sized to the captured viewport. */
 export function renderPathSvg(flow, positions) {
   if (!flow || !Array.isArray(flow.items)) throw new Error('input is not a flow: no items array');
-  if (!positions || !positions.viewport || !Array.isArray(positions.cards)) throw new Error('positions.json has no viewport and cards; run flow-capture first');
+  if (!positions || !positions.viewport || !Array.isArray(positions.cards))
+    throw new Error('positions.json has no viewport and cards; run flow-capture first');
   const W = positions.viewport.width;
   const H = positions.viewport.height;
   const placed = placeItems(flow, positions);
@@ -92,7 +102,9 @@ export function renderPathSvg(flow, positions) {
   const stats = pathStats(flow, positions);
 
   const out = [];
-  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui, sans-serif">`);
+  out.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui, sans-serif">`,
+  );
   out.push('<style>');
   out.push('.ground{fill:#1a1a2e}');
   out.push('.card{fill:none;stroke:rgba(255,255,255,0.28);stroke-width:1}');
@@ -111,7 +123,9 @@ export function renderPathSvg(flow, positions) {
   out.push('<g class="cards">');
   for (const c of positions.cards) {
     if (c.hidden || !c.box) continue;
-    out.push(`<rect class="card" x="${n(c.box.x)}" y="${n(c.box.y)}" width="${n(c.box.w)}" height="${n(c.box.h)}" rx="3"/>`);
+    out.push(
+      `<rect class="card" x="${n(c.box.x)}" y="${n(c.box.y)}" width="${n(c.box.w)}" height="${n(c.box.h)}" rx="3"/>`,
+    );
     out.push(`<text class="card-label" x="${n(c.box.x + 3)}" y="${n(c.box.y + 10)}">${esc(c.label)}</text>`);
   }
   out.push('</g>');
@@ -126,7 +140,9 @@ export function renderPathSvg(flow, positions) {
 
   out.push('<g class="path">');
   for (const seg of segments) {
-    out.push(`<line class="step${seg.seam ? ' seam' : ''}" data-step="${seg.step}" x1="${n(seg.x1)}" y1="${n(seg.y1)}" x2="${n(seg.x2)}" y2="${n(seg.y2)}"/>`);
+    out.push(
+      `<line class="step${seg.seam ? ' seam' : ''}" data-step="${seg.step}" x1="${n(seg.x1)}" y1="${n(seg.y1)}" x2="${n(seg.x2)}" y2="${n(seg.y2)}"/>`,
+    );
   }
   out.push('</g>');
 
