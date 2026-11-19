@@ -14,6 +14,7 @@
     "format": "prettier --write \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js",
     "format:check": "prettier --check \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js",
     "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json",
     "login:medium": "node index.js medium --login",
     "login:substack": "node index.js substack --login",
     "login:youtube": "node index.js youtube --login"
@@ -32,8 +33,10 @@
     "serve-handler": "^6.1.7"
   },
   "devDependencies": {
+    "@types/node": "25.9.9",
     "@vitejs/plugin-react": "^6.0.1",
     "prettier": "3.10.1",
+    "typescript": "7.0.2",
     "vite": "^8.0.12"
   }
 }
