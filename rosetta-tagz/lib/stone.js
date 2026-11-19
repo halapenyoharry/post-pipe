@@ -51,7 +51,9 @@ export function schemeLabels(variants, canonical) {
   for (const scheme of inScheme) {
     const forms = formsByScheme.get(scheme);
     prefLabel[scheme] = preferredForm(forms);
-    altLabel[scheme] = Object.keys(forms).filter((raw) => raw !== prefLabel[scheme]).sort();
+    altLabel[scheme] = Object.keys(forms)
+      .filter((raw) => raw !== prefLabel[scheme])
+      .sort();
   }
   const allForms = new Set(variants.flatMap((v) => Object.keys(v.forms)));
   inScheme.push(SITE_SCHEME);
@@ -69,7 +71,9 @@ function variantOf(t) {
     norm: t.norm,
     label: displayForm(t),
     forms: Object.fromEntries([...t.forms.entries()].sort()),
-    formsBySource: Object.fromEntries([...t.formsBySource.entries()].sort().map(([s, m]) => [s, Object.fromEntries([...m.entries()].sort())])),
+    formsBySource: Object.fromEntries(
+      [...t.formsBySource.entries()].sort().map(([s, m]) => [s, Object.fromEntries([...m.entries()].sort())]),
+    ),
     count: t.count,
     explicit: t.explicit,
     bySource: Object.fromEntries([...t.bySource.entries()].sort()),
@@ -91,18 +95,43 @@ function variantOf(t) {
 // concept at the bar, as a variant with its sourceRatio, without moving its canonical, its items or
 // its id; the rest form concepts of their own, whose relations are computed with everything. A viewer
 // set at the bar therefore shows exactly the build at the bar.
-export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds = [], extraSignals = [], builtin = true, now = null, ledger = null, warn = () => {} } = {}) {
+export function buildStone(
+  records,
+  {
+    cfg: userCfg = {},
+    overrides = {},
+    seeds = [],
+    extraSignals = [],
+    builtin = true,
+    now = null,
+    ledger = null,
+    warn = () => {},
+  } = {},
+) {
   const cfg = makeConfig(userCfg, overrides.config, { canon: overrides.canon, sourceWeights: overrides.sourceWeights });
   const ignore = new Set((overrides.ignore ?? []).map(normOf));
   const corpus = loadCorpus(records, { ignore });
   const late = records.some((r) => r.origin === 'discovered' && belowBar(r)); // emergent records never reach a stone
-  const atBar = late ? loadCorpus(records.filter((r) => !belowBar(r)), { ignore }) : corpus;
+  const atBar = late
+    ? loadCorpus(
+        records.filter((r) => !belowBar(r)),
+        { ignore },
+      )
+    : corpus;
 
   const signals = [...(builtin ? computeSignals(atBar, cfg, { seeds }) : []), ...extraSignals];
   const locks = { same: labelGroups(overrides.same), notSame: labelGroups(overrides.notSame) };
   locks.notSame = locks.notSame.flatMap((g) => g.flatMap((x, i) => g.slice(i + 1).map((y) => [x, y])));
   const early = resolveConcepts(atBar, signals, cfg, locks);
-  const { clusters, pairDetail } = late ? attachLate(early, corpus, [...(builtin ? computeSignals(corpus, cfg, { seeds }) : []), ...extraSignals], cfg, locks) : early;
+  const { clusters, pairDetail } = late
+    ? attachLate(
+        early,
+        corpus,
+        [...(builtin ? computeSignals(corpus, cfg, { seeds }) : []), ...extraSignals],
+        cfg,
+        locks,
+      )
+    : early;
   // the spellings a build at the bar holds in each cluster (all of them when nothing is below the bar)
   const atBarTerms = (cl) => (late ? cl.early : cl.terms);
 
@@ -125,7 +154,11 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   const assigned = assignIds(
     clusters.map((cl, i) => {
       const own = atBarTerms(cl);
-      return { terms: cl.terms, label: named[i].canonical.label, ...(own.length && own.length < cl.terms.length ? { mint: own } : {}) };
+      return {
+        terms: cl.terms,
+        label: named[i].canonical.label,
+        ...(own.length && own.length < cl.terms.length ? { mint: own } : {}),
+      };
     }),
     ledger?.prior ?? null,
     { pins: pinByNorm.keys(), now, retention: cfg.ledger },
@@ -166,7 +199,15 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
       sources: perSource,
       variants,
       rank,
-      links: cl.links.slice(0, 24).map((l) => ({ a: l.a, b: l.b, conf: Number(l.conf.toFixed(3)), cooc: Number(l.coocRatio.toFixed(2)), signals: l.signals })),
+      links: cl.links
+        .slice(0, 24)
+        .map((l) => ({
+          a: l.a,
+          b: l.b,
+          conf: Number(l.conf.toFixed(3)),
+          cooc: Number(l.coocRatio.toFixed(2)),
+          signals: l.signals,
+        })),
       ...(ledger ? { ledger: assigned.concepts[i] } : {}), // {since, event, previousLabel?}
     };
   });
@@ -180,8 +221,20 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   const derived = !late
     ? [...deriveRelations(corpus, conceptRefs, cfg), ...nearRelations(pairDetail, conceptOfNorm, cfg, labelOf)]
     : [
-        ...deriveRelations(atBar, conceptRefs.map((c, i) => ({ ...c, terms: clusters[i].early })).filter((c) => c.terms.length).sort((x, y) => (x.terms[0] < y.terms[0] ? -1 : 1)), cfg),
-        ...nearRelations(early.pairDetail, new Map([...conceptOfNorm].filter(([n]) => atBar.terms.has(n))), cfg, labelOf),
+        ...deriveRelations(
+          atBar,
+          conceptRefs
+            .map((c, i) => ({ ...c, terms: clusters[i].early }))
+            .filter((c) => c.terms.length)
+            .sort((x, y) => (x.terms[0] < y.terms[0] ? -1 : 1)),
+          cfg,
+        ),
+        ...nearRelations(
+          early.pairDetail,
+          new Map([...conceptOfNorm].filter(([n]) => atBar.terms.has(n))),
+          cfg,
+          labelOf,
+        ),
         ...deriveRelations(corpus, conceptRefs, cfg).filter(touchesLate),
         ...nearRelations(pairDetail, conceptOfNorm, cfg, labelOf).filter(touchesLate),
       ];
@@ -200,7 +253,14 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
         const n = normOf(label);
         return lookup(n, (x) => atBar.terms.has(x)) ?? lookup(n, (x) => lateIds.has(conceptOfNorm.get(x)));
       };
-  const merged0 = mergeManualRelations(derived, [...seeds.flatMap(seedRelations), ...(overrides.relations ?? [])], conceptFor, overrides.relations, labelOf, warn);
+  const merged0 = mergeManualRelations(
+    derived,
+    [...seeds.flatMap(seedRelations), ...(overrides.relations ?? [])],
+    conceptFor,
+    overrides.relations,
+    labelOf,
+    warn,
+  );
   const typed = typeRelations(merged0, concepts, cfg);
   const { relations, forbidden } = forbidRelations(typed, overrides.notRelated ?? [], conceptFor);
 
@@ -208,7 +268,9 @@ export function buildStone(records, { cfg: userCfg = {}, overrides = {}, seeds =
   // by scheme, so it cannot say this: a discovered spelling on a wire item sits under `discovered`).
   const systems = {};
   // (described at the bar: below-bar tags do not change a system's coverage)
-  const sourcesOfTerm = [...atBar.terms.values()].map((t) => new Set([...t.items].map((k) => atBar.items.get(k).source)));
+  const sourcesOfTerm = [...atBar.terms.values()].map(
+    (t) => new Set([...t.items].map((k) => atBar.items.get(k).source)),
+  );
   for (const s of atBar.sources.values()) {
     systems[s.name] = {
       items: s.items.size,
@@ -276,11 +338,21 @@ function nearRelations(pairDetail, conceptOfNorm, cfg, labelOf = new Map()) {
       b: y,
       type: 'near',
       weight: Number(d.conf.toFixed(4)),
-      evidence: { terms: [d.a, d.b], signals: Object.fromEntries(Object.entries(d.signals).map(([k, v]) => [k, v.why])) },
+      evidence: {
+        terms: [d.a, d.b],
+        signals: Object.fromEntries(Object.entries(d.signals).map(([k, v]) => [k, v.why])),
+      },
       locked: false,
       why: `"${labelOf.get(x) ?? x}" and "${labelOf.get(y) ?? y}" are probably the same: "${d.a}" ~ "${d.b}" by ${signalNames.join(', ')} (confidence ${d.conf.toFixed(2)}, short of the merge threshold ${cfg.mergeThreshold}); a human should decide`,
-      wasDerivedFrom: Object.entries(d.signals).map(([name, v]) => ({ type: 'signal', name, score: Number(v.score.toFixed(3)) })),
-      wasGeneratedBy: { activity: 'relate', parameters: { nearThreshold: cfg.nearThreshold, mergeThreshold: cfg.mergeThreshold } },
+      wasDerivedFrom: Object.entries(d.signals).map(([name, v]) => ({
+        type: 'signal',
+        name,
+        score: Number(v.score.toFixed(3)),
+      })),
+      wasGeneratedBy: {
+        activity: 'relate',
+        parameters: { nearThreshold: cfg.nearThreshold, mergeThreshold: cfg.mergeThreshold },
+      },
     });
   }
   return [...best.values()];
@@ -293,20 +365,50 @@ function seedRelations(seed) {
   return out;
 }
 
-const SYMMETRIC = new Set(['related', 'adjacent', 'near', 'synergy', 'opposes', 'closeMatch', 'relatedMatch', 'exactMatch']);
+const SYMMETRIC = new Set([
+  'related',
+  'adjacent',
+  'near',
+  'synergy',
+  'opposes',
+  'closeMatch',
+  'relatedMatch',
+  'exactMatch',
+]);
 // Relation names SKOS defines. `narrower` and `narrowMatch` are accepted in overrides and stored
 // flipped (broader {a,b} means b skos:broader a; broadMatch {a,b} means b skos:broadMatch a), so the
 // stone never emits them: the inverse is implied.
 const SKOS_NAMES = new Set(['broader', 'related', 'closeMatch', 'broadMatch', 'relatedMatch', 'exactMatch']);
 const MAPPING_NAMES = new Set(['closeMatch', 'broadMatch', 'relatedMatch', 'exactMatch']);
 // The names an override may use (the header above): anything else is a typo, dropped with one line.
-const MANUAL_TYPES = new Set(['broader', 'narrower', 'contains', 'related', 'adjacent', 'synergy', 'opposes', 'closeMatch', 'broadMatch', 'narrowMatch', 'relatedMatch', 'exactMatch']);
+const MANUAL_TYPES = new Set([
+  'broader',
+  'narrower',
+  'contains',
+  'related',
+  'adjacent',
+  'synergy',
+  'opposes',
+  'closeMatch',
+  'broadMatch',
+  'narrowMatch',
+  'relatedMatch',
+  'exactMatch',
+]);
 // A within-scheme name and the mapping it becomes across schemes say the same thing of a pair; a
 // human's relation replaces the computed one of either name, and a `notRelated` written in one name
 // removes the row whatever name typing gave it.
-const SAME_SAYING = { near: 'near', closeMatch: 'near', related: 'related', relatedMatch: 'related', broader: 'broader', broadMatch: 'broader' };
+const SAME_SAYING = {
+  near: 'near',
+  closeMatch: 'near',
+  related: 'related',
+  relatedMatch: 'related',
+  broader: 'broader',
+  broadMatch: 'broader',
+};
 const saysTheSame = (x, y) => x === y || (SAME_SAYING[x] !== undefined && SAME_SAYING[x] === SAME_SAYING[y]);
-const relationKey = (r) => (SYMMETRIC.has(r.type) ? [r.a, r.b].sort().join('\u0000') : `${r.a}\u0000${r.b}`) + `\u0000${r.type}`;
+const relationKey = (r) =>
+  (SYMMETRIC.has(r.type) ? [r.a, r.b].sort().join('\u0000') : `${r.a}\u0000${r.b}`) + `\u0000${r.type}`;
 
 // "<schemeId>:<externalId>" names a concept of a published vocabulary stone.json does not hold; it is
 // kept verbatim. A label that merely contains a colon but resolves to a concept is that concept.
@@ -327,7 +429,9 @@ function mergeManualRelations(derived, manual, conceptFor, humanList = [], label
   const name = (id) => `"${labelOf.get(id) ?? id}"`;
   for (const m of manual) {
     if (!MANUAL_TYPES.has(m.type)) {
-      warn(`overrides.relations: "${m.type}" is not a relation type (${[...MANUAL_TYPES].join(', ')}); ${JSON.stringify(m.a)} ${JSON.stringify(m.b)} dropped`);
+      warn(
+        `overrides.relations: "${m.type}" is not a relation type (${[...MANUAL_TYPES].join(', ')}); ${JSON.stringify(m.a)} ${JSON.stringify(m.b)} dropped`,
+      );
       continue;
     }
     const ca = conceptFor(m.a);
@@ -356,11 +460,13 @@ function mergeManualRelations(derived, manual, conceptFor, humanList = [], label
       ...(external ? { external: true } : {}),
     };
     // the human's (or seed's) row replaces a computed one saying the same of the pair under either name
-    for (const twin of Object.keys(SAME_SAYING)) if (twin !== full.type && saysTheSame(twin, full.type)) map.delete(relationKey({ ...full, type: twin }));
+    for (const twin of Object.keys(SAME_SAYING))
+      if (twin !== full.type && saysTheSame(twin, full.type)) map.delete(relationKey({ ...full, type: twin }));
     map.set(relationKey(full), full);
   }
   // `near` already says "probably the same"; a weaker `adjacent` on the same pair is redundant
-  const pairs = (type) => new Set([...map.values()].filter((r) => r.type === type).map((r) => [r.a, r.b].sort().join('\u0000')));
+  const pairs = (type) =>
+    new Set([...map.values()].filter((r) => r.type === type).map((r) => [r.a, r.b].sort().join('\u0000')));
   const near = pairs('near');
   return [...map.values()]
     .filter((r) => r.type !== 'adjacent' || !near.has([r.a, r.b].sort().join('\u0000')))
@@ -417,7 +523,10 @@ function typeRelations(relations, concepts, cfg) {
       out.skos = true;
       out.why = `${r.why}, and their items read alike (cosine ${r.evidence.cosine.toFixed(2)})`;
       out.wasDerivedFrom = [...(r.wasDerivedFrom ?? []), { type: 'text', cosine: r.evidence.cosine }];
-      out.wasGeneratedBy = { activity: 'relate', parameters: { ...(r.wasGeneratedBy?.parameters ?? {}), minAdjacent: R.minAdjacent } };
+      out.wasGeneratedBy = {
+        activity: 'relate',
+        parameters: { ...(r.wasGeneratedBy?.parameters ?? {}), minAdjacent: R.minAdjacent },
+      };
     } else {
       out.skos = false;
     }
@@ -444,7 +553,12 @@ function forbidRelations(relations, notRelated, conceptFor) {
     }
   }
   if (!rules.length) return { relations, forbidden: [] };
-  const hits = (r) => rules.some((x) => (x.type === null || saysTheSame(x.type, r.type)) && ((x.a === r.a && x.b === r.b) || (x.a === r.b && x.b === r.a && (x.type === null || SYMMETRIC.has(r.type)))));
+  const hits = (r) =>
+    rules.some(
+      (x) =>
+        (x.type === null || saysTheSame(x.type, r.type)) &&
+        ((x.a === r.a && x.b === r.b) || (x.a === r.b && x.b === r.a && (x.type === null || SYMMETRIC.has(r.type)))),
+    );
   const forbidden = relations.filter(hits).map((r) => ({ a: r.a, b: r.b, type: r.type, why: 'override' }));
   return { relations: relations.filter((r) => !hits(r)), forbidden };
 }

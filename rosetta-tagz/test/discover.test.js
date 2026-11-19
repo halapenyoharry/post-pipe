@@ -22,18 +22,47 @@ const writes = (text, phrase) => {
 
 // A tagged system, an untagged wire, and filler so that no real phrase is "everywhere".
 const filler = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`f${i}`, []]));
-const fillerMeta = Object.fromEntries(Object.keys(filler).map((k, i) => [k, { title: `zorbl${i} flarn${i} wumpus${i}`, text: `grindle${i} plonk${i} vexor${i} snarf${i}` }]));
+const fillerMeta = Object.fromEntries(
+  Object.keys(filler).map((k, i) => [
+    k,
+    { title: `zorbl${i} flarn${i} wumpus${i}`, text: `grindle${i} plonk${i} vexor${i} snarf${i}` },
+  ]),
+);
 const wire = {
-  q1: { title: 'Quantum computers solve a hard problem', text: 'a quantum computer uses qubits to search; officials told reporters it is early' },
-  q2: { title: 'New quantum chip adds qubits', text: 'engineers built a quantum chip with more qubits; officials told reporters little' },
-  q3: { title: 'Quantum error correction keeps qubits stable', text: 'stable qubits make a quantum machine useful; the lab told reporters nothing' },
-  v1: { title: 'Volcano eruption buried the city in ash', text: 'an ancient volcano erupted and ash covered every street' },
-  v2: { title: 'Ash from a volcano eruption reveals old lives', text: 'the volcano eruption preserved ash layers in the city' },
+  q1: {
+    title: 'Quantum computers solve a hard problem',
+    text: 'a quantum computer uses qubits to search; officials told reporters it is early',
+  },
+  q2: {
+    title: 'New quantum chip adds qubits',
+    text: 'engineers built a quantum chip with more qubits; officials told reporters little',
+  },
+  q3: {
+    title: 'Quantum error correction keeps qubits stable',
+    text: 'stable qubits make a quantum machine useful; the lab told reporters nothing',
+  },
+  v1: {
+    title: 'Volcano eruption buried the city in ash',
+    text: 'an ancient volcano erupted and ash covered every street',
+  },
+  v2: {
+    title: 'Ash from a volcano eruption reveals old lives',
+    text: 'the volcano eruption preserved ash layers in the city',
+  },
   lone: { title: 'Pangolin conservation succeeds', text: 'pangolin numbers recover in a single reserve' },
 };
 const records = [
   ...rec('Wire', Object.fromEntries(Object.keys(wire).map((k) => [k, []])), wire),
-  ...rec('Mine', { m1: ['physics'] }, { m1: { title: 'Notes on physics', text: 'I keep thinking about quantum computing and qubits as a way to think about measurement' } }),
+  ...rec(
+    'Mine',
+    { m1: ['physics'] },
+    {
+      m1: {
+        title: 'Notes on physics',
+        text: 'I keep thinking about quantum computing and qubits as a way to think about measurement',
+      },
+    },
+  ),
   ...rec('Filler', filler, fillerMeta),
 ];
 const out = discover(records);
@@ -59,7 +88,10 @@ test('a phrase that appears in only one item never becomes a hub', () => {
   const hubs = new Map();
   for (const t of out) hubs.set(t.label, (hubs.get(t.label) ?? 0) + 1);
   assert.ok(![...hubs.keys()].some((l) => l.includes('pangolin')));
-  assert.ok([...hubs.values()].every((n) => n >= 2), 'every hub connects at least two items');
+  assert.ok(
+    [...hubs.values()].every((n) => n >= 2),
+    'every hub connects at least two items',
+  );
 });
 
 test('generic words are never topics, even when they recur', () => {
@@ -68,7 +100,10 @@ test('generic words are never topics, even when they recur', () => {
 
 test('hubs bridge into tagged items that contain them; items that never mention a hub get nothing', () => {
   const mine = labels('Mine');
-  assert.ok(mine.has('qubits') || mine.has('quantum'), 'the tagged note mentions quantum computing and gains the wire\'s hub');
+  assert.ok(
+    mine.has('qubits') || mine.has('quantum'),
+    "the tagged note mentions quantum computing and gains the wire's hub",
+  );
   assert.equal(out.filter((t) => t.source === 'Filler').length, 0);
   assert.equal(out.filter((t) => t.item === 'lone').length, 0);
 });
@@ -113,16 +148,35 @@ test('every discovered record carries its provenance', () => {
     assert.equal(typeof d.inTitle, 'boolean');
     const it = records.find((r) => r.type === 'item' && r.source === t.source && r.id === t.item);
     assert.ok(writes(`${it.title} ${it.text}`, d.phrase), `"${d.phrase}" is in the item's text, as written`);
-    assert.equal(d.inTitle, ` ${words(it.title).join(' ')} `.includes(` ${words(d.phrase).join(' ')} `), `inTitle for "${d.phrase}" on ${t.item}`);
+    assert.equal(
+      d.inTitle,
+      ` ${words(it.title).join(' ')} `.includes(` ${words(d.phrase).join(' ')} `),
+      `inTitle for "${d.phrase}" on ${t.item}`,
+    );
     assert.equal(t.wasGeneratedBy.activity, 'discover');
     const P = t.wasGeneratedBy.parameters;
-    const keys = ['coherence', 'df', 'items', 'maxDfRatio', 'minDf', 'nearCopy', 'nearCopyGrouping', 'nearCopyWords', 'perItem', 'sourceBaseline', 'sourceCoherenceRatio'];
+    const keys = [
+      'coherence',
+      'df',
+      'items',
+      'maxDfRatio',
+      'minDf',
+      'nearCopy',
+      'nearCopyGrouping',
+      'nearCopyWords',
+      'perItem',
+      'sourceBaseline',
+      'sourceCoherenceRatio',
+    ];
     if ('sourceRatio' in t) keys.push('sourceRatio');
     else assert.equal(P.sourceBaseline, 0, 'the ratio is missing only when there was nothing to divide by');
     if (P.sourceRatio < P.sourceCoherenceRatio) keys.push('sourceRatioFloor'); // only on a hub the floor admitted
     assert.deepEqual(Object.keys(P).sort(), keys.sort());
     assert.equal(t.sourceRatio, P.sourceRatio, 'the record carries the ratio as a plain field too');
-    assert.ok(P.items >= P.minDf && P.items <= P.df, 'no near-copies in this corpus, so every item is its own piece of evidence');
+    assert.ok(
+      P.items >= P.minDf && P.items <= P.df,
+      'no near-copies in this corpus, so every item is its own piece of evidence',
+    );
   }
 });
 
@@ -138,9 +192,16 @@ test('discovery is deterministic', () => {
   assert.deepEqual(discover(records), out);
 });
 
-test('discovered phrases join stone.json as evidence and fold into other systems\' vocabulary', () => {
+test("discovered phrases join stone.json as evidence and fold into other systems' vocabulary", () => {
   const shared = [
-    ...rec('Editorial', { e1: ['Quantum'], e2: ['Quantum'] }, { e1: { title: 'Quantum sensing', text: 'quantum sensors' }, e2: { title: 'Quantum networks', text: 'quantum links' } }),
+    ...rec(
+      'Editorial',
+      { e1: ['Quantum'], e2: ['Quantum'] },
+      {
+        e1: { title: 'Quantum sensing', text: 'quantum sensors' },
+        e2: { title: 'Quantum networks', text: 'quantum links' },
+      },
+    ),
     ...records,
   ];
   const withDiscovered = [...shared, ...discover(shared)];
@@ -166,9 +227,16 @@ test('a concept only ever proposed by discovery is flagged, visible to emerge, a
   for (const t of earned) assert.equal(t.label, eruption.canonical);
 
   // with them, every item that carries a discovered concept already is left alone
-  const carried = new Set(out.map((t) => `${t.source}::${t.item}::${s.concepts.find((c) => c.variants.some((v) => v.norm === t.label.toLowerCase()))?.id}`));
+  const carried = new Set(
+    out.map(
+      (t) =>
+        `${t.source}::${t.item}::${s.concepts.find((c) => c.variants.some((v) => v.norm === t.label.toLowerCase()))?.id}`,
+    ),
+  );
   const extra = emerge(s, [...records, ...out]);
-  for (const t of extra) if (discoveredIds.has(t.concept)) assert.ok(!carried.has(`${t.source}::${t.item}::${t.concept}`), `${t.item} already carries ${t.concept}`);
+  for (const t of extra)
+    if (discoveredIds.has(t.concept))
+      assert.ok(!carried.has(`${t.source}::${t.item}::${t.concept}`), `${t.item} already carries ${t.concept}`);
 });
 
 // A newsroom whose items are alike anyway (they share its vocabulary), one untagged newsroom item, a
@@ -176,11 +244,21 @@ test('a concept only ever proposed by discovery is flagged, visible to emerge, a
 // five newsroom items and nowhere else; "wildfire" on three newsroom items and both wire items. (It was
 // "instead" until 2026-11-04, when the function-word gate began refusing "instead" before any of this
 // is measured; the mechanism this pins is unchanged.)
-const newsroom = 'county commissioners weighed the budget after an audit of agency records; lawmakers demanded testimony and a subpoena from the department';
+const newsroom =
+  'county commissioners weighed the budget after an audit of agency records; lawmakers demanded testimony and a subpoena from the department';
 const deskMeta = {
-  d1: { title: 'Wildfire response audit in Ashford County', text: `${newsroom}. the wildfire forced evacuation orders as smoke covered acres near ashford; firefighters held containment lines` },
-  d2: { title: 'Brennan County wildfire costs', text: `${newsroom}. after the wildfire, smoke and evacuation costs grew as firefighters lost acres near brennan` },
-  d3: { title: 'Calloway wildfire records', text: `${newsroom}. a wildfire near calloway sent smoke over acres; evacuation routes jammed and firefighters asked for relief` },
+  d1: {
+    title: 'Wildfire response audit in Ashford County',
+    text: `${newsroom}. the wildfire forced evacuation orders as smoke covered acres near ashford; firefighters held containment lines`,
+  },
+  d2: {
+    title: 'Brennan County wildfire costs',
+    text: `${newsroom}. after the wildfire, smoke and evacuation costs grew as firefighters lost acres near brennan`,
+  },
+  d3: {
+    title: 'Calloway wildfire records',
+    text: `${newsroom}. a wildfire near calloway sent smoke over acres; evacuation routes jammed and firefighters asked for relief`,
+  },
   d4: { title: 'Dunmore audit', text: `${newsroom}; dunmore spent the reserve quietly` },
   d5: { title: 'Fairhaven audit', text: `${newsroom}; fairhaven hired a consultant quietly` },
   d6: { title: 'Glenrock audit', text: `${newsroom}; glenrock delayed the vote quietly` },
@@ -188,11 +266,34 @@ const deskMeta = {
   d8: { title: 'Elmwood audit', text: `${newsroom}; elmwood paid the vendor quietly` },
 };
 const deskRecords = [
-  ...rec('Desk', { d1: ['Politics'], d2: ['Politics'], d3: ['Politics'], d4: ['Politics'], d5: ['Politics'], d6: ['Politics'], d7: ['Politics'], d8: [] }, deskMeta),
-  ...rec('Wire', { w1: [], w2: [] }, {
-    w1: { title: 'Wildfire smoke reaches the valley', text: 'smoke from the wildfire drifted over acres of orchards; evacuation shelters opened and firefighters worked overnight' },
-    w2: { title: 'Firefighters gain on the wildfire', text: 'firefighters cut lines around the wildfire; smoke thinned, evacuation orders eased and acres of forest were saved' },
-  }),
+  ...rec(
+    'Desk',
+    {
+      d1: ['Politics'],
+      d2: ['Politics'],
+      d3: ['Politics'],
+      d4: ['Politics'],
+      d5: ['Politics'],
+      d6: ['Politics'],
+      d7: ['Politics'],
+      d8: [],
+    },
+    deskMeta,
+  ),
+  ...rec(
+    'Wire',
+    { w1: [], w2: [] },
+    {
+      w1: {
+        title: 'Wildfire smoke reaches the valley',
+        text: 'smoke from the wildfire drifted over acres of orchards; evacuation shelters opened and firefighters worked overnight',
+      },
+      w2: {
+        title: 'Firefighters gain on the wildfire',
+        text: 'firefighters cut lines around the wildfire; smoke thinned, evacuation orders eased and acres of forest were saved',
+      },
+    },
+  ),
   ...rec('Filler', filler, fillerMeta),
 ];
 const deskOn = discover(deskRecords);
@@ -202,23 +303,46 @@ const hubsOf = (found) => new Set(found.map((t) => t.label));
 const atBar = (found, bar = 1.6) => found.filter((t) => !(t.sourceRatio < bar));
 
 test('a word spread over one homogeneous source is not a topic: its items are only as alike as the source makes them', () => {
-  assert.ok(hubsOf(deskOff).has('quietly'), 'measured against the whole corpus, the newsroom\'s likeness carries "quietly" through');
+  assert.ok(
+    hubsOf(deskOff).has('quietly'),
+    'measured against the whole corpus, the newsroom\'s likeness carries "quietly" through',
+  );
   assert.ok(!hubsOf(atBar(deskOn)).has('quietly'), 'measured against items from the same source, it adds nothing');
-  assert.equal(atBar(deskOn).filter((t) => t.item === 'd8').length, 0, 'the untagged newsroom item had only "quietly" to offer');
+  assert.equal(
+    atBar(deskOn).filter((t) => t.item === 'd8').length,
+    0,
+    'the untagged newsroom item had only "quietly" to offer',
+  );
   const quietly = deskOn.filter((t) => t.label === 'quietly');
-  assert.ok(quietly.length > 0 && quietly.every((t) => t.sourceRatio >= 1 && t.sourceRatio < 1.6 && t.wasGeneratedBy.parameters.sourceRatioFloor === 1), 'below the bar it is still handed over, with its ratio, for a viewer to try a lower bar');
+  assert.ok(
+    quietly.length > 0 &&
+      quietly.every(
+        (t) => t.sourceRatio >= 1 && t.sourceRatio < 1.6 && t.wasGeneratedBy.parameters.sourceRatioFloor === 1,
+      ),
+    'below the bar it is still handed over, with its ratio, for a viewer to try a lower bar',
+  );
   assert.match(quietly[0].why, /under the 1\.6× bar, admitted by the 1× floor\)$/);
 });
 
 test('a real topic whose items are alike beyond what their sources share is kept', () => {
   assert.ok(hubsOf(deskOn).has('wildfire'), `got ${[...hubsOf(deskOn)]}`);
   const w = deskOn.filter((t) => t.label === 'wildfire');
-  assert.deepEqual(w.map((t) => t.item).sort(), ['d1', 'd2', 'd3', 'w1', 'w2'], 'it lands on every item that says it, newsroom items included');
+  assert.deepEqual(
+    w.map((t) => t.item).sort(),
+    ['d1', 'd2', 'd3', 'w1', 'w2'],
+    'it lands on every item that says it, newsroom items included',
+  );
   for (const t of w) {
     const P = t.wasGeneratedBy.parameters;
     assert.equal(P.sourceCoherenceRatio, 1.6);
-    assert.ok(P.sourceBaseline > 0 && P.coherence >= P.sourceCoherenceRatio * P.sourceBaseline, `coherence ${P.coherence} against baseline ${P.sourceBaseline}`);
-    assert.match(t.why, /^recurs in 5 of 50 items, which stay alike without it \(\d\.\d\d, \d+\.\d× the \d\.\d{3} that items from the same sources share\)/);
+    assert.ok(
+      P.sourceBaseline > 0 && P.coherence >= P.sourceCoherenceRatio * P.sourceBaseline,
+      `coherence ${P.coherence} against baseline ${P.sourceBaseline}`,
+    );
+    assert.match(
+      t.why,
+      /^recurs in 5 of 50 items, which stay alike without it \(\d\.\d\d, \d+\.\d× the \d\.\d{3} that items from the same sources share\)/,
+    );
   }
 });
 
@@ -227,20 +351,43 @@ test('a real topic whose items are alike beyond what their sources share is kept
 // each incidental word also turns up on one unrelated item, which picks it as its only hub: counted
 // twice, the copies' likeness carries the word's coherence. Three short items about glaciers share
 // only their topic. Filler keeps any phrase from being everywhere.
-const story = 'flood ruidoso trotter riverview crawford swiftwater lincoln mescalero sierra blanca peak tourist cabins campground bridge culvert gauge sirens shelter levee arroyo burn scar sediment debris river mayor chief volunteers rescue';
+const story =
+  'flood ruidoso trotter riverview crawford swiftwater lincoln mescalero sierra blanca peak tourist cabins campground bridge culvert gauge sirens shelter levee arroyo burn scar sediment debris river mayor chief volunteers rescue';
 const incidental = ['memory', 'lingering', 'moderate', 'danger']; // "lingering" was "staying" until the function-word gate of 2026-11-04
 const copyRecords = [
-  ...rec('Paper', { a: [], b: [], c: [] }, {
-    a: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met; residents said the memory of the fire was lingering with them and a moderate rain could still bring danger` },
-    b: { title: 'The river cannot be trusted', text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response; families described lingering near the water, the memory of the night, and the danger of moderate storms` },
-    c: { title: 'A flood in another valley', text: 'waters rose after rain on a burn scar near the river; sediment and debris closed the road' },
-  }),
-  ...rec('Wire', { g1: [], g2: [], g3: [], x0: [], x1: [], x2: [], x3: [] }, {
-    g1: { title: 'Glacier retreat speeds up', text: 'the glacier lost ice as melt ran into the fjord' },
-    g2: { title: 'Ice cores from a shrinking glacier', text: 'scientists drilled the glacier where melt pools spread' },
-    g3: { title: 'Glacier melt raises lake levels', text: 'meltwater from the glacier filled a lake below the ice' },
-    ...Object.fromEntries(incidental.map((w, i) => [`x${i}`, { title: `quillon${i} brask${i}`, text: `${w} ottery${i} frund${i}` }])),
-  }),
+  ...rec(
+    'Paper',
+    { a: [], b: [], c: [] },
+    {
+      a: {
+        title: 'Town leaders said they were prepared',
+        text: `${story} ${story}. the village council met; residents said the memory of the fire was lingering with them and a moderate rain could still bring danger`,
+      },
+      b: {
+        title: 'The river cannot be trusted',
+        text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response; families described lingering near the water, the memory of the night, and the danger of moderate storms`,
+      },
+      c: {
+        title: 'A flood in another valley',
+        text: 'waters rose after rain on a burn scar near the river; sediment and debris closed the road',
+      },
+    },
+  ),
+  ...rec(
+    'Wire',
+    { g1: [], g2: [], g3: [], x0: [], x1: [], x2: [], x3: [] },
+    {
+      g1: { title: 'Glacier retreat speeds up', text: 'the glacier lost ice as melt ran into the fjord' },
+      g2: {
+        title: 'Ice cores from a shrinking glacier',
+        text: 'scientists drilled the glacier where melt pools spread',
+      },
+      g3: { title: 'Glacier melt raises lake levels', text: 'meltwater from the glacier filled a lake below the ice' },
+      ...Object.fromEntries(
+        incidental.map((w, i) => [`x${i}`, { title: `quillon${i} brask${i}`, text: `${w} ottery${i} frund${i}` }]),
+      ),
+    },
+  ),
   ...rec('Filler', filler, fillerMeta),
 ];
 const copiesOn = {};
@@ -248,7 +395,11 @@ const withCopies = discover(copyRecords, makeConfig(), copiesOn);
 const copiesOff = discover(copyRecords, makeConfig({ discover: { nearCopy: 0 } }));
 
 test('two copies of one story are one piece of evidence: a word only they share is not a tag', () => {
-  assert.deepEqual(copiesOn.nearCopies, [['Paper::a', 'Paper::b']], 'the two flood articles are found as near-copies, the short glacier items are not');
+  assert.deepEqual(
+    copiesOn.nearCopies,
+    [['Paper::a', 'Paper::b']],
+    'the two flood articles are found as near-copies, the short glacier items are not',
+  );
   for (const w of incidental) {
     assert.ok(hubsOf(copiesOff).has(w), `counted twice, the copies carry "${w}" through`);
     assert.ok(!hubsOf(withCopies).has(w), `counted once, "${w}" recurs nowhere`);
@@ -258,7 +409,11 @@ test('two copies of one story are one piece of evidence: a word only they share 
 test('a word spread over distinct items is still a tag, and a tag still lands on every copy', () => {
   assert.ok(hubsOf(withCopies).has('glacier'), `got ${[...hubsOf(withCopies)]}`);
   const flood = withCopies.filter((t) => t.label === 'flood');
-  assert.deepEqual(flood.map((t) => t.item).sort(), ['a', 'b', 'c'], 'attached to both copies and the other flood item');
+  assert.deepEqual(
+    flood.map((t) => t.item).sort(),
+    ['a', 'b', 'c'],
+    'attached to both copies and the other flood item',
+  );
   for (const t of flood) {
     assert.equal(t.wasGeneratedBy.parameters.df, 2, 'df counts the copies once');
     assert.equal(t.wasGeneratedBy.parameters.items, 3, 'items counts where it lands');
@@ -272,20 +427,45 @@ test('a word spread over distinct items is still a tag, and a tag still lands on
 // of the lawyer story and most of the ballots story; the two stories share only "election officials in
 // the county". Three tellings of the flood story above are near-copies every pair, and a wire item
 // says "election officials" too.
-const lawyer = 'marguerite vance lawyer halloway conference denial movement donors trained volunteers poll observers lawsuits fraud claims caucus foundation strategy memo canvass precinct challengers podcast seminar playbook audit recount affidavits';
-const ballots = 'mail ballots rejections rural postal service sorting plant consolidation delays postmarks deadline tamsin clerks envelopes carriers routes overnight processing rejected signature cure letters trucks';
+const lawyer =
+  'marguerite vance lawyer halloway conference denial movement donors trained volunteers poll observers lawsuits fraud claims caucus foundation strategy memo canvass precinct challengers podcast seminar playbook audit recount affidavits';
+const ballots =
+  'mail ballots rejections rural postal service sorting plant consolidation delays postmarks deadline tamsin clerks envelopes carriers routes overnight processing rejected signature cure letters trucks';
 const roundupRecords = [
-  ...rec('Paper', { roundup: [], ballots: [], lawyer: [], flood1: [], flood2: [], flood3: [] }, {
-    roundup: { title: 'Key findings from our election reporting', text: `${lawyer}. ${ballots.split(' ').slice(0, 19).join(' ')}. election officials in the county` },
-    ballots: { title: 'Rural ballots rejected after postal cuts', text: `${ballots} ${ballots}. election officials in the county weighed certification` },
-    lawyer: { title: 'How a lawyer built a movement', text: `${lawyer} ${lawyer}. election officials in the county delayed certification` },
-    flood1: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met` },
-    flood2: { title: 'The river cannot be trusted', text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response` },
-    flood3: { title: 'After the flood, a reckoning', text: `${story}. families described the night` },
-  }),
-  ...rec('Wire', { w1: [] }, {
-    w1: { title: 'Certification fights reach county boards', text: 'county election officials weighed certification after mail ballots were rejected and poll observers filed lawsuits; certification deadlines loom' },
-  }),
+  ...rec(
+    'Paper',
+    { roundup: [], ballots: [], lawyer: [], flood1: [], flood2: [], flood3: [] },
+    {
+      roundup: {
+        title: 'Key findings from our election reporting',
+        text: `${lawyer}. ${ballots.split(' ').slice(0, 19).join(' ')}. election officials in the county`,
+      },
+      ballots: {
+        title: 'Rural ballots rejected after postal cuts',
+        text: `${ballots} ${ballots}. election officials in the county weighed certification`,
+      },
+      lawyer: {
+        title: 'How a lawyer built a movement',
+        text: `${lawyer} ${lawyer}. election officials in the county delayed certification`,
+      },
+      flood1: { title: 'Town leaders said they were prepared', text: `${story} ${story}. the village council met` },
+      flood2: {
+        title: 'The river cannot be trusted',
+        text: `${story.split(' ').reverse().join(' ')} ${story}. the county board reviewed the response`,
+      },
+      flood3: { title: 'After the flood, a reckoning', text: `${story}. families described the night` },
+    },
+  ),
+  ...rec(
+    'Wire',
+    { w1: [] },
+    {
+      w1: {
+        title: 'Certification fights reach county boards',
+        text: 'county election officials weighed certification after mail ballots were rejected and poll observers filed lawsuits; certification deadlines loom',
+      },
+    },
+  ),
   ...rec('Filler', filler, fillerMeta),
 ];
 const chained = {};
@@ -303,42 +483,71 @@ test('chain, the default: any near-copy pair joins two groups, so a roundup that
 
 test('all-pairs: a group holds only items that are near-copies every pair, and the roundup joins the story it is more alike to', () => {
   assert.equal(makeConfig().discover.nearCopyGrouping, 'chain', 'chain is the default');
-  assert.deepEqual(allPaired.nearCopies, [floods, paper('lawyer', 'roundup')], 'the ballots story comes first in item order, but the roundup is more alike to the lawyer story');
-  assert.deepEqual(allPaired.nearCopiesApart.map(([a, b]) => [a, b]), [paper('ballots', 'roundup')], 'the near-copy pair left in different groups');
+  assert.deepEqual(
+    allPaired.nearCopies,
+    [floods, paper('lawyer', 'roundup')],
+    'the ballots story comes first in item order, but the roundup is more alike to the lawyer story',
+  );
+  assert.deepEqual(
+    allPaired.nearCopiesApart.map(([a, b]) => [a, b]),
+    [paper('ballots', 'roundup')],
+    'the near-copy pair left in different groups',
+  );
   assert.ok(allPaired.nearCopiesApart[0][2] >= 0.35, 'with the likeness that made it a near-copy pair');
   for (const t of byAllPairs) assert.equal(t.wasGeneratedBy.parameters.nearCopyGrouping, 'all-pairs');
 });
 
 test('a true triple of copies is one group under either value', () => {
-  for (const info of [chained, allPaired]) assert.ok(info.nearCopies.some((g) => JSON.stringify(g) === JSON.stringify(floods)), JSON.stringify(info.nearCopies));
+  for (const info of [chained, allPaired])
+    assert.ok(
+      info.nearCopies.some((g) => JSON.stringify(g) === JSON.stringify(floods)),
+      JSON.stringify(info.nearCopies),
+    );
 });
 
 test('under all-pairs the two stories are two pieces of evidence; so are the roundup and the story it did not join', () => {
   const [c] = byChain.filter((t) => t.label === 'election officials');
   const [a] = byAllPairs.filter((t) => t.label === 'election officials');
-  assert.equal(c.wasGeneratedBy.parameters.df, 2, 'chain: the roundup and both stories are one item, the wire item another');
+  assert.equal(
+    c.wasGeneratedBy.parameters.df,
+    2,
+    'chain: the roundup and both stories are one item, the wire item another',
+  );
   assert.match(c.why, /^recurs in 4 of 47 items \(2 of 43 counting near-copies once\)/);
   assert.equal(a.wasGeneratedBy.parameters.df, 3, 'all-pairs: the two stories count apart');
   assert.match(a.why, /^recurs in 4 of 47 items \(3 of 44 counting near-copies once\)/);
   // what all-pairs costs: a detail of the ballots story that the roundup retells now recurs in two items
   assert.ok(!hubsOf(byChain).has('postal'));
-  assert.deepEqual(byAllPairs.filter((t) => t.label === 'postal').map((t) => t.item).sort(), ['ballots', 'roundup']);
+  assert.deepEqual(
+    byAllPairs
+      .filter((t) => t.label === 'postal')
+      .map((t) => t.item)
+      .sort(),
+    ['ballots', 'roundup'],
+  );
 });
 
 test('an unknown nearCopyGrouping is an error that names the values', () => {
-  assert.throws(() => discover(roundupRecords, makeConfig({ discover: { nearCopyGrouping: 'complete' } })), /unknown discover\.nearCopyGrouping "complete" \(all-pairs, chain\)/);
+  assert.throws(
+    () => discover(roundupRecords, makeConfig({ discover: { nearCopyGrouping: 'complete' } })),
+    /unknown discover\.nearCopyGrouping "complete" \(all-pairs, chain\)/,
+  );
 });
 
 // The floor. On the shipped synthetic corpus every hub clears 1.6, so the bar is raised to 9 to put
 // some below it; what is tested is the shape, not the number.
 const synth = syntheticRecords();
-const bar = (sourceCoherenceRatio, sourceRatioFloor) => discover(synth, makeConfig({ discover: { sourceCoherenceRatio, sourceRatioFloor } }));
+const bar = (sourceCoherenceRatio, sourceRatioFloor) =>
+  discover(synth, makeConfig({ discover: { sourceCoherenceRatio, sourceRatioFloor } }));
 const atNine = bar(9, 9);
 const toOne = bar(9, 1);
 
 test('a floor at the bar adds nothing: the output is the one without a floor, byte for byte', () => {
   assert.equal(JSON.stringify(atNine), JSON.stringify(bar(9, null)));
-  assert.ok(atNine.length > 0 && atNine.every((t) => t.sourceRatio >= 9 && !('sourceRatioFloor' in t.wasGeneratedBy.parameters)));
+  assert.ok(
+    atNine.length > 0 &&
+      atNine.every((t) => t.sourceRatio >= 9 && !('sourceRatioFloor' in t.wasGeneratedBy.parameters)),
+  );
 });
 
 test('a lower floor only adds: every record of the build at the bar is there unchanged, and the bar filters the rest away', () => {
@@ -352,7 +561,11 @@ test('a lower floor only adds: every record of the build at the bar is there unc
     assert.equal(t.wasGeneratedBy.parameters.sourceRatioFloor, 1);
     assert.match(t.why, /under the 9× bar, admitted by the 1× floor/);
   }
-  assert.equal(JSON.stringify(atBar(toOne, 9)), JSON.stringify(atNine), 'a viewer at the bar shows exactly the build at the bar, in the same order');
+  assert.equal(
+    JSON.stringify(atBar(toOne, 9)),
+    JSON.stringify(atNine),
+    'a viewer at the bar shows exactly the build at the bar, in the same order',
+  );
 });
 
 // The SHA-256 of discovery's output on the synthetic corpus before nearCopyGrouping existed (post-pipe
@@ -366,14 +579,32 @@ const withoutGrouping = (found) =>
     const { nearCopyGrouping, ...parameters } = t.wasGeneratedBy.parameters;
     return { ...t, wasGeneratedBy: { ...t.wasGeneratedBy, parameters } };
   });
-const unspelled = (found) => found.map((t) => ({ ...t, label: asWritten(t.label), wasDerivedFrom: t.wasDerivedFrom.map((d) => ({ ...d, phrase: asWritten(d.phrase) })) }));
+const unspelled = (found) =>
+  found.map((t) => ({
+    ...t,
+    label: asWritten(t.label),
+    wasDerivedFrom: t.wasDerivedFrom.map((d) => ({ ...d, phrase: asWritten(d.phrase) })),
+  }));
 
 test('with chain, discovery on the synthetic corpus is what it was before the switch existed, but for the spellings', () => {
   const chain = discover(synth, makeConfig({ discover: { nearCopyGrouping: 'chain' } }));
-  assert.ok(chain.length > 0 && chain.every((t) => t.wasGeneratedBy.parameters.nearCopyGrouping === 'chain'), 'the switch is recorded on every record');
-  const digest = createHash('sha256').update(JSON.stringify(unspelled(withoutGrouping(chain)))).digest('hex');
-  assert.equal(digest, BEFORE_THE_SWITCH, 'taken out of the parameters and read back without capitals or joiners, nothing else differs');
-  assert.deepEqual([...new Set(chain.filter((t) => t.label !== asWritten(t.label)).map((t) => t.label))], ['Robots'], 'the one label spelled otherwise: written only in titles ("Robots learn to fold laundry", "Warehouse Workers Organize Against Robots"), so the capital is all the text has');
+  assert.ok(
+    chain.length > 0 && chain.every((t) => t.wasGeneratedBy.parameters.nearCopyGrouping === 'chain'),
+    'the switch is recorded on every record',
+  );
+  const digest = createHash('sha256')
+    .update(JSON.stringify(unspelled(withoutGrouping(chain))))
+    .digest('hex');
+  assert.equal(
+    digest,
+    BEFORE_THE_SWITCH,
+    'taken out of the parameters and read back without capitals or joiners, nothing else differs',
+  );
+  assert.deepEqual(
+    [...new Set(chain.filter((t) => t.label !== asWritten(t.label)).map((t) => t.label))],
+    ['Robots'],
+    'the one label spelled otherwise: written only in titles ("Robots learn to fold laundry", "Warehouse Workers Organize Against Robots"), so the capital is all the text has',
+  );
   // the synthetic corpus holds no near-copies, so all-pairs has nothing to group differently
   assert.equal(JSON.stringify(withoutGrouping(discover(synth))), JSON.stringify(withoutGrouping(chain)));
 });
@@ -400,62 +631,144 @@ const spelled = {
   n1: { title: 'Gristle', text: 'bee gut dna from NASA' },
   n2: { title: 'Hobnail', text: 'bee gut dna from Nasa' },
 };
-const spellingRecords = [...rec('Wire', Object.fromEntries(Object.keys(spelled).map((k) => [k, []])), spelled), ...rec('Filler', filler, fillerMeta)];
+const spellingRecords = [
+  ...rec('Wire', Object.fromEntries(Object.keys(spelled).map((k) => [k, []])), spelled),
+  ...rec('Filler', filler, fillerMeta),
+];
 const spelledOut = discover(spellingRecords);
 const hubOf = (found, label) => found.filter((t) => t.label === label);
-const phrasesOf = (found, label) => Object.fromEntries(hubOf(found, label).map((t) => [t.item, t.wasDerivedFrom[0].phrase]));
+const phrasesOf = (found, label) =>
+  Object.fromEntries(hubOf(found, label).map((t) => [t.item, t.wasDerivedFrom[0].phrase]));
 
 test('a hyphen is kept as written: "energy-efficient" in the text is the label "energy-efficient"', () => {
   assert.deepEqual(phrasesOf(spelledOut, 'energy-efficient'), { h1: 'energy-efficient', h2: 'energy-efficient' });
-  assert.equal(hubOf(spelledOut, 'energy efficient').length, 0, 'never the words without their hyphen, which the text does not write');
+  assert.equal(
+    hubOf(spelledOut, 'energy efficient').length,
+    0,
+    'never the words without their hyphen, which the text does not write',
+  );
 });
 
 test('capitals are kept as written: "San Diego" in the text gives the label "Diego", never "diego"', () => {
-  assert.deepEqual(phrasesOf(spelledOut, 'Diego'), { d1: 'Diego', d2: 'Diego' }, '"San" has three letters, too short to be a candidate, so the hub is the one word');
+  assert.deepEqual(
+    phrasesOf(spelledOut, 'Diego'),
+    { d1: 'Diego', d2: 'Diego' },
+    '"San" has three letters, too short to be a candidate, so the hub is the one word',
+  );
   assert.equal(hubOf(spelledOut, 'diego').length, 0);
 });
 
 test('a capital where a sentence begins says nothing about the word: "drilled" once mid-sentence beats "Drilled" twice at a sentence start', () => {
-  assert.deepEqual(phrasesOf(spelledOut, 'drilled'), { s1: 'Drilled', s2: 'drilled', s3: 'Drilled' }, 'each phrase is what its own item wrote');
+  assert.deepEqual(
+    phrasesOf(spelledOut, 'drilled'),
+    { s1: 'Drilled', s2: 'drilled', s3: 'Drilled' },
+    'each phrase is what its own item wrote',
+  );
   assert.equal(hubOf(spelledOut, 'Drilled').length, 0, 'counted as written, "Drilled" would have won two to one');
 });
 
 test('a word written only where a sentence begins keeps its capital: it is the only spelling the text has', () => {
-  assert.deepEqual(phrasesOf(spelledOut, 'Fossils'), { r1: 'Fossils', r2: 'Fossils' }, 'the first word of the text, and the first after "!"');
+  assert.deepEqual(
+    phrasesOf(spelledOut, 'Fossils'),
+    { r1: 'Fossils', r2: 'Fossils' },
+    'the first word of the text, and the first after "!"',
+  );
   assert.equal(hubOf(spelledOut, 'fossils').length, 0, 'lower case would be a spelling the text never writes');
 });
 
-test("a title's capitals say nothing either: \"Carbon Capture\" in two titles, \"carbon capture\" in one text, and the label is \"carbon capture\"", () => {
-  assert.deepEqual(phrasesOf(spelledOut, 'carbon capture'), { t1: 'carbon capture', t2: 'Carbon Capture' }, 't2 writes it only in its title, and its phrase is that');
+test('a title\'s capitals say nothing either: "Carbon Capture" in two titles, "carbon capture" in one text, and the label is "carbon capture"', () => {
+  assert.deepEqual(
+    phrasesOf(spelledOut, 'carbon capture'),
+    { t1: 'carbon capture', t2: 'Carbon Capture' },
+    't2 writes it only in its title, and its phrase is that',
+  );
   for (const t of hubOf(spelledOut, 'carbon capture')) assert.equal(t.wasDerivedFrom[0].inTitle, true);
 });
 
 test('ties go to a spelling in lower case, then to the one met first, items in key order', () => {
-  assert.deepEqual(phrasesOf(spelledOut, 'glacier'), { g1: 'Glacier', g2: 'glacier' }, '"Glacier" (in "Thwaites Glacier") and "glacier" once each, both mid-sentence');
+  assert.deepEqual(
+    phrasesOf(spelledOut, 'glacier'),
+    { g1: 'Glacier', g2: 'glacier' },
+    '"Glacier" (in "Thwaites Glacier") and "glacier" once each, both mid-sentence',
+  );
   assert.deepEqual(phrasesOf(spelledOut, 'NASA'), { n1: 'NASA', n2: 'Nasa' }, 'neither in lower case: n1 comes first');
   const swapped = { ...spelled, n1: spelled.n2, n2: spelled.n1 };
-  const again = discover([...rec('Wire', Object.fromEntries(Object.keys(swapped).map((k) => [k, []])), swapped), ...rec('Filler', filler, fillerMeta)]);
-  assert.deepEqual(phrasesOf(again, 'Nasa'), { n1: 'Nasa', n2: 'NASA' }, 'with the items the other way round, the other spelling');
+  const again = discover([
+    ...rec('Wire', Object.fromEntries(Object.keys(swapped).map((k) => [k, []])), swapped),
+    ...rec('Filler', filler, fillerMeta),
+  ]);
+  assert.deepEqual(
+    phrasesOf(again, 'Nasa'),
+    { n1: 'Nasa', n2: 'NASA' },
+    'with the items the other way round, the other spelling',
+  );
 });
 
 test('the spelling changes nothing else: read back without capitals or joiners, the output is what the lower-case labels were', () => {
-  assert.deepEqual(spelledOut.map((t) => asWritten(t.label)), ['carbon capture', 'carbon capture', 'diego', 'diego', 'drilled', 'drilled', 'drilled', 'energy efficient', 'energy efficient', 'fossils', 'fossils', 'glacier', 'glacier', 'nasa', 'nasa'], 'hubs in the order of their form, as before');
+  assert.deepEqual(
+    spelledOut.map((t) => asWritten(t.label)),
+    [
+      'carbon capture',
+      'carbon capture',
+      'diego',
+      'diego',
+      'drilled',
+      'drilled',
+      'drilled',
+      'energy efficient',
+      'energy efficient',
+      'fossils',
+      'fossils',
+      'glacier',
+      'glacier',
+      'nasa',
+      'nasa',
+    ],
+    'hubs in the order of their form, as before',
+  );
   const lower = { ...spelled };
-  for (const [k, v] of Object.entries(lower)) lower[k] = { title: v.title.toLowerCase(), text: v.text.toLowerCase().replaceAll('-', ' ') };
-  const plain = discover([...rec('Wire', Object.fromEntries(Object.keys(lower).map((k) => [k, []])), lower), ...rec('Filler', filler, fillerMeta)]);
-  assert.equal(JSON.stringify(unspelled(spelledOut)), JSON.stringify(plain), 'the same corpus with no capitals or hyphens gives the same records, numbers and why included');
+  for (const [k, v] of Object.entries(lower))
+    lower[k] = { title: v.title.toLowerCase(), text: v.text.toLowerCase().replaceAll('-', ' ') };
+  const plain = discover([
+    ...rec('Wire', Object.fromEntries(Object.keys(lower).map((k) => [k, []])), lower),
+    ...rec('Filler', filler, fillerMeta),
+  ]);
+  assert.equal(
+    JSON.stringify(unspelled(spelledOut)),
+    JSON.stringify(plain),
+    'the same corpus with no capitals or hyphens gives the same records, numbers and why included',
+  );
 });
 
-test('every label is written in some item\'s text, and every phrase in its own item\'s, exactly as given, in every corpus here', () => {
+test("every label is written in some item's text, and every phrase in its own item's, exactly as given, in every corpus here", () => {
   const corpora = [
-    [records, out], [deskRecords, deskOn], [deskRecords, deskOff], [copyRecords, withCopies], [copyRecords, copiesOff],
-    [roundupRecords, byChain], [roundupRecords, byAllPairs], [synth, atNine], [synth, toOne], [synth, discover(synth)], [spellingRecords, spelledOut],
+    [records, out],
+    [deskRecords, deskOn],
+    [deskRecords, deskOff],
+    [copyRecords, withCopies],
+    [copyRecords, copiesOff],
+    [roundupRecords, byChain],
+    [roundupRecords, byAllPairs],
+    [synth, atNine],
+    [synth, toOne],
+    [synth, discover(synth)],
+    [spellingRecords, spelledOut],
   ];
   for (const [recs, found] of corpora) {
-    const items = new Map(recs.filter((r) => r.type === 'item').map((r) => [`${r.source}::${r.id}`, `${r.title} ${r.text}`]));
+    const items = new Map(
+      recs.filter((r) => r.type === 'item').map((r) => [`${r.source}::${r.id}`, `${r.title} ${r.text}`]),
+    );
     const texts = [...items.values()];
-    for (const label of new Set(found.map((t) => t.label))) assert.ok(texts.some((x) => writes(x, label)), `label "${label}" is written somewhere`);
-    for (const t of found) assert.ok(writes(items.get(`${t.source}::${t.item}`), t.wasDerivedFrom[0].phrase), `phrase "${t.wasDerivedFrom[0].phrase}" is written in ${t.item}`);
+    for (const label of new Set(found.map((t) => t.label)))
+      assert.ok(
+        texts.some((x) => writes(x, label)),
+        `label "${label}" is written somewhere`,
+      );
+    for (const t of found)
+      assert.ok(
+        writes(items.get(`${t.source}::${t.item}`), t.wasDerivedFrom[0].phrase),
+        `phrase "${t.wasDerivedFrom[0].phrase}" is written in ${t.item}`,
+      );
   }
 });
 
@@ -469,14 +782,29 @@ test('downstream a spelled label is the same term as before: same norm, same id,
   // an item discovery never saw, which writes the words without the hyphen, earns it through emergence
   const late = rec('Late', { z1: [] }, { z1: { title: 'Plinth', text: 'an energy efficient pump: ice air sea' } });
   const earnedHere = emerge(s, [...spellingRecords, ...late, ...spelledOut]).filter((t) => t.concept === c.id);
-  assert.deepEqual(earnedHere.map((t) => [t.item, t.label]), [['z1', 'energy-efficient']], 'h1 and h2 carry it already, and are not doubled');
+  assert.deepEqual(
+    earnedHere.map((t) => [t.item, t.label]),
+    [['z1', 'energy-efficient']],
+    'h1 and h2 carry it already, and are not doubled',
+  );
 });
 
 test('the one exception, pinned so it stays visible: a camel-case spelling is carried out as written ("mRNA"), and rtz-stone reads it as two words, as it reads a human\'s tag spelled so', () => {
-  const m = { m1: { title: 'Wexley', text: 'an mRNA dose: ice air sea' }, m2: { title: 'Brombat', text: 'ice air sea and mRNA' } };
+  const m = {
+    m1: { title: 'Wexley', text: 'an mRNA dose: ice air sea' },
+    m2: { title: 'Brombat', text: 'ice air sea and mRNA' },
+  };
   const base = [...rec('Wire', { m1: [], m2: [] }, m), ...rec('Filler', filler, fillerMeta)];
   const found = discover(base);
-  assert.deepEqual([...new Set(found.map((t) => t.label))], ['mRNA'], 'the text never writes "mrna", so that is not a label');
+  assert.deepEqual(
+    [...new Set(found.map((t) => t.label))],
+    ['mRNA'],
+    'the text never writes "mrna", so that is not a label',
+  );
   const c = buildStone([...base, ...found], {}).concepts.find((x) => x.canonical === 'mRNA');
-  assert.deepEqual([c.id, c.variants.map((v) => v.norm)], ['c_m_rna', ['m rna']], 'normalizeLabel splits camel case, so this is not the term "mrna" a lower-case label made');
+  assert.deepEqual(
+    [c.id, c.variants.map((v) => v.norm)],
+    ['c_m_rna', ['m rna']],
+    'normalizeLabel splits camel case, so this is not the term "mrna" a lower-case label made',
+  );
 });

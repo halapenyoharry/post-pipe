@@ -203,9 +203,10 @@ function places(chunk, ws) {
   if (ws.length * runs.length > 1e6) return at;
   const L = Array.from({ length: ws.length + 1 }, () => new Int32Array(runs.length + 1));
   for (let a = ws.length - 1; a >= 0; a--) {
-    for (let b = runs.length - 1; b >= 0; b--) L[a][b] = ws[a] === runs[b].w ? L[a + 1][b + 1] + 1 : Math.max(L[a + 1][b], L[a][b + 1]);
+    for (let b = runs.length - 1; b >= 0; b--)
+      L[a][b] = ws[a] === runs[b].w ? L[a + 1][b + 1] + 1 : Math.max(L[a + 1][b], L[a][b + 1]);
   }
-  for (let a = 0, b = 0; a < ws.length && b < runs.length; ) {
+  for (let a = 0, b = 0; a < ws.length && b < runs.length;) {
     if (ws[a] === runs[b].w) at[a++] = runs[b++].at;
     else if (L[a + 1][b] >= L[a][b + 1]) a++;
     else b++;
@@ -237,7 +238,8 @@ function scan(text, onKey, title) {
     for (let i = 0; i < ws.length; i++) {
       if (!ok(ws[i])) continue;
       onKey(stem(ws[i]), ws[i], written(i, i));
-      if (i + 1 < ws.length && ok(ws[i + 1])) onKey(`${stem(ws[i])} ${stem(ws[i + 1])}`, `${ws[i]} ${ws[i + 1]}`, written(i, i + 1));
+      if (i + 1 < ws.length && ok(ws[i + 1]))
+        onKey(`${stem(ws[i])} ${stem(ws[i + 1])}`, `${ws[i]} ${ws[i + 1]}`, written(i, i + 1));
     }
     start = false;
   }
@@ -270,7 +272,9 @@ function candidates(item) {
 // ones; the most votes wins; ties go to a spelling in lower case, then to the one met first. null when
 // the form is not written legibly anywhere in `written`.
 function spell(written, form = null) {
-  const cands = [...written].map(([spelling, s], first) => ({ spelling, ...s, first })).filter((c) => form === null || c.form === form);
+  const cands = [...written]
+    .map(([spelling, s], first) => ({ spelling, ...s, first }))
+    .filter((c) => form === null || c.form === form);
   if (!cands.length) return null;
   const free = cands.some((c) => c.free > 0);
   const votes = (c) => (free ? c.free : c.styled);
@@ -302,7 +306,9 @@ const keyOf = (label) => {
 export function discover(records, cfg = makeConfig(), info = null, { queue = false, overrides = null } = {}) {
   const D = cfg.discover;
   if (!NEAR_COPY_GROUPINGS.includes(D.nearCopyGrouping)) {
-    throw new Error(`unknown discover.nearCopyGrouping ${JSON.stringify(D.nearCopyGrouping)} (${NEAR_COPY_GROUPINGS.join(', ')})`);
+    throw new Error(
+      `unknown discover.nearCopyGrouping ${JSON.stringify(D.nearCopyGrouping)} (${NEAR_COPY_GROUPINGS.join(', ')})`,
+    );
   }
   const ignored = new Set((overrides?.ignore ?? []).map(keyOf).filter(Boolean));
   const accepted = new Map(); // candidate key -> the label as the human wrote it (the first spelling wins)
@@ -311,7 +317,9 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     if (k && !accepted.has(k)) accepted.set(k, String(label).trim());
   }
   const corpus = loadCorpus(records);
-  const reps = [...corpus.items.values()].filter((it) => (corpus.canonItem.get(it.key) ?? it.key) === it.key).sort((a, b) => (a.key < b.key ? -1 : 1));
+  const reps = [...corpus.items.values()]
+    .filter((it) => (corpus.canonItem.get(it.key) ?? it.key) === it.key)
+    .sort((a, b) => (a.key < b.key ? -1 : 1));
   const perItem = new Map(reps.map((it) => [it.key, candidates(it)]));
   const vecs = buildItemVectors(corpus.items);
   const idf = buildIdf(vecs);
@@ -364,7 +372,10 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
   const distinct = new Map();
   for (const [key, keys] of containing) {
     const seen = new Set();
-    distinct.set(key, keys.filter((k) => !seen.has(groupOf.get(k)) && seen.add(groupOf.get(k))));
+    distinct.set(
+      key,
+      keys.filter((k) => !seen.has(groupOf.get(k)) && seen.add(groupOf.get(k))),
+    );
   }
   const df = new Map([...distinct].map(([key, keys]) => [key, keys.length]));
   // a hub's form: among the forms the text writes legibly (in ordinary text, all of them), the one with
@@ -374,7 +385,9 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
   const formOf = (key) => {
     if (!forms.has(key)) {
       const spelled = new Set([...written.get(key).values()].map((s) => s.form));
-      const ranked = [...surface.get(key).entries()].filter(([form]) => spelled.has(form)).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+      const ranked = [...surface.get(key).entries()]
+        .filter(([form]) => spelled.has(form))
+        .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
       forms.set(key, ranked.length ? ranked[0][0] : written.get(key).get(spell(written.get(key))).form);
     }
     return forms.get(key);
@@ -410,7 +423,10 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     const k = blockKey(s, t);
     if (!blocks.has(k)) {
       const [lo, hi] = s < t ? [s, t] : [t, s];
-      blocks.set(k, samplePairs(bySource.get(lo) ?? [], bySource.get(hi) ?? [], BASELINE_PAIRS).map(([a, b]) => [a, b, sim(a, b)]));
+      blocks.set(
+        k,
+        samplePairs(bySource.get(lo) ?? [], bySource.get(hi) ?? [], BASELINE_PAIRS).map(([a, b]) => [a, b, sim(a, b)]),
+      );
     }
     return blocks.get(k);
   };
@@ -431,10 +447,11 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
       if (!memo.has(k)) {
         let sum = 0;
         let n = 0;
-        for (const [a, b, v] of block(s, t)) if (!(carriers.has(a) && carriers.has(b))) {
-          sum += v;
-          n += 1;
-        }
+        for (const [a, b, v] of block(s, t))
+          if (!(carriers.has(a) && carriers.has(b))) {
+            sum += v;
+            n += 1;
+          }
         memo.set(k, n ? sum / n : corpusBase);
       }
       return memo.get(k);
@@ -442,10 +459,11 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     const keys = sample(key);
     let sum = 0;
     let n = 0;
-    for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
-      sum += pairBase(sourceOf.get(keys[i]), sourceOf.get(keys[j]));
-      n += 1;
-    }
+    for (let i = 0; i < keys.length; i++)
+      for (let j = i + 1; j < keys.length; j++) {
+        sum += pairBase(sourceOf.get(keys[i]), sourceOf.get(keys[j]));
+        n += 1;
+      }
     return n ? sum / n : 0;
   };
 
@@ -455,17 +473,19 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     const vs = keys.map((k) => withoutPhrase(vecs.get(k), idf, drop));
     let sum = 0;
     let n = 0;
-    for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) {
-      sum += dot(vs[i], vs[j]);
-      n += 1;
-    }
+    for (let i = 0; i < vs.length; i++)
+      for (let j = i + 1; j < vs.length; j++) {
+        sum += dot(vs[i], vs[j]);
+        n += 1;
+      }
     return n ? sum / n : 0;
   };
 
   // `sourceRatio` is the measured multiple, to three decimals, and the bar is applied to that same
   // number, so a viewer comparing it with another value makes exactly the build's comparison. With no
   // source likeness to compare with (0), nothing is measured and the bar cannot reject the phrase.
-  const floor = typeof D.sourceRatioFloor === 'number' && D.sourceRatioFloor < D.sourceCoherenceRatio ? D.sourceRatioFloor : null;
+  const floor =
+    typeof D.sourceRatioFloor === 'number' && D.sourceRatioFloor < D.sourceCoherenceRatio ? D.sourceRatioFloor : null;
   const usable = new Map(); // stemKey -> coherence, at or above sourceCoherenceRatio
   const under = new Map(); // stemKey -> coherence, below it but at or above the floor
   const measure = new Map(); // stemKey -> { baseline, ratio }
@@ -507,7 +527,8 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
   }
   const coherenceOf = (key) => usable.get(key) ?? under.get(key);
 
-  const score = (key, f) => (1 + Math.log(f.tf)) * Math.log(N / df.get(key)) * (key.includes(' ') ? D.bigramBoost : 1) * (1 + coherenceOf(key));
+  const score = (key, f) =>
+    (1 + Math.log(f.tf)) * Math.log(N / df.get(key)) * (key.includes(' ') ? D.bigramBoost : 1) * (1 + coherenceOf(key));
 
   // hubs are chosen from the orphans' point of view...
   const hubs = new Set();
@@ -516,7 +537,11 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     for (const c of cands) {
       if (chosen.length >= limit) break;
       const parts = c.key.split(' ');
-      if (parts.length === 1 && chosen.some((p) => p.key.split(' ').includes(c.key) && df.get(p.key) >= 0.6 * df.get(c.key))) continue;
+      if (
+        parts.length === 1 &&
+        chosen.some((p) => p.key.split(' ').includes(c.key) && df.get(p.key) >= 0.6 * df.get(c.key))
+      )
+        continue;
       if (parts.length === 2) {
         const i = chosen.findIndex((p) => parts.includes(p.key) && df.get(c.key) >= 0.6 * df.get(p.key));
         if (i >= 0) chosen.splice(i, 1);
@@ -554,7 +579,11 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
         if (kept.length + chosen.length >= D.perItem) break;
         const parts = c.key.split(' ');
         const all = [...kept, ...chosen];
-        if (parts.length === 1 && all.some((p) => p.key.split(' ').includes(c.key) && df.get(p.key) >= 0.6 * df.get(c.key))) continue;
+        if (
+          parts.length === 1 &&
+          all.some((p) => p.key.split(' ').includes(c.key) && df.get(p.key) >= 0.6 * df.get(c.key))
+        )
+          continue;
         if (parts.length === 2) {
           if (kept.some((p) => parts.includes(p.key) && df.get(c.key) >= 0.6 * df.get(p.key))) continue;
           const i = chosen.findIndex((p) => parts.includes(p.key) && df.get(c.key) >= 0.6 * df.get(p.key));
@@ -617,7 +646,10 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
           weight: Number(Math.min(0.6, D.weight + 0.05 * Math.min(4, f.tf)).toFixed(3)),
           origin: 'discovered',
           why: `accepted from the queue by the site's overrides; recurs in ${n} of ${reps.length} items${f.tf > 1 ? `; ${f.tf}× here` : ''}`,
-          wasDerivedFrom: [{ type: 'text', phrase: phrase(f), count: f.tf, inTitle: f.inTitle }, { type: 'overrides', key: 'accept', label: name }],
+          wasDerivedFrom: [
+            { type: 'text', phrase: phrase(f), count: f.tf, inTitle: f.inTitle },
+            { type: 'overrides', key: 'accept', label: name },
+          ],
           wasGeneratedBy: { activity: 'discover', parameters: { accepted: true, df: df.get(key), items: n } },
         });
       }
@@ -630,7 +662,10 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     const coherence = coherenceOf(key);
     const { baseline, ratio } = measure.get(key);
     const below = under.has(key);
-    const lift = baseline > 0 ? `, ${(coherence / baseline).toFixed(1)}× the ${baseline.toFixed(3)} that items from the same sources share` : '';
+    const lift =
+      baseline > 0
+        ? `, ${(coherence / baseline).toFixed(1)}× the ${baseline.toFixed(3)} that items from the same sources share`
+        : '';
     const bar = below ? `; under the ${D.sourceCoherenceRatio}× bar, admitted by the ${floor}× floor` : '';
     const copies = k < n ? ` (${k} of ${N} counting near-copies once)` : '';
     const name = label(key);
@@ -691,7 +726,11 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     if (queue) {
       // highest score first, then by form, so a reader starts at the top
       const byScore = (a, b) => b.score - a.score || byForm(a.key, b.key);
-      info.queue = { bar: D.sourceCoherenceRatio, floor, candidates: [...queued].sort(byScore).map(({ key: _key, ...rest }) => rest) };
+      info.queue = {
+        bar: D.sourceCoherenceRatio,
+        floor,
+        candidates: [...queued].sort(byScore).map(({ key: _key, ...rest }) => rest),
+      };
     }
   }
   return out;
@@ -710,7 +749,21 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
     const fates = {};
     for (const it of reps) {
       if (tagged.has(it.key) || landed.has(it.key)) continue;
-      const fate = { members: (members.get(it.key) ?? [it.key]).sort(), candidates: 0, single: 0, queued: [], functionWord: [], ignored: [], nearCopy: [], tooCommon: [], incoherent: [], underFloor: [], underBar: [], dropped: [], notChosen: [] };
+      const fate = {
+        members: (members.get(it.key) ?? [it.key]).sort(),
+        candidates: 0,
+        single: 0,
+        queued: [],
+        functionWord: [],
+        ignored: [],
+        nearCopy: [],
+        tooCommon: [],
+        incoherent: [],
+        underFloor: [],
+        underBar: [],
+        dropped: [],
+        notChosen: [],
+      };
       const inQueue = new Set((queuedOn.get(it.key) ?? []).map((q) => q.key));
       for (const [key, f] of perItem.get(it.key)) {
         fate.candidates += 1;
@@ -723,16 +776,27 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
         else if (gate === 'ignored') fate.ignored.push({ phrase: name, df: d });
         else if (inQueue.has(key)) {
           const q = queuedOn.get(it.key).find((x) => x.key === key);
-          fate.queued.push({ phrase: name, score: q.score, ...(q.sourceRatio === undefined ? {} : { sourceRatio: q.sourceRatio }) });
+          fate.queued.push({
+            phrase: name,
+            score: q.score,
+            ...(q.sourceRatio === undefined ? {} : { sourceRatio: q.sourceRatio }),
+          });
         } else if (raw < D.minDf) fate.single += 1;
         else if (d < D.minDf) fate.nearCopy.push({ phrase: name, items: raw, df: d });
         else if (dropped.has(key)) fate.dropped.push({ phrase: name, df: d });
         else if (usable.has(key)) fate.notChosen.push({ phrase: name, sourceRatio: measure.get(key).ratio });
-        else if (under.has(key)) fate.underBar.push({ phrase: name, sourceRatio: measure.get(key).ratio, attached: hubs.has(key) });
+        else if (under.has(key))
+          fate.underBar.push({ phrase: name, sourceRatio: measure.get(key).ratio, attached: hubs.has(key) });
         else if (turnedAway.has(key)) {
           const t = turnedAway.get(key);
           if (t.reason === 'tooCommon') fate.tooCommon.push({ phrase: name, df: d, of: N });
-          else if (t.reason === 'incoherent') fate.incoherent.push({ phrase: name, df: d, coherence: Number(t.coherence.toFixed(4)), bar: Number(threshold.toFixed(4)) });
+          else if (t.reason === 'incoherent')
+            fate.incoherent.push({
+              phrase: name,
+              df: d,
+              coherence: Number(t.coherence.toFixed(4)),
+              bar: Number(threshold.toFixed(4)),
+            });
           else fate.underFloor.push({ phrase: name, sourceRatio: t.sourceRatio });
         }
       }
@@ -740,9 +804,18 @@ export function discover(records, cfg = makeConfig(), info = null, { queue = fal
       fate.underBar.sort(byRatio);
       fate.underFloor.sort(byRatio);
       fate.queued.sort((a, b) => b.score - a.score || (a.phrase < b.phrase ? -1 : 1));
-      for (const k of ['functionWord', 'ignored', 'nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen']) fate[k].sort((a, b) => (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
+      for (const k of ['functionWord', 'ignored', 'nearCopy', 'tooCommon', 'incoherent', 'dropped', 'notChosen'])
+        fate[k].sort((a, b) => (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
       fates[it.key] = fate;
     }
-    return { bar: D.sourceCoherenceRatio, floor, minDf: D.minDf, maxDfRatio: D.maxDfRatio, items: N, queue, untagged: fates };
+    return {
+      bar: D.sourceCoherenceRatio,
+      floor,
+      minDf: D.minDf,
+      maxDfRatio: D.maxDfRatio,
+      items: N,
+      queue,
+      untagged: fates,
+    };
   }
 }

@@ -11,7 +11,13 @@ export function fromJsonFeed(text, opts = {}) {
   for (const it of feed.items ?? []) {
     const source = opts.source || it._source?.title || feed.title || 'feed';
     const id = String(it.id ?? it.url);
-    const body = [decodeEntities(it.summary), decodeEntities(it.tldr), stripHtml(it.content_html ?? it.content_text ?? '')].filter(Boolean).join(' ');
+    const body = [
+      decodeEntities(it.summary),
+      decodeEntities(it.tldr),
+      stripHtml(it.content_html ?? it.content_text ?? ''),
+    ]
+      .filter(Boolean)
+      .join(' ');
     records.push({
       type: 'item',
       source,
@@ -24,7 +30,8 @@ export function fromJsonFeed(text, opts = {}) {
       ...(it._source?.color ? { color: it._source.color } : {}),
     });
     for (const label of it.tags ?? []) {
-      if (typeof label === 'string' && label.trim()) records.push({ type: 'tag', source, item: id, label: label.trim(), weight: 1, origin: 'explicit' });
+      if (typeof label === 'string' && label.trim())
+        records.push({ type: 'tag', source, item: id, label: label.trim(), weight: 1, origin: 'explicit' });
     }
   }
   return records;

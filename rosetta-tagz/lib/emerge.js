@@ -65,7 +65,8 @@ export function buildPhraseTable(stone) {
       const variant = c.variants.find((v) => v.norm === norm);
       const ratio = typeof variant?.sourceRatio === 'number' ? variant.sourceRatio : null; // the canonical of a pin is a human's
       if (info.tokens.length === 1 && variant?.acronym) {
-        for (const raw of Object.keys(variant.forms)) if (looksLikeAcronym(raw)) acronyms.set(raw.replace(/[.\s]/g, ''), { cid: c.id, ratio });
+        for (const raw of Object.keys(variant.forms))
+          if (looksLikeAcronym(raw)) acronyms.set(raw.replace(/[.\s]/g, ''), { cid: c.id, ratio });
         continue;
       }
       if (!info.stems.length || info.stems.length > MAX_PHRASE) continue;
@@ -88,7 +89,12 @@ function matchText(text, table, { ws, seq } = stemSeq(text)) {
   for (let i = 0; i < seq.length; i++) {
     if (!table.first.has(seq[i].stem)) continue; // no phrase starts with this word
     for (let n = 1; n <= MAX_PHRASE && i + n <= seq.length; n++) {
-      const hit = table.phrases.get(seq.slice(i, i + n).map((s) => s.stem).join(' '));
+      const hit = table.phrases.get(
+        seq
+          .slice(i, i + n)
+          .map((s) => s.stem)
+          .join(' '),
+      );
       if (!hit) continue;
       const span = ws.slice(seq[i].at, seq[i + n - 1].at + 1).join(' ');
       for (const [cid, h] of hit) bump(cid, span, h.single, h.ratio);
@@ -160,7 +166,11 @@ function earn(stone, records, cfg, shared, { only = null, level = null } = {}) {
     carried.get(k).add(cid);
   }
 
-  const perItem = items.map(({ it, body, title, bodySeq, titleSeq }) => ({ it, inBody: matchText(body, table, bodySeq), inTitle: matchText(title, table, titleSeq) }));
+  const perItem = items.map(({ it, body, title, bodySeq, titleSeq }) => ({
+    it,
+    inBody: matchText(body, table, bodySeq),
+    inTitle: matchText(title, table, titleSeq),
+  }));
 
   const df = new Map();
   for (const { inBody } of perItem) for (const cid of inBody.keys()) df.set(cid, (df.get(cid) ?? 0) + 1);
@@ -252,5 +262,9 @@ export function emerge(stone, records, cfg = makeConfig()) {
 
   // in emergence's own order: by item, then by concept
   const order = new Map(shared.items.map(({ it }, i) => [`${it.source}::${it.id}`, i]));
-  return [...base, ...extra].sort((a, b) => order.get(`${a.source}::${a.item}`) - order.get(`${b.source}::${b.item}`) || (a.concept < b.concept ? -1 : a.concept > b.concept ? 1 : 0));
+  return [...base, ...extra].sort(
+    (a, b) =>
+      order.get(`${a.source}::${a.item}`) - order.get(`${b.source}::${b.item}`) ||
+      (a.concept < b.concept ? -1 : a.concept > b.concept ? 1 : 0),
+  );
 }

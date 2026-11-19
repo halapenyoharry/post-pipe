@@ -31,7 +31,10 @@ test('hyper: one node per concept, tags are vertices', () => {
   assert.ok(g.nodes.filter((n) => n.type === 'concept').length < g.nodes.filter((n) => n.type === 'term').length + 100);
   assert.ok(g.links.some((l) => l.type === 'tag' && l.origin === 'emergent'));
   const ids = new Set(g.nodes.map((n) => n.id));
-  assert.ok(g.links.every((l) => ids.has(l.source) && ids.has(l.target)), 'no dangling links');
+  assert.ok(
+    g.links.every((l) => ids.has(l.source) && ids.has(l.target)),
+    'no dangling links',
+  );
 });
 
 test('hyper: folding makes the graph smaller than raw, never larger', () => {
@@ -59,7 +62,10 @@ test('concepts: only vocabulary, joined by typed relations', () => {
   const g = projectGraph(U, 'concepts');
   assert.ok(g.nodes.every((n) => n.type === 'concept'));
   assert.ok(g.links.every((l) => l.relation));
-  assert.deepEqual([...new Set(g.links.map((l) => l.type))].sort(), [...new Set(U.relations.map((r) => r.type))].sort());
+  assert.deepEqual(
+    [...new Set(g.links.map((l) => l.type))].sort(),
+    [...new Set(U.relations.map((r) => r.type))].sort(),
+  );
 });
 
 test('relation type filter and labels override', () => {
@@ -69,7 +75,11 @@ test('relation type filter and labels override', () => {
   const labels = new Map([[cid('ai'), 'Renamed']]);
   assert.equal(projectGraph(U, 'concepts', { labels }).nodes.find((n) => n.concept === cid('ai')).label, 'Renamed');
   const step1 = projectGraph(U, 'concepts', { broaderDepth: 1 });
-  assert.equal(step1.nodes.find((n) => n.concept === cid('ml')).label, 'AI', 'broaderDepth: 1 walks one step up skos:broader');
+  assert.equal(
+    step1.nodes.find((n) => n.concept === cid('ml')).label,
+    'AI',
+    'broaderDepth: 1 walks one step up skos:broader',
+  );
 });
 
 test('hiding a tag-system removes its items and the concepts only it used', () => {
@@ -100,16 +110,17 @@ test('unknown mode throws a helpful error', () => {
 
 test('tags newer than stone.json become unmapped singleton concepts instead of vanishing', () => {
   const stale = syntheticStone();
-  const newer = [
-    ...rec('Fresh', { n1: ['quantum gravity', 'AI'], n2: ['quantum gravity'] }),
-  ];
+  const newer = [...rec('Fresh', { n1: ['quantum gravity', 'AI'], n2: ['quantum gravity'] })];
   const u = buildUniverse(stale, newer);
   const q = u.concepts.find((c) => c.unmapped);
   assert.ok(q && q.canonical === 'quantum gravity' && q.n === 2);
   assert.equal(u.stats.unmapped, 1);
   const g = projectGraph(u, 'hyper');
   assert.ok(g.nodes.some((n) => n.unmapped && n.n === 2));
-  assert.ok(u.items.find((i) => i.key === 'Fresh::n1').tags.some((t) => t.c === cid('ai')), 'known spellings still resolve');
+  assert.ok(
+    u.items.find((i) => i.key === 'Fresh::n1').tags.some((t) => t.c === cid('ai')),
+    'known spellings still resolve',
+  );
 });
 
 test('the same article in two tag-systems is one item carrying both vocabularies', () => {
@@ -117,12 +128,16 @@ test('the same article in two tag-systems is one item carrying both vocabularies
   assert.deepEqual(w3.alsoIn, ['Archive']);
   assert.ok(!U.items.some((i) => i.key === 'Archive::a1'), 'the Archive copy is folded into the Wire item');
   const labels = w3.tags.flatMap((t) => t.raw.map((r) => `${r.s}:${r.l}`)).sort();
-  assert.ok(labels.includes('Wire:Artificial Intelligence') && labels.includes('Archive:A.I.') && labels.includes('Archive:courts'));
+  assert.ok(
+    labels.includes('Wire:Artificial Intelligence') &&
+      labels.includes('Archive:A.I.') &&
+      labels.includes('Archive:courts'),
+  );
   const ai = w3.tags.find((t) => t.c === cid('ai'));
   assert.deepEqual([...ai.sys].sort(), ['Archive', 'Wire'], 'both systems agree this is AI; the tag knows who said so');
 });
 
-test('hiding one tag-system keeps a shared item but drops that system\'s tags', () => {
+test("hiding one tag-system keeps a shared item but drops that system's tags", () => {
   const g = projectGraph(U, 'raw', { hiddenSources: new Set(['Archive']) });
   assert.ok(g.nodes.some((n) => n.id === 'i:Wire::w3'));
   assert.ok(!g.nodes.some((n) => n.type === 'term' && n.source === 'Archive'));

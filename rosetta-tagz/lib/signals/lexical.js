@@ -1,7 +1,8 @@
 // Lexical evidence that two terms are the same concept. No semantics, just spelling structure.
 import { jaroWinkler, orderPair } from '../similarity.js';
 
-const SUFFIXES = /^(er|ers|or|ors|ly|ion|ions|ment|ments|ness|ity|al|ial|ic|ist|ists|ism|ize|ise|ful|less|able|ible|ous|ive|ee|ed|en)$/;
+const SUFFIXES =
+  /^(er|ers|or|ors|ly|ion|ions|ment|ments|ness|ity|al|ial|ic|ist|ists|ism|ize|ise|ful|less|able|ible|ous|ive|ee|ed|en)$/;
 
 // true when one label is the other plus an ordinary derivational suffix (trade -> trader)
 function derivation(a, b) {
@@ -62,7 +63,13 @@ export function lexicalSignals(corpus, caps) {
         const jw = jaroWinkler(x.norm, y.norm);
         if (jw < (short ? 0.945 : 0.92)) continue;
         const [a, b] = orderPair(x.norm, y.norm);
-        out.push({ a, b, signal: 'edit', score: caps.edit * (0.5 + (0.5 * (jw - 0.92)) / 0.08), why: `spelling similarity ${jw.toFixed(3)}` });
+        out.push({
+          a,
+          b,
+          signal: 'edit',
+          score: caps.edit * (0.5 + (0.5 * (jw - 0.92)) / 0.08),
+          why: `spelling similarity ${jw.toFixed(3)}`,
+        });
       }
     }
   }

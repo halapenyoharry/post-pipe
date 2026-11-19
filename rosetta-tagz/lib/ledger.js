@@ -22,7 +22,15 @@ export const DEFAULT_RETENTION = { retiredMaxBuilds: 50, retiredMaxDays: 90 };
 const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const normOf = (label) => normalizeLabel(label).norm;
 
-function isRetiredExpired(entry, { now = null, builds = 1, maxBuilds = DEFAULT_RETENTION.retiredMaxBuilds, maxDays = DEFAULT_RETENTION.retiredMaxDays } = {}) {
+function isRetiredExpired(
+  entry,
+  {
+    now = null,
+    builds = 1,
+    maxBuilds = DEFAULT_RETENTION.retiredMaxBuilds,
+    maxDays = DEFAULT_RETENTION.retiredMaxDays,
+  } = {},
+) {
   if (typeof maxBuilds === 'number' && maxBuilds > 0 && builds > maxBuilds) return true;
   const stamp = entry?.retiredAt ?? entry?.lastSeen;
   if (typeof maxDays === 'number' && maxDays > 0 && now && stamp) {
@@ -92,7 +100,8 @@ export function writeLedger(file, ledger) {
 export function assignIds(clusters, prior, { pins = [], now = null, retention = {} } = {}) {
   const base = isLedger(prior) ? prior : emptyLedger(now);
   const live = base.concepts;
-  const maxBuilds = retention?.retiredMaxBuilds !== undefined ? retention.retiredMaxBuilds : DEFAULT_RETENTION.retiredMaxBuilds;
+  const maxBuilds =
+    retention?.retiredMaxBuilds !== undefined ? retention.retiredMaxBuilds : DEFAULT_RETENTION.retiredMaxBuilds;
   const maxDays = retention?.retiredMaxDays !== undefined ? retention.retiredMaxDays : DEFAULT_RETENTION.retiredMaxDays;
   const gone = {};
   for (const [id, r] of Object.entries(base.retired)) {
@@ -188,7 +197,10 @@ export function assignIds(clusters, prior, { pins = [], now = null, retention = 
     );
     keeperOf.set(id, list[0].i);
     for (const other of list.slice(1)) parentOf.set(other.i, id);
-    splitChildren.set(id, list.map((c) => c.i));
+    splitChildren.set(
+      id,
+      list.map((c) => c.i),
+    );
   }
 
   // ids: reused first (so a mint never collides with one), then minted
@@ -248,7 +260,13 @@ export function assignIds(clusters, prior, { pins = [], now = null, retention = 
     const parent = parentOf.get(i) ?? from?.parent;
     if (parent) entry.parent = parent;
     next.concepts[id] = entry;
-    const event = absorbedBy.has(i) ? 'merged' : parentOf.has(i) || (from && splitChildren.has(ids[i])) ? 'split' : from ? 'reused' : 'minted';
+    const event = absorbedBy.has(i)
+      ? 'merged'
+      : parentOf.has(i) || (from && splitChildren.has(ids[i]))
+        ? 'split'
+        : from
+          ? 'reused'
+          : 'minted';
     const note = { since: entry.since, event };
     if (from && from.label !== undefined && from.label !== label) note.previousLabel = from.label;
     return note;
@@ -271,7 +289,8 @@ export function assignIds(clusters, prior, { pins = [], now = null, retention = 
   }
 
   const events = [];
-  for (const [id, children] of splitChildren) events.push({ type: 'split', at: now, parent: id, children: children.map((i) => ids[i]) });
+  for (const [id, children] of splitChildren)
+    events.push({ type: 'split', at: now, parent: id, children: children.map((i) => ids[i]) });
   for (const [i, parents] of absorbedBy) {
     const all = reusedFrom.has(i) ? [reusedFrom.get(i), ...parents] : parents;
     events.push({ type: 'merge', at: now, parents: all, child: ids[i] });
