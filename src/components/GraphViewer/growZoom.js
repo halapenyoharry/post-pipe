@@ -69,7 +69,7 @@ function growCap(acts, { gap = 16, homeK = 1, floor = 1 } = {}) {
     for (let j = i + 1; j < list.length; j++) {
       const a = list[i],
         b = list[j];
-      const along = (lo, hi, aLo, aHi, bLo, bHi) => {
+      const along = (lo, hi, aLo, aHi, bLo, _bHi) => {
         // a before b along this axis: a's far side (aHi) and b's near side (bLo).
         const reach = aHi - lo + (hi - bLo);
         const room = hi - lo - g;

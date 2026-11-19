@@ -22,6 +22,15 @@ module.exports = [
   },
   js.configs.recommended,
   {
+    rules: {
+      'no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ], // leading underscore marks an intentionally unused parameter or caught error; destructuring with rest omits properties
+      'no-empty': ['error', { allowEmptyCatch: true }], // empty catch blocks intentionally ignore non-fatal errors
+    },
+  },
+  {
     // Root scripts, platforms, tools, tests, and CommonJS modules under src/
     files: [
       '*.js',
@@ -75,7 +84,10 @@ module.exports = [
       },
     },
     rules: {
-      'no-unused-vars': ['error', { vars: 'local' }], // top-level functions or variables may be used by another page script or inline HTML
+      'no-unused-vars': [
+        'error',
+        { vars: 'local', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ], // top-level functions or variables may be used by another page script or inline HTML
     },
   },
   {

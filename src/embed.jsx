@@ -313,12 +313,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           const parts = hash.substring(6).split('&p=');
           const id = parts[0];
           const p = parts[1] ? parseInt(parts[1], 10) : null;
-          const items =
-            typeof feed !== 'undefined'
-              ? feed.items || []
-              : typeof feedData !== 'undefined'
-                ? feedData.items || []
-                : [];
+          const items = typeof feedData !== 'undefined' ? feedData.items || [] : [];
           const item = items.find((i) => i.id === decodeURIComponent(id) || i.url === decodeURIComponent(id));
           if (item) {
             if (viewState) viewState.markSeen(item.id);
@@ -352,7 +347,7 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         window.removeEventListener('graph:reset-layout', onResetLayout);
       };
     },
-    [typeof feed !== 'undefined' ? feed : feedData, viewState],
+    [feedData, viewState],
   );
 
   const hiddenSources = React.useMemo(() => {

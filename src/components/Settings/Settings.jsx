@@ -249,7 +249,15 @@ export function SettingsButton({ className, size = 15, ...rest }) {
 // schemes: the feed's concept schemes (feed._rtagz.schemes, as
 // schemesOf(feedData) reads them when the prop is left out); with two or
 // more, the view group offers the scheme and the depth the tags are read at.
-export function Settings({ viewState, feedData, subject, readerOpen, where = 'graph', ownButton, schemes }) {
+export function Settings({
+  viewState,
+  feedData,
+  subject,
+  readerOpen: _readerOpen,
+  where = 'graph',
+  ownButton,
+  schemes,
+}) {
   const W = whereOf(where);
   const [open, setOpen] = useState(false);
   const [confirmForget, setConfirmForget] = useState(false);

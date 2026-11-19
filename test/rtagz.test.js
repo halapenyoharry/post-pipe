@@ -7,7 +7,6 @@ const os = require('os');
 const { loadCorpus } = require('../src/aggregator');
 const { buildEdges } = require('../src/corpus/buildEdges');
 const {
-  htmlToText,
   canonicalUrl,
   cacheDirForSite,
   mergeOverrides,

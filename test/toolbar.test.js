@@ -47,10 +47,6 @@ const DIMS = [
   { id: 'commits', label: 'revisions', title: 'c' },
   { id: 'chronology', label: 'chronology', title: 'h' },
 ];
-const LAYOUTS = [
-  { id: 'force', label: 'cluster', title: 'a' },
-  { id: 'radial', label: 'ring', title: 'b' },
-];
 
 test('menu: a checkbox row per dimension, checked when its axis is on, and the bucket size; nothing else', () => {
   const m = menuModel({

@@ -397,7 +397,7 @@ test('bookmarks add and list in para order', async () => {
   await s.ready();
   const id2 = s.addBookmark({ item: 'ch1', para: 5, quote: 'Five words in the fifth para', note: 'second note' });
   const id1 = s.addBookmark({ item: 'ch1', para: 1, quote: 'First words in the first para' });
-  const idOther = s.addBookmark({ item: 'ch2', para: 0, quote: 'Other item first para' });
+  s.addBookmark({ item: 'ch2', para: 0, quote: 'Other item first para' });
 
   assert.ok(id1.startsWith('bm-'));
   assert.ok(id2.startsWith('bm-'));

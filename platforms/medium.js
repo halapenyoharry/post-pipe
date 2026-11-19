@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
 const matter = require('gray-matter');
 const path = require('path');
 const fs = require('fs');
-const { pushArticle, PAGES_BASE } = require('./github-pages');
+const { pushArticle } = require('./github-pages');
 
 // ─── Login ───────────────────────────────────────────────────────────────────
 

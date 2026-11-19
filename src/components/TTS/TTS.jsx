@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './TTS.module.css';
 import { ICONS } from '../../utils/icons';
-import { listenState, toggleListen, stopListening } from '../../lib/listenInCard';
+import { toggleListen, stopListening } from '../../lib/listenInCard';
 
 // The voice, shared by three views of it: the transport in the reader (play,
 // pause, stop, and what it is doing), the choices in the settings panel's

@@ -223,13 +223,13 @@ async function subscribe(config, value, fetchImpl) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ [config.field]: String(value || '').trim() }),
     });
-  } catch (e) {
+  } catch (_e) {
     return { ok: false, message: config.error };
   }
   let body = null;
   try {
     body = await res.json();
-  } catch (e) {
+  } catch (_e) {
     body = null;
   }
   return subscribeResult(config, res.status, body);

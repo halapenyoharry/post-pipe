@@ -292,7 +292,7 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
 // One of the two is open at a time. Escape or a tap outside closes it; the
 // arrow keys, Home and End move through it. The sliders open the main view's
 // panel (src/components/Settings).
-function TopControls({ viewState, show, layouts, settings, layers, feedData, hiddenSources }) {
+function TopControls({ viewState, show, layouts: _layouts, settings, layers, feedData, hiddenSources }) {
   const S = settings || (typeof window !== 'undefined' ? window.SETTINGS : null);
   const [, bump] = useReducer((n) => n + 1, 0);
   // Which is open: 'dimensions', 'tags', or null.
@@ -432,7 +432,7 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
     list[next].focus();
   };
 
-  const row = (r, i) => {
+  const row = (r, _i) => {
     if (r.kind === 'dimension' || r.kind === 'layer') {
       const toggle =
         r.kind === 'dimension'

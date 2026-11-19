@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import * as d3 from 'd3';
 import styles from './GraphViewer.module.css';
 import { lensFor } from '../NodeView';
-import { computeLayout, radialLayout, layoutIsDegenerate, timeAxisGeometry, dimensionAxisGeometry } from './layouts';
+import { computeLayout, radialLayout, layoutIsDegenerate, dimensionAxisGeometry } from './layouts';
 import { containerLayout, containerLayoutOf, hullDrawn, closedPillScaleOf, closedPillOf } from './containerLayout';
 import { containerLook } from './containerLook';
 import { nodePaletteFor } from '../../lib/nodePalettes';
@@ -12,8 +12,6 @@ import { tightened } from '../../lib/tightness';
 import {
   MODE_PREF as EDGE_WEIGHT_MODE_PREF,
   PENALTY_PREF as DEGREE_PENALTY_PREF,
-  EDGE_WEIGHT_MODES,
-  DEGREE_PENALTIES,
   degreesOf,
   effectiveWeight,
   linkStrength,
@@ -787,7 +785,6 @@ export function GraphViewer({
 
   // The live graph, reachable from effects that must not rebuild it.
   const cardSizeFor = makeCardSizeFor(CARD);
-  const GLOW_PAD = CARD.glowPadding;
 
   const graphRef = useRef(null);
   const layoutRef = useRef(layout);
@@ -2160,7 +2157,7 @@ export function GraphViewer({
             if (event.button !== undefined && event.button !== 0) return false;
             return true;
           })
-          .on('start', function (event, c) {
+          .on('start', function (event, _c) {
             if (event.sourceEvent) event.sourceEvent.stopPropagation();
             const startX = event.x;
             const startY = event.y;
@@ -2225,7 +2222,6 @@ export function GraphViewer({
 
             if (totalMove >= 4) {
               if (!state.moves) return;
-              anchorsAuto = false;
               const memberSlugs = getAllMemberSlugs(c.id);
               // The anchored containers it carried leave their anchors.
               if (anchoredOffsetsReady) {
@@ -2618,7 +2614,6 @@ export function GraphViewer({
     // Move each anchored container, members and all, so its centre is on
     // its anchor; they stay there (pinned) until the reader moves them.
     const anchorsPending = new Set(); // fresh: placed when the art is known
-    let anchorsAuto = false; // placed by the layout and not moved since
     // An anchored container stays pinned to its anchor (the anchor is its
     // centre, closed or open, through every opening and closing) until the
     // reader drags it; then it stays where it was dropped, until Reset. The
@@ -2744,7 +2739,6 @@ export function GraphViewer({
       const targets = apart(anchorTargets());
       moveCentres(ids.map((cId) => [cId, targets.get(cId)]));
       for (const cId of ids) anchorsPending.delete(cId);
-      anchorsAuto = ids.length === ANCHORS.size;
       return true;
     }
     function placeDrops() {
@@ -4085,7 +4079,6 @@ export function GraphViewer({
         d.fx = d.x;
         d.fy = d.y;
         if (!d._dragMoved) return;
-        anchorsAuto = false;
         // One history entry for the whole drag, not one per frame.
         if (vs) {
           vs.setNodePosition(positionKey(d), d.x, d.y, { transient: true });

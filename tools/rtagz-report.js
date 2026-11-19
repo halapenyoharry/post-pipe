@@ -179,7 +179,7 @@ function run(argv, log = console.log) {
   const shows = (ratio) => opt.ratio === null || ratioShows(ratio, opt.ratio);
 
   // Optional re-keying through a scheme and depth.
-  let keyOf = (tagId, edge) => tagId;
+  let keyOf = (tagId, _edge) => tagId;
   if (opt.scheme || opt.depth) {
     let schemeLabels = null;
     try {

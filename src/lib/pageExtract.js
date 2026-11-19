@@ -133,7 +133,7 @@ const ATTRS_KEPT = new Set([
 
 function parseAttributes(s) {
   const attrs = {};
-  const re = /([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+  const re = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
   let m;
   while ((m = re.exec(s)) !== null) {
     const name = m[1].toLowerCase();
@@ -182,7 +182,7 @@ function parseHtml(html) {
       i = end < 0 ? len : end + 1;
       continue;
     }
-    const m = /^<(\/?)([a-zA-Z][^\s\/>]*)([^>]*?)(\/?)>/.exec(src.slice(lt, lt + 4096));
+    const m = /^<(\/?)([a-zA-Z][^\s/>]*)([^>]*?)(\/?)>/.exec(src.slice(lt, lt + 4096));
     if (!m) {
       text('<');
       i = lt + 1;

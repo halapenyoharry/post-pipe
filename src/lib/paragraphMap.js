@@ -66,13 +66,7 @@ function mapParagraphs(oldParas, newParas) {
     usedNew.add(newIdx);
   }
 
-  // Fill gaps
-  const oldGaps = [];
-  const newGaps = [];
-
-  let exactMatchIdx = 0;
-
-  // We can just iterate through and match unmapped old paragraphs with unmapped new ones sequentially,
+  // Fill gaps: iterate through and match unmapped old paragraphs with unmapped new ones sequentially,
   // constrained by the exact matches as boundaries.
 
   exactMatches.push([oldParas.length, newParas.length]); // Dummy end match for gap calculation
