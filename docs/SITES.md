@@ -31,7 +31,7 @@ Every script (`generate-index.js`, `add-feed.js`, `update-index.js`, the publish
 
 A site may convert its own content shape into post-pipe's before building, the way the novel's `scripts/build.js` assembles chapter folders from a manuscript repository and then calls `generate-index.js` with `POSTPIPE_SITE` set. That converter belongs to the site, not the engine. Formats many people share (a folder of pieces, feeds) are read by the engine directly.
 
-Another checkout of the engine can be used with `POSTPIPE_ENGINE=<folder>` in a site's own build script; the novel's does this.
+Another checkout of the engine can be used with `POSTPIPE_ENGINE=<folder>` in a site's own build script; the novel's does this. Set `POSTPIPE_SAVED_COPIES=1` to build from each fetched feed's saved copy in the site (`savedCopy` on its outline in `feeds.opml`) without reaching the network.
 
 ## What stays out of the engine
 

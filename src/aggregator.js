@@ -76,6 +76,28 @@ async function loadEntry({ adapter, config }, options) {
   const now = typeof options.now === 'function' ? options.now : () => new Date();
   const url = typeof config.xmlUrl === 'string' && config.xmlUrl ? config.xmlUrl : null;
   const savedCopy = typeof config.savedCopy === 'string' && config.savedCopy ? config.savedCopy : null;
+  if (options.savedCopiesOnly && url) {
+    const siteCopy = readSavedCopy(savedCopy);
+    if (!siteCopy) {
+      const error = savedCopy ? `its saved copy ${savedCopy} is missing or is not a copy` : 'no savedCopy named on its outline';
+      console.warn(`[aggregator] ${adapter.id}:${config.id}: ${error}, so it has no items this build`);
+      return {
+        adapter, config, ok: false, error, items: [], feedMeta: { id: config.id, title: config.title },
+        fetchedAt: null,
+      };
+    }
+    try {
+      const result = await adapter.load(config, { fetchText: async () => siteCopy.body });
+      return { adapter, config, ok: true, ...result, fetchedAt: siteCopy.fetchedAt || null };
+    } catch (copyErr) {
+      const error = describeError(copyErr);
+      console.warn(`[aggregator] ${adapter.id}:${config.id}: ${COPY_NAMES.site} could not be read (${error}), so it has no items this build`);
+      return {
+        adapter, config, ok: false, error, items: [], feedMeta: { id: config.id, title: config.title },
+        fetchedAt: null,
+      };
+    }
+  }
   const fetched = new Map(); // address -> text this build fetched
   const remembering = async (address, opts) => {
     const text = await fetchImpl(address, opts);
@@ -173,6 +195,7 @@ async function loadCorpus(entries, options = {}) {
     const feedId = r.feedMeta.id || r.config.id;
     const cached = cache.get(feedId);
     if (cached) { r.color = cached; return; }
+    if (options.savedCopiesOnly) { r.color = r.config.customColor || null; return; }
     r.color = await detectExplicitFeedColor(r.feedMeta, r.config.customColor);
   }));
 
