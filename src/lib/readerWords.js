@@ -91,7 +91,7 @@ function countWords(text) {
 // ── Sentence ends ───────────────────────────────────────────────────────────
 
 const ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'st', 'jr', 'sr', 'vs', 'etc', 'e.g', 'i.e']);
-const OPENERS = /^["'“‘«‹(\[{]+/;
+const OPENERS = /^["'“‘«‹([{]+/;
 // Sentence-ending marks, then any closing quotes or brackets, then a space or
 // the end of the text.
 const SENTENCE_END = /[.!?…]+["'”’»›)\]}]*(?=\s|$)/g;

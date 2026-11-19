@@ -10,7 +10,7 @@
 /** @type {any} */
 const matter = require('gray-matter');
 
-const OPEN = /^﻿?---[ \t]*\r?\n/;
+const OPEN = /^\uFEFF?---[ \t]*\r?\n/;
 const CLOSE = /^(?:---|\.\.\.)[ \t]*$/;
 
 /**

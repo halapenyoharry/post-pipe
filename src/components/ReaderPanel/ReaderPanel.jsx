@@ -1223,7 +1223,7 @@ async function fetchPage(item) {
     doc.querySelectorAll('.pp-rights').forEach((el) => el.remove());
     let bodyHtml = doc.querySelector('body') ? doc.querySelector('body').innerHTML : html;
     return bodyHtml + renderCompanions(item);
-  } catch (e) {
+  } catch (_e) {
     return renderPlaceholder(item, 'Rendered article not yet published to GitHub Pages.');
   }
 }
@@ -1451,7 +1451,7 @@ function FrontmatterPanel({ article, settings }) {
       case 'license':
         value = article.license || '';
         break;
-      case 'syndication':
+      case 'syndication': {
         const synd = article.syndication || {};
         const links = Object.entries(synd).filter(([, url]) => url);
         if (links.length) {
@@ -1469,6 +1469,7 @@ function FrontmatterPanel({ article, settings }) {
           );
         }
         break;
+      }
       default:
         break;
     }

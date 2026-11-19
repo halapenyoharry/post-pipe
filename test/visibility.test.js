@@ -2,10 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { ingestFolder } = require('../ingest');
 const LocalFolderAdapter = require('../src/adapters/LocalFolderAdapter');
 
-test('visibility flag', async (t) => {
+test('visibility flag', async (_t) => {
   const rootPath = path.join(__dirname, '_test_visibility_root');
   fs.mkdirSync(rootPath, { recursive: true });
 

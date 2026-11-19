@@ -281,6 +281,7 @@ function turtleTerm(t) {
     .replace(/\n/g, '\\n')
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t')
+    // eslint-disable-next-line no-control-regex -- escaping ASCII control characters in Turtle string literals
     .replace(/[\u0000-\u001F\u007F]/g, (c) => `\\u${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`)}"`;
   if (t.lang) return `${body}@${t.lang}`;
   if (t.type) return `${body}^^${turtleTerm({ iri: t.type })}`;

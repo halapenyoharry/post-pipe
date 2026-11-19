@@ -11,8 +11,9 @@
     "build": "vite build",
     "build:lib": "vite build --config vite.config.lib.js",
     "build:embed": "vite build --config vite.config.embed.js",
-    "format": "prettier --write \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js",
-    "format:check": "prettier --check \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js",
+    "format": "prettier --write \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js eslint.config.js",
+    "format:check": "prettier --check \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js eslint.config.js",
+    "lint": "eslint . flow/bin/* rosetta-tagz/bin/*",
     "test": "node --test test/*.test.js",
     "smoke": "node tools/smoke.js",
     "typecheck": "tsc -p tsconfig.json",
@@ -34,8 +35,12 @@
     "serve-handler": "^6.1.7"
   },
   "devDependencies": {
+    "@eslint/js": "9.39.5",
     "@types/node": "25.9.9",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-react": "7.37.5",
+    "globals": "17.14.0",
     "prettier": "3.10.1",
     "typescript": "7.0.2",
     "vite": "^8.0.12"

@@ -104,7 +104,7 @@ function loadInk(src, crown) {
           above: inkSpan(data, w, h, 0, at),
           below: at < 1 ? widestInkRow(data, w, h, at, 1) : null,
         });
-      } catch (e) {
+      } catch (_e) {
         resolve(null);
       }
     };
@@ -836,7 +836,7 @@ function Cover({ config, viewState, children }) {
     return () => {
       live = false;
     };
-  }, [art]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [art]);
 
   // title.fit 'width': once the title's face has loaded, each line is
   // measured as drawn and set to its width, and the byline measured at
@@ -849,7 +849,7 @@ function Cover({ config, viewState, children }) {
         ? [...ref.current.querySelectorAll('[data-cover-title-line]')].map((t) => {
             try {
               return t.getComputedTextLength();
-            } catch (e) {
+            } catch (_e) {
               return 0;
             }
           })
@@ -884,7 +884,7 @@ function Cover({ config, viewState, children }) {
     return () => {
       live = false;
     };
-  }, [art, config]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [art, config]);
 
   // The fitted title: paint again with its sizes, and say where the art is.
   useLayoutEffect(() => {
@@ -892,7 +892,7 @@ function Cover({ config, viewState, children }) {
     const m = machineRef.current;
     if (m) paintRef.current(m.p);
     publishFrameRef.current();
-  }, [title]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [title]);
 
   // The roots as vectors: read once (the site's own file), drawn, and from
   // then on bent toward their acts each frame (drawFrame).
@@ -920,7 +920,7 @@ function Cover({ config, viewState, children }) {
       if (built) built.dispose();
       rootsRef.current = null;
     };
-  }, [config, art]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [config, art]);
 
   // The rootlets' layer, and the graph's word that its world has changed.
   useEffect(() => {
@@ -946,7 +946,7 @@ function Cover({ config, viewState, children }) {
       reachRef.current = null;
       if (window.PostPipeCoverFrame) delete window.PostPipeCoverFrame;
     };
-  }, [config, reduced]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [config, reduced]);
 
   // The machine, from the first frame. Its rests are remembered.
   useLayoutEffect(() => {
@@ -1206,7 +1206,7 @@ function Cover({ config, viewState, children }) {
       if (window.PostPipeCover && window.PostPipeCover.go) delete window.PostPipeCover;
       machineRef.current = null;
     };
-  }, [config, reduced, start, viewState]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [config, reduced, start, viewState]);
 
   const tap = (to) => {
     const m = machineRef.current;

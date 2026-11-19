@@ -54,7 +54,7 @@ export function TextView({
   sourceColor: feedColor,
   listen = true,
 }) {
-  const { hovered = false, pinned = false, lod = 'full', zoomScale = 1 } = viewState || {};
+  const { hovered = false, pinned = false, zoomScale = 1 } = viewState || {};
   const expanded = hovered || pinned;
   const useFullArticle = pinned && !!fullContent;
   // The listening strip, in an open card only.
@@ -341,7 +341,7 @@ function CardContent({
   article,
   width,
   height,
-  bandHeight = 0,
+  bandHeight: _bandHeight = 0,
   viewState,
   expanded,
   useFullArticle,

@@ -45,7 +45,7 @@ export function ResizeHandles({ width, height, zoomScale = 1, onResize, onResize
       }
     };
 
-    const handlePointerUp = (upEvt) => {
+    const handlePointerUp = (_upEvt) => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       document.body.style.cursor = '';

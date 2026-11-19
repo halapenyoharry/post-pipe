@@ -148,7 +148,6 @@
 
   // ── Highlighting & scroll sync ─────────────────────────────────────────────
   let highlightBlock = null;
-  let highlightMark = null;
 
   function highlightSentence(idx) {
     clearHighlight();
@@ -178,7 +177,6 @@
       if (!highlightBlock.style.borderRadius) highlightBlock.style.removeProperty('border-radius');
       highlightBlock = null;
     }
-    highlightMark = null;
 
     // Defensive sweep: ensure no orphaned <mark class="tts-active"> elements remain in DOM
     try {
@@ -191,7 +189,7 @@
           p.normalize();
         }
       });
-    } catch (e) {
+    } catch (_e) {
       /* ignore cleanup errors */
     }
   }
@@ -216,7 +214,7 @@
     try {
       const v = eng && eng.voices ? eng.voices().find((x) => x.id === voiceId) : null;
       return (v && v.label) || voiceId;
-    } catch (e) {
+    } catch (_e) {
       return voiceId;
     }
   }
@@ -232,7 +230,7 @@
     let voices = [];
     try {
       voices = eng && eng.voices ? eng.voices() : [];
-    } catch (e) {
+    } catch (_e) {
       voices = [];
     }
     const b = registry.browser && isExposed('browser') ? registry.browser : null;
@@ -241,7 +239,7 @@
       const listed = (() => {
         try {
           return b.voices ? b.voices() : [];
-        } catch (e) {
+        } catch (_e) {
           return [];
         }
       })();
@@ -650,12 +648,10 @@
     const synth = window.speechSynthesis;
     if (!synth) return;
 
-    let currentUtterance = null;
     let resolveSpeak = null;
-    let cachedVoices = [];
 
     function refreshVoices() {
-      cachedVoices = synth.getVoices();
+      synth.getVoices();
     }
     synth.addEventListener('voiceschanged', refreshVoices);
     refreshVoices();
@@ -804,18 +800,15 @@
           utt.pitch = p.pitch || 1;
           utt.volume = p.volume !== undefined ? p.volume : 1;
           utt.onend = () => {
-            currentUtterance = null;
             resolve();
           };
           utt.onerror = (e) => {
-            currentUtterance = null;
             const code = (e && e.error) || 'failed';
             const err = new Error('speech ' + code);
             err.code = code;
             err.interrupted = code === 'interrupted' || code === 'canceled';
             reject(err);
           };
-          currentUtterance = utt;
           resolveSpeak = resolve;
           synth.speak(utt);
         });
@@ -829,7 +822,6 @@
       },
       stop: function () {
         synth.cancel();
-        currentUtterance = null;
         if (resolveSpeak) {
           resolveSpeak();
           resolveSpeak = null;
@@ -925,7 +917,7 @@
       const ctx = getAudioCtx();
       const wav = pcmToWav(pcmBuffer);
       const audioBuffer = await ctx.decodeAudioData(wav);
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve, _reject) => {
         currentSource = ctx.createBufferSource();
         currentSource.buffer = audioBuffer;
         currentSource.connect(ctx.destination);
@@ -959,7 +951,7 @@
         },
       },
 
-      init: async function (params) {
+      init: async function (_params) {
         if (!apiKey) throw new Error('Gemini TTS: no API key. Set GEMINI_API_KEY in auth/.env and rebuild.');
         getAudioCtx();
       },
@@ -1008,7 +1000,7 @@
         if (currentSource) {
           try {
             currentSource.stop();
-          } catch (e) {}
+          } catch (_e) {}
           currentSource = null;
         }
         paused = false;

@@ -291,7 +291,7 @@ function selectedQuote(textEl) {
  * selected. Nothing else about them is asked for or sent. It goes to a queue;
  * nothing appears until it has been read and approved.
  */
-function SubmitForm({ article, chapter, config, feedData, textRef }) {
+function SubmitForm({ article: _article, chapter, config, feedData, textRef }) {
   const [open, setOpen] = useState(false);
   const [author, setAuthor] = useState('');
   const [type, setType] = useState('comment');

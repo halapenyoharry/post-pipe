@@ -7,7 +7,6 @@ const assert = require('node:assert');
 const {
   containerLayout,
   rectsOverlap,
-  hangChain,
   hangRows,
   hangOptions,
   containerLayoutOf,
