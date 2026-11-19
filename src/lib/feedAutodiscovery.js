@@ -95,7 +95,7 @@ function parseAlternateFeedLink(html, baseUrl) {
  * @param {string} pageUrl
  * @param {Object} [options]
  * @param {boolean} [options.autodiscover=true]
- * @param {Function} [options.fetchImpl] — browser `fetch` or `(url) => Promise<string|Response>`
+ * @param {Function} [options.fetchImpl] - browser `fetch` or `(url) => Promise<string|Response>`
  * @returns {Promise<string>}
  */
 async function discoverFeedUrl(pageUrl, options = {}) {
@@ -152,11 +152,12 @@ function parsePageTitle(html) {
  * feed address itself is not): the address is then taken as a feed, as ever.
  *
  * @param {string} pageUrl
- * @param {Object} [options]   as discoverFeedUrl's
+ * @param {{ autodiscover?: boolean, fetchImpl?: Function }} [options]   as discoverFeedUrl's
  * @returns {Promise<{ url: string, kind: 'feed'|'page'|'unknown', title: string }>}
  */
 async function discoverSource(pageUrl, options = {}) {
   const input = typeof pageUrl === 'string' ? pageUrl.trim() : '';
+  /** @type {{ url: string, kind: 'feed'|'page'|'unknown', title: string }} */
   const unknown = { url: input, kind: 'unknown', title: '' };
   if (!input || options.autodiscover === false) return unknown;
   const f = options.fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);

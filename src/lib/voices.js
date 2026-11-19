@@ -80,6 +80,10 @@ function byLanguageThenLabel(voices, want, displayNames) {
 // page's language), preferred (names, best first), max (a cap; none by
 // default). Returns every voice as [{ voice, label }], ordered: Google's,
 // the preferred in order, the rest; the page's language first within each.
+/**
+ * @param {Array<{ name?: string, lang?: string, default?: boolean }>} all
+ * @param {{ lang?: string, preferred?: string[], max?: number, displayNames?: any }} [opts]
+ */
 function voiceList(all, { lang = 'en', preferred = [], max = Infinity, displayNames } = {}) {
   const want = langOf(lang) || 'en';
   const have = (all || []).filter((v) => v && v.name);

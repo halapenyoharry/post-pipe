@@ -29,6 +29,11 @@ const plural = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 // How old a copy fetched at copyDate is at now (ms or a Date), or null:
 // short ('2d'), span ('2 days', for "2 days ago") and long ('2 days old').
+/**
+ * @param {string} copyDate
+ * @param {number|Date} [now]
+ * @returns {{ ms: number, short: string, span: string, long: string }|null}
+ */
 function copyAge(copyDate, now = Date.now()) {
   const t = Date.parse(copyDate);
   const at = now instanceof Date ? now.getTime() : Number(now);
@@ -61,6 +66,11 @@ function copyDay(copyDate) {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 }
 
+/**
+ * @param {any} source
+ * @param {number|Date} [now]
+ * @returns {{ kind: 'stale'|'failed', date: string|null, age: { ms: number, short: string, span: string, long: string }|null, note: string }|null}
+ */
 function sourceStatus(source, now = Date.now()) {
   if (!source || typeof source !== 'object') return null;
   const error = typeof source.error === 'string' && source.error.trim() ? source.error.trim() : '';
@@ -86,6 +96,11 @@ function sourceStatus(source, now = Date.now()) {
 // date and short time, in locale and timeZone (the viewer's own when not
 // given; tests give both). null for no date or one that does not read.
 const formats = new Map();
+/**
+ * @param {string} iso
+ * @param {{ locale?: string, timeZone?: string }} [opts]
+ * @returns {string|null}
+ */
 function formatWhen(iso, { locale, timeZone } = {}) {
   const t = typeof iso === 'string' ? Date.parse(iso) : NaN;
   if (!Number.isFinite(t)) return null;
@@ -125,6 +140,11 @@ const READ_TYPES = new Set(['local', 'page', 'pages']);
 // [] when the source says nothing of the sort (a feed.json from before
 // these fields). options: now (ms or a Date), locale and timeZone (the
 // viewer's when not given).
+/**
+ * @param {any} source
+ * @param {{ now?: number|Date, locale?: string, timeZone?: string }} [opts]
+ * @returns {string[]}
+ */
 function sourceLines(source, { now = Date.now(), locale, timeZone } = {}) {
   if (!source || typeof source !== 'object') return [];
   const when = (iso) => formatWhen(iso, { locale, timeZone });

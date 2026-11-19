@@ -58,6 +58,11 @@ const weightOf = (r) => {
 // says whether a relative is drawn; one that is not is left out before any
 // counting. limit: how many to return (STRONGEST by default; Infinity for
 // all). total counts every visible relative, more those beyond the limit.
+/**
+ * @param {any[]} relations
+ * @param {string} tagId
+ * @param {{ visible?: ((id: string) => boolean)|null, limit?: number }} [opts]
+ */
 function relativesOf(relations, tagId, { visible, limit = STRONGEST } = {}) {
   const byRelative = new Map();
   if (!tagId) return { relatives: [], total: 0, more: 0 };
@@ -136,6 +141,17 @@ const byWeight = (a, b) => {
 // its relations every member's, strongest first, and broader the bubble the
 // members' directed relations point at, or null when none is directed or
 // they point both ways. The bubbles go strongest first, ties by id.
+/**
+ * @param {any[]} relations
+ * @param {string} tagId
+ * @param {{
+ *   visible?: ((id: string) => boolean)|null,
+ *   present?: ((id: string) => boolean)|null,
+ *   limit?: number,
+ *   bubbleOf?: ((id: string) => string|null)|null,
+ *   folded?: string|null
+ * }} [opts]
+ */
 function drawnRelativesOf(relations, tagId, { visible, present, limit = STRONGEST, bubbleOf, folded = 'bubble' } = {}) {
   const isPresent = (id) => typeof present !== 'function' || Boolean(present(id));
   if (!tagId || !isPresent(tagId)) return { from: null, relatives: [], total: 0, more: 0 };

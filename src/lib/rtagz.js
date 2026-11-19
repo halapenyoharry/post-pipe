@@ -107,7 +107,13 @@ function cacheDirForSite(siteRoot, cacheBase = CACHE_BASE) {
   return path.join(cacheBase, 'rtagz', `${base}-${hash}`);
 }
 
+/**
+ * @param {Record<string, any>} [siteOverrides]
+ * @param {Array<{ tag?: string }>} [containment]
+ * @returns {Record<string, any>}
+ */
 function mergeOverrides(siteOverrides = {}, containment = []) {
+  /** @type {Record<string, any>} */
   const merged = { ...(siteOverrides || {}) };
   const pins = { ...(siteOverrides && siteOverrides.pin ? siteOverrides.pin : {}) };
   for (const c of containment || []) {
@@ -192,8 +198,21 @@ function rtagzSettings(settings) {
 // the site's rtagz-queue.json) names the file rtz-build writes the queue to;
 // without one rtz-build puts it beside the overrides it was given, which for
 // post-pipe is the cache folder's copy.
+/**
+ * @param {{
+ *   emerge?: boolean,
+ *   discover?: boolean|'queue'|string,
+ *   queue?: string,
+ *   conceptSchemes?: Array<{ id?: string, path?: string }>,
+ *   ledger?: string,
+ *   siteRoot?: string,
+ *   skos?: boolean|Record<string, any>
+ * }} [opts]
+ * @returns {Record<string, any>}
+ */
 function buildConfig({ emerge = true, discover = false, queue, conceptSchemes, ledger, siteRoot, skos } = {}) {
   const root = path.resolve(siteRoot || POSTPIPE_ROOT);
+  /** @type {Record<string, any>} */
   const config = {
     out: '.',
     sources: [{ adapter: 'jsonl', path: 'records.jsonl' }],
@@ -232,6 +251,10 @@ function buildConfig({ emerge = true, discover = false, queue, conceptSchemes, l
   return config;
 }
 
+/**
+ * @param {any[]} results
+ * @param {Record<string, any>} [overrides]
+ */
 function buildRecords(results, overrides = {}) {
   const ignoreSet = new Set(
     (overrides.ignore || [])
@@ -600,6 +623,15 @@ function untaggedExtra(u) {
   return out;
 }
 
+/**
+ * @param {any[]} results
+ * @param {Map<any, string>} resultSystems
+ * @param {Record<string, any>} systems
+ * @param {number} skippedDuplicateIds
+ * @param {Record<string, any>} universe
+ * @param {Record<string, any>} buildManifest
+ * @param {Record<string, any>} [options]
+ */
 function applyUniverse(results, resultSystems, systems, skippedDuplicateIds, universe, buildManifest, options = {}) {
   const conceptById = new Map();
   for (const c of universe.concepts || []) {
@@ -998,6 +1030,10 @@ function runRtzBuild(engineBin, configPath, cwd, timeoutMs) {
   });
 }
 
+/**
+ * @param {any[]} results
+ * @param {Record<string, any>} [options]
+ */
 async function runRtagzPhase(results, options = {}) {
   const rtagzCfg = options.rtagz;
   if (!rtagzCfg || !rtagzCfg.enabled) {

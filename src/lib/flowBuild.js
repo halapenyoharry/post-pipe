@@ -114,11 +114,18 @@ function runProgram(bin, args, input, timeoutMs = TIMEOUT_MS) {
   });
 }
 
-// The orders for a finished feed, one per preset the site lists, in the order
-// it lists them; null when it lists none (or Flow's programs are missing, or
-// flow-select fails, each said in one line). flow-select --all is the same
-// for every preset, so it runs once and its subfield goes to each flow-score.
-// warn: where a failure's one line goes (console.warn by default).
+/**
+ * The orders for a finished feed, one per preset the site lists, in the order
+ * it lists them; null when it lists none (or Flow's programs are missing, or
+ * flow-select fails, each said in one line). flow-select --all is the same
+ * for every preset, so it runs once and its subfield goes to each flow-score.
+ * warn: where a failure's one line goes (console.warn by default).
+ *
+ * @param {any} feed
+ * @param {any} settings
+ * @param {{ siteRoot?: string, flowDir?: string, timeoutMs?: number, warn?: (...data: any[]) => void }} [opts]
+ * @returns {Promise<Array<{ name: string, description: string, mode: string|null, order: string[] }>|null>}
+ */
 async function runFlows(
   feed,
   settings,

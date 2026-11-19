@@ -8,9 +8,14 @@
 //
 // Pure, so it can be tested without the DOM.
 
-// '#rgb', '#rrggbb', '#rrggbbaa', 'rgb(…)', 'rgba(…)', 'hsl(…)', 'hsla(…)'
-// to [r, g, b] in 0..1; anything else (a named colour, a var(), nothing)
-// to null, so the caller can fall back rather than guess.
+/**
+ * '#rgb', '#rrggbb', '#rrggbbaa', 'rgb(…)', 'rgba(…)', 'hsl(…)', 'hsla(…)'
+ * to [r, g, b] in 0..1; anything else (a named colour, a var(), nothing)
+ * to null, so the caller can fall back rather than guess.
+ *
+ * @param {string|null|undefined} str
+ * @returns {[number, number, number]|null}
+ */
 function parseColor(str) {
   if (typeof str !== 'string') return null;
   const s = str.trim().toLowerCase();
@@ -22,13 +27,13 @@ function parseColor(str) {
         .split('')
         .map((c) => c + c)
         .join('');
-    return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    return /** @type {[number, number, number]} */ ([0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255));
   }
   m = s.match(/^rgba?\(\s*([^,\s/]+)\s*[,\s]\s*([^,\s/]+)\s*[,\s]\s*([^,\s/)]+)/);
   if (m) {
     const ch = (v) => (v.endsWith('%') ? parseFloat(v) / 100 : parseFloat(v) / 255);
     const rgb = [ch(m[1]), ch(m[2]), ch(m[3])];
-    return rgb.every(Number.isFinite) ? rgb.map(clamp01) : null;
+    return rgb.every(Number.isFinite) ? /** @type {[number, number, number]} */ (rgb.map(clamp01)) : null;
   }
   m = s.match(/^hsla?\(\s*([^,\s/]+)\s*[,\s]\s*([^,\s/]+)%?\s*[,\s]\s*([^,\s/)]+)%?/);
   if (m) {
@@ -41,10 +46,20 @@ function parseColor(str) {
   return null;
 }
 
+/**
+ * @param {number} v
+ * @returns {number}
+ */
 function clamp01(v) {
   return Math.min(1, Math.max(0, v));
 }
 
+/**
+ * @param {number} h
+ * @param {number} s
+ * @param {number} l
+ * @returns {[number, number, number]}
+ */
 function hslToRgb(h, s, l) {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const hp = h / 60;
@@ -66,6 +81,10 @@ function hslToRgb(h, s, l) {
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 const fromLinear = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
 
+/**
+ * @param {number[]} param0
+ * @returns {[number, number, number]}
+ */
 function rgbToOklab([r, g, b]) {
   const lr = toLinear(r),
     lg = toLinear(g),
@@ -80,6 +99,10 @@ function rgbToOklab([r, g, b]) {
   ];
 }
 
+/**
+ * @param {number[]} param0
+ * @returns {number[]}
+ */
 function oklabToRgb([L, a, b]) {
   const l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3);
   const m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3);
@@ -91,6 +114,10 @@ function oklabToRgb([L, a, b]) {
   ].map((c) => clamp01(fromLinear(clamp01(c))));
 }
 
+/**
+ * @param {number[]} rgb
+ * @returns {string}
+ */
 function toHex(rgb) {
   return (
     '#' +
@@ -104,10 +131,16 @@ function toHex(rgb) {
   );
 }
 
-// parts: [{ color, weight }]. A part whose colour cannot be read takes the
-// fallback colour at its weight, so a tag mostly on pieces without a feed
-// colour stays mostly the tag colour. Returns '#rrggbb', or null when
-// nothing could be read at all.
+/**
+ * parts: [{ color, weight }]. A part whose colour cannot be read takes the
+ * fallback colour at its weight, so a tag mostly on pieces without a feed
+ * colour stays mostly the tag colour. Returns '#rrggbb', or null when
+ * nothing could be read at all.
+ *
+ * @param {Array<{ color?: string|null, weight?: number }>} parts
+ * @param {string|null} [fallback]
+ * @returns {string|null}
+ */
 function blendColors(parts, fallback) {
   const fb = parseColor(fallback);
   let L = 0,
