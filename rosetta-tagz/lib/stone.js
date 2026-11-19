@@ -199,15 +199,13 @@ export function buildStone(
       sources: perSource,
       variants,
       rank,
-      links: cl.links
-        .slice(0, 24)
-        .map((l) => ({
-          a: l.a,
-          b: l.b,
-          conf: Number(l.conf.toFixed(3)),
-          cooc: Number(l.coocRatio.toFixed(2)),
-          signals: l.signals,
-        })),
+      links: cl.links.slice(0, 24).map((l) => ({
+        a: l.a,
+        b: l.b,
+        conf: Number(l.conf.toFixed(3)),
+        cooc: Number(l.coocRatio.toFixed(2)),
+        signals: l.signals,
+      })),
       ...(ledger ? { ledger: assigned.concepts[i] } : {}), // {since, event, previousLabel?}
     };
   });
