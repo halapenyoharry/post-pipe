@@ -9,7 +9,7 @@
 
 // settings.timeOverlay with its default.
 function timeOverlayConfig(settings) {
-  const t = (settings && settings.timeOverlay && typeof settings.timeOverlay === 'object') ? settings.timeOverlay : {};
+  const t = settings && settings.timeOverlay && typeof settings.timeOverlay === 'object' ? settings.timeOverlay : {};
   return { show: t.show !== false };
 }
 

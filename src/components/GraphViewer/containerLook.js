@@ -26,8 +26,8 @@
 //   }
 
 const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : '');
-const opacityOf = (v) => (v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v))
-  ? Math.max(0, Math.min(1, Number(v))) : null);
+const opacityOf = (v) =>
+  v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v)) ? Math.max(0, Math.min(1, Number(v))) : null;
 
 // The container's own colour: its badge, else its colour, else its stroke.
 function containerColor(c) {
@@ -41,7 +41,7 @@ function faceFamily(face) {
 }
 
 function containerLook(c, palette) {
-  const own = (c && c.look && typeof c.look === 'object') ? c.look : {};
+  const own = c && c.look && typeof c.look === 'object' ? c.look : {};
   const pal = palette && str(palette.color) ? palette : null;
   // A palette whose colour is 'none': no fill and no outline on the
   // containers (the fill kept transparent so they still take taps), the
@@ -66,8 +66,12 @@ function containerLook(c, palette) {
     },
     label: {
       face: faceFamily(own.labelFace),
-      color: (none ? str(pal.labelColor) || str(own.labelColor)
-        : pal ? str(pal.labelColor) || str(pal.color) : str(own.labelColor)) || null,
+      color:
+        (none
+          ? str(pal.labelColor) || str(own.labelColor)
+          : pal
+            ? str(pal.labelColor) || str(pal.color)
+            : str(own.labelColor)) || null,
     },
   };
 }

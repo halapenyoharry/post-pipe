@@ -26,9 +26,15 @@ test('a root starts and ends on its two points, and follows them when they move'
 test('segments follow the reading path from the book down', () => {
   const segs = rootSegments({
     containers: [{ id: 'book' }, { id: 'act1', parent: 'book' }],
-    memberOf: new Map([['a', 'act1'], ['b', 'act1']]),
+    memberOf: new Map([
+      ['a', 'act1'],
+      ['b', 'act1'],
+    ]),
     sequence: [{ source: 'a', target: 'b' }],
   });
-  assert.deepStrictEqual(segs.map((s) => s.key), ['c:book>act1', 's:act1>a', 'e:a>b']);
+  assert.deepStrictEqual(
+    segs.map((s) => s.key),
+    ['c:book>act1', 's:act1>a', 'e:a>b'],
+  );
   assert.deepStrictEqual(segs[2].reach, { node: 'b' });
 });

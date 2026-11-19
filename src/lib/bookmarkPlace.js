@@ -3,9 +3,16 @@
 
 // The chapter a bookmark belongs to, and its first words.
 function bookmarkLabel(b, title) {
-  const chapter = title || decodeURIComponent(String(b.item || '').split('/').pop().replace(/\.html$/, '')).replace(/[-_]+/g, ' ');
+  const chapter =
+    title ||
+    decodeURIComponent(
+      String(b.item || '')
+        .split('/')
+        .pop()
+        .replace(/\.html$/, ''),
+    ).replace(/[-_]+/g, ' ');
   const para = b.para !== undefined ? b.para : b.paragraph;
-  const where = b.quote ? `“${b.quote}…”` : (para != null ? `paragraph ${Number(para) + 1}` : '');
+  const where = b.quote ? `“${b.quote}…”` : para != null ? `paragraph ${Number(para) + 1}` : '';
   return [chapter, where].filter(Boolean).join(' · ');
 }
 

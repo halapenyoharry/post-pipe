@@ -34,13 +34,17 @@ const BACKDROP_DEFAULTS = {
 
 const num = (v, d) => (v !== '' && v !== null && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : d);
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
-const smooth = (x) => { const t = clamp01(x); return t * t * (3 - 2 * t); };
+const smooth = (x) => {
+  const t = clamp01(x);
+  return t * t * (3 - 2 * t);
+};
 
 // A point on the art as fractions of its width and height: { x, y }, or
 // null when either is missing.
 function fraction(p) {
   if (!p || typeof p !== 'object') return null;
-  const x = num(p.x, NaN), y = num(p.y, NaN);
+  const x = num(p.x, NaN),
+    y = num(p.y, NaN);
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
@@ -63,7 +67,7 @@ function reachConfig(opening) {
 // opening.backdrop with its defaults. The resting opacity falls back to the
 // earlier opening.graph.artOpacity.
 function backdropConfig(opening) {
-  const b = (opening && opening.backdrop && typeof opening.backdrop === 'object') ? opening.backdrop : {};
+  const b = opening && opening.backdrop && typeof opening.backdrop === 'object' ? opening.backdrop : {};
   const legacy = opening && opening.graph && opening.graph.artOpacity;
   return {
     opacity: clamp01(num(b.opacity, num(legacy, BACKDROP_DEFAULTS.opacity))),
@@ -118,8 +122,9 @@ function nearestTips(tips, target, n) {
 function insidePolygon(pt, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i], b = poly[j];
-    if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    const a = poly[i],
+      b = poly[j];
+    if (a.y > pt.y !== b.y > pt.y && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
   }
   return inside;
 }
@@ -127,16 +132,20 @@ function insidePolygon(pt, poly) {
 // Where the segment from -> to first crosses the polygon's edge: { x, y, t }
 // with t the share of the way from `from`, or null.
 function rayHit(from, to, poly) {
-  const dx = to.x - from.x, dy = to.y - from.y;
+  const dx = to.x - from.x,
+    dy = to.y - from.y;
   let best = null;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[j], b = poly[i];
-    const ex = b.x - a.x, ey = b.y - a.y;
+    const a = poly[j],
+      b = poly[i];
+    const ex = b.x - a.x,
+      ey = b.y - a.y;
     const den = dx * ey - dy * ex;
     if (Math.abs(den) < 1e-9) continue;
     const t = ((a.x - from.x) * ey - (a.y - from.y) * ex) / den;
     const u = ((a.x - from.x) * dy - (a.y - from.y) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (!best || t < best.t)) best = { x: from.x + dx * t, y: from.y + dy * t, t };
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && (!best || t < best.t))
+      best = { x: from.x + dx * t, y: from.y + dy * t, t };
   }
   return best;
 }
@@ -180,7 +189,9 @@ const easeOutCubic = (x) => 1 - Math.pow(1 - clamp01(x), 3);
 //   at(now)           where the point is
 //   settled(now)      whether it has arrived
 function createLag(lagMs, { ease = easeOutCubic, epsilon = 0.25 } = {}) {
-  let from = null, target = null, t0 = 0;
+  let from = null,
+    target = null,
+    t0 = 0;
   const at = (now) => {
     if (!target) return null;
     if (!from || lagMs <= 0) return { x: target.x, y: target.y };
@@ -190,15 +201,24 @@ function createLag(lagMs, { ease = easeOutCubic, epsilon = 0.25 } = {}) {
   return {
     to(next, now) {
       if (!next) return;
-      if (!target) { target = { x: next.x, y: next.y }; from = null; return; }
+      if (!target) {
+        target = { x: next.x, y: next.y };
+        from = null;
+        return;
+      }
       if (Math.hypot(next.x - target.x, next.y - target.y) < epsilon) return;
       from = at(now);
       target = { x: next.x, y: next.y };
       t0 = now;
     },
     at,
-    settled(now) { return !target || !from || lagMs <= 0 || now - t0 >= lagMs; },
-    jump(next) { target = next ? { x: next.x, y: next.y } : null; from = null; },
+    settled(now) {
+      return !target || !from || lagMs <= 0 || now - t0 >= lagMs;
+    },
+    jump(next) {
+      target = next ? { x: next.x, y: next.y } : null;
+      from = null;
+    },
   };
 }
 
@@ -224,7 +244,10 @@ function reachShape(seedKey) {
       angle: (r() < 0.5 ? -1 : 1) * between(0.28, 0.62),
       length: between(0.16, 0.34),
       bend: between(-0.35, 0.35),
-      twig: r() < 0.5 ? { t: between(0.4, 0.75), angle: (r() < 0.5 ? -1 : 1) * between(0.35, 0.7), length: between(0.3, 0.55) } : null,
+      twig:
+        r() < 0.5
+          ? { t: between(0.4, 0.75), angle: (r() < 0.5 ? -1 : 1) * between(0.35, 0.7), length: between(0.3, 0.55) }
+          : null,
     };
     forks.push(fork);
   }
@@ -232,9 +255,11 @@ function reachShape(seedKey) {
 }
 
 function wander(p0, p1, shape, steps) {
-  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const dx = p1.x - p0.x,
+    dy = p1.y - p0.y;
   const len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len;
+  const nx = -dy / len,
+    ny = dx / len;
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -249,7 +274,9 @@ function wander(p0, p1, shape, steps) {
 
 function bent(origin, heading, angle, length, bend, steps) {
   const pts = [[origin[0], origin[1]]];
-  let a = heading + angle, x = origin[0], y = origin[1];
+  let a = heading + angle,
+    x = origin[0],
+    y = origin[1];
   const step = length / steps;
   for (let i = 1; i <= steps; i++) {
     a += bend / steps;
@@ -291,9 +318,21 @@ function reachPath(p0, p1, shape) {
 }
 
 module.exports = {
-  REACH_DEFAULTS, BACKDROP_DEFAULTS,
-  reachConfig, backdropConfig, backdropOpacity, fraction,
-  artPoint, anchorWorld, homeView,
-  nearestTips, reachFor, insidePolygon, rayHit, reachEnd, createLag,
-  reachShape, reachPath,
+  REACH_DEFAULTS,
+  BACKDROP_DEFAULTS,
+  reachConfig,
+  backdropConfig,
+  backdropOpacity,
+  fraction,
+  artPoint,
+  anchorWorld,
+  homeView,
+  nearestTips,
+  reachFor,
+  insidePolygon,
+  rayHit,
+  reachEnd,
+  createLag,
+  reachShape,
+  reachPath,
 };

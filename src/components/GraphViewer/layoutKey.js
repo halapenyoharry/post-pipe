@@ -16,7 +16,18 @@
 
 const { EDGE_WEIGHT_DEFAULTS, normaliseEdgeWeights } = require('../../lib/edgeWeight');
 
-const SPIRAL_KEYS = ['enabled', 'mode', 'spacing', 'startRadius', 'direction', 'strength', 'anchorEnd', 'openTowards', 'keepBelow', 'cardScale'];
+const SPIRAL_KEYS = [
+  'enabled',
+  'mode',
+  'spacing',
+  'startRadius',
+  'direction',
+  'strength',
+  'anchorEnd',
+  'openTowards',
+  'keepBelow',
+  'cardScale',
+];
 const SIM_KEYS = ['linkDistance', 'chargeStrength', 'collidePadding'];
 
 function pick(obj, keys) {
@@ -41,7 +52,9 @@ function spiralPart(spiral) {
 // without anchors keeps the keys it had).
 function anchorPart(anchors) {
   if (!anchors || typeof anchors !== 'object') return null;
-  const ids = Object.keys(anchors).filter((id) => anchors[id] && Number.isFinite(Number(anchors[id].x)) && Number.isFinite(Number(anchors[id].y))).sort();
+  const ids = Object.keys(anchors)
+    .filter((id) => anchors[id] && Number.isFinite(Number(anchors[id].x)) && Number.isFinite(Number(anchors[id].y)))
+    .sort();
   if (!ids.length) return null;
   return ids.map((id) => [id, Number(anchors[id].x), Number(anchors[id].y)]);
 }
@@ -49,7 +62,9 @@ function anchorPart(anchors) {
 // Each container's own layout settings, in id order; none, nothing.
 function containerPart(layouts) {
   if (!layouts || typeof layouts !== 'object') return null;
-  const ids = Object.keys(layouts).filter((id) => layouts[id] && Object.keys(layouts[id]).length).sort();
+  const ids = Object.keys(layouts)
+    .filter((id) => layouts[id] && Object.keys(layouts[id]).length)
+    .sort();
   if (!ids.length) return null;
   return ids.map((id) => [id, layouts[id]]);
 }
@@ -73,7 +88,8 @@ function edgeWeightsPart(siteEw, overrideEw) {
   if (ew.mode === 'weighted') {
     if (ew.degreePenalty !== EDGE_WEIGHT_DEFAULTS.degreePenalty) out.degreePenalty = ew.degreePenalty;
     if (ew.recencyClock !== EDGE_WEIGHT_DEFAULTS.recencyClock) out.recencyClock = ew.recencyClock;
-    if (ew.recencyHalfLifeDays !== EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays) out.recencyHalfLifeDays = ew.recencyHalfLifeDays;
+    if (ew.recencyHalfLifeDays !== EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays)
+      out.recencyHalfLifeDays = ew.recencyHalfLifeDays;
     if (ew.recencyFloor !== EDGE_WEIGHT_DEFAULTS.recencyFloor) out.recencyFloor = ew.recencyFloor;
     if (ew.distanceSpread !== EDGE_WEIGHT_DEFAULTS.distanceSpread) out.distanceSpread = ew.distanceSpread;
     const wDiff = {};
@@ -89,7 +105,10 @@ function edgeWeightsPart(siteEw, overrideEw) {
 // The settings that move nodes, in a fixed order.
 function layoutSignature(graphSettings, { anchors, layouts, edgeWeights } = {}) {
   const g = graphSettings || {};
-  const v = Number.isFinite(Number(g.layoutVersion)) && g.layoutVersion !== null && g.layoutVersion !== '' ? Number(g.layoutVersion) : 1;
+  const v =
+    Number.isFinite(Number(g.layoutVersion)) && g.layoutVersion !== null && g.layoutVersion !== ''
+      ? Number(g.layoutVersion)
+      : 1;
   const card = g.card || {};
   const sig = {
     v,

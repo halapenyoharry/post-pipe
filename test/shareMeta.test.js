@@ -15,7 +15,10 @@ test('a description with quotes and apostrophes is escaped', () => {
 });
 
 test('a share image is made absolute and carries the twitter card', () => {
-  const out = shareMeta({ title: 'T', description: 'D', share_image: { src: 'og.png', width: 1200, height: 630, alt: 'a' } }, 'https://x.org/');
+  const out = shareMeta(
+    { title: 'T', description: 'D', share_image: { src: 'og.png', width: 1200, height: 630, alt: 'a' } },
+    'https://x.org/',
+  );
   assert.ok(out.includes('<meta property="og:image" content="https://x.org/og.png">'));
   assert.ok(out.includes('<meta property="og:image:width" content="1200">'));
   assert.ok(out.includes('<meta name="twitter:card" content="summary_large_image">'));
@@ -29,7 +32,9 @@ test('an absolute share image stays as it is', () => {
 
 test('icons: the old single svg link by default, the set when given', () => {
   assert.strictEqual(iconLinks({}), '<link rel="icon" type="image/svg+xml" href="./favicon.svg">');
-  const out = iconLinks({ icons: { ico: 'favicon.ico', svg: 'favicon.svg?v=2', png: 'icon-192.png', apple_touch: 'apple-touch-icon.png' } });
+  const out = iconLinks({
+    icons: { ico: 'favicon.ico', svg: 'favicon.svg?v=2', png: 'icon-192.png', apple_touch: 'apple-touch-icon.png' },
+  });
   assert.deepStrictEqual(out.split('\n'), [
     '<link rel="icon" href="./favicon.ico" sizes="48x48">',
     '<link rel="icon" type="image/svg+xml" href="./favicon.svg?v=2">',
@@ -49,20 +54,33 @@ test('og:url ends with one slash', () => {
 const { faviconPlan, faviconColor, placeholderFavicon, NEUTRAL_GREY } = require('../src/lib/shareMeta');
 
 test('favicon: a site that sets site.icons keeps its own icons untouched', () => {
-  assert.deepStrictEqual(faviconPlan({ site: { icons: { svg: 'favicon.svg?v=2' } } }, { hasSiteFavicon: true }), { action: 'keep' });
-  assert.deepStrictEqual(faviconPlan({ site: { icons: { ico: 'favicon.ico' } } }, { hasSiteFavicon: false }), { action: 'keep' });
+  assert.deepStrictEqual(faviconPlan({ site: { icons: { svg: 'favicon.svg?v=2' } } }, { hasSiteFavicon: true }), {
+    action: 'keep',
+  });
+  assert.deepStrictEqual(faviconPlan({ site: { icons: { ico: 'favicon.ico' } } }, { hasSiteFavicon: false }), {
+    action: 'keep',
+  });
 });
 
-test('favicon: the site folder\'s own favicon.svg is copied', () => {
-  assert.deepStrictEqual(faviconPlan({ site: {}, theme: { accent: '#64ffda' } }, { hasSiteFavicon: true }), { action: 'copy' });
+test("favicon: the site folder's own favicon.svg is copied", () => {
+  assert.deepStrictEqual(faviconPlan({ site: {}, theme: { accent: '#64ffda' } }, { hasSiteFavicon: true }), {
+    action: 'copy',
+  });
 });
 
-test('favicon: with neither, a placeholder circle in the site\'s accent, else the theme\'s, else grey', () => {
+test("favicon: with neither, a placeholder circle in the site's accent, else the theme's, else grey", () => {
   const p = faviconPlan({ site: {}, accent: '#c0392b', theme: { accent: '#64ffda' } });
   assert.strictEqual(p.action, 'placeholder');
-  assert.strictEqual(p.color, '#c0392b', 'the site\'s accent first');
-  assert.strictEqual(p.svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#c0392b"/></svg>\n');
-  assert.strictEqual(faviconPlan({ site: {}, accent: '', theme: { accent: '#64ffda' } }).color, '#64ffda', 'an empty accent leaves the theme\'s');
+  assert.strictEqual(p.color, '#c0392b', "the site's accent first");
+  assert.strictEqual(
+    p.svg,
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="#c0392b"/></svg>\n',
+  );
+  assert.strictEqual(
+    faviconPlan({ site: {}, accent: '', theme: { accent: '#64ffda' } }).color,
+    '#64ffda',
+    "an empty accent leaves the theme's",
+  );
   assert.strictEqual(faviconPlan({ theme: {} }).color, NEUTRAL_GREY);
   assert.strictEqual(faviconPlan(null).color, NEUTRAL_GREY);
   assert.strictEqual(NEUTRAL_GREY, '#888888');

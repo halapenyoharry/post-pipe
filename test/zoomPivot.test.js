@@ -12,7 +12,8 @@ test('zooming about a point keeps the world point under it', () => {
   for (const r of [2, 0.5, 1.25]) {
     const after = zoomAbout(v, r, 640, 400);
     assert.ok(Math.abs(after.k - v.k * r) < 1e-12);
-    const [a, b] = world(v, 640, 400), [c, d] = world(after, 640, 400);
+    const [a, b] = world(v, 640, 400),
+      [c, d] = world(after, 640, 400);
     assert.ok(Math.abs(a - c) < 1e-9 && Math.abs(b - d) < 1e-9);
   }
 });
@@ -42,7 +43,8 @@ test('a zoom asked about the pointer becomes the same zoom about the pivot', () 
   const atCorner = zoomAbout(prev, 1.149, 1270, 790);
   const v = repivot(prev, atCorner, 623, 285);
   assert.ok(Math.abs(v.k - atCorner.k) < 1e-12);
-  const [a, b] = world(prev, 623, 285), [c, d] = world(v, 623, 285);
+  const [a, b] = world(prev, 623, 285),
+    [c, d] = world(v, 623, 285);
   assert.ok(Math.abs(a - c) < 1e-9 && Math.abs(b - d) < 1e-9);
   // Ten steps keep the pivot's world point exactly where it was.
   let w = prev;

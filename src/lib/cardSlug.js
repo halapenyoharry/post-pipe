@@ -18,12 +18,12 @@
 //
 // Nothing here changes an item's id; downstream keeps using what it uses.
 
-const fs   = require('fs');
-const os   = require('os');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const LEDGER_SCHEMA = 'post-pipe/cards@1';
-const LEDGER_FILE   = 'cards.json';
+const LEDGER_FILE = 'cards.json';
 
 const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -56,7 +56,11 @@ function lastPathPart(u) {
   const m = s.match(/^[a-z][a-z0-9+.-]*:\/\/([^/]*)(.*)$/i);
   if (m && !m[2]) return '';
   s = s.split('/').pop();
-  try { s = decodeURIComponent(s); } catch (_) { /* as written */ }
+  try {
+    s = decodeURIComponent(s);
+  } catch (_) {
+    /* as written */
+  }
   return s.replace(/\.html?$/i, '');
 }
 
@@ -73,8 +77,9 @@ function canonicalOf(item) {
   const c = str(item.canonical_url);
   if (c && c !== url && isWebAddress(c)) return c;
   const html = typeof item.content_html === 'string' ? item.content_html : '';
-  const m = html.match(/<link\b[^>]*\brel=["']?canonical["']?[^>]*\bhref=["']([^"']+)["']/i)
-    || html.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\brel=["']?canonical["']?/i);
+  const m =
+    html.match(/<link\b[^>]*\brel=["']?canonical["']?[^>]*\bhref=["']([^"']+)["']/i) ||
+    html.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\brel=["']?canonical["']?/i);
   const h = m ? str(m[1]) : '';
   if (h && h !== url && isWebAddress(h)) return h;
   return '';
@@ -132,10 +137,15 @@ function dateOf(now) {
 // leaves the file alone.
 function isLedger(x) {
   if (!isObject(x) || x.schema !== LEDGER_SCHEMA || !isObject(x.cards)) return false;
-  return Object.values(x.cards).every((c) => isObject(c)
-    && Array.isArray(c.urls) && c.urls.every((u) => typeof u === 'string')
-    && Array.isArray(c.titles) && c.titles.every((t) => typeof t === 'string')
-    && typeof c.source === 'string');
+  return Object.values(x.cards).every(
+    (c) =>
+      isObject(c) &&
+      Array.isArray(c.urls) &&
+      c.urls.every((u) => typeof u === 'string') &&
+      Array.isArray(c.titles) &&
+      c.titles.every((t) => typeof t === 'string') &&
+      typeof c.source === 'string',
+  );
 }
 
 // -> { ledger, status: 'absent' | 'ok' | 'unreadable' }
@@ -162,7 +172,10 @@ function writeLedger(file, ledger) {
 // canonical or DOI discovery read, its url, its DOI as an address, its id.
 function addressesOf(item, found) {
   const out = [];
-  const add = (v) => { const s = str(v); if (s && !out.includes(s)) out.push(s); };
+  const add = (v) => {
+    const s = str(v);
+    if (s && !out.includes(s)) out.push(s);
+  };
   if (found.source === 'canonical') add(found.identity);
   if (found.source === 'doi') add(`https://doi.org/${found.identity}`);
   add(item.url);
@@ -190,7 +203,7 @@ function assignSlugs(items, prior, { now = null } = {}) {
     };
   }
   const byAddress = new Map(); // address -> slug
-  const byTitle = new Map();   // title -> slug, for cards whose only identity is their title
+  const byTitle = new Map(); // title -> slug, for cards whose only identity is their title
   const index = (slug, card) => {
     for (const u of card.urls) if (!byAddress.has(u)) byAddress.set(u, slug);
     for (const i of card.ids || []) if (!byAddress.has(i)) byAddress.set(i, slug);
@@ -206,7 +219,12 @@ function assignSlugs(items, prior, { now = null } = {}) {
     const addresses = addressesOf(item, found);
     const title = str(item.title);
     let slug = null;
-    for (const a of addresses) { if (byAddress.has(a)) { slug = byAddress.get(a); break; } }
+    for (const a of addresses) {
+      if (byAddress.has(a)) {
+        slug = byAddress.get(a);
+        break;
+      }
+    }
     if (!slug && !addresses.length && title && byTitle.has(title)) slug = byTitle.get(title);
 
     if (slug) {
@@ -214,8 +232,10 @@ function assignSlugs(items, prior, { now = null } = {}) {
       const card = next.cards[slug];
       for (const a of addresses) {
         if (card.urls.includes(a) || (card.ids || []).includes(a)) continue;
-        if (a === str(item.id) && a !== str(item.url)) { card.ids = card.ids || []; card.ids.push(a); }
-        else card.urls.push(a);
+        if (a === str(item.id) && a !== str(item.url)) {
+          card.ids = card.ids || [];
+          card.ids.push(a);
+        } else card.urls.push(a);
       }
       if (title && !card.titles.includes(title)) card.titles.push(title);
     } else {
@@ -257,7 +277,16 @@ function cardsLedgerPath(settings, siteRoot) {
 }
 
 module.exports = {
-  LEDGER_SCHEMA, LEDGER_FILE,
-  slugify, doiIn, lastPathPart, discoverSlug,
-  emptyLedger, isLedger, readLedger, writeLedger, assignSlugs, cardsLedgerPath,
+  LEDGER_SCHEMA,
+  LEDGER_FILE,
+  slugify,
+  doiIn,
+  lastPathPart,
+  discoverSlug,
+  emptyLedger,
+  isLedger,
+  readLedger,
+  writeLedger,
+  assignSlugs,
+  cardsLedgerPath,
 };

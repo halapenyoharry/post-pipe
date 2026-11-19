@@ -15,19 +15,23 @@ function separateOpen(rects, { gap = 12, maxRounds = 200 } = {}) {
     let any = false;
     for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
-        const a = boxes[i], b = boxes[j];
+        const a = boxes[i],
+          b = boxes[j];
         const ox = (a.w + b.w) / 2 + gap - Math.abs(a.x - b.x);
         const oy = (a.h + b.h) / 2 + gap - Math.abs(a.y - b.y);
         if (ox <= 0 || oy <= 0) continue;
         any = true;
         if (ox < oy) {
           const s = a.x < b.x || (a.x === b.x && i < j) ? -1 : 1;
-          a.x += (s * ox) / 2; b.x -= (s * ox) / 2;
+          a.x += (s * ox) / 2;
+          b.x -= (s * ox) / 2;
         } else {
           const s = a.y < b.y || (a.y === b.y && i < j) ? -1 : 1;
-          a.y += (s * oy) / 2; b.y -= (s * oy) / 2;
+          a.y += (s * oy) / 2;
+          b.y -= (s * oy) / 2;
         }
-        moved.set(a.id, a); moved.set(b.id, b);
+        moved.set(a.id, a);
+        moved.set(b.id, b);
       }
     }
     if (!any) break;
@@ -41,7 +45,8 @@ function overlappingPairs(rects, gap = 0) {
   let n = 0;
   for (let i = 0; i < rects.length; i++) {
     for (let j = i + 1; j < rects.length; j++) {
-      const a = rects[i], b = rects[j];
+      const a = rects[i],
+        b = rects[j];
       if (Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + gap) n++;
     }
   }

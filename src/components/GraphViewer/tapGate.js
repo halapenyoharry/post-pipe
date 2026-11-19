@@ -7,7 +7,13 @@
 // settles the earlier one as single straight away.
 // Timers and the clock are injectable so the timing can be tested.
 
-function createTapGate({ ms = 250, px = 32, now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+function createTapGate({
+  ms = 250,
+  px = 32,
+  now = () => Date.now(),
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+} = {}) {
   let pending = null; // { t, x, y, timer, run, double }
 
   function tap(x, y, single, double) {

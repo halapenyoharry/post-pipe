@@ -23,8 +23,18 @@ test('the same records twice: identical ids, nothing minted the second time', ()
   const second = ledgered(records, first.next, { now: '2026-10-25T11:00:00.000Z' });
   assert.deepEqual(idsOf(second.stone), idsOf(first.stone));
   assert.equal(first.stone.ledger.minted, first.stone.concepts.length);
-  assert.deepEqual(second.stone.ledger, { path: 'ledger.json', minted: 0, reused: first.stone.concepts.length, retired: 0, splits: 0, merges: 0, events: [] });
-  assert.ok(second.stone.concepts.every((c) => c.ledger.event === 'reused' && c.ledger.since === '2026-10-25T10:00:00.000Z'));
+  assert.deepEqual(second.stone.ledger, {
+    path: 'ledger.json',
+    minted: 0,
+    reused: first.stone.concepts.length,
+    retired: 0,
+    splits: 0,
+    merges: 0,
+    events: [],
+  });
+  assert.ok(
+    second.stone.concepts.every((c) => c.ledger.event === 'reused' && c.ledger.since === '2026-10-25T10:00:00.000Z'),
+  );
   assert.equal(second.next.builds, 2);
   assert.equal(second.next.created, '2026-10-25T10:00:00.000Z');
   assert.equal(second.next.updated, '2026-10-25T11:00:00.000Z');
@@ -46,13 +56,23 @@ test('adding one unrelated term keeps every prior id and mints exactly one', () 
 });
 
 test('a notSame override that splits a cluster 3/1: the three keep the id, the one mints with a parent and a split event', () => {
-  const records = rec('Journal', { 1: ['system thinking'], 2: ['systems thinking'], 3: ['thinking systems'], 4: ['thinking system'], 5: ['courts'] });
+  const records = rec('Journal', {
+    1: ['system thinking'],
+    2: ['systems thinking'],
+    3: ['thinking systems'],
+    4: ['thinking system'],
+    5: ['courts'],
+  });
   const first = ledgered(records, null, { now: 't1' });
   const whole = byMember(first.stone, 'thinking system');
   assert.equal(whole.variants.length, 4, 'the fixture is one cluster of four spellings');
   assert.equal(whole.id, 'c_system_thinking');
 
-  const notSame = [['thinking system', 'system thinking'], ['thinking system', 'systems thinking'], ['thinking system', 'thinking systems']];
+  const notSame = [
+    ['thinking system', 'system thinking'],
+    ['thinking system', 'systems thinking'],
+    ['thinking system', 'thinking systems'],
+  ];
   const second = ledgered(records, first.next, { now: 't2', overrides: { notSame } });
   const three = byMember(second.stone, 'system thinking');
   const one = byMember(second.stone, 'thinking system');
@@ -63,9 +83,15 @@ test('a notSame override that splits a cluster 3/1: the three keep the id, the o
   assert.equal(second.next.concepts.c_thinking_system.parent, 'c_system_thinking');
   assert.deepEqual(one.ledger, { since: 't2', event: 'split' });
   assert.equal(three.ledger.event, 'split');
-  const split = [{ type: 'split', at: 't2', parent: 'c_system_thinking', children: ['c_system_thinking', 'c_thinking_system'] }];
+  const split = [
+    { type: 'split', at: 't2', parent: 'c_system_thinking', children: ['c_system_thinking', 'c_thinking_system'] },
+  ];
   assert.deepEqual(second.next.events, split);
-  assert.deepEqual(second.stone.ledger, { path: 'ledger.json', minted: 1, reused: 2, retired: 0, splits: 1, merges: 0, events: split }, "this build's events ride on the stone, so build.json names the parent and children");
+  assert.deepEqual(
+    second.stone.ledger,
+    { path: 'ledger.json', minted: 1, reused: 2, retired: 0, splits: 1, merges: 0, events: split },
+    "this build's events ride on the stone, so build.json names the parent and children",
+  );
   assert.equal(byMember(second.stone, 'courts').ledger.event, 'reused');
 });
 
@@ -81,9 +107,19 @@ test("a same override that merges two priors: one id (the larger prior's), one m
   assert.deepEqual(merged.ledger, { since: 't1', event: 'merged' });
   const merge = [{ type: 'merge', at: 't2', parents: ['c_cat', 'c_dog'], child: 'c_cat' }];
   assert.deepEqual(second.next.events, merge);
-  assert.deepEqual(second.next.retired, { c_dog: { members: ['dog'], label: 'dog', since: 't1', lastSeen: 't1', retiredAt: 't2', into: 'c_cat' } });
+  assert.deepEqual(second.next.retired, {
+    c_dog: { members: ['dog'], label: 'dog', since: 't1', lastSeen: 't1', retiredAt: 't2', into: 'c_cat' },
+  });
   assert.equal(second.next.concepts.c_dog, undefined);
-  assert.deepEqual(second.stone.ledger, { path: 'ledger.json', minted: 0, reused: 1, retired: 1, splits: 0, merges: 1, events: merge });
+  assert.deepEqual(second.stone.ledger, {
+    path: 'ledger.json',
+    minted: 0,
+    reused: 1,
+    retired: 1,
+    splits: 0,
+    merges: 1,
+    events: merge,
+  });
 });
 
 test('a concept of one spelling keeps its id when a second spelling joins it: nothing minted, nothing retired', () => {
@@ -91,15 +127,36 @@ test('a concept of one spelling keeps its id when a second spelling joins it: no
   assert.deepEqual(idsOf(first.stone), { cat: 'c_cat', courts: 'c_courts' });
   const second = ledgered(rec('Journal', { 1: ['cat'], 2: ['courts'], 3: ['cats'] }), first.next, { now: 't2' });
   assert.deepEqual(idsOf(second.stone), { 'cat|cats': 'c_cat', courts: 'c_courts' });
-  assert.deepEqual(second.stone.ledger, { path: 'ledger.json', minted: 0, reused: 2, retired: 0, splits: 0, merges: 0, events: [] });
+  assert.deepEqual(second.stone.ledger, {
+    path: 'ledger.json',
+    minted: 0,
+    reused: 2,
+    retired: 0,
+    splits: 0,
+    merges: 0,
+    events: [],
+  });
   assert.deepEqual(byMember(second.stone, 'cats').ledger, { since: 't1', event: 'reused' });
   assert.deepEqual(second.next.retired, {});
   // directly: a prior wholly continued by a cluster twice its size, and a prior of two continued by a cluster of four
-  assert.deepEqual(assignIds([{ terms: ['a', 'z'], label: 'a' }], { ...emptyLedger('t0'), concepts: { c_a: { members: ['a'], label: 'a', since: 't0', lastSeen: 't0' } } }, { now: 't1' }).ids, ['c_a']);
-  const two = { ...emptyLedger('t0'), concepts: { c_a: { members: ['a', 'b'], label: 'a', since: 't0', lastSeen: 't0' } } };
+  assert.deepEqual(
+    assignIds(
+      [{ terms: ['a', 'z'], label: 'a' }],
+      { ...emptyLedger('t0'), concepts: { c_a: { members: ['a'], label: 'a', since: 't0', lastSeen: 't0' } } },
+      { now: 't1' },
+    ).ids,
+    ['c_a'],
+  );
+  const two = {
+    ...emptyLedger('t0'),
+    concepts: { c_a: { members: ['a', 'b'], label: 'a', since: 't0', lastSeen: 't0' } },
+  };
   assert.deepEqual(assignIds([{ terms: ['a', 'b', 'y', 'z'], label: 'a' }], two, { now: 't1' }).ids, ['c_a']);
   // but one spelling of three continuing into a cluster of three is not a majority on either side
-  const three = { ...emptyLedger('t0'), concepts: { c_a: { members: ['a', 'b', 'c'], label: 'a', since: 't0', lastSeen: 't0' } } };
+  const three = {
+    ...emptyLedger('t0'),
+    concepts: { c_a: { members: ['a', 'b', 'c'], label: 'a', since: 't0', lastSeen: 't0' } },
+  };
   assert.deepEqual(assignIds([{ terms: ['a', 'y', 'z'], label: 'a' }], three, { now: 't1' }).ids, ['c_a_2']);
 });
 
@@ -122,39 +179,81 @@ test('an even merge of two priors keeps one of the two ids and absorbs the other
 test('in a split the larger child keeps the id even when the smaller child holds the pin', () => {
   const prior = emptyLedger('t0');
   prior.concepts.c_ai = { members: ['ai', 'ml', 'dl'], label: 'AI', pin: 'ai', since: 't0', lastSeen: 't0' };
-  const r = assignIds([{ terms: ['dl', 'ml', 'nn'], label: 'dl' }, { terms: ['ai'], label: 'AI' }], prior, { pins: ['ai'], now: 't1' });
+  const r = assignIds(
+    [
+      { terms: ['dl', 'ml', 'nn'], label: 'dl' },
+      { terms: ['ai'], label: 'AI' },
+    ],
+    prior,
+    { pins: ['ai'], now: 't1' },
+  );
   assert.deepEqual(r.ids, ['c_ai', 'c_ai_2'], 'overlap decides first; the pinned one-member child mints with a parent');
   assert.equal(r.next.concepts.c_ai_2.parent, 'c_ai');
   assert.equal(r.next.concepts.c_ai_2.pin, 'ai');
   assert.deepEqual(r.events, [{ type: 'split', at: 't1', parent: 'c_ai', children: ['c_ai', 'c_ai_2'] }]);
   // with equal overlap the pin breaks the tie
   prior.concepts.c_ai.members = ['ai', 'ml', 'dl', 'nn'];
-  const even = assignIds([{ terms: ['dl', 'ml'], label: 'dl' }, { terms: ['ai', 'nn'], label: 'AI' }], prior, { pins: ['ai'], now: 't1' });
+  const even = assignIds(
+    [
+      { terms: ['dl', 'ml'], label: 'dl' },
+      { terms: ['ai', 'nn'], label: 'AI' },
+    ],
+    prior,
+    { pins: ['ai'], now: 't1' },
+  );
   assert.deepEqual(even.ids, ['c_dl', 'c_ai']);
 });
 
 test('two clusters whose smallest members slugify alike: the second takes _2', () => {
-  const r = assignIds([{ terms: ['a b'], label: 'a b' }, { terms: ['a_b'], label: 'a_b' }], null, { now: 't1' });
+  const r = assignIds(
+    [
+      { terms: ['a b'], label: 'a b' },
+      { terms: ['a_b'], label: 'a_b' },
+    ],
+    null,
+    { now: 't1' },
+  );
   assert.deepEqual(r.ids, ['c_a_b', 'c_a_b_2']);
-  const again = assignIds([{ terms: ['a b'], label: 'a b' }, { terms: ['a_b'], label: 'a_b' }], r.next, { now: 't2' });
+  const again = assignIds(
+    [
+      { terms: ['a b'], label: 'a b' },
+      { terms: ['a_b'], label: 'a_b' },
+    ],
+    r.next,
+    { now: 't2' },
+  );
   assert.deepEqual(again.ids, ['c_a_b', 'c_a_b_2']);
   assert.equal(again.summary.minted, 0);
 });
 
 test('pin continuity: a cluster whose only overlap with its prior is the pinned norm keeps the id', () => {
   const prior = emptyLedger('t0');
-  prior.concepts.c_ai = { members: ['ai', 'artificial intelligence', 'machine intelligence'], label: 'AI', pin: 'ai', since: 't0', lastSeen: 't0' };
+  prior.concepts.c_ai = {
+    members: ['ai', 'artificial intelligence', 'machine intelligence'],
+    label: 'AI',
+    pin: 'ai',
+    since: 't0',
+    lastSeen: 't0',
+  };
   prior.concepts.c_courts = { members: ['courts'], label: 'courts', since: 't0', lastSeen: 't0' };
   // directly: one of three members overlaps, no majority, but that member is the pinned one
-  const direct = assignIds([{ terms: ['ai', 'smart machines', 'thinking machines'], label: 'AI' }], prior, { pins: ['ai'], now: 't1' });
+  const direct = assignIds([{ terms: ['ai', 'smart machines', 'thinking machines'], label: 'AI' }], prior, {
+    pins: ['ai'],
+    now: 't1',
+  });
   assert.deepEqual(direct.ids, ['c_ai']);
   assert.equal(direct.summary.reused, 1);
   // and without the pin the same cluster mints (c_ai is in use, so the mint is c_ai_2)
-  const unpinned = assignIds([{ terms: ['ai', 'smart machines', 'thinking machines'], label: 'ai' }], prior, { now: 't1' });
+  const unpinned = assignIds([{ terms: ['ai', 'smart machines', 'thinking machines'], label: 'ai' }], prior, {
+    now: 't1',
+  });
   assert.deepEqual(unpinned.ids, ['c_ai_2']);
   // through rtz-stone: `same` forces the cluster, `pin` names the norm
   const records = rec('Journal', { 1: ['ai'], 2: ['smart machines'], 3: ['thinking machines'] });
-  const { stone } = ledgered(records, prior, { now: 't1', overrides: { same: [['ai', 'smart machines', 'thinking machines']], pin: { ai: 'AI' } } });
+  const { stone } = ledgered(records, prior, {
+    now: 't1',
+    overrides: { same: [['ai', 'smart machines', 'thinking machines']], pin: { ai: 'AI' } },
+  });
   const c = byMember(stone, 'ai');
   assert.equal(c.id, 'c_ai');
   assert.equal(c.canonical, 'AI');
@@ -168,27 +267,44 @@ test('a term that disappears is retired and gets its old id back when it returns
   assert.equal(byMember(first.stone, 'zeta').id, 'c_zeta');
   const second = ledgered(without, first.next, { now: 't2' });
   assert.equal(second.stone.ledger.retired, 1);
-  assert.deepEqual(second.next.retired.c_zeta, { members: ['zeta'], label: 'zeta', since: 't1', lastSeen: 't1', retiredAt: 't2' });
+  assert.deepEqual(second.next.retired.c_zeta, {
+    members: ['zeta'],
+    label: 'zeta',
+    since: 't1',
+    lastSeen: 't1',
+    retiredAt: 't2',
+  });
   assert.deepEqual(second.next.events, [{ type: 'retire', at: 't2', ids: ['c_zeta'] }]);
   const third = ledgered(withZ, second.next, { now: 't3' });
   const back = byMember(third.stone, 'zeta');
   assert.equal(back.id, 'c_zeta');
   assert.deepEqual(back.ledger, { since: 't1', event: 'reused' });
   assert.equal(third.next.retired.c_zeta, undefined);
-  assert.deepEqual(third.stone.ledger, { path: 'ledger.json', minted: 0, reused: 3, retired: 0, splits: 0, merges: 0, events: [] });
+  assert.deepEqual(third.stone.ledger, {
+    path: 'ledger.json',
+    minted: 0,
+    reused: 3,
+    retired: 0,
+    splits: 0,
+    merges: 0,
+    events: [],
+  });
 });
 
 test('the first ledgered build reproduces the ids of a build without a ledger', () => {
   const records = syntheticRecords();
   const plain = buildStone(records, { seeds: [shippedSeed()] });
   const { stone } = ledgered(records, null, { now: 't1' });
-  assert.deepEqual(stone.concepts.map((c) => c.id), plain.concepts.map((c) => c.id));
+  assert.deepEqual(
+    stone.concepts.map((c) => c.id),
+    plain.concepts.map((c) => c.id),
+  );
   assert.equal(plain.ledger, undefined, 'without a ledger stone.json carries no ledger summary');
   assert.ok(plain.concepts.every((c) => c.ledger === undefined));
   assert.ok(stone.concepts.every((c) => c.ledger.event === 'minted' && c.ledger.since === 't1'));
 });
 
-test('previousLabel appears when the stored label differs from this build\'s canonical', () => {
+test("previousLabel appears when the stored label differs from this build's canonical", () => {
   const records = rec('Journal', { 1: ['ai'], 2: ['ai'] });
   const first = ledgered(records, null, { now: 't1' });
   assert.equal(first.next.concepts.c_ai.label, 'ai');
@@ -205,16 +321,28 @@ test('the ledger never holds a label that is not a member norm, the canonical, o
   const canonicalOf = new Map(stone.concepts.map((c) => [c.id, c.canonical]));
   const norms = new Set(stone.concepts.flatMap((c) => c.variants.map((v) => v.norm)));
   for (const [id, entry] of Object.entries(next.concepts)) {
-    assert.ok(entry.members.every((m) => norms.has(m)), `${id} members are norms`);
-    assert.ok(entry.label === canonicalOf.get(id) || entry.members.includes(entry.label) || Object.values(pin).includes(entry.label), `${id} label ${entry.label}`);
-    if (entry.pin) assert.ok(entry.members.includes(entry.pin) && entry.pin in pin, `${id} pin is a pinned member norm`);
+    assert.ok(
+      entry.members.every((m) => norms.has(m)),
+      `${id} members are norms`,
+    );
+    assert.ok(
+      entry.label === canonicalOf.get(id) ||
+        entry.members.includes(entry.label) ||
+        Object.values(pin).includes(entry.label),
+      `${id} label ${entry.label}`,
+    );
+    if (entry.pin)
+      assert.ok(entry.members.includes(entry.pin) && entry.pin in pin, `${id} pin is a pinned member norm`);
   }
   assert.equal(next.schema, LEDGER_SCHEMA);
   assert.ok(isLedger(next));
 });
 
 test('an unreadable prior is treated as absent: every cluster mints by the first-build rule', () => {
-  const clusters = [{ terms: ['ai'], label: 'AI' }, { terms: ['courts'], label: 'courts' }];
+  const clusters = [
+    { terms: ['ai'], label: 'AI' },
+    { terms: ['courts'], label: 'courts' },
+  ];
   const fromNull = assignIds(clusters, null, { now: 't1' });
   const garbages = [
     {},

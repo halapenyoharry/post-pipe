@@ -17,11 +17,18 @@ test('every group belongs to the main view or the reader, never both', () => {
   assert.ok(graph.every((g) => !reader.includes(g)));
 });
 
-test('light or dark paper is the reader\'s when a dark cover holds the page dark', () => {
+test("light or dark paper is the reader's when a dark cover holds the page dark", () => {
   assert.strictEqual(modeInReader(null), false);
   assert.strictEqual(modeInReader(cover), true);
-  assert.deepStrictEqual(ids(panelGroups('reader', { settings: cover, voice: true, modes: 2 })), ['reading', 'paper', 'listening']);
-  assert.deepStrictEqual(ids(panelGroups('reader', { settings: cover, voice: true, modes: 1 })), ['reading', 'listening']);
+  assert.deepStrictEqual(ids(panelGroups('reader', { settings: cover, voice: true, modes: 2 })), [
+    'reading',
+    'paper',
+    'listening',
+  ]);
+  assert.deepStrictEqual(ids(panelGroups('reader', { settings: cover, voice: true, modes: 1 })), [
+    'reading',
+    'listening',
+  ]);
 });
 
 test('nothing to read: no reading groups; no voice: no listening', () => {
@@ -29,9 +36,12 @@ test('nothing to read: no reading groups; no voice: no listening', () => {
   assert.deepStrictEqual(ids(panelGroups('reader', { voice: false })), ['reading']);
 });
 
-test('titles: the site\'s, or the engine\'s own', () => {
+test("titles: the site's, or the engine's own", () => {
   assert.strictEqual(panelTitle(null, 'graph'), 'Things to change');
   assert.strictEqual(panelTitle(null, 'reader'), 'Reading');
-  assert.strictEqual(panelTitle({ panels: { graph: { title: 'Fun things to change' } } }, 'graph'), 'Fun things to change');
+  assert.strictEqual(
+    panelTitle({ panels: { graph: { title: 'Fun things to change' } } }, 'graph'),
+    'Fun things to change',
+  );
   assert.strictEqual(panelTitle({ panels: { graph: { title: '  ' } } }, 'nonsense'), 'Things to change');
 });

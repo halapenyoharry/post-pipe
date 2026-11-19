@@ -94,9 +94,10 @@ function sourceOf(item) {
 function hiddenInGraph(item, hiddenSources) {
   const source = sourceOf(item);
   if (!source || source.id === undefined || source.id === null) return null;
-  const hidden = hiddenSources instanceof Set
-    ? hiddenSources.has(source.id)
-    : Array.isArray(hiddenSources) && hiddenSources.includes(source.id);
+  const hidden =
+    hiddenSources instanceof Set
+      ? hiddenSources.has(source.id)
+      : Array.isArray(hiddenSources) && hiddenSources.includes(source.id);
   if (!hidden) return null;
   return { id: source.id, title: typeof source.title === 'string' ? source.title.trim() : '' };
 }
@@ -134,4 +135,15 @@ function readerSourcePill(item, hiddenSources, sources, settings) {
   return { source: entry || stamp, hidden };
 }
 
-module.exports = { PREF, feedFlows, chosenFlow, prefFor, chosenOrder, nextFollowsFlow, flowNav, hiddenInGraph, HIDDEN_IN_GRAPH, readerSourcePill };
+module.exports = {
+  PREF,
+  feedFlows,
+  chosenFlow,
+  prefFor,
+  chosenOrder,
+  nextFollowsFlow,
+  flowNav,
+  hiddenInGraph,
+  HIDDEN_IN_GRAPH,
+  readerSourcePill,
+};

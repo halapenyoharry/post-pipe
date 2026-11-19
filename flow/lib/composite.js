@@ -19,7 +19,9 @@ export function pngSize(file) {
 export async function compositeOver({ svg, screenshot, width, height, out }) {
   const size = pngSize(screenshot);
   if (size.width !== width || size.height !== height) {
-    throw new Error(`${screenshot} is ${size.width}x${size.height}, the positions say ${width}x${height}; capture and positions must be the same frame`);
+    throw new Error(
+      `${screenshot} is ${size.width}x${size.height}, the positions say ${width}x${height}; capture and positions must be the same frame`,
+    );
   }
   const png = fs.readFileSync(screenshot).toString('base64');
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>

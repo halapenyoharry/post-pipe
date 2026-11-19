@@ -47,9 +47,10 @@ const READER_FONTS = {
 // settings.reader.fonts: which faces are offered, in order. Default: the
 // page's own face and OpenDyslexic. The page's own face is always offered.
 function readerFonts(settings) {
-  const list = settings && settings.reader && Array.isArray(settings.reader.fonts)
-    ? settings.reader.fonts
-    : ['default', 'opendyslexic'];
+  const list =
+    settings && settings.reader && Array.isArray(settings.reader.fonts)
+      ? settings.reader.fonts
+      : ['default', 'opendyslexic'];
   const ids = ['default', ...list.filter((id) => id !== 'default' && READER_FONTS[id])];
   return [...new Set(ids)].map((id) => READER_FONTS[id]);
 }

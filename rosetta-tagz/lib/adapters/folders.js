@@ -11,7 +11,11 @@ function get(obj, dotted) {
 }
 
 function listDirs(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith('.')).map((d) => d.name).sort();
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => d.name)
+    .sort();
 }
 
 // One piece of content: frontmatter.json (post-pipe Gen-2), else the YAML header of
@@ -19,7 +23,9 @@ function listDirs(dir) {
 function readPiece(dir, name) {
   const base = path.join(dir, name);
   const fm = path.join(base, 'frontmatter.json');
-  const bodyFile = ['index.md', 'index.qmd', 'index.markdown'].map((f) => path.join(base, f)).find((f) => fs.existsSync(f));
+  const bodyFile = ['index.md', 'index.qmd', 'index.markdown']
+    .map((f) => path.join(base, f))
+    .find((f) => fs.existsSync(f));
   const raw = bodyFile ? fs.readFileSync(bodyFile, 'utf8') : '';
   if (fs.existsSync(fm)) {
     try {
@@ -57,7 +63,8 @@ export function fromFrontmatterDir(dir, opts = {}) {
     });
     const labels = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[,;]/) : [];
     for (const label of labels) {
-      if (typeof label === 'string' && label.trim()) records.push({ type: 'tag', source, item: id, label: label.trim(), weight: 1, origin: 'explicit' });
+      if (typeof label === 'string' && label.trim())
+        records.push({ type: 'tag', source, item: id, label: label.trim(), weight: 1, origin: 'explicit' });
     }
   }
   return records;
@@ -76,10 +83,21 @@ function parseYamlHeader(text) {
     const [, key, rest] = kv;
     if (rest === '') {
       const list = [];
-      while (i + 1 < lines.length && /^\s*-\s+/.test(lines[i + 1])) list.push(lines[++i].replace(/^\s*-\s+/, '').trim().replace(/^["']|["']$/g, ''));
+      while (i + 1 < lines.length && /^\s*-\s+/.test(lines[i + 1]))
+        list.push(
+          lines[++i]
+            .replace(/^\s*-\s+/, '')
+            .trim()
+            .replace(/^["']|["']$/g, ''),
+        );
       header[key] = list;
     } else if (/^\[.*\]$/.test(rest.trim())) {
-      header[key] = rest.trim().slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+      header[key] = rest
+        .trim()
+        .slice(1, -1)
+        .split(',')
+        .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+        .filter(Boolean);
     } else {
       header[key] = rest.trim().replace(/^["']|["']$/g, '');
     }
@@ -104,9 +122,19 @@ export function fromMarkdownDir(dir, opts = {}) {
     const id = path.relative(dir, file).replace(/\.(md|markdown)$/i, '');
     const labels = new Set();
     const raw = header.tags ?? header.tag ?? [];
-    for (const t of Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/)) if (t.trim()) labels.add(t.trim().replace(/^#/, ''));
+    for (const t of Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/))
+      if (t.trim()) labels.add(t.trim().replace(/^#/, ''));
     if (opts.inline) for (const m of body.matchAll(/(?:^|\s)#([\p{L}\p{N}_][\p{L}\p{N}_/-]*)/gu)) labels.add(m[1]);
-    records.push({ type: 'item', source, id, title: header.title ?? path.basename(id), text: body.slice(0, MAX_TEXT), url: '', date: header.date ?? '', kind: 'note' });
+    records.push({
+      type: 'item',
+      source,
+      id,
+      title: header.title ?? path.basename(id),
+      text: body.slice(0, MAX_TEXT),
+      url: '',
+      date: header.date ?? '',
+      kind: 'note',
+    });
     for (const label of labels) records.push({ type: 'tag', source, item: id, label, weight: 1, origin: 'explicit' });
   }
   return records;

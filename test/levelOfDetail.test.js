@@ -15,12 +15,32 @@ const ZOOMS = [0, 1e-4, 0.001, 0.01, 0.04, 0.05, 0.1, 0.2, 0.28, 0.34, 0.35, 0.3
 for (let i = -14 * 16; i <= 7 * 16; i++) ZOOMS.push(2 ** (i / 16));
 
 // GraphViewer's own defaults for graph.card.
-const ENGINE_CARD = { width: 180, height: 140, hoverWidth: 200, hoverHeight: 160,
-  pinnedWidth: 230, pinnedHeight: 190, minWidth: 110, minHeight: 80,
-  maxWidth: 620, maxHeight: 520, glowPadding: 16 };
-const EXAMPLE_CARD = { ...ENGINE_CARD,
-  ...JSON.parse(fs.readFileSync(path.join(__dirname, '../examples/site/settings.json'), 'utf8')).graph.card };
-const SMALL_CARD = { ...ENGINE_CARD, width: 120, height: 90, hoverWidth: 130, hoverHeight: 100, pinnedWidth: 150, pinnedHeight: 120 };
+const ENGINE_CARD = {
+  width: 180,
+  height: 140,
+  hoverWidth: 200,
+  hoverHeight: 160,
+  pinnedWidth: 230,
+  pinnedHeight: 190,
+  minWidth: 110,
+  minHeight: 80,
+  maxWidth: 620,
+  maxHeight: 520,
+  glowPadding: 16,
+};
+const EXAMPLE_CARD = {
+  ...ENGINE_CARD,
+  ...JSON.parse(fs.readFileSync(path.join(__dirname, '../examples/site/settings.json'), 'utf8')).graph.card,
+};
+const SMALL_CARD = {
+  ...ENGINE_CARD,
+  width: 120,
+  height: 90,
+  hoverWidth: 130,
+  hoverHeight: 100,
+  pinnedWidth: 150,
+  pinnedHeight: 120,
+};
 
 test('two levels: title below LOD_TITLE, full at it and above', () => {
   assert.strictEqual(LOD_TITLE, 0.6);
@@ -64,10 +84,23 @@ test('a card is the size its state gives it, the same at every zoom', () => {
     const sizeFor = makeCardSizeFor(CARD);
     for (const k of ZOOMS) {
       const lod = getLOD(k);
-      assert.deepStrictEqual(sizeFor({ hovered: false, pinned: false, lod }), { width: CARD.width, height: CARD.height });
-      assert.deepStrictEqual(sizeFor({ hovered: true, pinned: false, lod }), { width: CARD.hoverWidth, height: CARD.hoverHeight });
-      assert.deepStrictEqual(sizeFor({ hovered: false, pinned: true, lod }), { width: CARD.pinnedWidth, height: CARD.pinnedHeight });
-      assert.deepStrictEqual(sizeFor({ hovered: true, pinned: true, lod }), { width: CARD.pinnedWidth, height: CARD.pinnedHeight }, 'open wins over the pointer');
+      assert.deepStrictEqual(sizeFor({ hovered: false, pinned: false, lod }), {
+        width: CARD.width,
+        height: CARD.height,
+      });
+      assert.deepStrictEqual(sizeFor({ hovered: true, pinned: false, lod }), {
+        width: CARD.hoverWidth,
+        height: CARD.hoverHeight,
+      });
+      assert.deepStrictEqual(sizeFor({ hovered: false, pinned: true, lod }), {
+        width: CARD.pinnedWidth,
+        height: CARD.pinnedHeight,
+      });
+      assert.deepStrictEqual(
+        sizeFor({ hovered: true, pinned: true, lod }),
+        { width: CARD.pinnedWidth, height: CARD.pinnedHeight },
+        'open wins over the pointer',
+      );
     }
   }
 });

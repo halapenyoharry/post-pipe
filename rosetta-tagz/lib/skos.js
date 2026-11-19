@@ -36,7 +36,15 @@ export const RTZ_NS = 'urn:rosetta-tagz:vocab#'; // provisional
 export const DEFAULT_BASE = 'urn:rosetta-tagz:'; // provisional; a site that publishes its vocabulary sets its own
 export const DEFAULT_LANG = 'en';
 
-const PREFIXES = { skos: SKOS_NS, prov: PROV_NS, rdf: RDF_NS, rdfs: RDFS_NS, xsd: XSD_NS, dcterms: DCT_NS, rtz: RTZ_NS };
+const PREFIXES = {
+  skos: SKOS_NS,
+  prov: PROV_NS,
+  rdf: RDF_NS,
+  rdfs: RDFS_NS,
+  xsd: XSD_NS,
+  dcterms: DCT_NS,
+  rtz: RTZ_NS,
+};
 const SITE = 'site';
 const MAPPINGS = new Set(['closeMatch', 'broadMatch', 'narrowMatch', 'relatedMatch', 'exactMatch']);
 const SEMANTIC = new Set(['broader', 'related']); // within a scheme; narrower is never emitted
@@ -52,8 +60,12 @@ export function checkBase(base) {
   return base;
 }
 
-const enc = (s) => encodeURIComponent(String(s)).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-const localName = (k) => String(k).replace(/[^A-Za-z0-9_]/g, '_').replace(/^([0-9])/, '_$1') || '_';
+const enc = (s) =>
+  encodeURIComponent(String(s)).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+const localName = (k) =>
+  String(k)
+    .replace(/[^A-Za-z0-9_]/g, '_')
+    .replace(/^([0-9])/, '_$1') || '_';
 
 // terms: { iri } | { bnode } | { lit, lang? , type? }
 const iri = (v) => ({ iri: v });
@@ -72,7 +84,8 @@ function literal(v, lang) {
 // A language tag as BCP 47 spells it, or null/'' for plain literals.
 export function checkLang(lang) {
   if (lang === null || lang === '' || lang === false) return null;
-  if (typeof lang !== 'string' || !/^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$/.test(lang)) throw new Error(`skos lang ${JSON.stringify(lang)} is not a language tag`);
+  if (typeof lang !== 'string' || !/^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$/.test(lang))
+    throw new Error(`skos lang ${JSON.stringify(lang)} is not a language tag`);
   return lang;
 }
 
@@ -95,10 +108,13 @@ export function buildSkos(universe, { base = DEFAULT_BASE, lang = DEFAULT_LANG }
   };
   const itemIri = (key) => iri(`${base}item/${enc(key)}`);
 
-  const concepts = [...(universe.concepts ?? [])].filter((c) => c && typeof c.id === 'string').sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const concepts = [...(universe.concepts ?? [])]
+    .filter((c) => c && typeof c.id === 'string')
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const byId = new Map(concepts.map((c) => [c.id, c]));
   const schemesOf = (c) => {
-    const list = Array.isArray(c.inScheme) && c.inScheme.length ? c.inScheme.filter((s) => typeof s === 'string' && s) : [];
+    const list =
+      Array.isArray(c.inScheme) && c.inScheme.length ? c.inScheme.filter((s) => typeof s === 'string' && s) : [];
     return list.includes(SITE) ? list : [...list, SITE];
   };
   const ownSchemes = (c) => schemesOf(c).filter((s) => s !== SITE);
@@ -140,12 +156,17 @@ export function buildSkos(universe, { base = DEFAULT_BASE, lang = DEFAULT_LANG }
       for (const a of alts(s)) add(f, P('skos', 'altLabel'), label(a));
       forms.push(f);
     }
-    for (let i = 0; i < forms.length; i++) for (let j = i + 1; j < forms.length; j++) add(forms[i], P('skos', 'exactMatch'), forms[j]);
+    for (let i = 0; i < forms.length; i++)
+      for (let j = i + 1; j < forms.length; j++) add(forms[i], P('skos', 'exactMatch'), forms[j]);
   }
 
   // PROV on a reified triple
   const provenance = (stmt, src) => {
-    for (const e of Array.isArray(src.wasDerivedFrom) ? src.wasDerivedFrom : src.wasDerivedFrom ? [src.wasDerivedFrom] : []) {
+    for (const e of Array.isArray(src.wasDerivedFrom)
+      ? src.wasDerivedFrom
+      : src.wasDerivedFrom
+        ? [src.wasDerivedFrom]
+        : []) {
       if (!e || typeof e !== 'object') continue;
       const ent = bnode();
       add(stmt, P('prov', 'wasDerivedFrom'), ent);
@@ -179,22 +200,30 @@ export function buildSkos(universe, { base = DEFAULT_BASE, lang = DEFAULT_LANG }
   };
 
   // relations
-  const relations = [...(universe.relations ?? [])].filter((r) => r && typeof r.a === 'string' && typeof r.b === 'string' && typeof r.type === 'string');
+  const relations = [...(universe.relations ?? [])].filter(
+    (r) => r && typeof r.a === 'string' && typeof r.b === 'string' && typeof r.type === 'string',
+  );
   for (const r of relations) {
     const a = byId.get(r.a);
     const b = byId.get(r.b);
     if (!a) continue;
     const external = !b && r.b.includes(':');
     if (!b && !external) continue;
-    const extra = { why: typeof r.why === 'string' && r.why ? r.why : undefined, weight: typeof r.weight === 'number' ? r.weight : undefined };
+    const extra = {
+      why: typeof r.why === 'string' && r.why ? r.why : undefined,
+      weight: typeof r.weight === 'number' ? r.weight : undefined,
+    };
     if (r.skos === true && MAPPINGS.has(r.type)) {
       // across schemes: between the forms in their own schemes; b first for the flipped types
       const fromA = (ownSchemes(a).length ? ownSchemes(a) : [SITE]).map((s) => formIri(a.id, s));
-      const toB = external ? [externalIri(r.b)] : (ownSchemes(b).length ? ownSchemes(b) : [SITE]).map((s) => formIri(b.id, s));
-      for (const x of fromA) for (const y of toB) {
-        if (FLIPPED.has(r.type) && !external) statement(y, P('skos', r.type), x, r, extra);
-        else statement(x, P('skos', r.type), y, r, extra);
-      }
+      const toB = external
+        ? [externalIri(r.b)]
+        : (ownSchemes(b).length ? ownSchemes(b) : [SITE]).map((s) => formIri(b.id, s));
+      for (const x of fromA)
+        for (const y of toB) {
+          if (FLIPPED.has(r.type) && !external) statement(y, P('skos', r.type), x, r, extra);
+          else statement(x, P('skos', r.type), y, r, extra);
+        }
       continue;
     }
     if (external) {
@@ -214,11 +243,14 @@ export function buildSkos(universe, { base = DEFAULT_BASE, lang = DEFAULT_LANG }
   }
 
   // items and their tags
-  const items = [...(universe.items ?? [])].filter((it) => it && typeof it.key === 'string').sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0));
+  const items = [...(universe.items ?? [])]
+    .filter((it) => it && typeof it.key === 'string')
+    .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0));
   for (const it of items) {
     const s = itemIri(it.key);
     if (typeof it.title === 'string' && it.title) add(s, P('dcterms', 'title'), literal(it.title));
-    if (typeof it.url === 'string' && /^https?:\/\/[^\s<>"{}|^`\\]+$/.test(it.url)) add(s, P('rdfs', 'seeAlso'), iri(it.url));
+    if (typeof it.url === 'string' && /^https?:\/\/[^\s<>"{}|^`\\]+$/.test(it.url))
+      add(s, P('rdfs', 'seeAlso'), iri(it.url));
     for (const t of it.tags ?? []) {
       if (!t || !byId.has(t.c)) continue;
       statement(s, P('dcterms', 'subject'), conceptIri(t.c), t, {
@@ -237,7 +269,8 @@ export function buildSkos(universe, { base = DEFAULT_BASE, lang = DEFAULT_LANG }
 function turtleTerm(t) {
   if (t.iri !== undefined) {
     for (const [p, ns] of Object.entries(PREFIXES)) {
-      if (t.iri.startsWith(ns) && /^[A-Za-z_][A-Za-z0-9_]*$/.test(t.iri.slice(ns.length))) return `${p}:${t.iri.slice(ns.length)}`;
+      if (t.iri.startsWith(ns) && /^[A-Za-z_][A-Za-z0-9_]*$/.test(t.iri.slice(ns.length)))
+        return `${p}:${t.iri.slice(ns.length)}`;
     }
     return `<${t.iri}>`;
   }
@@ -277,7 +310,8 @@ function toTurtle(triples) {
 
 // ── JSON-LD ──────────────────────────────────────────────────────────────────────────────────────
 function compact(i) {
-  for (const [p, ns] of Object.entries(PREFIXES)) if (i.startsWith(ns) && i.length > ns.length) return `${p}:${i.slice(ns.length)}`;
+  for (const [p, ns] of Object.entries(PREFIXES))
+    if (i.startsWith(ns) && i.length > ns.length) return `${p}:${i.slice(ns.length)}`;
   return i;
 }
 function jsonTerm(t) {

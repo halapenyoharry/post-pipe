@@ -65,7 +65,7 @@ export function ResizeHandles({ width, height, zoomScale = 1, onResize, onResize
       n: 'ns-resize',
       s: 'ns-resize',
       w: 'ew-resize',
-      e: 'ew-resize'
+      e: 'ew-resize',
     };
 
     document.body.style.cursor = cursorMap[direction] || 'nwse-resize';

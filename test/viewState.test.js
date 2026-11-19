@@ -3,9 +3,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const {
-  createViewState, memoryBackend, localStorageBackend, hostParamsBackend,
-} = require('../src/lib/viewState');
+const { createViewState, memoryBackend, localStorageBackend, hostParamsBackend } = require('../src/lib/viewState');
 
 const mk = (o = {}) => createViewState({ debounceMs: 0, ...o });
 
@@ -52,7 +50,8 @@ test("another corpus's arrangement is not applied to this one", async () => {
 });
 
 test('undo and redo walk the arrangement', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   assert.strictEqual(s.canUndo, false);
   s.setLayout('radial');
   s.setLayout('timeline');
@@ -67,8 +66,9 @@ test('undo and redo walk the arrangement', async () => {
 });
 
 test('a drag is one undo, not one per frame', async () => {
-  const s = mk(); await s.ready();
-  s.setLayout('radial');           // something to come back to
+  const s = mk();
+  await s.ready();
+  s.setLayout('radial'); // something to come back to
   for (let x = 0; x < 30; x++) s.setNodePosition('n', x, 0, { transient: true });
   s.commit();
   assert.strictEqual(s.nodeState('n').x, 29);
@@ -78,7 +78,8 @@ test('a drag is one undo, not one per frame', async () => {
 });
 
 test('a new action clears the redo branch', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.setLayout('radial');
   s.undo();
   assert.strictEqual(s.canRedo, true);
@@ -87,7 +88,8 @@ test('a new action clears the redo branch', async () => {
 });
 
 test('history is bounded', async () => {
-  const s = mk({ maxHistory: 5 }); await s.ready();
+  const s = mk({ maxHistory: 5 });
+  await s.ready();
   for (let i = 0; i < 50; i++) s.setNodePosition('n', i, 0);
   let depth = 0;
   while (s.undo()) depth++;
@@ -95,7 +97,8 @@ test('history is bounded', async () => {
 });
 
 test('scrolling is not an undoable act', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.setLayout('radial');
   s.setReadingPosition('n', 120);
   s.setReadingPosition('n', 340);
@@ -106,7 +109,8 @@ test('scrolling is not an undoable act', async () => {
 
 test('seen is recorded once and not overwritten', async () => {
   let t = 1000;
-  const s = mk({ now: () => t }); await s.ready();
+  const s = mk({ now: () => t });
+  await s.ready();
   s.markSeen('n');
   const first = s.state.reading.n.seenAt;
   t = 9999;
@@ -117,7 +121,8 @@ test('seen is recorded once and not overwritten', async () => {
 });
 
 test('hidden feeds round-trip and toggle', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.toggleSource('sciencedaily');
   assert.strictEqual(s.isHidden('sciencedaily'), true);
   s.toggleSource('sciencedaily');
@@ -125,7 +130,8 @@ test('hidden feeds round-trip and toggle', async () => {
 });
 
 test('a feed color override round-trips and is undoable', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   assert.strictEqual(s.sourceColor('sciencedaily'), null);
   s.setSourceColor('sciencedaily', '#ff8800');
   assert.strictEqual(s.sourceColor('sciencedaily'), '#ff8800');
@@ -134,7 +140,8 @@ test('a feed color override round-trips and is undoable', async () => {
 });
 
 test('a color profile replaces the whole graph palette at once', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.applyColorProfile('cool', { tag: '#111', topology: '#222' });
   assert.deepStrictEqual(s.graphColors(), { tag: '#111', topology: '#222' });
   assert.strictEqual(s.colorProfileId(), 'cool');
@@ -147,7 +154,8 @@ test('a color profile replaces the whole graph palette at once', async () => {
 
 test('prune keeps everything present and caps what is gone', async () => {
   let t = 0;
-  const s = mk({ now: () => ++t }); await s.ready();
+  const s = mk({ now: () => ++t });
+  await s.ready();
   for (let i = 0; i < 20; i++) s.setNodePosition(`gone-${i}`, i, i);
   s.setNodePosition('here', 1, 1);
 
@@ -161,8 +169,12 @@ test('prune keeps everything present and caps what is gone', async () => {
 
 test('a browser that refuses to store anything still yields a working store', async () => {
   const hostile = {
-    getItem() { throw new Error('SecurityError'); },
-    setItem() { throw new Error('QuotaExceeded'); },
+    getItem() {
+      throw new Error('SecurityError');
+    },
+    setItem() {
+      throw new Error('QuotaExceeded');
+    },
   };
   const s = mk({ backend: localStorageBackend('k', hostile) });
   await s.ready();
@@ -191,7 +203,9 @@ test('host backend writes through the panel api without clobbering its params', 
   let params = { fontSize: 13 };
   const api = {
     getParameters: () => params,
-    updateParameters: (p) => { params = { ...params, ...p }; },
+    updateParameters: (p) => {
+      params = { ...params, ...p };
+    },
   };
   const s = mk({ backend: hostParamsBackend(api), corpusId: 'c' });
   await s.ready();
@@ -202,7 +216,8 @@ test('host backend writes through the panel api without clobbering its params', 
 });
 
 test('subscribers are notified and can unsubscribe', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   let calls = 0;
   const off = s.subscribe(() => calls++);
   s.setLayout('radial');
@@ -214,7 +229,15 @@ test('subscribers are notified and can unsubscribe', async () => {
 
 test('writes during a gesture are coalesced rather than one per frame', async () => {
   let saves = 0;
-  const backend = { id: 'counting', async load() { return null; }, async save() { saves++; } };
+  const backend = {
+    id: 'counting',
+    async load() {
+      return null;
+    },
+    async save() {
+      saves++;
+    },
+  };
   const s = createViewState({ backend, debounceMs: 20 });
   await s.ready();
   for (let x = 0; x < 40; x++) s.setNodePosition('n', x, 0, { transient: true });
@@ -224,10 +247,11 @@ test('writes during a gesture are coalesced rather than one per frame', async ()
 });
 
 test('a silent write persists without entering history or disturbing a gesture', async () => {
-  const s = mk(); await s.ready();
-  s.setLayout('radial');                                  // the reader's act
-  s.setNodePosition('a', 1, 1, { transient: true });      // mid-gesture
-  s.setNodePosition('settled', 9, 9, { silent: true });   // the simulation's act
+  const s = mk();
+  await s.ready();
+  s.setLayout('radial'); // the reader's act
+  s.setNodePosition('a', 1, 1, { transient: true }); // mid-gesture
+  s.setNodePosition('settled', 9, 9, { silent: true }); // the simulation's act
   s.commit();
 
   assert.strictEqual(s.nodeState('settled').x, 9, 'silently written state is present');
@@ -242,8 +266,8 @@ test('a new layout version discards generated positions and keeps placed ones', 
   const backend = memoryBackend();
   const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
   await a.ready();
-  a.setNodePosition('generated', 1, 1, { silent: true });   // the layout chose this
-  a.setNodePosition('placed', 2, 2);                        // the reader chose this
+  a.setNodePosition('generated', 1, 1, { silent: true }); // the layout chose this
+  a.setNodePosition('placed', 2, 2); // the reader chose this
   await a.flush();
 
   const b = mk({ backend, corpusId: 'c', layoutVersion: 'v2' });
@@ -268,37 +292,38 @@ test('the same layout version keeps everything', async () => {
   assert.ok(b.nodeState('generated'), 'nothing is discarded without a reason');
 });
 
-test('dragging a generated position makes it the reader\'s', async () => {
+test("dragging a generated position makes it the reader's", async () => {
   const backend = memoryBackend();
   const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
   await a.ready();
   a.setNodePosition('n', 1, 1, { silent: true });
-  a.setNodePosition('n', 9, 9);                    // reader moves it
+  a.setNodePosition('n', 9, 9); // reader moves it
   await a.flush();
 
   const b = mk({ backend, corpusId: 'c', layoutVersion: 'v2' });
   await b.ready();
-  assert.strictEqual(b.nodeState('n').x, 9, 'a node you touched is no longer the layout\'s to reset');
+  assert.strictEqual(b.nodeState('n').x, 9, "a node you touched is no longer the layout's to reset");
 });
 
-test('resizing a generated node makes it the reader\'s, like moving it does', async () => {
+test("resizing a generated node makes it the reader's, like moving it does", async () => {
   const backend = memoryBackend();
   const a = mk({ backend, corpusId: 'c', layoutVersion: 'v1' });
   await a.ready();
-  a.setNodePosition('n', 1, 1, { silent: true });   // the layout placed it
-  a.setNodeSize('n', 400, 300);                     // the reader sized it
+  a.setNodePosition('n', 1, 1, { silent: true }); // the layout placed it
+  a.setNodeSize('n', 400, 300); // the reader sized it
   await a.flush();
 
   const b = mk({ backend, corpusId: 'c', layoutVersion: 'v2' });
   await b.ready();
-  assert.ok(b.nodeState('n'), 'a card you resized is not the layout\'s to discard');
+  assert.ok(b.nodeState('n'), "a card you resized is not the layout's to discard");
   assert.strictEqual(b.nodeState('n').w, 400);
 });
 
 test('prune matches the item, not the layout-prefixed position key', async () => {
   // Positions are filed per layout as "<layout>::<id>". A prune that compared
   // whole keys would treat every one of them as orphaned.
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.setNodePosition('force::https://x/a.html', 1, 1);
   s.setNodePosition('radial::https://x/a.html', 2, 2);
   s.setNodeSize('https://x/a.html', 300, 200);
@@ -327,7 +352,8 @@ test('the time axis is positioned, oriented and remembered', async () => {
 });
 
 test('dragging the axis is one undo, not one per frame', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.setTimeAxis({ on: true });
   for (let x = 0; x < 20; x++) s.setTimeAxis({ x }, { transient: true });
   s.commit();
@@ -338,7 +364,8 @@ test('dragging the axis is one undo, not one per frame', async () => {
 });
 
 test('paragraphIndent and paragraphSpace are independent booleans with correct defaults', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   assert.strictEqual(s.paragraphIndent(), false, 'indent defaults to false');
   assert.strictEqual(s.paragraphSpace(), true, 'space defaults to true');
 
@@ -366,7 +393,8 @@ test('legacy paragraphStyle maps to paragraphIndent and paragraphSpace on load',
 });
 
 test('bookmarks add and list in para order', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   const id2 = s.addBookmark({ item: 'ch1', para: 5, quote: 'Five words in the fifth para', note: 'second note' });
   const id1 = s.addBookmark({ item: 'ch1', para: 1, quote: 'First words in the first para' });
   const idOther = s.addBookmark({ item: 'ch2', para: 0, quote: 'Other item first para' });
@@ -391,7 +419,8 @@ test('bookmarks add and list in para order', async () => {
 });
 
 test('bookmarks note editing and removal', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   const id = s.addBookmark({ item: 'ch1', para: 3, quote: 'Some words here' });
   assert.strictEqual(s.bookmarks('ch1')[0].note, '');
 
@@ -427,10 +456,10 @@ test('bookmarks persist across reload and do not enter undo history', async () =
   assert.strictEqual(loaded[0].note, 'Saved note');
 });
 
-
 test('bookmarks accept and store optional version', async () => {
   const { createViewState } = require('../src/lib/viewState');
-  const s = createViewState(); await s.ready();
+  const s = createViewState();
+  await s.ready();
   s.addBookmark({ item: 'ch1', para: 1, quote: 'First words', version: 'abc123def456' });
   const marks = s.bookmarks('ch1');
   assert.strictEqual(marks[0].version, 'abc123def456');
@@ -463,7 +492,9 @@ test("viewState's own list of word choices is readerWords' list, and its retired
 test('viewState.js runs as a plain script, as generate-index.js puts it in the page: no require', () => {
   const fs = require('fs');
   const path = require('path');
-  const src = fs.readFileSync(path.join(__dirname, '../src/lib/viewState.js'), 'utf8').replace(/module\.exports[\s\S]*?};/, '');
+  const src = fs
+    .readFileSync(path.join(__dirname, '../src/lib/viewState.js'), 'utf8')
+    .replace(/module\.exports[\s\S]*?};/, '');
   assert.doesNotMatch(src, /\brequire\s*\(/);
 });
 
@@ -499,7 +530,10 @@ test("the reading aid 'words' is null until chosen, keeps a choice across visits
 test("a device that chose 'one', one card at a time (2026-11-10 to 2026-11-11), reads whole; 'one' given is kept as whole", async () => {
   const fresh = mk({ backend: memoryBackend(), corpusId: 'c' });
   await fresh.ready();
-  const stored = mk({ backend: memoryBackend({ ...fresh.state, readerAids: { words: 'one', followAlong: true } }), corpusId: 'c' });
+  const stored = mk({
+    backend: memoryBackend({ ...fresh.state, readerAids: { words: 'one', followAlong: true } }),
+    corpusId: 'c',
+  });
   await stored.ready();
   assert.strictEqual(stored.readerAid('words'), 'whole');
   assert.strictEqual(stored.readerAid('followAlong'), true);
@@ -549,7 +583,8 @@ test('reading progress keeps the furthest point and stays done', async () => {
 });
 
 test('historyVersion counts the undos and redos that happen, and nothing else', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   assert.strictEqual(s.historyVersion, 0);
   s.setNodePosition('n', 1, 2, { transient: true });
   s.setNodePosition('n', 5, 6, { transient: true });
@@ -570,7 +605,8 @@ test('historyVersion counts the undos and redos that happen, and nothing else', 
 // Positions moving from one key to another (a graph that starts keying tag
 // positions on concept ids instead of labels): copied, never overwritten.
 test('migrateNodeKeys copies an entry once, as it is, and leaves the old key', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.setNodePosition('force@h::tag:ml', 10, 20, { silent: true });
   s.setNodeSize('tag:ml', 30, 40);
   const historyBefore = s.historyVersion;
@@ -583,10 +619,7 @@ test('migrateNodeKeys copies an entry once, as it is, and leaves the old key', a
   assert.strictEqual(n, 2, 'only entries that exist are copied');
   assert.deepStrictEqual(s.nodeState('force@h::concept:c_ml'), s.nodeState('force@h::tag:ml'), 'copied as it is');
   assert.strictEqual(s.nodeState('force@h::concept:c_ml').auto, true, 'a generated position stays generated');
-  assert.deepStrictEqual(
-    { w: s.nodeState('concept:c_ml').w, h: s.nodeState('concept:c_ml').h },
-    { w: 30, h: 40 },
-  );
+  assert.deepStrictEqual({ w: s.nodeState('concept:c_ml').w, h: s.nodeState('concept:c_ml').h }, { w: 30, h: 40 });
   assert.ok(s.nodeState('force@h::tag:ml'), 'the old key remains');
   assert.strictEqual(s.nodeState('force@h::concept:c_absent'), null);
   assert.strictEqual(s.canUndo, undoBefore, 'not an undoable act');
@@ -594,11 +627,16 @@ test('migrateNodeKeys copies an entry once, as it is, and leaves the old key', a
 });
 
 test('migrateNodeKeys is idempotent and never overwrites a target', async () => {
-  const s = mk(); await s.ready();
+  const s = mk();
+  await s.ready();
   s.setNodePosition('tag:ml', 1, 1);
   s.setNodePosition('concept:c_ml', 5, 5);
   assert.strictEqual(s.migrateNodeKeys([['tag:ml', 'concept:c_ml']]), 0);
-  assert.deepStrictEqual({ x: s.nodeState('concept:c_ml').x, y: s.nodeState('concept:c_ml').y }, { x: 5, y: 5 }, 'the target is kept');
+  assert.deepStrictEqual(
+    { x: s.nodeState('concept:c_ml').x, y: s.nodeState('concept:c_ml').y },
+    { x: 5, y: 5 },
+    'the target is kept',
+  );
 
   s.setNodePosition('tag:old', 2, 3);
   assert.strictEqual(s.migrateNodeKeys([['tag:old', 'concept:c_old']]), 1);
@@ -607,8 +645,15 @@ test('migrateNodeKeys is idempotent and never overwrites a target', async () => 
   s.migrateNodeKeys([['tag:old', 'concept:c_old']]);
   assert.deepStrictEqual({ x: s.nodeState('concept:c_old').x, y: s.nodeState('concept:c_old').y }, { x: 2, y: 3 });
   // Two pairs naming one target: the first wins.
-  s.setNodePosition('tag:a', 1, 0); s.setNodePosition('tag:b', 2, 0);
-  assert.strictEqual(s.migrateNodeKeys([['tag:a', 'concept:c_ab'], ['tag:b', 'concept:c_ab']]), 1);
+  s.setNodePosition('tag:a', 1, 0);
+  s.setNodePosition('tag:b', 2, 0);
+  assert.strictEqual(
+    s.migrateNodeKeys([
+      ['tag:a', 'concept:c_ab'],
+      ['tag:b', 'concept:c_ab'],
+    ]),
+    1,
+  );
   assert.strictEqual(s.nodeState('concept:c_ab').x, 1);
   // Nothing at all: nothing happens.
   assert.strictEqual(s.migrateNodeKeys(null), 0);
@@ -618,19 +663,25 @@ test('migrateNodeKeys is idempotent and never overwrites a target', async () => 
 test('migrated keys survive a reload and prune leaves them alone', async () => {
   const backend = memoryBackend();
   let t = 0;
-  const a = mk({ backend, corpusId: 'c', now: () => ++t }); await a.ready();
+  const a = mk({ backend, corpusId: 'c', now: () => ++t });
+  await a.ready();
   a.setNodePosition('force@h::tag:ml', 10, 20);
   a.migrateNodeKeys([['force@h::tag:ml', 'force@h::concept:c_ml']]);
   a.prune(['https://x/1'], { keep: 500 });
   assert.ok(a.nodeState('force@h::concept:c_ml'), 'a migrated position is kept through prune');
   await a.flush();
-  const b = mk({ backend, corpusId: 'c' }); await b.ready();
-  assert.deepStrictEqual({ x: b.nodeState('force@h::concept:c_ml').x, y: b.nodeState('force@h::concept:c_ml').y }, { x: 10, y: 20 });
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
+  assert.deepStrictEqual(
+    { x: b.nodeState('force@h::concept:c_ml').x, y: b.nodeState('force@h::concept:c_ml').y },
+    { x: 10, y: 20 },
+  );
 });
 
 test('container open and closed state persists and walks undo and redo', async () => {
   const backend = memoryBackend();
-  const a = mk({ backend, corpusId: 'c' }); await a.ready();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
   assert.strictEqual(a.containerState('book-1'), null);
   assert.strictEqual(a.isContainerClosed('book-1', false), false);
   assert.strictEqual(a.isContainerClosed('book-2', true), true);
@@ -654,13 +705,15 @@ test('container open and closed state persists and walks undo and redo', async (
   assert.strictEqual(a.containerState('book-1'), 'closed');
 
   await a.flush();
-  const b = mk({ backend, corpusId: 'c' }); await b.ready();
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
   assert.strictEqual(b.containerState('book-1'), 'closed');
 });
 
 test('rotation persists, coalesces a gesture into one undo, and resets with layout', async () => {
   const backend = memoryBackend();
-  const a = mk({ backend, corpusId: 'c' }); await a.ready();
+  const a = mk({ backend, corpusId: 'c' });
+  await a.ready();
   assert.strictEqual(a.rotation(), 0);
 
   for (let deg = 5; deg <= 45; deg += 5) a.setRotation(deg, { transient: true });
@@ -687,7 +740,7 @@ test('rotation persists, coalesces a gesture into one undo, and resets with layo
   assert.strictEqual(a.rotation(), 45);
 
   await a.flush();
-  const b = mk({ backend, corpusId: 'c' }); await b.ready();
+  const b = mk({ backend, corpusId: 'c' });
+  await b.ready();
   assert.strictEqual(b.rotation(), 45);
 });
-

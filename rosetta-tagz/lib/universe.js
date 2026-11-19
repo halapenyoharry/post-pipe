@@ -20,7 +20,8 @@ export const UNIVERSE_SCHEMA = 'rosetta-tagz/universe@1';
 // The scheme an unmapped label is filed under: a human's category under its system, a discovered
 // phrase under `discovered` (never under the system of the item it was found on), an emergent label
 // under `site` alone, since it is a canonical rtz-stone chose, not a word any system wrote.
-const schemeOfUnmapped = (r, origin) => (origin === 'discovered' ? DISCOVERED_SCHEME : origin === 'emergent' ? SITE_SCHEME : schemeOfSource(r.source));
+const schemeOfUnmapped = (r, origin) =>
+  origin === 'discovered' ? DISCOVERED_SCHEME : origin === 'emergent' ? SITE_SCHEME : schemeOfSource(r.source);
 
 // Golden-angle hues keep adjacent sources visibly distinct without a hand-made palette.
 function sourceColor(i) {
@@ -32,14 +33,33 @@ export function buildUniverse(stone, records) {
   // a stone.json built with a ledger says, per concept, since when its id has existed and what happened
   // to it this build ({since, event: minted|reused|split|merged, previousLabel?}); carried through
   // as written, absent when stone.json had no ledger (and always absent on a `u_` concept)
-  const ledgerNote = (c) => (c.ledger && typeof c.ledger === 'object' ? { ledger: { since: c.ledger.since, event: c.ledger.event, ...(c.ledger.previousLabel !== undefined ? { previousLabel: c.ledger.previousLabel } : {}) } } : {});
+  const ledgerNote = (c) =>
+    c.ledger && typeof c.ledger === 'object'
+      ? {
+          ledger: {
+            since: c.ledger.since,
+            event: c.ledger.event,
+            ...(c.ledger.previousLabel !== undefined ? { previousLabel: c.ledger.previousLabel } : {}),
+          },
+        }
+      : {};
   const concepts = new Map(stone.concepts.map((c) => [c.id, { ...c, ...ledgerNote(c), n: 0, nEmergent: 0 }]));
   const items = new Map();
   const sourceNames = Object.keys(stone.systems);
   const ensureSource = (name) => {
     if (!sourceNames.includes(name)) sourceNames.push(name);
   };
-  const bare = (source, id, title = String(id)) => ({ key: `${source}::${id}`, source, id: String(id), title, excerpt: '', url: '', kind: '', date: '', tags: new Map() });
+  const bare = (source, id, title = String(id)) => ({
+    key: `${source}::${id}`,
+    source,
+    id: String(id),
+    title,
+    excerpt: '',
+    url: '',
+    kind: '',
+    date: '',
+    tags: new Map(),
+  });
 
   for (const r of records) {
     if (r.type !== 'item') continue;
@@ -87,7 +107,19 @@ export function buildUniverse(stone, records) {
           altLabel: {},
           items: 0,
           sources: {},
-          variants: [{ norm: info.norm, label: r.label, forms: {}, formsBySource: {}, count: 0, explicit: 0, bySource: {}, acronym: false, tokens: info.tokens.length }],
+          variants: [
+            {
+              norm: info.norm,
+              label: r.label,
+              forms: {},
+              formsBySource: {},
+              count: 0,
+              explicit: 0,
+              bySource: {},
+              acronym: false,
+              tokens: info.tokens.length,
+            },
+          ],
           ratios: [], // the ratio of each record naming it, null for one without (dropped below)
           rank: [{ norm: info.norm, label: r.label, score: 1, parts: { freq: 1, cover: 1, trust: 1, quality: 1 } }],
           links: [],
@@ -99,7 +131,9 @@ export function buildUniverse(stone, records) {
       }
       // the spelling is evidence in the scheme that wrote it, exactly as rtz-stone files its own
       const v = concepts.get(cid).variants[0];
-      concepts.get(cid).ratios.push(origin === 'discovered' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null);
+      concepts
+        .get(cid)
+        .ratios.push(origin === 'discovered' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null);
       v.forms[r.label] = (v.forms[r.label] ?? 0) + 1;
       const written = (v.formsBySource[scheme] ??= {});
       written[r.label] = (written[r.label] ?? 0) + 1;
@@ -113,18 +147,32 @@ export function buildUniverse(stone, records) {
     const item = items.get(key);
     const below = under.length > 0 && belowBar(r);
     if (below && item.tags.has(cid) && !item.tags.get(cid).below) continue; // made at the bar already
-    const entry = item.tags.get(cid) ?? { c: cid, w: 0, origin, raw: [], via, why: r.why, sys: [r.source], ...(below ? { below: true } : {}) };
+    const entry = item.tags.get(cid) ?? {
+      c: cid,
+      w: 0,
+      origin,
+      raw: [],
+      via,
+      why: r.why,
+      sys: [r.source],
+      ...(below ? { below: true } : {}),
+    };
     entry.w = Math.max(entry.w, r.weight ?? 1);
-    entry.ratios = [...(entry.ratios ?? []), origin !== 'explicit' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null];
+    entry.ratios = [
+      ...(entry.ratios ?? []),
+      origin !== 'explicit' && typeof r.sourceRatio === 'number' ? r.sourceRatio : null,
+    ];
     if (origin === 'explicit') {
       entry.origin = 'explicit';
       entry.via = via;
-      if (!entry.raw.some((x) => x.n === info.norm && x.l === r.label)) entry.raw.push({ l: r.label, n: info.norm, s: r.source });
+      if (!entry.raw.some((x) => x.n === info.norm && x.l === r.label))
+        entry.raw.push({ l: r.label, n: info.norm, s: r.source });
     } else {
       if (!entry.why) entry.why = r.why;
       // an earned tag keeps the provenance its stage wrote, when it wrote any
       if (!entry.wasDerivedFrom && Array.isArray(r.wasDerivedFrom)) entry.wasDerivedFrom = r.wasDerivedFrom;
-      if (!entry.wasGeneratedBy && r.wasGeneratedBy && typeof r.wasGeneratedBy === 'object') entry.wasGeneratedBy = r.wasGeneratedBy;
+      if (!entry.wasGeneratedBy && r.wasGeneratedBy && typeof r.wasGeneratedBy === 'object')
+        entry.wasGeneratedBy = r.wasGeneratedBy;
     }
     item.tags.set(cid, entry);
   }
@@ -176,7 +224,8 @@ export function buildUniverse(stone, records) {
   const ids = new Set(concepts.keys());
   // a relation to a published vocabulary names its target "<schemeId>:<externalId>" (an override, or
   // later a mapping); it has no concept here and passes through as long as its own concept is known
-  const external = (b) => typeof b === 'string' && b.includes(':') && !ids.has(b) && !ids.has(b.slice(0, b.indexOf(':')));
+  const external = (b) =>
+    typeof b === 'string' && b.includes(':') && !ids.has(b) && !ids.has(b.slice(0, b.indexOf(':')));
   const list = [...merged.values()];
   return {
     schema: UNIVERSE_SCHEMA,
@@ -223,7 +272,9 @@ function ratioOfAll(ratios) {
 
 // Collapse items that are the same real-world article in different tag-systems.
 function mergeIdentical(items) {
-  const forCanon = new Map([...items.values()].map((it) => [it.key, { key: it.key, title: it.title, url: it.url, text: it.excerpt }]));
+  const forCanon = new Map(
+    [...items.values()].map((it) => [it.key, { key: it.key, title: it.title, url: it.url, text: it.excerpt }]),
+  );
   const canon = canonicalItems(forCanon);
   const out = new Map();
   for (const it of [...items.values()].sort((a, b) => (a.key < b.key ? -1 : 1))) {

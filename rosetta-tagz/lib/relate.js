@@ -22,14 +22,18 @@ const quote = (s) => `"${s}"`;
 
 export function deriveRelations(corpus, concepts, cfg) {
   const R = cfg.relate;
-  const LB = R.lexicalBroader === false || R.lexicalBroader === null ? null : { minP: 0.5, minN: 2, ...R.lexicalBroader };
+  const LB =
+    R.lexicalBroader === false || R.lexicalBroader === null ? null : { minP: 0.5, minN: 2, ...R.lexicalBroader };
   const labelOf = new Map(concepts.map((c) => [c.id, c.label ?? c.id]));
   const name = (id) => quote(labelOf.get(id) ?? id);
   const itemsOf = new Map();
   const conceptsOf = new Map();
   for (const c of concepts) {
     // items are counted as distinct real-world things: the same essay in two tag-systems is one
-    const set = entitySet(corpus, [...c.terms].flatMap((norm) => [...corpus.terms.get(norm).items]));
+    const set = entitySet(
+      corpus,
+      [...c.terms].flatMap((norm) => [...corpus.terms.get(norm).items]),
+    );
     itemsOf.set(c.id, set);
     for (const k of set) {
       if (!conceptsOf.has(k)) conceptsOf.set(k, []);
@@ -85,7 +89,10 @@ export function deriveRelations(corpus, concepts, cfg) {
     const na = itemsOf.get(a).size;
     const nb = itemsOf.get(b).size;
     put(
-      a, b, 'broader', n / nb,
+      a,
+      b,
+      'broader',
+      n / nb,
       { n, na, nb, derivation: ['usage'] },
       `${name(a)} is broader than ${name(b)} by usage: ${n} of ${nb} ${labelOf.get(b)} items also carry ${labelOf.get(a)} (P=${p2(n / nb)}), while only ${n} of ${na} ${labelOf.get(a)} items carry ${labelOf.get(b)} (P=${p2(n / na)})`,
       [{ type: 'cooccurrence', items: n }],
@@ -112,7 +119,10 @@ export function deriveRelations(corpus, concepts, cfg) {
       const npmi = Math.log(pab / ((nx / N) * (ny / N))) / -Math.log(pab);
       if (Number.isFinite(npmi) && npmi >= R.minNpmi) {
         put(
-          x, y, 'related', npmi * (n / (n + 1)),
+          x,
+          y,
+          'related',
+          npmi * (n / (n + 1)),
           { n, na: nx, nb: ny, npmi: Number(npmi.toFixed(3)) },
           `${name(x)} and ${name(y)} share ${n} of their ${nx} and ${ny} items, more than chance predicts (NPMI ${npmi.toFixed(2)})`,
           [{ type: 'cooccurrence', items: n }],
@@ -144,7 +154,9 @@ export function deriveRelations(corpus, concepts, cfg) {
       if (!va.first) continue;
       for (const other of byStem.get(va.first) ?? []) {
         if (other === c.id) continue;
-        const vb = stemSets.get(other).find((v) => v.stems.size > va.stems.size && [...va.stems].every((s) => v.stems.has(s)));
+        const vb = stemSets
+          .get(other)
+          .find((v) => v.stems.size > va.stems.size && [...va.stems].every((s) => v.stems.has(s)));
         if (!vb) continue;
         const a = c.id; // the shorter label is the broader one: "brain" ⊃ "brain scans"
         const b = other;
@@ -174,10 +186,23 @@ export function deriveRelations(corpus, concepts, cfg) {
         // weaker symmetric reading of the same pair; the replacement is recorded, not silent
         const replaced = out.delete(relKey(a, b, 'related'));
         put(
-          a, b, 'broader', p,
-          { n, na: itemsOf.get(a).size, nb, derivation: ['lexical'], stem: stemKey, ...(replaced ? { replaced: 'related' } : {}) },
+          a,
+          b,
+          'broader',
+          p,
+          {
+            n,
+            na: itemsOf.get(a).size,
+            nb,
+            derivation: ['lexical'],
+            stem: stemKey,
+            ...(replaced ? { replaced: 'related' } : {}),
+          },
           contains,
-          [{ type: 'cooccurrence', items: n }, { type: 'stem', key: stemKey }],
+          [
+            { type: 'cooccurrence', items: n },
+            { type: 'stem', key: stemKey },
+          ],
           { lexicalBroader: { minP: LB.minP, minN: LB.minN } },
         );
         covered.add(pairKey(a, b));
@@ -194,7 +219,10 @@ export function deriveRelations(corpus, concepts, cfg) {
     const ny = itemsOf.get(y).size;
     const n = Math.min(nx, ny);
     put(
-      x, y, 'adjacent', cos * (n / (n + 1.5)),
+      x,
+      y,
+      'adjacent',
+      cos * (n / (n + 1.5)),
       { cosine: Number(cos.toFixed(3)), na: nx, nb: ny },
       `${name(x)} and ${name(y)} are used on texts that read alike (cosine ${cos.toFixed(2)}) but never on the same item (${nx} and ${ny} items)`,
       [{ type: 'text', cosine: Number(cos.toFixed(3)) }],
@@ -216,7 +244,5 @@ export function deriveRelations(corpus, concepts, cfg) {
     list.sort((p, q) => q.weight - p.weight);
     for (const r of list.slice(0, R.perConcept)) keep.add(r);
   }
-  return all
-    .filter((r) => keep.has(r))
-    .sort((p, q) => (p.a + p.b + p.type < q.a + q.b + q.type ? -1 : 1));
+  return all.filter((r) => keep.has(r)).sort((p, q) => (p.a + p.b + p.type < q.a + q.b + q.type ? -1 : 1));
 }

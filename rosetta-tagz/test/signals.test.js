@@ -8,7 +8,8 @@ import { seedSignals } from '../lib/signals/seed.js';
 import { corpusOf, rec } from './helpers.js';
 
 const cfg = makeConfig();
-const find = (signals, a, b, signal) => signals.find((s) => s.a === [a, b].sort()[0] && s.b === [a, b].sort()[1] && s.signal === signal);
+const find = (signals, a, b, signal) =>
+  signals.find((s) => s.a === [a, b].sort()[0] && s.b === [a, b].sort()[1] && s.signal === signal);
 const sig = (records, only) => computeSignals(corpusOf(records), cfg, { only });
 
 test('stem: plural / gerund variants are the same term sequence', () => {
@@ -32,7 +33,9 @@ test('edit: spelling variants are found, derivational suffixes are not', () => {
 });
 
 test('acronym: initials match but are deliberately too weak to merge alone', () => {
-  const s = sig(rec('A', { 1: ['ai', 'ml'], 2: ['artificial intelligence', 'machine learning', 'art installation'] }), ['acronym']);
+  const s = sig(rec('A', { 1: ['ai', 'ml'], 2: ['artificial intelligence', 'machine learning', 'art installation'] }), [
+    'acronym',
+  ]);
   assert.ok(find(s, 'ai', 'artificial intelligence', 'acronym'));
   assert.ok(find(s, 'ai', 'art installation', 'acronym'), 'ambiguity is real: AI is also art installation');
   assert.ok(find(s, 'ml', 'machine learning', 'acronym'));
@@ -41,7 +44,9 @@ test('acronym: initials match but are deliberately too weak to merge alone', () 
 
 test('seed: only labels present in the corpus produce evidence', () => {
   const corpus = corpusOf(rec('A', { 1: ['ai'], 2: ['artificial intelligence'] }));
-  const out = seedSignals(corpus, cfg.signals, [{ same: [['ai', 'artificial intelligence', 'a.i.', 'not present anywhere']] }]);
+  const out = seedSignals(corpus, cfg.signals, [
+    { same: [['ai', 'artificial intelligence', 'a.i.', 'not present anywhere']] },
+  ]);
   assert.equal(out.length, 1);
   assert.equal(out[0].score, cfg.signals.seed);
 });
@@ -68,9 +73,15 @@ test('anchor: noisy multi-tag items give each pairing less weight', () => {
 });
 
 test('anchor: same source never anchors to itself; unrelated URLs never anchor', () => {
-  const same = [...rec('S', { a: ['x'] }, { a: { url: 'https://x.org/p' } }), ...rec('S', { b: ['y'] }, { b: { url: 'https://x.org/p' } })];
+  const same = [
+    ...rec('S', { a: ['x'] }, { a: { url: 'https://x.org/p' } }),
+    ...rec('S', { b: ['y'] }, { b: { url: 'https://x.org/p' } }),
+  ];
   assert.equal(anchorSignals(corpusOf(same), cfg.signals).length, 0);
-  const diff = [...rec('L', { a: ['x'] }, { a: { url: 'https://x.org/p' } }), ...rec('R', { b: ['y'] }, { b: { url: 'https://x.org/q' } })];
+  const diff = [
+    ...rec('L', { a: ['x'] }, { a: { url: 'https://x.org/p' } }),
+    ...rec('R', { b: ['y'] }, { b: { url: 'https://x.org/q' } }),
+  ];
   assert.equal(anchorSignals(corpusOf(diff), cfg.signals).length, 0);
   assert.equal(canonicalUrl('not a url'), '');
 });
@@ -88,7 +99,15 @@ test('text: tags used on similar texts, at least twice each, produce capped evid
   const records = [
     ...rec('A', { 1: ['cats'], 2: ['cats'] }, { 1: { title: 'one', text: t }, 2: { title: 'two', text: t } }),
     ...rec('B', { 3: ['felines'], 4: ['felines'] }, { 3: { title: 'three', text: t }, 4: { title: 'four', text: t } }),
-    ...rec('C', { 5: ['dogs'], 6: ['dogs'], 7: ['dogs'] }, { 5: { title: 'five', text: 'barking leash fetch bones' }, 6: { title: 'six', text: 'barking leash fetch bones' }, 7: { title: 'seven', text: 'barking leash fetch bones' } }),
+    ...rec(
+      'C',
+      { 5: ['dogs'], 6: ['dogs'], 7: ['dogs'] },
+      {
+        5: { title: 'five', text: 'barking leash fetch bones' },
+        6: { title: 'six', text: 'barking leash fetch bones' },
+        7: { title: 'seven', text: 'barking leash fetch bones' },
+      },
+    ),
   ];
   const out = textSignals(corpusOf(records), cfg.signals);
   const hit = find(out, 'cats', 'felines', 'text');

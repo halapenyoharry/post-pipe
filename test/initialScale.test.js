@@ -7,7 +7,7 @@ const { minCardScale, homeScale } = require('../src/components/GraphViewer/initi
 
 test('the scale that draws a card at the minimum width', () => {
   assert.strictEqual(minCardScale({ minCardWidthPx: 96 }, 180), 96 / 180);
-  assert.strictEqual(96 / 180 * 180, 96);
+  assert.strictEqual((96 / 180) * 180, 96);
 });
 
 test('no minimum, or a nonsense one, asks for nothing', () => {

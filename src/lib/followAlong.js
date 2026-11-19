@@ -14,7 +14,11 @@ function sentenceSpans(text) {
   SENTENCE.lastIndex = 0;
   let m;
   while ((m = SENTENCE.exec(text)) !== null) {
-    if (m[0].length === 0) { SENTENCE.lastIndex++; if (SENTENCE.lastIndex > text.length) break; continue; }
+    if (m[0].length === 0) {
+      SENTENCE.lastIndex++;
+      if (SENTENCE.lastIndex > text.length) break;
+      continue;
+    }
     let s = m.index;
     let e = m.index + m[0].length;
     while (s < e && /\s/.test(text[s])) s++;

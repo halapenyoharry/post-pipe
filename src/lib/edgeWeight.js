@@ -70,9 +70,10 @@ function recencyX(dateIso, newestMs, opts = {}) {
   const t = parseMs(dateIso);
   const newest = parseMs(newestMs);
   if (!Number.isFinite(t) || !Number.isFinite(newest)) return 0;
-  const hl = isFiniteNum(o.halfLifeDays) && Number(o.halfLifeDays) > 0
-    ? Number(o.halfLifeDays)
-    : EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays;
+  const hl =
+    isFiniteNum(o.halfLifeDays) && Number(o.halfLifeDays) > 0
+      ? Number(o.halfLifeDays)
+      : EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays;
   return Math.pow(0.5, Math.max(0, newest - t) / DAY_MS / hl);
 }
 
@@ -110,17 +111,22 @@ function extractRawBlock(input) {
 function normaliseEdgeWeights(settings) {
   const raw = extractRawBlock(settings);
   const mode = EDGE_WEIGHT_MODES.includes(raw.mode) ? raw.mode : EDGE_WEIGHT_DEFAULTS.mode;
-  const degreePenalty = DEGREE_PENALTIES.includes(raw.degreePenalty) ? raw.degreePenalty : EDGE_WEIGHT_DEFAULTS.degreePenalty;
+  const degreePenalty = DEGREE_PENALTIES.includes(raw.degreePenalty)
+    ? raw.degreePenalty
+    : EDGE_WEIGHT_DEFAULTS.degreePenalty;
   const recencyClock = RECENCY_CLOCKS.includes(raw.recencyClock) ? raw.recencyClock : EDGE_WEIGHT_DEFAULTS.recencyClock;
-  const recencyHalfLifeDays = isFiniteNum(raw.recencyHalfLifeDays) && Number(raw.recencyHalfLifeDays) > 0
-    ? Number(raw.recencyHalfLifeDays)
-    : EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays;
-  const recencyFloor = isFiniteNum(raw.recencyFloor) && Number(raw.recencyFloor) >= 0 && Number(raw.recencyFloor) <= 1
-    ? Number(raw.recencyFloor)
-    : EDGE_WEIGHT_DEFAULTS.recencyFloor;
-  const distanceSpread = isFiniteNum(raw.distanceSpread) && Number(raw.distanceSpread) >= 0
-    ? Number(raw.distanceSpread)
-    : EDGE_WEIGHT_DEFAULTS.distanceSpread;
+  const recencyHalfLifeDays =
+    isFiniteNum(raw.recencyHalfLifeDays) && Number(raw.recencyHalfLifeDays) > 0
+      ? Number(raw.recencyHalfLifeDays)
+      : EDGE_WEIGHT_DEFAULTS.recencyHalfLifeDays;
+  const recencyFloor =
+    isFiniteNum(raw.recencyFloor) && Number(raw.recencyFloor) >= 0 && Number(raw.recencyFloor) <= 1
+      ? Number(raw.recencyFloor)
+      : EDGE_WEIGHT_DEFAULTS.recencyFloor;
+  const distanceSpread =
+    isFiniteNum(raw.distanceSpread) && Number(raw.distanceSpread) >= 0
+      ? Number(raw.distanceSpread)
+      : EDGE_WEIGHT_DEFAULTS.distanceSpread;
   const weights = { ...EDGE_WEIGHT_DEFAULTS.weights };
   if (raw.weights && typeof raw.weights === 'object' && !Array.isArray(raw.weights)) {
     for (const [k, v] of Object.entries(raw.weights)) {
@@ -140,8 +146,9 @@ function normaliseEdgeWeights(settings) {
 }
 
 function isAuxId(id) {
-  return typeof id === 'string' && (
-    id.startsWith('tag:') || id.startsWith('topology:') || id.startsWith('reference:') || id.startsWith('container:')
+  return (
+    typeof id === 'string' &&
+    (id.startsWith('tag:') || id.startsWith('topology:') || id.startsWith('reference:') || id.startsWith('container:'))
   );
 }
 
@@ -206,15 +213,18 @@ function effectiveWeight(link, ctx = {}) {
   const c = ctx && typeof ctx === 'object' ? ctx : {};
   const ew = normaliseEdgeWeights(c.settings || c.edgeWeights || c);
 
-  const wVal = link && isFiniteNum(link.weight)
-    ? Number(link.weight)
-    : (link && link.attrs && isFiniteNum(link.attrs.weight) ? Number(link.attrs.weight) : NaN);
+  const wVal =
+    link && isFiniteNum(link.weight)
+      ? Number(link.weight)
+      : link && link.attrs && isFiniteNum(link.attrs.weight)
+        ? Number(link.attrs.weight)
+        : NaN;
   const raw = Number.isFinite(wVal) && wVal > 0 ? Math.min(1, wVal) : 1;
 
   const sObj = link && link.source && typeof link.source === 'object' ? link.source : null;
   const tObj = link && link.target && typeof link.target === 'object' ? link.target : null;
-  const sId = sObj ? sObj.id : (link ? link.source : null);
-  const tId = tObj ? tObj.id : (link ? link.target : null);
+  const sId = sObj ? sObj.id : link ? link.source : null;
+  const tId = tObj ? tObj.id : link ? link.target : null;
   const sNode = findNode(c, sId, sObj);
   const tNode = findNode(c, tId, tObj);
 
@@ -244,11 +254,13 @@ function effectiveWeight(link, ctx = {}) {
   const rankMap = c.ranks || c.sessionRank || null;
   const totalCards = isFiniteNum(c.count)
     ? Number(c.count)
-    : (isFiniteNum(c.cardCount)
+    : isFiniteNum(c.cardCount)
       ? Number(c.cardCount)
-      : (rankMap instanceof Map
+      : rankMap instanceof Map
         ? rankMap.size
-        : (Array.isArray(c.cards) ? c.cards.length : undefined)));
+        : Array.isArray(c.cards)
+          ? c.cards.length
+          : undefined;
 
   const cardX = (id, node) => {
     const pre = lookupIn(c.recencyById, id);
@@ -272,12 +284,12 @@ function effectiveWeight(link, ctx = {}) {
   else if (tCard) x = cardX(tId, tNode);
   const recencyFactor = ew.recencyFloor + (1 - ew.recencyFloor) * x;
 
-  const layerName = link && (
-    (link.layer === 'reference' && (link.refType || (link.attrs && link.attrs.type)))
-    || link.layer
-    || link.refType
-    || ''
-  );
+  const layerName =
+    link &&
+    ((link.layer === 'reference' && (link.refType || (link.attrs && link.attrs.type))) ||
+      link.layer ||
+      link.refType ||
+      '');
   let typeWeight = 1;
   if (layerName && isFiniteNum(ew.weights[layerName])) {
     typeWeight = Math.max(0, Number(ew.weights[layerName]));
@@ -307,11 +319,12 @@ function linkDistance(eff, effMax, L, spread = EDGE_WEIGHT_DEFAULTS.distanceSpre
 //   pull 0.16: weight 1.00 × degree 0.32 × recency 0.70 × tag 1
 function edgeWeightLine(link, factors) {
   if (!factors || typeof factors !== 'object') return '';
-  const layer = (link && (
-    (link.layer === 'reference' && (link.refType || (link.attrs && link.attrs.type)))
-    || link.layer
-    || link.refType
-  )) || 'edge';
+  const layer =
+    (link &&
+      ((link.layer === 'reference' && (link.refType || (link.attrs && link.attrs.type))) ||
+        link.layer ||
+        link.refType)) ||
+    'edge';
   const eff = Number(factors.eff || 0).toFixed(2);
   const raw = Number(factors.raw ?? 1).toFixed(2);
   const deg = Number(factors.degreeFactor ?? 1).toFixed(2);

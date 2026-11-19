@@ -1,7 +1,15 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import styles from './Toolbar.module.css';
 import { dimensionLabels, layerLabels, dimensionGroupLabel } from '../../lib/dimensionLabels';
-import { viewActionsFor, RESET_TITLE, hasGranularity as axisHasGranularity, toggleDimension, nextGranularity, menuModel, menuMove } from '../../lib/toolbar';
+import {
+  viewActionsFor,
+  RESET_TITLE,
+  hasGranularity as axisHasGranularity,
+  toggleDimension,
+  nextGranularity,
+  menuModel,
+  menuMove,
+} from '../../lib/toolbar';
 import { SEARCH_FROM, hasTagNodes, tagListModel, filterTagRows, tagRowTitle } from '../../lib/tagList';
 import { PREF as MIN_PIECES_PREF } from '../../lib/minPieces';
 import { iconBody } from '../../lib/icons';
@@ -37,12 +45,33 @@ export const LAYOUTS = [
 
 // The dimensions, named by settings.dimensions.labels (src/lib/dimensionLabels.js).
 
-const fire = (name, detail) => window.dispatchEvent(new CustomEvent(name, detail === undefined ? undefined : { detail }));
+const fire = (name, detail) =>
+  window.dispatchEvent(new CustomEvent(name, detail === undefined ? undefined : { detail }));
 
 // layers: the edge-layer dimensions that have something to draw, e.g.
 // ['readers'] when readers have connected chapters. Each is its own switch.
-export function Toolbar({ viewState, show = {}, layouts = LAYOUTS, settings, layers = [], placement = 'bottom', feedData = null, hiddenSources = null }) {
-  if (placement === 'top') return <TopControls viewState={viewState} show={show} layouts={layouts} settings={settings} layers={layers} feedData={feedData} hiddenSources={hiddenSources} />;
+export function Toolbar({
+  viewState,
+  show = {},
+  layouts = LAYOUTS,
+  settings,
+  layers = [],
+  placement = 'bottom',
+  feedData = null,
+  hiddenSources = null,
+}) {
+  if (placement === 'top')
+    return (
+      <TopControls
+        viewState={viewState}
+        show={show}
+        layouts={layouts}
+        settings={settings}
+        layers={layers}
+        feedData={feedData}
+        hiddenSources={hiddenSources}
+      />
+    );
   return <BottomBar viewState={viewState} show={show} layouts={layouts} settings={settings} layers={layers} />;
 }
 
@@ -57,7 +86,9 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
   useEffect(() => (viewState ? viewState.subscribe(bump) : undefined), [viewState]);
   useEffect(() => {
     if (!moreOpen) return;
-    const onKey = (e) => { if (e.key === 'Escape') setMoreOpen(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMoreOpen(false);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [moreOpen]);
@@ -118,8 +149,24 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
       <div className={styles.bar} role="toolbar" aria-label="Graph controls" data-toolbar>
         {showHistory && (
           <div className={styles.group} data-group="history">
-            <button className={styles.icon} title="Undo (Cmd+Z)" aria-label="Undo" disabled={!viewState.canUndo} onClick={() => viewState.undo()}>↩</button>
-            <button className={styles.icon} title="Redo (Cmd+Shift+Z)" aria-label="Redo" disabled={!viewState.canRedo} onClick={() => viewState.redo()}>↪</button>
+            <button
+              className={styles.icon}
+              title="Undo (Cmd+Z)"
+              aria-label="Undo"
+              disabled={!viewState.canUndo}
+              onClick={() => viewState.undo()}
+            >
+              ↩
+            </button>
+            <button
+              className={styles.icon}
+              title="Redo (Cmd+Shift+Z)"
+              aria-label="Redo"
+              disabled={!viewState.canRedo}
+              onClick={() => viewState.redo()}
+            >
+              ↪
+            </button>
           </div>
         )}
 
@@ -135,7 +182,9 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
                   role="radio"
                   aria-checked={on}
                   title={l.title}
-                  onClick={() => { if (!on) viewState.setLayout(l.id); }}
+                  onClick={() => {
+                    if (!on) viewState.setLayout(l.id);
+                  }}
                 >
                   {l.label}
                 </button>
@@ -146,7 +195,9 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
 
         {showDimensions && (
           <div className={`${styles.group} ${styles.wideOnly}`} data-group="dimensions" aria-label={GROUP_TITLE}>
-            <span className={styles.label} data-group-label>{GROUP}</span>
+            <span className={styles.label} data-group-label>
+              {GROUP}
+            </span>
             {dimensionButtons}
           </div>
         )}
@@ -158,7 +209,10 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
             className={styles.seg}
             title={RESET_TITLE}
             data-toolbar-reset
-            onClick={() => { setMoreOpen(false); fire('graph:reset-all'); }}
+            onClick={() => {
+              setMoreOpen(false);
+              fire('graph:reset-all');
+            }}
           >
             Reset
           </button>
@@ -171,7 +225,10 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
             data-toolbar-more
             onClick={() => setMoreOpen((o) => !o)}
           >
-            <span className={styles.moreText}>More </span><span aria-hidden="true" className={styles.moreMark}>{moreOpen ? '▾' : '▴'}</span>
+            <span className={styles.moreText}>More </span>
+            <span aria-hidden="true" className={styles.moreMark}>
+              {moreOpen ? '▾' : '▴'}
+            </span>
           </button>
         </div>
       </div>
@@ -179,10 +236,18 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
       {moreOpen && (
         <>
           <div className={styles.backdrop} onClick={() => setMoreOpen(false)} />
-          <div className={styles.sheet} id="pp-toolbar-more" role="dialog" aria-label="More graph controls" data-toolbar-sheet>
+          <div
+            className={styles.sheet}
+            id="pp-toolbar-more"
+            role="dialog"
+            aria-label="More graph controls"
+            data-toolbar-sheet
+          >
             {showDimensions && (
               <div className={`${styles.section} ${styles.narrowOnly}`}>
-                <div className={styles.sectionTitle} data-group-label>{GROUP_TITLE}</div>
+                <div className={styles.sectionTitle} data-group-label>
+                  {GROUP_TITLE}
+                </div>
                 <div className={styles.wrapRow}>{dimensionButtons}</div>
               </div>
             )}
@@ -194,7 +259,10 @@ function BottomBar({ viewState, show, layouts, settings, layers }) {
                     key={a.event}
                     className={styles.action}
                     title={a.title}
-                    onClick={() => { fire(a.event); setMoreOpen(false); }}
+                    onClick={() => {
+                      fire(a.event);
+                      setMoreOpen(false);
+                    }}
                   >
                     {a.label}
                   </button>
@@ -246,7 +314,9 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
   // pieces per tag slider's top (window.PostPipeGraphTags, and
   // 'graph:tag-counts' when it changes, as the panel reads it); null until
   // the graph has said.
-  const [graphTags, setGraphTags] = useState(() => (typeof window !== 'undefined' ? window.PostPipeGraphTags || null : null));
+  const [graphTags, setGraphTags] = useState(() =>
+    typeof window !== 'undefined' ? window.PostPipeGraphTags || null : null,
+  );
   useEffect(() => {
     const on = () => setGraphTags(window.PostPipeGraphTags || null);
     on();
@@ -268,7 +338,9 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
     const field = menuRef.current ? menuRef.current.querySelector('[data-menu-search]') : null;
     const first = field || items()[0];
     if (first) first.focus({ preventScroll: true });
-    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(null); };
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(null);
+    };
     // Escape closes it wherever the focus is (a tap on a row leaves the
     // focus on the page in some browsers).
     const onKey = (e) => {
@@ -311,13 +383,16 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
   const hasTags = hasTagNodes(feedData, S && S.graph);
   let tagRows = [];
   if (hasTags && open === 'tags') {
-    const root = typeof document !== 'undefined' ? (document.querySelector('[data-graph-root]') || document.documentElement) : null;
-    const themeTag = root && typeof getComputedStyle === 'function'
-      ? (getComputedStyle(root).getPropertyValue('--gv-tag-color').trim() || null)
-      : null;
-    const graphTop = graphTags && Array.isArray(graphTags.counts)
-      ? graphTags.counts.reduce((m, n) => (Number.isFinite(Number(n)) && Number(n) > m ? Number(n) : m), -1)
-      : -1;
+    const root =
+      typeof document !== 'undefined' ? document.querySelector('[data-graph-root]') || document.documentElement : null;
+    const themeTag =
+      root && typeof getComputedStyle === 'function'
+        ? getComputedStyle(root).getPropertyValue('--gv-tag-color').trim() || null
+        : null;
+    const graphTop =
+      graphTags && Array.isArray(graphTags.counts)
+        ? graphTags.counts.reduce((m, n) => (Number.isFinite(Number(n)) && Number(n) > m ? Number(n) : m), -1)
+        : -1;
     tagRows = tagListModel(feedData, {
       hiddenSources: hiddenSources || (viewState.state && viewState.state.hiddenSources) || [],
       sourceColorOf: (id) => (typeof viewState.sourceColor === 'function' ? viewState.sourceColor(id) : null),
@@ -329,11 +404,22 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
   }
   const shownTagRows = filterTagRows(tagRows, tagQuery);
   const showSearch = tagRows.length > SEARCH_FROM;
-  const toggleTags = () => { setTagQuery(''); setOpen((o) => (o === 'tags' ? null : 'tags')); };
+  const toggleTags = () => {
+    setTagQuery('');
+    setOpen((o) => (o === 'tags' ? null : 'tags'));
+  };
 
   const onMenuKey = (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); return; }
-    if (e.key === 'Tab') { setOpen(null); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+      return;
+    }
+    if (e.key === 'Tab') {
+      setOpen(null);
+      return;
+    }
     // In the search field, only the arrows leave it for the rows; the rest
     // of the keys type.
     const inField = e.target && typeof e.target.matches === 'function' && e.target.matches('[data-menu-search]');
@@ -348,23 +434,41 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
 
   const row = (r, i) => {
     if (r.kind === 'dimension' || r.kind === 'layer') {
-      const toggle = r.kind === 'dimension'
-        ? () => viewState.setTimeAxis(toggleDimension(axis, r.id))
-        : () => viewState.setPreference(r.id, r.checked ? null : true);
+      const toggle =
+        r.kind === 'dimension'
+          ? () => viewState.setTimeAxis(toggleDimension(axis, r.id))
+          : () => viewState.setPreference(r.id, r.checked ? null : true);
       return (
-        <button key={r.id} type="button" role="menuitemcheckbox" aria-checked={r.checked} title={r.title}
+        <button
+          key={r.id}
+          type="button"
+          role="menuitemcheckbox"
+          aria-checked={r.checked}
+          title={r.title}
           className={`${styles.menuItem} ${r.kind === 'layer' ? styles.layer : ''}`}
-          data-menu-item data-dimension={r.id} onClick={toggle}>
-          <span className={styles.menuCheck} aria-hidden="true">{r.checked && <Icon body={iconBody('check')} size={14} />}</span>
+          data-menu-item
+          data-dimension={r.id}
+          onClick={toggle}
+        >
+          <span className={styles.menuCheck} aria-hidden="true">
+            {r.checked && <Icon body={iconBody('check')} size={14} />}
+          </span>
           {r.label}
         </button>
       );
     }
     if (r.kind === 'granularity') {
       return (
-        <button key="granularity" type="button" role="menuitem" className={styles.menuItem}
-          title="Bucket size: auto, day, week, month, year" data-menu-item data-granularity
-          onClick={() => viewState.setTimeAxis({ granularity: nextGranularity(axis.granularity) })}>
+        <button
+          key="granularity"
+          type="button"
+          role="menuitem"
+          className={styles.menuItem}
+          title="Bucket size: auto, day, week, month, year"
+          data-menu-item
+          data-granularity
+          onClick={() => viewState.setTimeAxis({ granularity: nextGranularity(axis.granularity) })}
+        >
           <span className={styles.menuCheck} aria-hidden="true" />
           bucket size · {r.value}
         </button>
@@ -376,11 +480,25 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
   const tagRow = (r) => {
     const on = activeTag === r.id;
     return (
-      <button key={r.id} type="button" role="option" aria-selected={on} title={tagRowTitle(r)}
-        className={styles.menuItem} data-menu-item data-tag={r.id}
-        onClick={() => fire('graph:select-tag', { id: r.id })}>
-        <span className={styles.menuCheck} aria-hidden="true">{on && <Icon body={iconBody('check')} size={14} />}</span>
-        <span className={styles.tagSwatch} aria-hidden="true" style={{ background: r.color || 'var(--gv-tag-color)' }} />
+      <button
+        key={r.id}
+        type="button"
+        role="option"
+        aria-selected={on}
+        title={tagRowTitle(r)}
+        className={styles.menuItem}
+        data-menu-item
+        data-tag={r.id}
+        onClick={() => fire('graph:select-tag', { id: r.id })}
+      >
+        <span className={styles.menuCheck} aria-hidden="true">
+          {on && <Icon body={iconBody('check')} size={14} />}
+        </span>
+        <span
+          className={styles.tagSwatch}
+          aria-hidden="true"
+          style={{ background: r.color || 'var(--gv-tag-color)' }}
+        />
         <span className={styles.tagLabel}>{r.label}</span>
         <span className={styles.tagCount}>{r.pieces}</span>
       </button>
@@ -391,58 +509,137 @@ function TopControls({ viewState, show, layouts, settings, layers, feedData, hid
     <div ref={wrapRef} className={styles.top} role="group" aria-label="Graph controls" data-top-graph-controls>
       {showHistory && (
         <>
-          <button type="button" className={styles.topIcon} title="Undo (Cmd+Z)" aria-label="Undo" data-top-undo
-            disabled={!viewState.canUndo} onClick={() => viewState.undo()}>
+          <button
+            type="button"
+            className={styles.topIcon}
+            title="Undo (Cmd+Z)"
+            aria-label="Undo"
+            data-top-undo
+            disabled={!viewState.canUndo}
+            onClick={() => viewState.undo()}
+          >
             <Icon body={iconBody('undo-2')} size={15} />
           </button>
-          <button type="button" className={styles.topIcon} title="Redo (Cmd+Shift+Z)" aria-label="Redo" data-top-redo
-            disabled={!viewState.canRedo} onClick={() => viewState.redo()}>
+          <button
+            type="button"
+            className={styles.topIcon}
+            title="Redo (Cmd+Shift+Z)"
+            aria-label="Redo"
+            data-top-redo
+            disabled={!viewState.canRedo}
+            onClick={() => viewState.redo()}
+          >
             <Icon body={iconBody('redo-2')} size={15} />
           </button>
         </>
       )}
-      <button type="button" className={styles.topIcon} title={RESET_TITLE} aria-label="Reset" data-toolbar-reset
-        onClick={() => { setOpen(null); fire('graph:reset-all'); }}>
+      <button
+        type="button"
+        className={styles.topIcon}
+        title={RESET_TITLE}
+        aria-label="Reset"
+        data-toolbar-reset
+        onClick={() => {
+          setOpen(null);
+          fire('graph:reset-all');
+        }}
+      >
         <Icon body={iconBody('rotate-ccw')} size={15} />
       </button>
-      {hasMenu && (<>
-        <button ref={buttonRef} type="button" className={`${styles.topIcon} ${open === 'dimensions' ? styles.on : ''}`}
-          title={`${heading}: which to show`}
-          aria-label={heading} aria-haspopup="menu" aria-expanded={open === 'dimensions'} aria-controls="pp-top-menu" data-top-menu-button
-          onClick={() => setOpen((o) => (o === 'dimensions' ? null : 'dimensions'))}
-          onKeyDown={(e) => { if (e.key === 'ArrowDown' && open !== 'dimensions') { e.preventDefault(); setOpen('dimensions'); } }}>
-          <Icon body={iconBody('hourglass')} size={15} />
-        </button>
-        {open === 'dimensions' && (
-          <div ref={menuRef} id="pp-top-menu" className={styles.menu} role="menu" aria-labelledby="pp-top-menu-heading"
-            data-top-menu onKeyDown={onMenuKey}>
-            <div id="pp-top-menu-heading" role="presentation" className={styles.menuHeading} data-group-label>{heading}</div>
-            {model.rows.map(row)}
-          </div>
-        )}
-      </>)}
-      {hasTags && (<>
-        <button ref={tagButtonRef} type="button" className={`${styles.topIcon} ${open === 'tags' ? styles.on : ''}`}
-          title="Tagz" aria-label="Tagz" aria-haspopup="dialog" aria-expanded={open === 'tags'} aria-controls="pp-top-tags" data-top-tags-button
-          onClick={toggleTags}
-          onKeyDown={(e) => { if (e.key === 'ArrowDown' && open !== 'tags') { e.preventDefault(); toggleTags(); } }}>
-          <Icon body={iconBody('tag')} size={15} />
-        </button>
-        {open === 'tags' && (
-          <div ref={menuRef} id="pp-top-tags" className={`${styles.menu} ${styles.tagMenu}`} role="dialog" aria-label="Tagz"
-            data-top-tags onKeyDown={onMenuKey}>
-            <div role="presentation" className={styles.menuHeading}>Tagz</div>
-            {showSearch && (
-              <input type="search" className={styles.menuSearch} placeholder="find a tag" aria-label="Find a tag"
-                value={tagQuery} onChange={(e) => setTagQuery(e.target.value)} data-menu-search />
-            )}
-            <div role="listbox" aria-label="Tagz, the most cards first" className={styles.tagRows}>
-              {shownTagRows.map(tagRow)}
+      {hasMenu && (
+        <>
+          <button
+            ref={buttonRef}
+            type="button"
+            className={`${styles.topIcon} ${open === 'dimensions' ? styles.on : ''}`}
+            title={`${heading}: which to show`}
+            aria-label={heading}
+            aria-haspopup="menu"
+            aria-expanded={open === 'dimensions'}
+            aria-controls="pp-top-menu"
+            data-top-menu-button
+            onClick={() => setOpen((o) => (o === 'dimensions' ? null : 'dimensions'))}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && open !== 'dimensions') {
+                e.preventDefault();
+                setOpen('dimensions');
+              }
+            }}
+          >
+            <Icon body={iconBody('hourglass')} size={15} />
+          </button>
+          {open === 'dimensions' && (
+            <div
+              ref={menuRef}
+              id="pp-top-menu"
+              className={styles.menu}
+              role="menu"
+              aria-labelledby="pp-top-menu-heading"
+              data-top-menu
+              onKeyDown={onMenuKey}
+            >
+              <div id="pp-top-menu-heading" role="presentation" className={styles.menuHeading} data-group-label>
+                {heading}
+              </div>
+              {model.rows.map(row)}
             </div>
-            {!shownTagRows.length && <div className={styles.menuEmpty}>none</div>}
-          </div>
-        )}
-      </>)}
+          )}
+        </>
+      )}
+      {hasTags && (
+        <>
+          <button
+            ref={tagButtonRef}
+            type="button"
+            className={`${styles.topIcon} ${open === 'tags' ? styles.on : ''}`}
+            title="Tagz"
+            aria-label="Tagz"
+            aria-haspopup="dialog"
+            aria-expanded={open === 'tags'}
+            aria-controls="pp-top-tags"
+            data-top-tags-button
+            onClick={toggleTags}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && open !== 'tags') {
+                e.preventDefault();
+                toggleTags();
+              }
+            }}
+          >
+            <Icon body={iconBody('tag')} size={15} />
+          </button>
+          {open === 'tags' && (
+            <div
+              ref={menuRef}
+              id="pp-top-tags"
+              className={`${styles.menu} ${styles.tagMenu}`}
+              role="dialog"
+              aria-label="Tagz"
+              data-top-tags
+              onKeyDown={onMenuKey}
+            >
+              <div role="presentation" className={styles.menuHeading}>
+                Tagz
+              </div>
+              {showSearch && (
+                <input
+                  type="search"
+                  className={styles.menuSearch}
+                  placeholder="find a tag"
+                  aria-label="Find a tag"
+                  value={tagQuery}
+                  onChange={(e) => setTagQuery(e.target.value)}
+                  data-menu-search
+                />
+              )}
+              <div role="listbox" aria-label="Tagz, the most cards first" className={styles.tagRows}>
+                {shownTagRows.map(tagRow)}
+              </div>
+              {!shownTagRows.length && <div className={styles.menuEmpty}>none</div>}
+            </div>
+          )}
+        </>
+      )}
       <SettingsButton className={styles.topIcon} data-settings-open />
     </div>
   );

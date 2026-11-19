@@ -23,8 +23,10 @@ test('the rights line is the year, holder and statement', () => {
 });
 
 test('noAiTraining adds a sentence only when the statement does not already say it', () => {
-  assert.strictEqual(rightsLine({ holder: 'H', year: '2026', statement: 'All rights reserved.', noAiTraining: true }),
-    '© 2026 H. All rights reserved. Not to be used to train any machine-learning system.');
+  assert.strictEqual(
+    rightsLine({ holder: 'H', year: '2026', statement: 'All rights reserved.', noAiTraining: true }),
+    '© 2026 H. All rights reserved. Not to be used to train any machine-learning system.',
+  );
   assert.strictEqual(rightsLine({ holder: 'H', statement: 'All rights reserved.' }), '© H. All rights reserved.');
 });
 
@@ -32,7 +34,10 @@ test('meta and footer', () => {
   assert.match(rightsMeta(RIGHTS), /<meta name="copyright" content="A Holder 2026">/);
   assert.match(rightsMeta(RIGHTS), /noai, noimageai/);
   assert.doesNotMatch(rightsMeta({ ...RIGHTS, noAiTraining: false }), /noai/);
-  assert.match(rightsFooterHtml(RIGHTS), /^<footer class="pp-rights" data-rights>© 2026 A Holder\. All rights reserved\./);
+  assert.match(
+    rightsFooterHtml(RIGHTS),
+    /^<footer class="pp-rights" data-rights>© 2026 A Holder\. All rights reserved\./,
+  );
   assert.strictEqual(rightsFooterHtml(null), '');
 });
 
@@ -44,8 +49,14 @@ test('every piece page carries the rights line and meta', async () => {
   fs.writeFileSync(path.join(content, 'one', 'index.md'), 'Some text.');
   const pagesDir = path.join(root, 'pages');
   await LocalFolderAdapter.load({
-    id: 'local', title: 't', path: content, pagesBase: 'http://test',
-    coversDir: path.join(root, 'covers'), pagesDir, visibilityDefault: 'public', rights: RIGHTS,
+    id: 'local',
+    title: 't',
+    path: content,
+    pagesBase: 'http://test',
+    coversDir: path.join(root, 'covers'),
+    pagesDir,
+    visibilityDefault: 'public',
+    rights: RIGHTS,
   });
   const page = fs.readFileSync(path.join(pagesDir, 'one.html'), 'utf8');
   assert.match(page, /<meta name="copyright"/);
@@ -59,10 +70,21 @@ test('rights.position bottom-edge: the footer says so; the line meets a card onl
   assert.strictEqual(rightsPosition({ ...RIGHTS, position: 'bottom-edge' }), 'bottom-edge');
   assert.strictEqual(rightsPosition(RIGHTS), null);
   assert.strictEqual(rightsPosition({ ...RIGHTS, position: 'top' }), null);
-  assert.match(rightsFooterHtml({ ...RIGHTS, position: 'bottom-edge' }), /^<footer class="pp-rights" data-rights data-rights-position="bottom-edge">© 2026 A Holder\./);
+  assert.match(
+    rightsFooterHtml({ ...RIGHTS, position: 'bottom-edge' }),
+    /^<footer class="pp-rights" data-rights data-rights-position="bottom-edge">© 2026 A Holder\./,
+  );
   const line = { left: 4, top: 820, right: 386, bottom: 840 };
-  assert.strictEqual(rightsOverCards(line, [{ left: 100, top: 700, right: 160, bottom: 780 }]), false, 'a card above it');
-  assert.strictEqual(rightsOverCards(line, [{ left: 100, top: 800, right: 160, bottom: 830 }]), true, 'a card under it');
+  assert.strictEqual(
+    rightsOverCards(line, [{ left: 100, top: 700, right: 160, bottom: 780 }]),
+    false,
+    'a card above it',
+  );
+  assert.strictEqual(
+    rightsOverCards(line, [{ left: 100, top: 800, right: 160, bottom: 830 }]),
+    true,
+    'a card under it',
+  );
   assert.strictEqual(rightsOverCards(line, [{ left: 0, top: 0, right: 0, bottom: 0 }]), false, 'a card not drawn');
   assert.strictEqual(rightsOverCards(null, [{ left: 100, top: 800, right: 160, bottom: 830 }]), false);
   assert.strictEqual(rightsOverCards(line, []), false);

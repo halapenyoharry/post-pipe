@@ -8,36 +8,75 @@ const S = require('../src/lib/cardSlug');
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pp-cards-'));
 
 test('discovery order: canonical, then DOI, then the url path, then the title', () => {
-  const canonical = S.discoverSlug({ url: 'https://a.test/p/one.html', canonical_url: 'https://b.test/essays/the-real-one/', title: 'T' });
-  assert.deepStrictEqual(canonical, { slug: 'the-real-one', source: 'canonical', identity: 'https://b.test/essays/the-real-one/' });
+  const canonical = S.discoverSlug({
+    url: 'https://a.test/p/one.html',
+    canonical_url: 'https://b.test/essays/the-real-one/',
+    title: 'T',
+  });
+  assert.deepStrictEqual(canonical, {
+    slug: 'the-real-one',
+    source: 'canonical',
+    identity: 'https://b.test/essays/the-real-one/',
+  });
 
-  const inHtml = S.discoverSlug({ url: 'https://a.test/p/one.html', content_html: '<p>x</p><link rel="canonical" href="https://b.test/from-html">', title: 'T' });
+  const inHtml = S.discoverSlug({
+    url: 'https://a.test/p/one.html',
+    content_html: '<p>x</p><link rel="canonical" href="https://b.test/from-html">',
+    title: 'T',
+  });
   assert.strictEqual(inHtml.slug, 'from-html');
   assert.strictEqual(inHtml.source, 'canonical');
 
   const doi = S.discoverSlug({ url: 'https://a.test/p/one.html', doi: '10.1038/s41586-024-07123-4', title: 'T' });
-  assert.deepStrictEqual(doi, { slug: '10.1038-s41586-024-07123-4', source: 'doi', identity: '10.1038/s41586-024-07123-4' });
+  assert.deepStrictEqual(doi, {
+    slug: '10.1038-s41586-024-07123-4',
+    source: 'doi',
+    identity: '10.1038/s41586-024-07123-4',
+  });
 
   // A canonical that is a DOI address is the DOI, whole, not its last path part.
-  const doiCanonical = S.discoverSlug({ url: 'https://a.test/p/one.html', canonical_url: 'https://doi.org/10.5555/ABC.12', title: 'T' });
+  const doiCanonical = S.discoverSlug({
+    url: 'https://a.test/p/one.html',
+    canonical_url: 'https://doi.org/10.5555/ABC.12',
+    title: 'T',
+  });
   assert.strictEqual(doiCanonical.source, 'doi');
   assert.strictEqual(doiCanonical.slug, '10.5555-abc.12');
 
-  const url = S.discoverSlug({ url: 'https://a.test/p/one.html', canonical_url: 'https://a.test/p/one.html', title: 'T' });
+  const url = S.discoverSlug({
+    url: 'https://a.test/p/one.html',
+    canonical_url: 'https://a.test/p/one.html',
+    title: 'T',
+  });
   assert.deepStrictEqual(url, { slug: 'one', source: 'url', identity: 'https://a.test/p/one.html' });
 
   // A numeric path part is the identity as much as a worded one.
-  const numeric = S.discoverSlug({ url: 'https://www.sciencedaily.com/releases/2026/09/260901070541.htm', title: 'Some headline' });
-  assert.deepStrictEqual(numeric, { slug: '260901070541', source: 'url', identity: 'https://www.sciencedaily.com/releases/2026/09/260901070541.htm' });
+  const numeric = S.discoverSlug({
+    url: 'https://www.sciencedaily.com/releases/2026/09/260901070541.htm',
+    title: 'Some headline',
+  });
+  assert.deepStrictEqual(numeric, {
+    slug: '260901070541',
+    source: 'url',
+    identity: 'https://www.sciencedaily.com/releases/2026/09/260901070541.htm',
+  });
 
   // Query and fragment are not the slug; the id stands in for a missing url.
   assert.strictEqual(S.discoverSlug({ url: 'https://a.test/x/Two%20Words?utm=1#top' }).slug, 'two-words');
-  assert.deepStrictEqual(S.discoverSlug({ id: 'tag:a.test,2026:post-7', title: 'T' }), { slug: 'tag-a.test-2026-post-7', source: 'url', identity: 'tag:a.test,2026:post-7' });
+  assert.deepStrictEqual(S.discoverSlug({ id: 'tag:a.test,2026:post-7', title: 'T' }), {
+    slug: 'tag-a.test-2026-post-7',
+    source: 'url',
+    identity: 'tag:a.test,2026:post-7',
+  });
 
   // A bare host has no path part, so the title is next.
   const title = S.discoverSlug({ url: 'https://a.test/', title: 'The Bend in the River' });
   assert.deepStrictEqual(title, { slug: 'the-bend-in-the-river', source: 'title', identity: 'The Bend in the River' });
-  assert.deepStrictEqual(S.discoverSlug({ title: '  Café & Crème  ' }), { slug: 'café-crème', source: 'title', identity: 'Café & Crème' });
+  assert.deepStrictEqual(S.discoverSlug({ title: '  Café & Crème  ' }), {
+    slug: 'café-crème',
+    source: 'title',
+    identity: 'Café & Crème',
+  });
   assert.deepStrictEqual(S.discoverSlug({}), { slug: 'untitled', source: 'title', identity: '' });
 });
 
@@ -49,21 +88,39 @@ test('every item gets slug and slugSource; ids are untouched', () => {
   const { ledger, changed, summary } = S.assignSlugs(items, null, { now: '2026-11-04T10:00:00Z' });
   assert.strictEqual(changed, true);
   assert.deepStrictEqual(summary, { known: 0, added: 2, suffixed: 0 });
-  assert.deepStrictEqual(items.map((i) => [i.id, i.slug, i.slugSource]), [
-    ['https://s.test/river-bend.html', 'river-bend', 'url'],
-    ['guid-1', 'loaf', 'url'],
-  ]);
+  assert.deepStrictEqual(
+    items.map((i) => [i.id, i.slug, i.slugSource]),
+    [
+      ['https://s.test/river-bend.html', 'river-bend', 'url'],
+      ['guid-1', 'loaf', 'url'],
+    ],
+  );
   assert.strictEqual(ledger.schema, S.LEDGER_SCHEMA);
   assert.strictEqual(ledger.created, '2026-11-04');
-  assert.deepStrictEqual(ledger.cards['river-bend'], { urls: ['https://s.test/river-bend.html'], titles: ['The Bend in the River'], firstSeen: '2026-11-04', source: 'url' });
+  assert.deepStrictEqual(ledger.cards['river-bend'], {
+    urls: ['https://s.test/river-bend.html'],
+    titles: ['The Bend in the River'],
+    firstSeen: '2026-11-04',
+    source: 'url',
+  });
   // A feed id that is not the url is kept apart from the urls.
-  assert.deepStrictEqual(ledger.cards.loaf, { urls: ['https://pub.test/2026/loaf'], titles: ['Loaf'], firstSeen: '2026-11-04', source: 'url', ids: ['guid-1'] });
+  assert.deepStrictEqual(ledger.cards.loaf, {
+    urls: ['https://pub.test/2026/loaf'],
+    titles: ['Loaf'],
+    firstSeen: '2026-11-04',
+    source: 'url',
+    ids: ['guid-1'],
+  });
 });
 
 test('the freeze: a second build with a changed title keeps the slug, and the ledger holds both titles', () => {
-  const first = [{ id: 'https://s.test/river-bend.html', url: 'https://s.test/river-bend.html', title: 'The Bend in the River' }];
+  const first = [
+    { id: 'https://s.test/river-bend.html', url: 'https://s.test/river-bend.html', title: 'The Bend in the River' },
+  ];
   const b1 = S.assignSlugs(first, null, { now: '2026-11-04T10:00:00Z' });
-  const second = [{ id: 'https://s.test/river-bend.html', url: 'https://s.test/river-bend.html', title: 'Where the River Bends' }];
+  const second = [
+    { id: 'https://s.test/river-bend.html', url: 'https://s.test/river-bend.html', title: 'Where the River Bends' },
+  ];
   const b2 = S.assignSlugs(second, b1.ledger, { now: '2026-12-01T10:00:00Z' });
   assert.strictEqual(second[0].slug, 'river-bend');
   assert.strictEqual(second[0].slugSource, 'url');
@@ -95,7 +152,10 @@ test('the collision suffix: a different card with the same slug gets -2 on first
     { id: 'https://c.test/pattern/', url: 'https://c.test/pattern/', title: 'Pattern, by C' },
   ];
   const b1 = S.assignSlugs(items, null, { now: '2026-11-04T10:00:00Z' });
-  assert.deepStrictEqual(items.map((i) => i.slug), ['pattern', 'pattern-2', 'pattern-3']);
+  assert.deepStrictEqual(
+    items.map((i) => i.slug),
+    ['pattern', 'pattern-2', 'pattern-3'],
+  );
   assert.deepStrictEqual(b1.summary, { known: 0, added: 3, suffixed: 2 });
   assert.strictEqual(b1.ledger.cards['pattern-2'].disambiguatedFrom, 'pattern');
   assert.strictEqual(b1.ledger.cards.pattern.disambiguatedFrom, undefined);
@@ -103,13 +163,22 @@ test('the collision suffix: a different card with the same slug gets -2 on first
   // The next build sees them in another order; each keeps the slug it was given.
   const reordered = [items[2], items[0], items[1]].map((i) => ({ id: i.id, url: i.url, title: i.title }));
   const b2 = S.assignSlugs(reordered, b1.ledger, { now: '2026-11-05T10:00:00Z' });
-  assert.deepStrictEqual(reordered.map((i) => i.slug), ['pattern-3', 'pattern', 'pattern-2']);
+  assert.deepStrictEqual(
+    reordered.map((i) => i.slug),
+    ['pattern-3', 'pattern', 'pattern-2'],
+  );
   assert.strictEqual(b2.changed, false);
 
   // A title slug that collides with a url slug is suffixed the same way.
   const mixed = [{ url: 'https://a.test/loaf', title: 'x' }, { title: 'Loaf' }];
   S.assignSlugs(mixed, null, { now: '2026-11-04T10:00:00Z' });
-  assert.deepStrictEqual(mixed.map((i) => [i.slug, i.slugSource]), [['loaf', 'url'], ['loaf-2', 'title']]);
+  assert.deepStrictEqual(
+    mixed.map((i) => [i.slug, i.slugSource]),
+    [
+      ['loaf', 'url'],
+      ['loaf-2', 'title'],
+    ],
+  );
 });
 
 test('one article from two sources is two cards with one slug, not a merge', () => {
@@ -118,30 +187,45 @@ test('one article from two sources is two cards with one slug, not a merge', () 
     { id: 'https://pub.test/story', url: 'https://pub.test/story', title: 'Story', _source: { id: 'feed-b' } },
   ];
   const { ledger } = S.assignSlugs(items, null, { now: '2026-11-04T10:00:00Z' });
-  assert.deepStrictEqual(items.map((i) => i.slug), ['story', 'story']);
+  assert.deepStrictEqual(
+    items.map((i) => i.slug),
+    ['story', 'story'],
+  );
   assert.strictEqual(Object.keys(ledger.cards).length, 1);
 });
 
 test('the ledger grows without rewriting: known entries stay byte for byte, new ones are added', () => {
-  const b1 = S.assignSlugs([
-    { id: 'https://s.test/one.html', url: 'https://s.test/one.html', title: 'One' },
-    { id: 'https://s.test/two.html', url: 'https://s.test/two.html', title: 'Two' },
-  ], null, { now: '2026-11-04T10:00:00Z' });
+  const b1 = S.assignSlugs(
+    [
+      { id: 'https://s.test/one.html', url: 'https://s.test/one.html', title: 'One' },
+      { id: 'https://s.test/two.html', url: 'https://s.test/two.html', title: 'Two' },
+    ],
+    null,
+    { now: '2026-11-04T10:00:00Z' },
+  );
   const before = JSON.stringify(b1.ledger.cards);
 
   // The same corpus again: nothing changes.
-  const again = S.assignSlugs([
-    { id: 'https://s.test/one.html', url: 'https://s.test/one.html', title: 'One' },
-    { id: 'https://s.test/two.html', url: 'https://s.test/two.html', title: 'Two' },
-  ], b1.ledger, { now: '2026-11-06T10:00:00Z' });
+  const again = S.assignSlugs(
+    [
+      { id: 'https://s.test/one.html', url: 'https://s.test/one.html', title: 'One' },
+      { id: 'https://s.test/two.html', url: 'https://s.test/two.html', title: 'Two' },
+    ],
+    b1.ledger,
+    { now: '2026-11-06T10:00:00Z' },
+  );
   assert.strictEqual(again.changed, false);
   assert.strictEqual(JSON.stringify(again.ledger), JSON.stringify(b1.ledger));
 
   // One more card, one card gone from the corpus: the gone card stays in the ledger.
-  const b2 = S.assignSlugs([
-    { id: 'https://s.test/two.html', url: 'https://s.test/two.html', title: 'Two' },
-    { id: 'https://s.test/three.html', url: 'https://s.test/three.html', title: 'Three' },
-  ], b1.ledger, { now: '2026-11-07T10:00:00Z' });
+  const b2 = S.assignSlugs(
+    [
+      { id: 'https://s.test/two.html', url: 'https://s.test/two.html', title: 'Two' },
+      { id: 'https://s.test/three.html', url: 'https://s.test/three.html', title: 'Three' },
+    ],
+    b1.ledger,
+    { now: '2026-11-07T10:00:00Z' },
+  );
   assert.strictEqual(b2.changed, true);
   assert.deepStrictEqual(Object.keys(b2.ledger.cards), ['one', 'two', 'three']);
   assert.strictEqual(JSON.stringify({ one: b2.ledger.cards.one, two: b2.ledger.cards.two }), before);
@@ -154,7 +238,9 @@ test('reading and writing the file: absent, ok, unreadable; written atomically a
   const dir = tmpDir();
   const file = path.join(dir, 'cards.json');
   assert.deepStrictEqual(S.readLedger(file), { ledger: null, status: 'absent' });
-  const { ledger } = S.assignSlugs([{ id: 'https://s.test/a.html', url: 'https://s.test/a.html', title: 'A' }], null, { now: '2026-11-04T10:00:00Z' });
+  const { ledger } = S.assignSlugs([{ id: 'https://s.test/a.html', url: 'https://s.test/a.html', title: 'A' }], null, {
+    now: '2026-11-04T10:00:00Z',
+  });
   S.writeLedger(file, ledger);
   assert.ok(!fs.existsSync(`${file}.tmp`));
   const read = S.readLedger(file);
@@ -165,14 +251,21 @@ test('reading and writing the file: absent, ok, unreadable; written atomically a
   fs.writeFileSync(file, 'not json');
   assert.strictEqual(S.readLedger(file).status, 'unreadable');
   // An unreadable prior is built over as if absent, never carried.
-  const over = S.assignSlugs([{ url: 'https://s.test/a.html', title: 'A' }], { cards: 'no' }, { now: '2026-11-04T10:00:00Z' });
+  const over = S.assignSlugs(
+    [{ url: 'https://s.test/a.html', title: 'A' }],
+    { cards: 'no' },
+    { now: '2026-11-04T10:00:00Z' },
+  );
   assert.strictEqual(over.changed, true);
   assert.deepStrictEqual(Object.keys(over.ledger.cards), ['a']);
 });
 
 test('settings.cards.ledger: relative to the site, cards.json by default, false for none', () => {
   assert.strictEqual(S.cardsLedgerPath({}, '/site'), path.resolve('/site/cards.json'));
-  assert.strictEqual(S.cardsLedgerPath({ cards: { ledger: 'data/slugs.json' } }, '/site'), path.resolve('/site/data/slugs.json'));
+  assert.strictEqual(
+    S.cardsLedgerPath({ cards: { ledger: 'data/slugs.json' } }, '/site'),
+    path.resolve('/site/data/slugs.json'),
+  );
   assert.strictEqual(S.cardsLedgerPath({ cards: { ledger: '/abs/cards.json' } }, '/site'), '/abs/cards.json');
   assert.strictEqual(S.cardsLedgerPath({ cards: { ledger: false } }, '/site'), null);
   assert.strictEqual(S.cardsLedgerPath({ cards: { ledger: '' } }, '/site'), path.resolve('/site/cards.json'));
@@ -191,28 +284,54 @@ test('the feed adapters keep a canonical link and a DOI when the feed gives one'
   assert.strictEqual(rss.items[1].canonical_url, 'https://canon.test/the-piece');
   assert.strictEqual(rss.items[2].doi, undefined);
   assert.strictEqual(rss.items[2].canonical_url, 'https://j.test/articles/125');
-  assert.deepStrictEqual(rss.items.map((i) => { const d = S.discoverSlug(i); return [d.slug, d.source]; }), [
-    ['10.1000-xyz123', 'doi'], ['the-piece', 'canonical'], ['125', 'url'],
-  ]);
+  assert.deepStrictEqual(
+    rss.items.map((i) => {
+      const d = S.discoverSlug(i);
+      return [d.slug, d.source];
+    }),
+    [
+      ['10.1000-xyz123', 'doi'],
+      ['the-piece', 'canonical'],
+      ['125', 'url'],
+    ],
+  );
 
   const atomXml = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/"><title>A</title>
     <entry><id>e1</id><title>Canon</title><link rel="alternate" href="https://a.test/e/1"/><link rel="canonical" href="https://canon.test/first-entry"/></entry>
     <entry><id>e2</id><title>DOI</title><link href="https://a.test/e/2"/><dc:identifier>doi:10.2000/abc.9</dc:identifier></entry>
   </feed>`;
-  const atom = await Atom.load({ id: 'a', title: 'A', xmlUrl: 'https://a.test/feed' }, { fetchText: async () => atomXml });
+  const atom = await Atom.load(
+    { id: 'a', title: 'A', xmlUrl: 'https://a.test/feed' },
+    { fetchText: async () => atomXml },
+  );
   assert.strictEqual(atom.items[0].url, 'https://a.test/e/1');
   assert.strictEqual(atom.items[0].canonical_url, 'https://canon.test/first-entry');
   assert.strictEqual(atom.items[1].doi, '10.2000/abc.9');
-  assert.deepStrictEqual(atom.items.map((i) => S.discoverSlug(i).slug), ['first-entry', '10.2000-abc.9']);
+  assert.deepStrictEqual(
+    atom.items.map((i) => S.discoverSlug(i).slug),
+    ['first-entry', '10.2000-abc.9'],
+  );
 });
 
 test('a canonical that is not a web address is no canonical: the slug comes from what follows it', () => {
   // A note in a piece's front matter where a canonical link would be
   // (2026-11-05): the url path gives the slug, not the note.
-  const note = S.discoverSlug({ url: 'https://a.test/post-pipe/stone-cutters.html', canonical_url: 'fictional — unknown author, found in a novel', title: 'T' });
-  assert.deepStrictEqual(note, { slug: 'stone-cutters', source: 'url', identity: 'https://a.test/post-pipe/stone-cutters.html' });
+  const note = S.discoverSlug({
+    url: 'https://a.test/post-pipe/stone-cutters.html',
+    canonical_url: 'fictional — unknown author, found in a novel',
+    title: 'T',
+  });
+  assert.deepStrictEqual(note, {
+    slug: 'stone-cutters',
+    source: 'url',
+    identity: 'https://a.test/post-pipe/stone-cutters.html',
+  });
   // A relative canonical in the HTML is none either.
-  const relative = S.discoverSlug({ url: 'https://a.test/p/one.html', content_html: '<link rel="canonical" href="/elsewhere/two">', title: 'T' });
+  const relative = S.discoverSlug({
+    url: 'https://a.test/p/one.html',
+    content_html: '<link rel="canonical" href="/elsewhere/two">',
+    title: 'T',
+  });
   assert.strictEqual(relative.source, 'url');
   assert.strictEqual(relative.slug, 'one');
   // A DOI written as a canonical is still the DOI.

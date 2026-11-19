@@ -11,6 +11,8 @@
     "build": "vite build",
     "build:lib": "vite build --config vite.config.lib.js",
     "build:embed": "vite build --config vite.config.embed.js",
+    "format": "prettier --write \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js",
+    "format:check": "prettier --check \"{src,flow,rosetta-tagz,test,tools,platforms}/**/*.{js,jsx,mjs,cjs}\" generate-index.js index.js ingest.js tts.js add-feed.js update-index.js vite.config.js vite.config.lib.js vite.config.embed.js",
     "test": "node --test test/*.test.js",
     "smoke": "node tools/smoke.js",
     "login:medium": "node index.js medium --login",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.1",
+    "prettier": "3.10.1",
     "vite": "^8.0.12"
   }
 }

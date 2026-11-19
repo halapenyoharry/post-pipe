@@ -23,7 +23,9 @@ function fitRatioAbout(box, px, py, area) {
   if (!box || !(box.x1 > box.x0) || !(box.y1 > box.y0)) return null;
   if (px < area.x0 || px > area.x1 || py < area.y0 || py > area.y1) return null;
   let r = Infinity;
-  const limit = (room, reach) => { if (reach > 1e-9) r = Math.min(r, room / reach); };
+  const limit = (room, reach) => {
+    if (reach > 1e-9) r = Math.min(r, room / reach);
+  };
   limit(px - area.x0, px - box.x0);
   limit(area.x1 - px, box.x1 - px);
   limit(py - area.y0, py - box.y0);

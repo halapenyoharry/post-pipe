@@ -88,7 +88,7 @@ function pieceCountsFromFeed(feedData) {
   const pieces = new Map();
   for (const e of edges) {
     if (!e || e.layer !== 'tag') continue;
-    const tagId = isTag(e.target) ? e.target : (isTag(e.source) ? e.source : null);
+    const tagId = isTag(e.target) ? e.target : isTag(e.source) ? e.source : null;
     const pieceId = tagId === e.target ? e.source : e.target;
     if (!tagId || !itemIds.has(pieceId)) continue;
     if (!pieces.has(tagId)) pieces.set(tagId, []);
@@ -97,4 +97,12 @@ function pieceCountsFromFeed(feedData) {
   return pieceCounts(pieces);
 }
 
-module.exports = { PREF, clampMinPieces, pieceCounts, tagsBelow, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed };
+module.exports = {
+  PREF,
+  clampMinPieces,
+  pieceCounts,
+  tagsBelow,
+  minPiecesSummary,
+  minPiecesLabel,
+  pieceCountsFromFeed,
+};

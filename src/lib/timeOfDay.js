@@ -19,13 +19,13 @@
 const { TIMES_OF_DAY, sceneMonth } = require('./scene');
 
 const PALETTES = {
-  dawn:         { dark: ['#262036', '#38283a'], light: ['#f6e7e1', '#efe3d6'] },
-  morning:      { dark: ['#1b2838', '#26323e'], light: ['#f6f0df', '#eef0e4'] },
-  midday:       { dark: ['#1d2b38', '#22323a'], light: ['#f8f5e9', '#f1efe3'] },
-  afternoon:    { dark: ['#28282e', '#352c22'], light: ['#f6ecd7', '#efe1c8'] },
-  dusk:         { dark: ['#2a1e32', '#3a241e'], light: ['#f0dfd6', '#e9d4c3'] },
-  evening:      { dark: ['#1a1c32', '#281f34'], light: ['#e7e2e8', '#ded8dd'] },
-  night:        { dark: ['#0d1020', '#141a2c'], light: ['#dcdee6', '#d2d5df'] },
+  dawn: { dark: ['#262036', '#38283a'], light: ['#f6e7e1', '#efe3d6'] },
+  morning: { dark: ['#1b2838', '#26323e'], light: ['#f6f0df', '#eef0e4'] },
+  midday: { dark: ['#1d2b38', '#22323a'], light: ['#f8f5e9', '#f1efe3'] },
+  afternoon: { dark: ['#28282e', '#352c22'], light: ['#f6ecd7', '#efe1c8'] },
+  dusk: { dark: ['#2a1e32', '#3a241e'], light: ['#f0dfd6', '#e9d4c3'] },
+  evening: { dark: ['#1a1c32', '#281f34'], light: ['#e7e2e8', '#ded8dd'] },
+  night: { dark: ['#0d1020', '#141a2c'], light: ['#dcdee6', '#d2d5df'] },
   'late-night': { dark: ['#07080f', '#0d0f18'], light: ['#d0d3dc', '#c7cad4'] },
 };
 
@@ -65,16 +65,36 @@ function seasonOf(month, hemisphere = 'north') {
 function hexToRgb(hex) {
   const str = String(hex).trim();
   const m = /^rgba?\(([^)]+)\)/.exec(str);
-  if (m) return m[1].split(',').slice(0, 3).map((n) => Number(n.trim()));
+  if (m)
+    return m[1]
+      .split(',')
+      .slice(0, 3)
+      .map((n) => Number(n.trim()));
   const h = str.replace('#', '');
-  const v = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const v =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
   return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16));
 }
 function rgbToHex(rgb) {
-  return '#' + rgb.map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('');
+  return (
+    '#' +
+    rgb
+      .map((n) =>
+        Math.max(0, Math.min(255, Math.round(n)))
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')
+  );
 }
 function mix(a, b, t) {
-  const x = hexToRgb(a), y = hexToRgb(b);
+  const x = hexToRgb(a),
+    y = hexToRgb(b);
   return rgbToHex(x.map((n, i) => n + (y[i] - n) * t));
 }
 function luminance(hex) {
@@ -85,7 +105,8 @@ function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 function contrast(a, b) {
-  const la = luminance(a), lb = luminance(b);
+  const la = luminance(a),
+    lb = luminance(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
@@ -100,7 +121,8 @@ function legibleOn(color, backgrounds, { target = 3, opacity = 0.55 } = {}) {
   if (!bgs.length) return { color: base, opacity };
   const worst = (c, op) => Math.min(...bgs.map((b) => contrast(mix(b, c, op), b)));
   for (let op = opacity; op <= 1.0001; op += 0.05) {
-    if (worst(base, Math.min(op, 1)) >= target) return { color: base, opacity: Math.round(Math.min(op, 1) * 100) / 100 };
+    if (worst(base, Math.min(op, 1)) >= target)
+      return { color: base, opacity: Math.round(Math.min(op, 1) * 100) / 100 };
   }
   const darkBgs = bgs.reduce((n, b) => n + (luminance(b) < 0.18 ? 1 : 0), 0) > bgs.length / 2;
   const toward = darkBgs ? '#ffffff' : '#000000';
@@ -139,4 +161,17 @@ function ambienceFor(item, cfg, mode = 'dark') {
   return { time, season, mode, top: tint(pal[0]), bottom: tint(pal[1]) };
 }
 
-module.exports = { config, ambienceFor, seasonOf, contrast, mix, luminance, legibleOn, allBackgrounds, PALETTES, SEASONS, TEXT, QUIET };
+module.exports = {
+  config,
+  ambienceFor,
+  seasonOf,
+  contrast,
+  mix,
+  luminance,
+  legibleOn,
+  allBackgrounds,
+  PALETTES,
+  SEASONS,
+  TEXT,
+  QUIET,
+};

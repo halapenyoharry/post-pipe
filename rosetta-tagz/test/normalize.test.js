@@ -4,10 +4,18 @@ import { normalizeLabel, stem, looksLikeAcronym, initials } from '../lib/normali
 
 test('stem makes plural/gerund/e-drop forms agree', () => {
   const same = [
-    ['system', 'systems'], ['thinking', 'think'], ['category', 'categories'],
-    ['study', 'studies'], ['box', 'boxes'], ['class', 'classes'], ['make', 'making'],
-    ['run', 'running'], ['movie', 'movies'], ['analysis', 'analyses'],
-    ['connect', 'connected'], ['person', 'people'],
+    ['system', 'systems'],
+    ['thinking', 'think'],
+    ['category', 'categories'],
+    ['study', 'studies'],
+    ['box', 'boxes'],
+    ['class', 'classes'],
+    ['make', 'making'],
+    ['run', 'running'],
+    ['movie', 'movies'],
+    ['analysis', 'analyses'],
+    ['connect', 'connected'],
+    ['person', 'people'],
   ];
   for (const [a, b] of same) assert.equal(stem(a), stem(b), `${a} ~ ${b}`);
 });

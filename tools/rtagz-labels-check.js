@@ -45,7 +45,14 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { cacheDirForSite, rtagzSettings, mergeOverrides, buildConfig, OVERRIDES_FILE, IDS_FILE } = require('../src/lib/rtagz');
+const {
+  cacheDirForSite,
+  rtagzSettings,
+  mergeOverrides,
+  buildConfig,
+  OVERRIDES_FILE,
+  IDS_FILE,
+} = require('../src/lib/rtagz');
 
 const POSTPIPE_ROOT = path.resolve(__dirname, '..');
 // The default overrides file's name before 2026-10-31, read when only it
@@ -82,7 +89,10 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--feed' || a === '--cache') {
       const v = argv[++i];
-      if (typeof v !== 'string' || !v) { opt.error = `${a} needs a path`; break; }
+      if (typeof v !== 'string' || !v) {
+        opt.error = `${a} needs a path`;
+        break;
+      }
       opt[a.slice(2)] = path.resolve(expandHome(v));
     } else if (a.startsWith('--')) {
       opt.error = `unknown option ${a}`;
@@ -131,19 +141,37 @@ function phraseIn(hay, needle) {
 function readRecords(text) {
   const tagLabels = [];
   const texts = [];
-  let items = 0, tags = 0, earned = 0, unreadable = 0;
+  let items = 0,
+    tags = 0,
+    earned = 0,
+    unreadable = 0;
   for (const line of String(text).split('\n')) {
     if (!line.trim()) continue;
     let r;
-    try { r = JSON.parse(line); } catch (_) { unreadable++; continue; }
-    if (!r || typeof r !== 'object') { unreadable++; continue; }
+    try {
+      r = JSON.parse(line);
+    } catch (_) {
+      unreadable++;
+      continue;
+    }
+    if (!r || typeof r !== 'object') {
+      unreadable++;
+      continue;
+    }
     if (r.type === 'tag') {
-      if (r.origin !== undefined && r.origin !== 'explicit') { earned++; continue; }
+      if (r.origin !== undefined && r.origin !== 'explicit') {
+        earned++;
+        continue;
+      }
       tags++;
       if (typeof r.label === 'string') tagLabels.push(r.label);
     } else if (r.type === 'item') {
       items++;
-      texts.push({ id: r.id, title: typeof r.title === 'string' ? r.title : '', text: typeof r.text === 'string' ? r.text : '' });
+      texts.push({
+        id: r.id,
+        title: typeof r.title === 'string' ? r.title : '',
+        text: typeof r.text === 'string' ? r.text : '',
+      });
     }
   }
   return { tagLabels, texts, items, tags, earned, unreadable };
@@ -154,11 +182,21 @@ function readRecords(text) {
 // and notRelated ends, ignore. sourceWeights, canon and config name no label.
 function overrideLabels(o) {
   const out = [];
-  const add = (v) => { if (typeof v === 'string') out.push(v); };
+  const add = (v) => {
+    if (typeof v === 'string') out.push(v);
+  };
   if (!o || typeof o !== 'object') return out;
   for (const key of ['same', 'notSame']) for (const group of list(o[key])) for (const v of list(group)) add(v);
-  for (const [k, v] of entries(o.pin)) { add(k); add(v); }
-  for (const key of ['relations', 'notRelated']) for (const r of list(o[key])) if (r && typeof r === 'object') { add(r.a); add(r.b); }
+  for (const [k, v] of entries(o.pin)) {
+    add(k);
+    add(v);
+  }
+  for (const key of ['relations', 'notRelated'])
+    for (const r of list(o[key]))
+      if (r && typeof r === 'object') {
+        add(r.a);
+        add(r.b);
+      }
   for (const v of list(o.ignore)) add(v);
   return out;
 }
@@ -180,7 +218,10 @@ function labelValues(v, out) {
 }
 
 function walkVocabulary(node, out) {
-  if (Array.isArray(node)) { for (const x of node) walkVocabulary(x, out); return; }
+  if (Array.isArray(node)) {
+    for (const x of node) walkVocabulary(x, out);
+    return;
+  }
   if (!node || typeof node !== 'object') return;
   for (const [k, v] of Object.entries(node)) {
     if (LABEL_KEY.test(k)) labelValues(v, out);
@@ -188,13 +229,15 @@ function walkVocabulary(node, out) {
   }
 }
 
-const TTL_LABELS = /(?:skos:(?:prefLabel|altLabel)|<http:\/\/www\.w3\.org\/2004\/02\/skos\/core#(?:prefLabel|altLabel)>)\s+("(?:[^"\\\n]|\\.)*"(?:@[A-Za-z0-9-]+|\^\^\S+)?(?:\s*,\s*"(?:[^"\\\n]|\\.)*"(?:@[A-Za-z0-9-]+|\^\^\S+)?)*)/g;
+const TTL_LABELS =
+  /(?:skos:(?:prefLabel|altLabel)|<http:\/\/www\.w3\.org\/2004\/02\/skos\/core#(?:prefLabel|altLabel)>)\s+("(?:[^"\\\n]|\\.)*"(?:@[A-Za-z0-9-]+|\^\^\S+)?(?:\s*,\s*"(?:[^"\\\n]|\\.)*"(?:@[A-Za-z0-9-]+|\^\^\S+)?)*)/g;
 const TTL_LITERAL = /"((?:[^"\\\n]|\\.)*)"/g;
-const unescapeTtl = (s) => s.replace(/\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})|\\(.)/g, (m, u4, u8, c) => {
-  if (u4) return String.fromCodePoint(parseInt(u4, 16));
-  if (u8) return String.fromCodePoint(parseInt(u8, 16));
-  return { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' }[c] || c;
-});
+const unescapeTtl = (s) =>
+  s.replace(/\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})|\\(.)/g, (m, u4, u8, c) => {
+    if (u4) return String.fromCodePoint(parseInt(u4, 16));
+    if (u8) return String.fromCodePoint(parseInt(u8, 16));
+    return { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' }[c] || c;
+  });
 
 function vocabularyLabels(text) {
   const out = [];
@@ -202,12 +245,19 @@ function vocabularyLabels(text) {
   try {
     walkVocabulary(JSON.parse(s), out);
     return out;
-  } catch (_) { /* not one JSON document */ }
+  } catch (_) {
+    /* not one JSON document */
+  }
   let jsonLines = 0;
   for (const line of s.split('\n')) {
     const t = line.trim();
     if (!t.startsWith('{')) continue;
-    try { walkVocabulary(JSON.parse(t), out); jsonLines++; } catch (_) { /* not a JSON line */ }
+    try {
+      walkVocabulary(JSON.parse(t), out);
+      jsonLines++;
+    } catch (_) {
+      /* not a JSON line */
+    }
   }
   if (jsonLines) return out;
   for (const m of s.matchAll(TTL_LABELS)) {
@@ -232,7 +282,8 @@ function collectLabels(feed) {
     let p = places.get(kind);
     if (!p) places.set(kind, (p = { n: 0, examples: [] }));
     p.n++;
-    if (example !== undefined && example !== null && p.examples.length < 3 && !p.examples.includes(String(example))) p.examples.push(String(example));
+    if (example !== undefined && example !== null && p.examples.length < 3 && !p.examples.includes(String(example)))
+      p.examples.push(String(example));
     occurrences[group] = (occurrences[group] || 0) + 1;
   };
   const f = feed && typeof feed === 'object' ? feed : {};
@@ -242,8 +293,10 @@ function collectLabels(feed) {
     const cid = c.id || c.canonical;
     add(c.canonical, 'concept canonical', 'concept canonical', cid);
     for (const [s, l] of entries(c.prefLabel)) add(l, `concept prefLabel.${s}`, 'concept prefLabel', cid);
-    for (const [s, ls] of entries(c.altLabel)) for (const l of list(ls)) add(l, `concept altLabel.${s}`, 'concept altLabel', cid);
-    for (const [s, m] of entries(c.forms)) for (const [l] of entries(m)) add(l, `concept forms.${s}`, 'concept forms', cid);
+    for (const [s, ls] of entries(c.altLabel))
+      for (const l of list(ls)) add(l, `concept altLabel.${s}`, 'concept altLabel', cid);
+    for (const [s, m] of entries(c.forms))
+      for (const [l] of entries(m)) add(l, `concept forms.${s}`, 'concept forms', cid);
     for (const r of list(c.rank)) if (r && typeof r === 'object') add(r.label, 'concept rank', 'concept rank', cid);
   }
   for (const [id, ext] of entries(rtz && rtz.external)) {
@@ -257,14 +310,19 @@ function collectLabels(feed) {
     for (const r of list(it._references)) {
       if (!r || r.type !== 'tag') continue;
       add(r.value, '_references value', '_references value', it.id);
-      for (const [s, ls] of entries(r.forms)) for (const l of list(ls)) add(l, `_references forms.${s}`, '_references forms', it.id);
+      for (const [s, ls] of entries(r.forms))
+        for (const l of list(ls)) add(l, `_references forms.${s}`, '_references forms', it.id);
       for (const [s, l] of entries(r.prefLabel)) add(l, `_references prefLabel.${s}`, '_references prefLabel', it.id);
     }
   }
   for (const e of list(f.edges)) {
     if (!e || typeof e !== 'object') continue;
-    for (const [end, other] of [[e.source, e.target], [e.target, e.source]]) {
-      if (typeof end === 'string' && end.startsWith('tag:')) add(end.slice(4), `tag node, ${e.layer || 'no layer'} edge`, 'tag node', other);
+    for (const [end, other] of [
+      [e.source, e.target],
+      [e.target, e.source],
+    ]) {
+      if (typeof end === 'string' && end.startsWith('tag:'))
+        add(end.slice(4), `tag node, ${e.layer || 'no layer'} edge`, 'tag node', other);
     }
   }
   return { labels, occurrences };
@@ -345,7 +403,8 @@ function cacheCandidates(siteRoot) {
 
 // The site's overrides file, found as the build finds it (runRtagzPhase).
 function overridesPath(siteRoot, cfg) {
-  if (cfg && cfg.overrides) return path.isAbsolute(cfg.overrides) ? cfg.overrides : path.resolve(siteRoot, cfg.overrides);
+  if (cfg && cfg.overrides)
+    return path.isAbsolute(cfg.overrides) ? cfg.overrides : path.resolve(siteRoot, cfg.overrides);
   const current = path.resolve(siteRoot, OVERRIDES_FILE);
   const former = path.resolve(siteRoot, FORMER_OVERRIDES_FILE);
   return !fs.existsSync(current) && fs.existsSync(former) ? former : current;
@@ -355,21 +414,31 @@ const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
 function main(argv, log = console.log) {
   const opt = parseArgs(argv);
-  if (opt.error) { log(opt.error); log(USAGE); return 2; }
+  if (opt.error) {
+    log(opt.error);
+    log(USAGE);
+    return 2;
+  }
   const siteRoot = opt.site;
   const feedPath = opt.feed || path.join(siteRoot, '_site', 'feed.json');
 
   let feed;
-  try { feed = readJson(feedPath); } catch (err) {
+  try {
+    feed = readJson(feedPath);
+  } catch (err) {
     log(`feed: cannot read ${feedPath} (${err.message})`);
     return 2;
   }
-  const rtzKey = feed._rtagz ? '_rtagz' : (feed._stone ? '_stone' : null);
+  const rtzKey = feed._rtagz ? '_rtagz' : feed._stone ? '_stone' : null;
   const feedBuilt = rtzKey && feed[rtzKey] && feed[rtzKey].built ? feed[rtzKey].built : null;
 
   let settings = null;
   const settingsPath = path.join(siteRoot, 'settings.json');
-  try { settings = readJson(settingsPath); } catch (_) { settings = null; }
+  try {
+    settings = readJson(settingsPath);
+  } catch (_) {
+    settings = null;
+  }
   const cfg = settings ? rtagzSettings(settings) : undefined;
 
   // The records rosetta-tagz read.
@@ -377,14 +446,20 @@ function main(argv, log = console.log) {
   const cacheDir = candidates.find((d) => fs.existsSync(path.join(d, 'records.jsonl'))) || candidates[0];
   const recordsPath = path.join(cacheDir, 'records.jsonl');
   let records;
-  try { records = readRecords(fs.readFileSync(recordsPath, 'utf8')); } catch (err) {
+  try {
+    records = readRecords(fs.readFileSync(recordsPath, 'utf8'));
+  } catch (err) {
     log(`site: ${siteRoot}`);
     log(`feed: ${feedPath}`);
     log(`records: cannot read ${recordsPath} (${err.code || err.message}); name the cache folder with --cache DIR`);
     return 2;
   }
   let cacheBuilt = null;
-  try { cacheBuilt = readJson(path.join(cacheDir, 'build.json')).built || null; } catch (_) { cacheBuilt = null; }
+  try {
+    cacheBuilt = readJson(path.join(cacheDir, 'build.json')).built || null;
+  } catch (_) {
+    cacheBuilt = null;
+  }
 
   // The overrides rosetta-tagz was given: the site's file, and the container
   // pins post-pipe merges into it.
@@ -392,7 +467,12 @@ function main(argv, log = console.log) {
   let siteOverrides = {};
   let ovState = 'absent';
   if (fs.existsSync(ovPath)) {
-    try { siteOverrides = readJson(ovPath); ovState = 'read'; } catch (err) { ovState = `unreadable (${err.message})`; }
+    try {
+      siteOverrides = readJson(ovPath);
+      ovState = 'read';
+    } catch (err) {
+      ovState = `unreadable (${err.message})`;
+    }
   }
   const containment = settings && Array.isArray(settings.containment) ? settings.containment : [];
   const containerPins = containment.filter((c) => c && typeof c.tag === 'string' && c.tag).length;
@@ -403,9 +483,10 @@ function main(argv, log = console.log) {
   // former ids file).
   const vocabLines = [];
   const vocabulary = [];
-  const schemes = cfg && Array.isArray(cfg.conceptSchemes) && cfg.conceptSchemes.length
-    ? (buildConfig({ conceptSchemes: cfg.conceptSchemes, siteRoot, ledger: IDS_FILE }).conceptSchemes || [])
-    : [];
+  const schemes =
+    cfg && Array.isArray(cfg.conceptSchemes) && cfg.conceptSchemes.length
+      ? buildConfig({ conceptSchemes: cfg.conceptSchemes, siteRoot, ledger: IDS_FILE }).conceptSchemes || []
+      : [];
   for (const s of schemes) {
     let labels = [];
     let state;
@@ -423,27 +504,49 @@ function main(argv, log = console.log) {
 
   log(`site: ${siteRoot}`);
   log(`feed: ${feedPath}  (${rtzKey || 'no _rtagz or _stone'}${feedBuilt ? ', built ' + feedBuilt : ''})`);
-  log(`records: ${recordsPath}  ${records.items} items, ${records.tags} tag records (${new Set(records.tagLabels).size} distinct labels)` +
-    (records.earned ? `, ${records.earned} earned tag records left out` : '') +
-    (records.unreadable ? `, ${records.unreadable} unreadable lines` : '') +
-    (cacheBuilt ? `; build.json built ${cacheBuilt}` : '; no build.json'));
+  log(
+    `records: ${recordsPath}  ${records.items} items, ${records.tags} tag records (${new Set(records.tagLabels).size} distinct labels)` +
+      (records.earned ? `, ${records.earned} earned tag records left out` : '') +
+      (records.unreadable ? `, ${records.unreadable} unreadable lines` : '') +
+      (cacheBuilt ? `; build.json built ${cacheBuilt}` : '; no build.json'),
+  );
   if (cacheBuilt && feedBuilt && cacheBuilt !== feedBuilt) {
-    log(`warning: the records are from another build (${cacheBuilt}) than the feed (${feedBuilt}); this check may not describe the feed`);
+    log(
+      `warning: the records are from another build (${cacheBuilt}) than the feed (${feedBuilt}); this check may not describe the feed`,
+    );
   }
-  log(`overrides: ${ovPath} ${ovState}; container pins from settings.containment: ${containerPins}; ${new Set(overrides).size} labels`);
+  log(
+    `overrides: ${ovPath} ${ovState}; container pins from settings.containment: ${containerPins}; ${new Set(overrides).size} labels`,
+  );
   if (!schemes.length) log('vocabularies: none enabled');
-  else { log('vocabularies:'); for (const l of vocabLines) log(l); }
-  const occ = Object.entries(result.occurrences).map(([k, v]) => `${k} ${v}`).join(', ');
+  else {
+    log('vocabularies:');
+    for (const l of vocabLines) log(l);
+  }
+  const occ = Object.entries(result.occurrences)
+    .map(([k, v]) => `${k} ${v}`)
+    .join(', ');
   log(`labels checked: ${result.checked} distinct (appearances: ${occ || 'none'})`);
   log('origins, the first that holds, in this order:');
   for (const [k, name] of TIERS) log(`  ${name}: ${result.counts[k]}`);
   log(`  no origin: ${result.missing.length}`);
   // The labels verbatim only when case is ignored, named, since the rule asks
   // for verbatim.
-  for (const [k, name] of [['record-ci', 'record label'], ['text-ci', 'item text'], ['overrides-ci', 'overrides'], ['vocabulary-ci', 'enabled vocabulary']]) {
-    const ls = [...result.origins].filter(([, o]) => o === k).map(([l]) => l).sort();
+  for (const [k, name] of [
+    ['record-ci', 'record label'],
+    ['text-ci', 'item text'],
+    ['overrides-ci', 'overrides'],
+    ['vocabulary-ci', 'enabled vocabulary'],
+  ]) {
+    const ls = [...result.origins]
+      .filter(([, o]) => o === k)
+      .map(([l]) => l)
+      .sort();
     if (!ls.length) continue;
-    const shown = ls.slice(0, 40).map((l) => JSON.stringify(l)).join(', ');
+    const shown = ls
+      .slice(0, 40)
+      .map((l) => JSON.stringify(l))
+      .join(', ');
     log(`case-insensitive only, ${name}: ${shown}${ls.length > 40 ? `, and ${ls.length - 40} more` : ''}`);
   }
   if (!result.missing.length) {
@@ -453,14 +556,25 @@ function main(argv, log = console.log) {
   log(`labels with no origin: ${result.missing.length}`);
   for (const m of result.missing) {
     log(`  ${JSON.stringify(m.label)}`);
-    for (const p of m.places) log(`    ${p.kind}: ${p.n}${p.examples.length ? ' (' + p.examples.join(', ') + (p.n > p.examples.length ? ', ...' : '') + ')' : ''}`);
+    for (const p of m.places)
+      log(
+        `    ${p.kind}: ${p.n}${p.examples.length ? ' (' + p.examples.join(', ') + (p.n > p.examples.length ? ', ...' : '') + ')' : ''}`,
+      );
   }
   return 1;
 }
 
 module.exports = {
-  TIERS, parseArgs, phraseIn, readRecords, overrideLabels, vocabularyLabels,
-  collectLabels, checkLabels, cacheCandidates, main,
+  TIERS,
+  parseArgs,
+  phraseIn,
+  readRecords,
+  overrideLabels,
+  vocabularyLabels,
+  collectLabels,
+  checkLabels,
+  cacheCandidates,
+  main,
 };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

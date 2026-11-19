@@ -38,7 +38,10 @@ async function load(config, { fetchText: fetchPage = fetchText } = {}) {
 // The item one page makes. listedUrl is the address as listed (the id).
 function pageItem(html, listedUrl) {
   const page = extractPage(html, listedUrl);
-  const tags = [...page.article_tags, ...page.keywords.filter((k) => !page.article_tags.some((t) => t.toLowerCase() === k.toLowerCase()))];
+  const tags = [
+    ...page.article_tags,
+    ...page.keywords.filter((k) => !page.article_tags.some((t) => t.toLowerCase() === k.toLowerCase())),
+  ];
   const url = page.url || listedUrl;
   return {
     id: listedUrl,
@@ -69,7 +72,11 @@ function pageItem(html, listedUrl) {
 }
 
 function homeOf(url) {
-  try { return new URL(url).origin; } catch (_) { return null; }
+  try {
+    return new URL(url).origin;
+  } catch (_) {
+    return null;
+  }
 }
 
 module.exports = { id: ID, load, pageItem, homeOf };

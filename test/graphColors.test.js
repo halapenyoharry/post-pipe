@@ -25,7 +25,13 @@ test('an item kept out of the graph by the top bar is not counted, so nothing is
 });
 
 test('edge layers count when there are such edges', () => {
-  const f = { ...feed, edges: [{ source: 'ch1', target: 'ch2', layer: 'tag' }, { source: 'ch1', target: 'gone', layer: 'authored' }] };
+  const f = {
+    ...feed,
+    edges: [
+      { source: 'ch1', target: 'ch2', layer: 'tag' },
+      { source: 'ch1', target: 'gone', layer: 'authored' },
+    ],
+  };
   assert.deepStrictEqual([...colorKeysInUse(f)].sort(), ['draft', 'placeholder', 'tag']);
   assert.strictEqual(colorKeysInUse(null), null);
 });

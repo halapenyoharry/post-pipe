@@ -15,20 +15,39 @@ import { graphFeed, topBarConfig } from '../../lib/topBar';
 import { nodePalettesOf } from '../../lib/nodePalettes';
 import { clampTightness } from '../../lib/tightness';
 import {
-  MODE_PREF as EDGE_WEIGHT_MODE_PREF, PENALTY_PREF as DEGREE_PENALTY_PREF,
-  EDGE_WEIGHT_MODES, DEGREE_PENALTIES, normaliseEdgeWeights,
+  MODE_PREF as EDGE_WEIGHT_MODE_PREF,
+  PENALTY_PREF as DEGREE_PENALTY_PREF,
+  EDGE_WEIGHT_MODES,
+  DEGREE_PENALTIES,
+  normaliseEdgeWeights,
 } from '../../lib/edgeWeight';
 import { schemesOf, SITE_SCHEME } from '../../lib/schemeLabels';
 import { PREF as MIN_PIECES_PREF, minPiecesSummary, minPiecesLabel, pieceCountsFromFeed } from '../../lib/minPieces';
 import { hasTagNodes } from '../../lib/tagList';
 import {
-  PREF as TAG_SHOW_PREF, LABELS_PREF as TAG_LABELS_PREF,
-  showTagsChosen, showTagsPrefFor, showTagLabelsChosen, showTagLabelsPrefFor,
+  PREF as TAG_SHOW_PREF,
+  LABELS_PREF as TAG_LABELS_PREF,
+  showTagsChosen,
+  showTagsPrefFor,
+  showTagLabelsChosen,
+  showTagLabelsPrefFor,
 } from '../../lib/tagPills';
 import { FOLDED_PREF, foldedChoice, isRelationEdge } from '../../lib/tagNetwork';
-import { PREF as READING_ORDER_PREF, feedFlows, chosenFlow, prefFor as readingOrderPrefFor } from '../../lib/readingOrder';
 import {
-  PREF as SOURCE_RATIO_PREF, STEP as SOURCE_RATIO_STEP, ratioRange, clampRatio, ratioText, travelLength, ratioAt, positionOf,
+  PREF as READING_ORDER_PREF,
+  feedFlows,
+  chosenFlow,
+  prefFor as readingOrderPrefFor,
+} from '../../lib/readingOrder';
+import {
+  PREF as SOURCE_RATIO_PREF,
+  STEP as SOURCE_RATIO_STEP,
+  ratioRange,
+  clampRatio,
+  ratioText,
+  travelLength,
+  ratioAt,
+  positionOf,
 } from '../../lib/sourceRatio';
 
 /**
@@ -55,8 +74,11 @@ import {
  */
 
 const ENGINE_COLORS = {
-  draft: '#555555', published: '#2ecc71', tag: '#f39c12',
-  topology: '#9b59b6', placeholder: '#7f8c8d',
+  draft: '#555555',
+  published: '#2ecc71',
+  tag: '#f39c12',
+  topology: '#9b59b6',
+  placeholder: '#7f8c8d',
 };
 
 // "Default" means the site's own theme (settings.theme), not the engine's.
@@ -75,15 +97,18 @@ const DEFAULT_COLORS = themeColors();
 const PRESETS = [
   { id: 'default', label: 'Default', colors: DEFAULT_COLORS },
   {
-    id: 'highContrast', label: 'High Contrast',
+    id: 'highContrast',
+    label: 'High Contrast',
     colors: { draft: '#8a8a8a', published: '#00ff9d', tag: '#ffb700', topology: '#c77dff', placeholder: '#b0b0b0' },
   },
   {
-    id: 'warm', label: 'Warm',
+    id: 'warm',
+    label: 'Warm',
     colors: { draft: '#6b5b4f', published: '#e07a5f', tag: '#f2cc8f', topology: '#d88c9a', placeholder: '#9c8b7a' },
   },
   {
-    id: 'cool', label: 'Cool',
+    id: 'cool',
+    label: 'Cool',
     colors: { draft: '#4a6fa5', published: '#00d4ff', tag: '#5eead4', topology: '#818cf8', placeholder: '#64748b' },
   },
 ];
@@ -126,7 +151,10 @@ function Switch({ on, onChange, label, hint, ...rest }) {
       onClick={() => onChange(!on)}
       {...rest}
     >
-      <span className={styles.aidLabel}>{label}<span className={styles.aidState}>{on ? 'on' : 'off'}</span></span>
+      <span className={styles.aidLabel}>
+        {label}
+        <span className={styles.aidState}>{on ? 'on' : 'off'}</span>
+      </span>
       {hint && <span className={styles.aidHint}>{hint}</span>}
     </button>
   );
@@ -173,12 +201,13 @@ function Choice({ label, options, value, onChange, name }) {
 function Section({ id, title, children }) {
   return (
     <section className={styles.section} data-section={id} aria-labelledby={`pp-settings-${id}`}>
-      <h2 className={styles.sectionTitle} id={`pp-settings-${id}`}>{title}</h2>
+      <h2 className={styles.sectionTitle} id={`pp-settings-${id}`}>
+        {title}
+      </h2>
       {children}
     </section>
   );
 }
-
 
 const fire = (name) => window.dispatchEvent(new CustomEvent(name));
 
@@ -238,9 +267,9 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   // per tag slider: the graph's own count (window.PostPipeGraphTags, and
   // 'graph:tag-counts' when it changes, a group at a depth above 0 counted
   // as one bubble), read from the feed's tag edges until the graph has said.
-  const [graphTagCounts, setGraphTagCounts] = useState(() => (
-    typeof window !== 'undefined' && window.PostPipeGraphTags ? window.PostPipeGraphTags.counts : null
-  ));
+  const [graphTagCounts, setGraphTagCounts] = useState(() =>
+    typeof window !== 'undefined' && window.PostPipeGraphTags ? window.PostPipeGraphTags.counts : null,
+  );
   useEffect(() => {
     if (W !== 'graph') return undefined;
     if (window.PostPipeGraphTags) setGraphTagCounts(window.PostPipeGraphTags.counts);
@@ -251,9 +280,10 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
 
   // Whether the feed relates tags to one another (rosetta-tagz's relation
   // edges, lib/tagNetwork.js), for the folded choice.
-  const hasRelations = useMemo(() => (
-    Boolean(feedData && Array.isArray(feedData.edges) && feedData.edges.some(isRelationEdge))
-  ), [feedData]);
+  const hasRelations = useMemo(
+    () => Boolean(feedData && Array.isArray(feedData.edges) && feedData.edges.some(isRelationEdge)),
+    [feedData],
+  );
   // The feed's source coherence ratios (lib/sourceRatio.js): whether any tag
   // carries one, the slider's ends, and the build's own bar.
   const sourceRatios = useMemo(() => ratioRange(feedData), [feedData]);
@@ -277,7 +307,10 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   useEffect(() => {
     const onToggle = (e) => {
       const d = (e && e.detail) || {};
-      if (whereOf(d.where) !== W) { setOpen(false); return; }
+      if (whereOf(d.where) !== W) {
+        setOpen(false);
+        return;
+      }
       wantSection.current = d.section || null;
       setOpen((o) => (d.open ? true : !o));
     };
@@ -307,7 +340,7 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
 
   if (!viewState) return null;
 
-  const showOwnButton = ownButton !== undefined ? ownButton : (W === 'graph' && toolbarConfig(S).position !== 'top');
+  const showOwnButton = ownButton !== undefined ? ownButton : W === 'graph' && toolbarConfig(S).position !== 'top';
   const fonts = readerFonts(S);
   const font = viewState.readerAid ? viewState.readerAid('font') : 'default';
   const size = viewState.readerAid ? viewState.readerAid('size') : 'm';
@@ -338,14 +371,20 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   const schemeList = Array.isArray(schemes) ? schemes : schemesOf(feedData);
   const siteSchemeId = (schemeList.find((s) => s.kind === 'site') || { id: SITE_SCHEME }).id;
   const schemePref = viewState.preference('conceptScheme');
-  const schemeId = typeof schemePref === 'string' && schemeList.some((s) => s.id === schemePref) ? schemePref : siteSchemeId;
+  const schemeId =
+    typeof schemePref === 'string' && schemeList.some((s) => s.id === schemePref) ? schemePref : siteSchemeId;
   const depthPref = Number(viewState.preference('broaderDepth'));
   const depth = Number.isFinite(depthPref) ? Math.max(0, Math.min(2, Math.round(depthPref))) : 0;
   // Hide tagz on fewer than N cards (preference minTagPieces, null for 1;
   // lib/minPieces.js): a tag joining fewer pieces is hidden. Offered while
   // the graph draws tag nodes and some tag joins more than one piece.
-  const tagCounts = W !== 'graph' ? []
-    : (graphTagCounts || (hasTagNodes(feedData, S && S.graph) ? [...pieceCountsFromFeed(graphFeed(feedData, topBarConfig(S))).values()] : []));
+  const tagCounts =
+    W !== 'graph'
+      ? []
+      : graphTagCounts ||
+        (hasTagNodes(feedData, S && S.graph)
+          ? [...pieceCountsFromFeed(graphFeed(feedData, topBarConfig(S))).values()]
+          : []);
   const minPieces = minPiecesSummary(tagCounts, viewState.preference(MIN_PIECES_PREF));
   // Source coherence ratio (preference minSourceRatio; lib/sourceRatio.js):
   // the value in force, in tenths, and the setter, which stores null at the
@@ -386,444 +425,576 @@ export function Settings({ viewState, feedData, subject, readerOpen, where = 'gr
   );
 
   const body = {
-    look: () => (<>
-      <Choice
-        label="Theme"
-        name="theme"
-        options={Object.values(THEMES).map((t) => ({ id: t.id, label: t.label }))}
-        value={name}
-        onChange={(v) => viewState.setPreference('theme', v === themeName(S, null) ? null : v)}
-      />
-      {!modeInReader(S) && modeChoice}
-      {todConfig(S) && (
-        <Switch
-          on={viewState.preference('timeOfDay') !== false}
-          onChange={(v) => viewState.setPreference('timeOfDay', v ? null : false)}
-          label="narrative time of day background"
-          data-pref="timeOfDay"
+    look: () => (
+      <>
+        <Choice
+          label="Theme"
+          name="theme"
+          options={Object.values(THEMES).map((t) => ({ id: t.id, label: t.label }))}
+          value={name}
+          onChange={(v) => viewState.setPreference('theme', v === themeName(S, null) ? null : v)}
         />
-      )}
-      {palettes.length >= 2 && (
-        <div className={styles.choiceRow} role="radiogroup" aria-label="node colour" data-choice="nodePalette">
-          <span className={styles.rowLabel}>node colour</span>
-          <span className={styles.choices}>
-            {palettes.map((p, i) => (
+        {!modeInReader(S) && modeChoice}
+        {todConfig(S) && (
+          <Switch
+            on={viewState.preference('timeOfDay') !== false}
+            onChange={(v) => viewState.setPreference('timeOfDay', v ? null : false)}
+            label="narrative time of day background"
+            data-pref="timeOfDay"
+          />
+        )}
+        {palettes.length >= 2 && (
+          <div className={styles.choiceRow} role="radiogroup" aria-label="node colour" data-choice="nodePalette">
+            <span className={styles.rowLabel}>node colour</span>
+            <span className={styles.choices}>
+              {palettes.map((p, i) => (
+                <button
+                  key={p.id}
+                  role="radio"
+                  aria-checked={paletteId === p.id}
+                  title={p.label}
+                  data-value={p.id}
+                  className={`${styles.choiceBtn} ${paletteId === p.id ? styles.aidOn : ''}`}
+                  onClick={() => viewState.setPreference('nodePalette', i === 0 ? null : p.id)}
+                >
+                  <span
+                    className={styles.paletteSwatch}
+                    data-palette-swatch={p.id}
+                    aria-hidden="true"
+                    style={
+                      String(p.color).toLowerCase() === 'none'
+                        ? {
+                            borderColor: 'currentColor',
+                            borderStyle: 'dashed',
+                            background: 'transparent',
+                          }
+                        : {
+                            borderColor: p.color,
+                            background:
+                              p.fillOpacity === null
+                                ? p.color
+                                : `color-mix(in srgb, ${p.color} ${Math.round(p.fillOpacity * 100)}%, transparent)`,
+                          }
+                    }
+                  />
+                  {p.label}
+                </button>
+              ))}
+            </span>
+          </div>
+        )}
+        {fields.length > 0 && (
+          <>
+            <div className={styles.rowLabel}>Colors</div>
+            <div className={styles.presetRow}>
+              {PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  className={`${styles.presetBtn} ${activeProfile === p.id ? styles.presetActive : ''}`}
+                  onClick={() => viewState.applyColorProfile(p.id, p.colors)}
+                  title={p.label}
+                >
+                  <span className={styles.presetSwatches}>
+                    {fields.map((f) => (
+                      <span key={f.key} className={styles.miniSwatch} style={{ background: p.colors[f.key] }} />
+                    ))}
+                  </span>
+                  <span className={styles.presetLabel}>{p.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className={styles.fieldList}>
+              {fields.map((f) => (
+                <label key={f.key} className={styles.fieldRow}>
+                  <span className={styles.fieldLabel}>{f.label}</span>
+                  <input
+                    type="color"
+                    className={styles.colorInput}
+                    value={current[f.key]}
+                    onChange={(e) => viewState.setGraphColor(f.key, e.target.value)}
+                  />
+                  <span className={styles.hexLabel}>{current[f.key]}</span>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+      </>
+    ),
+
+    view: () => (
+      <>
+        <span className={styles.choices} data-view-actions>
+          <button
+            className={styles.choiceBtn}
+            data-view-action="graph:zoom-to-fit"
+            title="Every node on the screen, zoomed about its middle"
+            onClick={() => fire('graph:zoom-to-fit')}
+          >
+            Zoom to fit
+          </button>
+          {hasContainers && (
+            <>
               <button
-                key={p.id}
-                role="radio"
-                aria-checked={paletteId === p.id}
-                title={p.label}
-                data-value={p.id}
-                className={`${styles.choiceBtn} ${paletteId === p.id ? styles.aidOn : ''}`}
-                onClick={() => viewState.setPreference('nodePalette', i === 0 ? null : p.id)}
+                className={styles.choiceBtn}
+                data-view-action="graph:close-all-containers"
+                onClick={() => fire('graph:close-all-containers')}
               >
-                <span
-                  className={styles.paletteSwatch}
-                  data-palette-swatch={p.id}
-                  aria-hidden="true"
-                  style={String(p.color).toLowerCase() === 'none' ? {
-                    borderColor: 'currentColor',
-                    borderStyle: 'dashed',
-                    background: 'transparent',
-                  } : {
-                    borderColor: p.color,
-                    background: p.fillOpacity === null ? p.color : `color-mix(in srgb, ${p.color} ${Math.round(p.fillOpacity * 100)}%, transparent)`,
-                  }}
-                />
-                {p.label}
+                Close all {noun}
+              </button>
+              <button
+                className={styles.choiceBtn}
+                data-view-action="graph:open-all-containers"
+                onClick={() => fire('graph:open-all-containers')}
+              >
+                Open all {noun}
+              </button>
+            </>
+          )}
+          {viewActionsFor(S)
+            .filter((a) => a.event !== 'graph:zoom-to-fit')
+            .map((a) => (
+              <button
+                key={a.event}
+                className={styles.choiceBtn}
+                data-view-action={a.event}
+                title={a.title}
+                onClick={() => fire(a.event)}
+              >
+                {a.label}
               </button>
             ))}
-          </span>
-        </div>
-      )}
-      {fields.length > 0 && (<>
-        <div className={styles.rowLabel}>Colors</div>
-        <div className={styles.presetRow}>
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              className={`${styles.presetBtn} ${activeProfile === p.id ? styles.presetActive : ''}`}
-              onClick={() => viewState.applyColorProfile(p.id, p.colors)}
-              title={p.label}
-            >
-              <span className={styles.presetSwatches}>
-                {fields.map((f) => (
-                  <span key={f.key} className={styles.miniSwatch} style={{ background: p.colors[f.key] }} />
-                ))}
+        </span>
+        {TB.show.layout && (
+          <Choice
+            label="Layout"
+            name="layout"
+            options={[
+              { id: 'force', label: 'cluster', title: 'Cluster: each container its own path' },
+              { id: 'radial', label: 'ring', title: 'Ring: each container its own ring' },
+            ]}
+            value={viewState.state.layout}
+            onChange={(v) => viewState.setLayout(v)}
+          />
+        )}
+        {TB.show.layout && (
+          <label
+            className={styles.choiceRow}
+            data-pref="tightness"
+            title="How close the cards sit in cluster. At the tight end they may overlap a little."
+          >
+            <span className={styles.rowLabel}>Tightness</span>
+            <span className={styles.rangeRow}>
+              <span className={styles.rangeEnd} aria-hidden="true">
+                loose
               </span>
-              <span className={styles.presetLabel}>{p.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className={styles.fieldList}>
-          {fields.map((f) => (
-            <label key={f.key} className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{f.label}</span>
               <input
-                type="color"
-                className={styles.colorInput}
-                value={current[f.key]}
-                onChange={(e) => viewState.setGraphColor(f.key, e.target.value)}
+                type="range"
+                className={styles.range}
+                min="0"
+                max="1"
+                step="0.05"
+                aria-label="Tightness, from loose to tight"
+                value={clampTightness(viewState.preference('tightness'))}
+                onChange={(e) => {
+                  const v = clampTightness(e.target.value);
+                  viewState.setPreference('tightness', v === 0.5 ? null : v);
+                }}
               />
-              <span className={styles.hexLabel}>{current[f.key]}</span>
-            </label>
-          ))}
-        </div>
-      </>)}
-    </>),
-
-    view: () => (<>
-      <span className={styles.choices} data-view-actions>
-        <button className={styles.choiceBtn} data-view-action="graph:zoom-to-fit" title="Every node on the screen, zoomed about its middle" onClick={() => fire('graph:zoom-to-fit')}>Zoom to fit</button>
-        {hasContainers && (<>
-          <button className={styles.choiceBtn} data-view-action="graph:close-all-containers" onClick={() => fire('graph:close-all-containers')}>Close all {noun}</button>
-          <button className={styles.choiceBtn} data-view-action="graph:open-all-containers" onClick={() => fire('graph:open-all-containers')}>Open all {noun}</button>
-        </>)}
-        {viewActionsFor(S).filter((a) => a.event !== 'graph:zoom-to-fit').map((a) => (
-          <button key={a.event} className={styles.choiceBtn} data-view-action={a.event} title={a.title} onClick={() => fire(a.event)}>{a.label}</button>
-        ))}
-      </span>
-      {TB.show.layout && (
-        <Choice
-          label="Layout"
-          name="layout"
-          options={[{ id: 'force', label: 'cluster', title: 'Cluster: each container its own path' }, { id: 'radial', label: 'ring', title: 'Ring: each container its own ring' }]}
-          value={viewState.state.layout}
-          onChange={(v) => viewState.setLayout(v)}
-        />
-      )}
-      {TB.show.layout && (
-        <label className={styles.choiceRow} data-pref="tightness" title="How close the cards sit in cluster. At the tight end they may overlap a little.">
-          <span className={styles.rowLabel}>Tightness</span>
-          <span className={styles.rangeRow}>
-            <span className={styles.rangeEnd} aria-hidden="true">loose</span>
-            <input
-              type="range"
-              className={styles.range}
-              min="0"
-              max="1"
-              step="0.05"
-              aria-label="Tightness, from loose to tight"
-              value={clampTightness(viewState.preference('tightness'))}
-              onChange={(e) => {
-                const v = clampTightness(e.target.value);
-                viewState.setPreference('tightness', v === 0.5 ? null : v);
-              }}
-            />
-            <span className={styles.rangeEnd} aria-hidden="true">tight</span>
-          </span>
-        </label>
-      )}
-      {TB.show.layout && (
-        <Choice
-          label="Edge weights"
-          name={EDGE_WEIGHT_MODE_PREF}
-          options={[
-            { id: 'uniform', label: 'uniform', title: "One link distance and D3's default strength for every link." },
-            { id: 'weighted', label: 'weighted', title: "Each link's strength and distance follow its weight, endpoint degrees and card recency." },
-          ]}
-          value={ewMode}
-          onChange={(v) => viewState.setPreference(EDGE_WEIGHT_MODE_PREF, v === siteEw.mode ? null : v)}
-        />
-      )}
-      {TB.show.layout && ewMode === 'weighted' && (
-        <Choice
-          label="Degree penalty"
-          name={DEGREE_PENALTY_PREF}
-          options={[
-            { id: 'none', label: 'none', title: 'Divide by each endpoint degree as it is (n).' },
-            { id: 'sqrt', label: '√', title: 'Divide by the square root of each endpoint degree (√n).' },
-            { id: 'log', label: 'log', title: 'Divide by log(1 + n) of each endpoint degree.' },
-          ]}
-          value={ewPenalty}
-          onChange={(v) => viewState.setPreference(DEGREE_PENALTY_PREF, v === siteEw.degreePenalty ? null : v)}
-        />
-      )}
-      {W === 'graph' && hasTagNodes(feedData, S && S.graph) && (<>
-        {/* Whether the tagz are drawn (settings.graph.tag.show, the
+              <span className={styles.rangeEnd} aria-hidden="true">
+                tight
+              </span>
+            </span>
+          </label>
+        )}
+        {TB.show.layout && (
+          <Choice
+            label="Edge weights"
+            name={EDGE_WEIGHT_MODE_PREF}
+            options={[
+              { id: 'uniform', label: 'uniform', title: "One link distance and D3's default strength for every link." },
+              {
+                id: 'weighted',
+                label: 'weighted',
+                title: "Each link's strength and distance follow its weight, endpoint degrees and card recency.",
+              },
+            ]}
+            value={ewMode}
+            onChange={(v) => viewState.setPreference(EDGE_WEIGHT_MODE_PREF, v === siteEw.mode ? null : v)}
+          />
+        )}
+        {TB.show.layout && ewMode === 'weighted' && (
+          <Choice
+            label="Degree penalty"
+            name={DEGREE_PENALTY_PREF}
+            options={[
+              { id: 'none', label: 'none', title: 'Divide by each endpoint degree as it is (n).' },
+              { id: 'sqrt', label: '√', title: 'Divide by the square root of each endpoint degree (√n).' },
+              { id: 'log', label: 'log', title: 'Divide by log(1 + n) of each endpoint degree.' },
+            ]}
+            value={ewPenalty}
+            onChange={(v) => viewState.setPreference(DEGREE_PENALTY_PREF, v === siteEw.degreePenalty ? null : v)}
+          />
+        )}
+        {W === 'graph' && hasTagNodes(feedData, S && S.graph) && (
+          <>
+            {/* Whether the tagz are drawn (settings.graph.tag.show, the
             preference showTags, null for the site's own; lib/tagPills.js).
             Hidden, they still hold their cards where they are. */}
-        <Switch
-          on={tagsShown}
-          onChange={(v) => viewState.setPreference(TAG_SHOW_PREF, showTagsPrefFor(v, S))}
-          label="Show tagz on the graph"
-          hint="Off, the cards still sit by the tagz they share."
-          data-pref={TAG_SHOW_PREF}
-        />
-        {/* Whether each tag shows its label, its pill, or is a dot
+            <Switch
+              on={tagsShown}
+              onChange={(v) => viewState.setPreference(TAG_SHOW_PREF, showTagsPrefFor(v, S))}
+              label="Show tagz on the graph"
+              hint="Off, the cards still sit by the tagz they share."
+              data-pref={TAG_SHOW_PREF}
+            />
+            {/* Whether each tag shows its label, its pill, or is a dot
             (settings.graph.tag.labels, the preference showTagLabels, null
             for the site's own; lib/tagPills.js). Greyed and inert while the
             tagz are not shown. Either way nothing moves. */}
-        <Switch
-          on={showTagLabelsChosen(viewState.preference(TAG_LABELS_PREF), S)}
-          onChange={(v) => viewState.setPreference(TAG_LABELS_PREF, showTagLabelsPrefFor(v, S))}
-          label="Show their labels"
-          hint="Off, each tag is a dot; point at one, or tap it, to read it."
-          data-pref={TAG_LABELS_PREF}
-          disabled={!tagsShown}
-        />
-      </>)}
-      {minPieces.max > 1 && (
-        // The label carries the value, so it has a line of its own, and the
-        // count beside the slider keeps one width: dragging moves the thumb
-        // and nothing else.
-        <label className={styles.choiceRow} data-pref={MIN_PIECES_PREF} title="Tagz on fewer cards than this are hidden.">
-          <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-min-pieces-label>{minPiecesLabel(minPieces.min)}</span>
-          <span className={styles.rangeRow}>
-            <span className={styles.rangeEnd} aria-hidden="true">1</span>
-            <input
-              type="range"
-              className={styles.range}
-              min="1"
-              max={minPieces.max}
-              step="1"
-              aria-label={`Hide tagz on fewer than this many cards, from 1 to ${minPieces.max}`}
-              aria-valuetext={`${minPieces.min} ${minPieces.min === 1 ? 'card' : 'cards'}: ${minPieces.shown} of ${minPieces.total} tagz`}
-              value={minPieces.min}
-              onChange={(e) => {
-                const v = Math.round(Number(e.target.value));
-                viewState.setPreference(MIN_PIECES_PREF, Number.isFinite(v) && v > 1 ? v : null);
-              }}
+            <Switch
+              on={showTagLabelsChosen(viewState.preference(TAG_LABELS_PREF), S)}
+              onChange={(v) => viewState.setPreference(TAG_LABELS_PREF, showTagLabelsPrefFor(v, S))}
+              label="Show their labels"
+              hint="Off, each tag is a dot; point at one, or tap it, to read it."
+              data-pref={TAG_LABELS_PREF}
+              disabled={!tagsShown}
             />
-            <span className={styles.rangeEnd} aria-hidden="true">{minPieces.max}</span>
-          </span>
-          <output className={styles.rangeEnd} data-tag-count aria-live="polite">
-            <span className={styles.steadyCount} style={{ minWidth: `${String(minPieces.total).length}ch` }}>{minPieces.shown}</span> of {minPieces.total} tagz
-          </output>
-        </label>
-      )}
-      {W === 'graph' && sourceRatios.has && (
-        // Source coherence ratio (preference minSourceRatio, null for the
-        // build's own bar; lib/sourceRatio.js): a discovered tag under it is
-        // hidden, as a build at that bar would not have made it. Laid out as
-        // the cards slider above it, its value beside it. The input's value
-        // is a position on a logarithmic travel, its value text the ratio.
-        <label
-          className={styles.choiceRow}
-          data-pref={SOURCE_RATIO_PREF}
-          title={`Discovered tagz under this ratio are hidden; tagz a person wrote always show. The build's own bar is ${ratioText(sourceRatios.bar)}.`}
-        >
-          <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-source-ratio-label>Source coherence ratio</span>
-          <span className={styles.rangeRow}>
-            <span className={styles.rangeEnd} aria-hidden="true">{ratioText(sourceRatios.lo)}</span>
-            <input
-              type="range"
-              className={styles.range}
-              min="0"
-              max={travelLength(sourceRatios)}
-              step="1"
-              aria-label={`Source coherence ratio, from ${ratioText(sourceRatios.lo)} to ${ratioText(sourceRatios.hi)}`}
-              aria-valuetext={ratioText(ratioNow)}
-              data-ratio={ratioText(ratioNow)}
-              value={positionOf(ratioNow, sourceRatios)}
-              onChange={(e) => setRatio(ratioAt(e.target.value, sourceRatios))}
-              onKeyDown={(e) => {
-                const dir = RATIO_KEYS[e.key];
-                if (!dir) return;
-                e.preventDefault();
-                setRatio(clampRatio(ratioNow + dir * SOURCE_RATIO_STEP, sourceRatios));
-              }}
-            />
-            <span className={styles.rangeEnd} aria-hidden="true">{ratioText(sourceRatios.hi)}</span>
-          </span>
-          <output className={styles.rangeEnd} data-source-ratio aria-live="polite">
-            {ratioText(ratioNow)}
-          </output>
-        </label>
-      )}
-      {schemeList.length > 1 && (
-        <Choice
-          label="Scheme"
-          name="conceptScheme"
-          options={schemeList.map((s) => ({ id: s.id, label: s.label || s.id, title: s.kind === 'external' && s.license ? `${s.label || s.id} (${s.license})` : (s.label || s.id) }))}
-          value={schemeId}
-          onChange={(v) => viewState.setPreference('conceptScheme', v === siteSchemeId ? null : v)}
-        />
-      )}
-      {schemeList.length > 1 && (
-        <Choice
-          label="Depth"
-          name="broaderDepth"
-          options={[
-            { id: '0', label: '0', title: 'Each tag as it is' },
-            { id: '1', label: '1', title: 'Tags read one step up, by their broader concept' },
-            { id: '2', label: '2', title: 'Tags read two steps up' },
-          ]}
-          value={String(depth)}
-          onChange={(v) => viewState.setPreference('broaderDepth', v === '0' ? null : Number(v))}
-        />
-      )}
-      {/* While the depth folds tags into broader ones: a selected tag's line
+          </>
+        )}
+        {minPieces.max > 1 && (
+          // The label carries the value, so it has a line of its own, and the
+          // count beside the slider keeps one width: dragging moves the thumb
+          // and nothing else.
+          <label
+            className={styles.choiceRow}
+            data-pref={MIN_PIECES_PREF}
+            title="Tagz on fewer cards than this are hidden."
+          >
+            <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-min-pieces-label>
+              {minPiecesLabel(minPieces.min)}
+            </span>
+            <span className={styles.rangeRow}>
+              <span className={styles.rangeEnd} aria-hidden="true">
+                1
+              </span>
+              <input
+                type="range"
+                className={styles.range}
+                min="1"
+                max={minPieces.max}
+                step="1"
+                aria-label={`Hide tagz on fewer than this many cards, from 1 to ${minPieces.max}`}
+                aria-valuetext={`${minPieces.min} ${minPieces.min === 1 ? 'card' : 'cards'}: ${minPieces.shown} of ${minPieces.total} tagz`}
+                value={minPieces.min}
+                onChange={(e) => {
+                  const v = Math.round(Number(e.target.value));
+                  viewState.setPreference(MIN_PIECES_PREF, Number.isFinite(v) && v > 1 ? v : null);
+                }}
+              />
+              <span className={styles.rangeEnd} aria-hidden="true">
+                {minPieces.max}
+              </span>
+            </span>
+            <output className={styles.rangeEnd} data-tag-count aria-live="polite">
+              <span className={styles.steadyCount} style={{ minWidth: `${String(minPieces.total).length}ch` }}>
+                {minPieces.shown}
+              </span>{' '}
+              of {minPieces.total} tagz
+            </output>
+          </label>
+        )}
+        {W === 'graph' && sourceRatios.has && (
+          // Source coherence ratio (preference minSourceRatio, null for the
+          // build's own bar; lib/sourceRatio.js): a discovered tag under it is
+          // hidden, as a build at that bar would not have made it. Laid out as
+          // the cards slider above it, its value beside it. The input's value
+          // is a position on a logarithmic travel, its value text the ratio.
+          <label
+            className={styles.choiceRow}
+            data-pref={SOURCE_RATIO_PREF}
+            title={`Discovered tagz under this ratio are hidden; tagz a person wrote always show. The build's own bar is ${ratioText(sourceRatios.bar)}.`}
+          >
+            <span className={`${styles.rowLabel} ${styles.rowLabelLine}`} data-source-ratio-label>
+              Source coherence ratio
+            </span>
+            <span className={styles.rangeRow}>
+              <span className={styles.rangeEnd} aria-hidden="true">
+                {ratioText(sourceRatios.lo)}
+              </span>
+              <input
+                type="range"
+                className={styles.range}
+                min="0"
+                max={travelLength(sourceRatios)}
+                step="1"
+                aria-label={`Source coherence ratio, from ${ratioText(sourceRatios.lo)} to ${ratioText(sourceRatios.hi)}`}
+                aria-valuetext={ratioText(ratioNow)}
+                data-ratio={ratioText(ratioNow)}
+                value={positionOf(ratioNow, sourceRatios)}
+                onChange={(e) => setRatio(ratioAt(e.target.value, sourceRatios))}
+                onKeyDown={(e) => {
+                  const dir = RATIO_KEYS[e.key];
+                  if (!dir) return;
+                  e.preventDefault();
+                  setRatio(clampRatio(ratioNow + dir * SOURCE_RATIO_STEP, sourceRatios));
+                }}
+              />
+              <span className={styles.rangeEnd} aria-hidden="true">
+                {ratioText(sourceRatios.hi)}
+              </span>
+            </span>
+            <output className={styles.rangeEnd} data-source-ratio aria-live="polite">
+              {ratioText(ratioNow)}
+            </output>
+          </label>
+        )}
+        {schemeList.length > 1 && (
+          <Choice
+            label="Scheme"
+            name="conceptScheme"
+            options={schemeList.map((s) => ({
+              id: s.id,
+              label: s.label || s.id,
+              title: s.kind === 'external' && s.license ? `${s.label || s.id} (${s.license})` : s.label || s.id,
+            }))}
+            value={schemeId}
+            onChange={(v) => viewState.setPreference('conceptScheme', v === siteSchemeId ? null : v)}
+          />
+        )}
+        {schemeList.length > 1 && (
+          <Choice
+            label="Depth"
+            name="broaderDepth"
+            options={[
+              { id: '0', label: '0', title: 'Each tag as it is' },
+              { id: '1', label: '1', title: 'Tags read one step up, by their broader concept' },
+              { id: '2', label: '2', title: 'Tags read two steps up' },
+            ]}
+            value={String(depth)}
+            onChange={(v) => viewState.setPreference('broaderDepth', v === '0' ? null : Number(v))}
+          />
+        )}
+        {/* While the depth folds tags into broader ones: a selected tag's line
           to a relative folded into another bubble goes to that bubble, or is
           left out (preference foldedRelatives, null for the bubble;
           lib/tagNetwork.js). */}
-      {schemeList.length > 1 && depth > 0 && hasRelations && (
-        <Choice
-          label="Lines to folded tagz"
-          name={FOLDED_PREF}
-          options={[
-            { id: 'bubble', label: 'to their bubble', title: 'Lines to related tagz folded into broader ones go to the bubble that shows them' },
-            { id: 'omit', label: 'left out', title: 'No lines to related tagz folded into broader ones' },
-          ]}
-          value={foldedChoice(viewState.preference(FOLDED_PREF))}
-          onChange={(v) => viewState.setPreference(FOLDED_PREF, v === 'bubble' ? null : v)}
-        />
-      )}
-      {/* The reading order Next, Previous and the top bar's book follow, when
+        {schemeList.length > 1 && depth > 0 && hasRelations && (
+          <Choice
+            label="Lines to folded tagz"
+            name={FOLDED_PREF}
+            options={[
+              {
+                id: 'bubble',
+                label: 'to their bubble',
+                title: 'Lines to related tagz folded into broader ones go to the bubble that shows them',
+              },
+              { id: 'omit', label: 'left out', title: 'No lines to related tagz folded into broader ones' },
+            ]}
+            value={foldedChoice(viewState.preference(FOLDED_PREF))}
+            onChange={(v) => viewState.setPreference(FOLDED_PREF, v === 'bubble' ? null : v)}
+          />
+        )}
+        {/* The reading order Next, Previous and the top bar's book follow, when
           the site lists two or more Flow presets (flow.presets; the
           preference readingOrder, provisional, null for the site's first;
           lib/readingOrder.js): each choice is a preset's name, its
           description its title, and the chosen one's description is the line
           under the row. Changing it moves nothing in the graph. */}
-      {W === 'graph' && flows.length > 1 && flowNow && (<>
-        <Choice
-          label="Reading order"
-          name={READING_ORDER_PREF}
-          options={flows.map((f) => ({ id: f.name, label: f.name, title: f.description || f.name }))}
-          value={flowNow.name}
-          onChange={(v) => viewState.setPreference(READING_ORDER_PREF, readingOrderPrefFor(feedData, v))}
-        />
-        {flowNow.description && <div className={styles.hint} data-reading-order-description>{flowNow.description}</div>}
-      </>)}
-    </>),
-
-    memory: () => (<>
-      <button
-        className={styles.resetBtn}
-        data-settings-reset
-        title={`Layout, zoom, rotation, open and closed containers, selection, showing tagz and their labels, ${flows.length > 1 ? 'the reading order, ' : ''}and colors, back to how the site starts`}
-        onClick={() => {
-          setOpen(false);
-          if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);
-          fire('graph:reset-all');
-        }}
-      >
-        Reset the view
-      </button>
-      <div className={styles.forgetBlock} data-forget>
-        <div className={styles.hint} data-forget-note>
-          What you open, arrange, choose, mark and read here is kept on this device only.
-          Reset the view keeps your bookmarks and progress; Forget removes all of it.
-        </div>
-        {!confirmForget ? (
-          <button className={styles.resetBtn} data-forget-ask onClick={() => setConfirmForget(true)}>
-            Forget my usage on this site
-          </button>
-        ) : (
-          <div className={styles.forgetConfirm} role="group" aria-label="Confirm forgetting" data-forget-confirm>
-            <div className={styles.hint}>
-              Remove your bookmarks and notes, reading progress, open cards, positions,
-              and every choice made here, from this device? This can't be undone.
-            </div>
-            <span className={styles.choices}>
-              <button
-                className={styles.resetBtn}
-                data-forget-yes
-                onClick={async () => {
-                  setConfirmForget(false);
-                  setOpen(false);
-                  if (viewState.forget) await viewState.forget();
-                  window.dispatchEvent(new CustomEvent('postpipe:forgotten'));
-                }}
-              >
-                Forget
-              </button>
-              <button className={styles.choiceBtn} data-forget-no onClick={() => setConfirmForget(false)}>
-                Keep it
-              </button>
-            </span>
-          </div>
+        {W === 'graph' && flows.length > 1 && flowNow && (
+          <>
+            <Choice
+              label="Reading order"
+              name={READING_ORDER_PREF}
+              options={flows.map((f) => ({ id: f.name, label: f.name, title: f.description || f.name }))}
+              value={flowNow.name}
+              onChange={(v) => viewState.setPreference(READING_ORDER_PREF, readingOrderPrefFor(feedData, v))}
+            />
+            {flowNow.description && (
+              <div className={styles.hint} data-reading-order-description>
+                {flowNow.description}
+              </div>
+            )}
+          </>
         )}
-      </div>
-    </>),
+      </>
+    ),
 
-    reading: () => (<>
-      <div className={styles.fontRow} role="radiogroup" aria-label="Font">
-        {fonts.map((f) => (
-          <button
-            key={f.id}
-            role="radio"
-            aria-checked={font === f.id}
-            data-font={f.id}
-            className={`${styles.fontBtn} ${font === f.id ? styles.aidOn : ''}`}
-            style={{ fontFamily: f.family }}
-            onClick={() => viewState.setReaderAid && viewState.setReaderAid('font', f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-      {fonts.filter((f) => f.license).map((f) => (
-        <div key={f.id} className={styles.hint}>
-          {f.label} is under the <a className={styles.hintLink} href={`./fonts/${f.license}`} target="_blank" rel="noopener">{f.licenseName}</a>.
+    memory: () => (
+      <>
+        <button
+          className={styles.resetBtn}
+          data-settings-reset
+          title={`Layout, zoom, rotation, open and closed containers, selection, showing tagz and their labels, ${flows.length > 1 ? 'the reading order, ' : ''}and colors, back to how the site starts`}
+          onClick={() => {
+            setOpen(false);
+            if (fields.length) viewState.applyColorProfile('default', DEFAULT_COLORS);
+            fire('graph:reset-all');
+          }}
+        >
+          Reset the view
+        </button>
+        <div className={styles.forgetBlock} data-forget>
+          <div className={styles.hint} data-forget-note>
+            What you open, arrange, choose, mark and read here is kept on this device only. Reset the view keeps your
+            bookmarks and progress; Forget removes all of it.
+          </div>
+          {!confirmForget ? (
+            <button className={styles.resetBtn} data-forget-ask onClick={() => setConfirmForget(true)}>
+              Forget my usage on this site
+            </button>
+          ) : (
+            <div className={styles.forgetConfirm} role="group" aria-label="Confirm forgetting" data-forget-confirm>
+              <div className={styles.hint}>
+                Remove your bookmarks and notes, reading progress, open cards, positions, and every choice made here,
+                from this device? This can't be undone.
+              </div>
+              <span className={styles.choices}>
+                <button
+                  className={styles.resetBtn}
+                  data-forget-yes
+                  onClick={async () => {
+                    setConfirmForget(false);
+                    setOpen(false);
+                    if (viewState.forget) await viewState.forget();
+                    window.dispatchEvent(new CustomEvent('postpipe:forgotten'));
+                  }}
+                >
+                  Forget
+                </button>
+                <button className={styles.choiceBtn} data-forget-no onClick={() => setConfirmForget(false)}>
+                  Keep it
+                </button>
+              </span>
+            </div>
+          )}
         </div>
-      ))}
-      <Choice label="Size" name="size" options={SIZES} value={size} onChange={(v) => viewState.setReaderAid('size', v)} />
-      {/* Words before the next (provisional label): the reader's own choice,
+      </>
+    ),
+
+    reading: () => (
+      <>
+        <div className={styles.fontRow} role="radiogroup" aria-label="Font">
+          {fonts.map((f) => (
+            <button
+              key={f.id}
+              role="radio"
+              aria-checked={font === f.id}
+              data-font={f.id}
+              className={`${styles.fontBtn} ${font === f.id ? styles.aidOn : ''}`}
+              style={{ fontFamily: f.family }}
+              onClick={() => viewState.setReaderAid && viewState.setReaderAid('font', f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {fonts
+          .filter((f) => f.license)
+          .map((f) => (
+            <div key={f.id} className={styles.hint}>
+              {f.label} is under the{' '}
+              <a className={styles.hintLink} href={`./fonts/${f.license}`} target="_blank" rel="noopener">
+                {f.licenseName}
+              </a>
+              .
+            </div>
+          ))}
+        <Choice
+          label="Size"
+          name="size"
+          options={SIZES}
+          value={size}
+          onChange={(v) => viewState.setReaderAid('size', v)}
+        />
+        {/* Words before the next (provisional label): the reader's own choice,
           else the site's reader.words, else 100. Since 2026-11-11 nothing
           follows the open card, so the words are those before read the
           rest; the label is kept as it was until Harold names the row. */}
-      <Choice
-        label="Words before the next"
-        name="words"
-        options={WORDS}
-        value={wordsChoice(S, viewState.readerAid ? viewState.readerAid('words') : null)}
-        onChange={(v) => viewState.setReaderAid && viewState.setReaderAid('words', v)}
-      />
-      <div className={styles.choiceRow}>
-        <span className={styles.rowLabel}>Paragraphs</span>
-        <span className={styles.choices}>
-          <button
-            className={`${styles.choiceBtn} ${viewState.paragraphIndent() ? styles.aidOn : ''}`}
-            aria-pressed={viewState.paragraphIndent()}
-            onClick={() => viewState.setParagraphIndent(!viewState.paragraphIndent())}
-          >
-            Indent first line
-          </button>
-          <button
-            className={`${styles.choiceBtn} ${viewState.paragraphSpace() ? styles.aidOn : ''}`}
-            aria-pressed={viewState.paragraphSpace()}
-            onClick={() => viewState.setParagraphSpace(!viewState.paragraphSpace())}
-          >
-            Space between
-          </button>
-        </span>
-      </div>
-      <div className={styles.aidList}>
-        <ReadingAid viewState={viewState} aid="followAlong" label="Highlighter: follow along" hint="Tap or drag through the text to mark the sentence and word you are on." />
-        <ReadingAid viewState={viewState} aid="boldStart" label="Bold word beginnings" hint="The first part of each word is bold, to lead the eye. The text itself is unchanged." />
-      </div>
-    </>),
+        <Choice
+          label="Words before the next"
+          name="words"
+          options={WORDS}
+          value={wordsChoice(S, viewState.readerAid ? viewState.readerAid('words') : null)}
+          onChange={(v) => viewState.setReaderAid && viewState.setReaderAid('words', v)}
+        />
+        <div className={styles.choiceRow}>
+          <span className={styles.rowLabel}>Paragraphs</span>
+          <span className={styles.choices}>
+            <button
+              className={`${styles.choiceBtn} ${viewState.paragraphIndent() ? styles.aidOn : ''}`}
+              aria-pressed={viewState.paragraphIndent()}
+              onClick={() => viewState.setParagraphIndent(!viewState.paragraphIndent())}
+            >
+              Indent first line
+            </button>
+            <button
+              className={`${styles.choiceBtn} ${viewState.paragraphSpace() ? styles.aidOn : ''}`}
+              aria-pressed={viewState.paragraphSpace()}
+              onClick={() => viewState.setParagraphSpace(!viewState.paragraphSpace())}
+            >
+              Space between
+            </button>
+          </span>
+        </div>
+        <div className={styles.aidList}>
+          <ReadingAid
+            viewState={viewState}
+            aid="followAlong"
+            label="Highlighter: follow along"
+            hint="Tap or drag through the text to mark the sentence and word you are on."
+          />
+          <ReadingAid
+            viewState={viewState}
+            aid="boldStart"
+            label="Bold word beginnings"
+            hint="The first part of each word is bold, to lead the eye. The text itself is unchanged."
+          />
+        </div>
+      </>
+    ),
 
     paper: () => modeChoice,
 
-    listening: () => (<>
-      <TTSSettings />
-      <div className={styles.hint}>Play and pause are in the reader.</div>
-    </>),
+    listening: () => (
+      <>
+        <TTSSettings />
+        <div className={styles.hint}>Play and pause are in the reader.</div>
+      </>
+    ),
   };
 
   return (
     <>
-      {showOwnButton && (
-        <SettingsButton className={styles.gearBtn} size={18} aria-expanded={open} data-settings-gear />
-      )}
+      {showOwnButton && <SettingsButton className={styles.gearBtn} size={18} aria-expanded={open} data-settings-gear />}
 
       {open && (
         <>
           {/* A transparent click-catcher: closes the panel on a tap outside
               it, without dimming the canvas. */}
           <div className={styles.backdrop} onClick={() => setOpen(false)} />
-          <aside className={styles.drawer} role="dialog" aria-label={panelTitle(S, W)} ref={panelRef} data-settings-panel={W}>
+          <aside
+            className={styles.drawer}
+            role="dialog"
+            aria-label={panelTitle(S, W)}
+            ref={panelRef}
+            data-settings-panel={W}
+          >
             <div className={styles.header}>
               <span className={styles.title}>{panelTitle(S, W)}</span>
-              {W === 'reader' && subject && <span className={styles.subject} data-settings-subject>{subject.title}</span>}
+              {W === 'reader' && subject && (
+                <span className={styles.subject} data-settings-subject>
+                  {subject.title}
+                </span>
+              )}
               <button className={styles.closeBtn} onClick={() => setOpen(false)} aria-label="Close">
                 <Icon body={iconBody('x')} size={18} />
               </button>
             </div>
             {groups.map((g) => (
-              <Section key={g.id} id={g.id} title={g.title}>{body[g.id]()}</Section>
+              <Section key={g.id} id={g.id} title={g.title}>
+                {body[g.id]()}
+              </Section>
             ))}
           </aside>
         </>

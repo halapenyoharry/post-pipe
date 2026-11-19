@@ -7,9 +7,9 @@ const args = process.argv.slice(2);
 const platform = args[0];
 const flags = args.slice(1);
 
-const isDraft   = !flags.includes('--publish');
-const isLogin   = flags.includes('--login');
-const fileArg   = flags.find(f => !f.startsWith('--'));
+const isDraft = !flags.includes('--publish');
+const isLogin = flags.includes('--login');
+const fileArg = flags.find((f) => !f.startsWith('--'));
 
 const PLATFORMS = ['medium', 'substack', 'youtube'];
 
@@ -41,7 +41,7 @@ async function main() {
     const fullPath = path.resolve(fileArg);
     // If it's a directory, pass the path directly (for folder-based articles)
     if (fs.statSync(fullPath).isDirectory()) {
-      content = fullPath; 
+      content = fullPath;
     } else {
       content = fs.readFileSync(fullPath, 'utf8');
     }
@@ -53,7 +53,7 @@ async function main() {
   console.log(isDraft ? `draft: ${result.url}` : `published: ${result.url}`);
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('error:', err.message);
   process.exit(1);
 });

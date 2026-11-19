@@ -39,7 +39,9 @@ const isTagId = (v) => typeof v === 'string' && v.startsWith('tag:');
 
 // A feed edge between two tags on one of the relation layers.
 function isRelationEdge(edge) {
-  return Boolean(edge && LAYER_SET.has(edge.layer) && isTagId(edge.source) && isTagId(edge.target) && edge.source !== edge.target);
+  return Boolean(
+    edge && LAYER_SET.has(edge.layer) && isTagId(edge.source) && isTagId(edge.target) && edge.source !== edge.target,
+  );
 }
 
 const weightOf = (r) => {
@@ -64,7 +66,7 @@ function relativesOf(relations, tagId, { visible, limit = STRONGEST } = {}) {
     const s = typeof r.source === 'object' && r.source ? r.source.id : r.source;
     const t = typeof r.target === 'object' && r.target ? r.target.id : r.target;
     if (s === t) continue;
-    const other = s === tagId ? t : (t === tagId ? s : null);
+    const other = s === tagId ? t : t === tagId ? s : null;
     if (other === null || other === undefined) continue;
     if (typeof visible === 'function' && !visible(other)) continue;
     if (!byRelative.has(other)) byRelative.set(other, { id: other, weight: null, relations: [], broader: null });
@@ -84,7 +86,8 @@ function relativesOf(relations, tagId, { visible, limit = STRONGEST } = {}) {
   });
   for (const e of all) {
     e.relations.sort((x, y) => {
-      const wx = weightOf(x); const wy = weightOf(y);
+      const wx = weightOf(x);
+      const wy = weightOf(y);
       if (wx === wy) return 0;
       if (wx === null) return 1;
       if (wy === null) return -1;
@@ -143,7 +146,7 @@ function drawnRelativesOf(relations, tagId, { visible, present, limit = STRONGES
   const from = bubble(tagId);
   const omit = foldedChoice(folded) === 'omit';
   // The broader end of a directed relation, read as a bubble.
-  const bubbleEnd = (end, relBubble) => (end === null ? null : (end === tagId ? from : relBubble));
+  const bubbleEnd = (end, relBubble) => (end === null ? null : end === tagId ? from : relBubble);
   const byBubble = new Map();
   for (const r of relativesOf(relations, tagId, { limit: Infinity }).relatives) {
     if (!isPresent(r.id)) continue;
@@ -169,7 +172,11 @@ function drawnRelativesOf(relations, tagId, { visible, present, limit = STRONGES
     all.push({
       id: b,
       weight: members[0].weight,
-      relations: members.flatMap((m) => m.relations).map((r) => ({ r, weight: weightOf(r) })).sort(byWeight).map((x) => x.r),
+      relations: members
+        .flatMap((m) => m.relations)
+        .map((r) => ({ r, weight: weightOf(r) }))
+        .sort(byWeight)
+        .map((x) => x.r),
       broader: ends.size === 1 ? [...ends][0] : null,
       members,
     });
@@ -226,6 +233,15 @@ function relativeLabel(relative, { width = 48, nameOf = tagName } = {}) {
 }
 
 module.exports = {
-  RELATION_LAYERS, STRONGEST, FOLDED_PREF, FOLDED_CHOICES, foldedChoice,
-  isRelationEdge, relativesOf, drawnRelativesOf, relationLabel, relativeLabel, wrapText,
+  RELATION_LAYERS,
+  STRONGEST,
+  FOLDED_PREF,
+  FOLDED_CHOICES,
+  foldedChoice,
+  isRelationEdge,
+  relativesOf,
+  drawnRelativesOf,
+  relationLabel,
+  relativeLabel,
+  wrapText,
 };

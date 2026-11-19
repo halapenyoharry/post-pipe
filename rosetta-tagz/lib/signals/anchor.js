@@ -67,7 +67,13 @@ export function anchorSignals(corpus, caps) {
   const out = [];
   for (const [k, S] of mass) {
     const [a, b] = k.split('\u0000');
-    out.push({ a, b, signal: 'anchor', score: caps.anchor * (S / (S + 0.5)), why: `tagged the same ${shared.get(k)} item(s) in different systems (evidence ${S.toFixed(2)})` });
+    out.push({
+      a,
+      b,
+      signal: 'anchor',
+      score: caps.anchor * (S / (S + 0.5)),
+      why: `tagged the same ${shared.get(k)} item(s) in different systems (evidence ${S.toFixed(2)})`,
+    });
   }
   return out;
 }

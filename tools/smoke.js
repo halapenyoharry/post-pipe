@@ -39,11 +39,11 @@ const WIDTHS = [
 function buildTestPage() {
   const env = { ...process.env, POSTPIPE_SAVED_COPIES: '1' };
   delete env.POSTPIPE_SITE;
-  execFileSync(
-    process.execPath,
-    [path.join(ENGINE_ROOT, 'generate-index.js')],
-    { cwd: ENGINE_ROOT, env, stdio: 'inherit' },
-  );
+  execFileSync(process.execPath, [path.join(ENGINE_ROOT, 'generate-index.js')], {
+    cwd: ENGINE_ROOT,
+    env,
+    stdio: 'inherit',
+  });
 }
 
 function listenOnFreePort(siteDir) {
@@ -131,9 +131,8 @@ async function checkWidth(browser, base, widthSpec) {
     const state = await page.evaluate(() => {
       const errEl = document.getElementById('error');
       const errStyle = errEl ? window.getComputedStyle(errEl) : null;
-      const errorShown = errEl && errStyle && errStyle.display !== 'none' && errEl.textContent
-        ? errEl.textContent.trim()
-        : '';
+      const errorShown =
+        errEl && errStyle && errStyle.display !== 'none' && errEl.textContent ? errEl.textContent.trim() : '';
       const svg = document.querySelector('[data-graph-root] svg');
       const svgRect = svg ? svg.getBoundingClientRect() : null;
       const cards = document.querySelectorAll('.node-card').length;
@@ -197,4 +196,13 @@ if (require.main === module) {
   });
 }
 
-module.exports = { WIDTHS, FORBIDDEN_PORTS, SETTLE_MS, buildTestPage, listenOnFreePort, launchBrowser, checkWidth, main };
+module.exports = {
+  WIDTHS,
+  FORBIDDEN_PORTS,
+  SETTLE_MS,
+  buildTestPage,
+  listenOnFreePort,
+  launchBrowser,
+  checkWidth,
+  main,
+};

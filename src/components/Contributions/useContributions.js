@@ -24,13 +24,22 @@ export function useContributions(settings, feedData) {
     const sep = config.src.includes('?') ? '&' : '?';
     fetch(config.src + sep + 'v=' + Date.now())
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (live) setRaw(data); })
-      .catch(() => { if (live) setRaw(null); });
-    return () => { live = false; };
+      .then((data) => {
+        if (live) setRaw(data);
+      })
+      .catch(() => {
+        if (live) setRaw(null);
+      });
+    return () => {
+      live = false;
+    };
   }, [config && config.src]);
 
   const list = useMemo(
-    () => (config && raw ? visibleContributions(raw, { items: (feedData && feedData.items) || [], showTest: config.showTest }) : []),
+    () =>
+      config && raw
+        ? visibleContributions(raw, { items: (feedData && feedData.items) || [], showTest: config.showTest })
+        : [],
     [key, raw, feedData],
   );
   const layers = useMemo(() => (connectionEdges(list).length ? ['readers'] : []), [list]);

@@ -9,11 +9,26 @@
 // (`--report`), which says what became of each candidate phrase of the item's text; without one
 // (discovery off) the only reason given is that no tag-system tagged it.
 
-export const UNTAGGED_REASONS = ['underBar', 'queued', 'underFloor', 'nearCopy', 'tooCommon', 'incoherent', 'functionWord', 'ignored', 'dropped', 'notChosen', 'noRecurring', 'noCandidate', 'noDiscovery'];
+export const UNTAGGED_REASONS = [
+  'underBar',
+  'queued',
+  'underFloor',
+  'nearCopy',
+  'tooCommon',
+  'incoherent',
+  'functionWord',
+  'ignored',
+  'dropped',
+  'notChosen',
+  'noRecurring',
+  'noCandidate',
+  'noDiscovery',
+];
 
 // at most eight named in a sentence; the full lists are in `candidates`
 const list = (xs, f) => xs.slice(0, 8).map(f).join(', ') + (xs.length > 8 ? `, and ${xs.length - 8} more` : '');
-const ratio = (x) => (typeof x.sourceRatio === 'number' ? `${x.phrase ?? x.label} ${x.sourceRatio}` : `${x.phrase ?? x.label}`);
+const ratio = (x) =>
+  typeof x.sourceRatio === 'number' ? `${x.phrase ?? x.label} ${x.sourceRatio}` : `${x.phrase ?? x.label}`;
 // a report written before a group existed (functionWord, ignored, queued since 2026-11-04) lacks the key
 const group = (fate, k) => (Array.isArray(fate[k]) ? fate[k] : []);
 
@@ -32,7 +47,12 @@ export function untaggedReport(universe, report, bar) {
     const tags = it.tags ?? [];
     if (tags.some(shows)) continue;
     const under = tags
-      .map((t) => ({ concept: t.c, label: concepts.get(t.c)?.canonical ?? t.c, origin: t.origin, sourceRatio: t.sourceRatio }))
+      .map((t) => ({
+        concept: t.c,
+        label: concepts.get(t.c)?.canonical ?? t.c,
+        origin: t.origin,
+        sourceRatio: t.sourceRatio,
+      }))
       .sort((a, b) => b.sourceRatio - a.sourceRatio || (a.label < b.label ? -1 : 1));
     const fate = fates.get(it.key) ?? null;
     const reasons = [];
@@ -63,19 +83,27 @@ export function untaggedReport(universe, report, bar) {
       }
       if (group(fate, 'nearCopy').length) {
         reasons.push('nearCopy');
-        why.push(`phrases that recur only in near-copies of one story, counted once: ${list(fate.nearCopy, (x) => `${x.phrase} (${x.items} items, ${x.df} counting near-copies once)`)}`);
+        why.push(
+          `phrases that recur only in near-copies of one story, counted once: ${list(fate.nearCopy, (x) => `${x.phrase} (${x.items} items, ${x.df} counting near-copies once)`)}`,
+        );
       }
       if (group(fate, 'tooCommon').length) {
         reasons.push('tooCommon');
-        why.push(`phrases on too many items (over ${report.maxDfRatio} of ${report.items}): ${list(fate.tooCommon, (x) => `${x.phrase} (${x.df})`)}`);
+        why.push(
+          `phrases on too many items (over ${report.maxDfRatio} of ${report.items}): ${list(fate.tooCommon, (x) => `${x.phrase} (${x.df})`)}`,
+        );
       }
       if (group(fate, 'incoherent').length) {
         reasons.push('incoherent');
-        why.push(`phrases whose items are not alike without them: ${list(fate.incoherent, (x) => `${x.phrase} (${x.coherence}, under ${x.bar})`)}`);
+        why.push(
+          `phrases whose items are not alike without them: ${list(fate.incoherent, (x) => `${x.phrase} (${x.coherence}, under ${x.bar})`)}`,
+        );
       }
       if (group(fate, 'functionWord').length) {
         reasons.push('functionWord');
-        why.push(`function words, never a tag whatever their score: ${list(fate.functionWord, (x) => `${x.phrase} (${x.df})`)}`);
+        why.push(
+          `function words, never a tag whatever their score: ${list(fate.functionWord, (x) => `${x.phrase} (${x.df})`)}`,
+        );
       }
       if (group(fate, 'ignored').length) {
         reasons.push('ignored');
@@ -83,7 +111,9 @@ export function untaggedReport(universe, report, bar) {
       }
       if (group(fate, 'dropped').length) {
         reasons.push('dropped');
-        why.push(`hubs chosen and then left on fewer than ${report.minDf} items: ${list(fate.dropped, (x) => x.phrase)}`);
+        why.push(
+          `hubs chosen and then left on fewer than ${report.minDf} items: ${list(fate.dropped, (x) => x.phrase)}`,
+        );
       }
       if (group(fate, 'notChosen').length) {
         reasons.push('notChosen');
@@ -104,17 +134,46 @@ export function untaggedReport(universe, report, bar) {
       reasons.push('noCandidate');
       why.push('discovery reported no candidate for it');
     }
-    const entry = { key: it.key, source: it.source, id: it.id ?? keyId(it.key), title: it.title ?? '', reason: reasons[0], reasons, why, under };
+    const entry = {
+      key: it.key,
+      source: it.source,
+      id: it.id ?? keyId(it.key),
+      title: it.title ?? '',
+      reason: reasons[0],
+      reasons,
+      why,
+      under,
+    };
     if (fate) {
       entry.candidates = {
         phrases: fate.candidates,
         single: fate.single,
-        ...Object.fromEntries(['queued', 'underBar', 'underFloor', 'nearCopy', 'tooCommon', 'incoherent', 'functionWord', 'ignored', 'dropped', 'notChosen'].filter((k) => group(fate, k).length).map((k) => [k, fate[k]])),
+        ...Object.fromEntries(
+          [
+            'queued',
+            'underBar',
+            'underFloor',
+            'nearCopy',
+            'tooCommon',
+            'incoherent',
+            'functionWord',
+            'ignored',
+            'dropped',
+            'notChosen',
+          ]
+            .filter((k) => group(fate, k).length)
+            .map((k) => [k, fate[k]]),
+        ),
       };
     }
     items.push(entry);
   }
-  return { bar: typeof bar === 'number' ? bar : null, count: items.length, none: items.filter((x) => !x.under.length).length, items };
+  return {
+    bar: typeof bar === 'number' ? bar : null,
+    count: items.length,
+    none: items.filter((x) => !x.under.length).length,
+    items,
+  };
 }
 
 const keyId = (key) => {

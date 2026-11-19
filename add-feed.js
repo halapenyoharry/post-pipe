@@ -18,7 +18,7 @@
 //   - Remove duplicate entries (no-op if URL already present)
 //   - Detect type beyond what the OPML parser already does
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { siteRoot } = require('./src/lib/siteRoot');
@@ -26,10 +26,10 @@ const { siteRoot } = require('./src/lib/siteRoot');
 function parseArgs(argv) {
   const out = { url: '', title: '', color: '', type: '' };
   for (const arg of argv.slice(2)) {
-    if (arg.startsWith('--title='))  out.title = arg.slice(8);
+    if (arg.startsWith('--title=')) out.title = arg.slice(8);
     else if (arg.startsWith('--color=')) out.color = arg.slice(8);
-    else if (arg.startsWith('--type='))  out.type = arg.slice(7).trim().toLowerCase();
-    else if (!arg.startsWith('--'))   out.url = arg;
+    else if (arg.startsWith('--type=')) out.type = arg.slice(7).trim().toLowerCase();
+    else if (!arg.startsWith('--')) out.url = arg;
   }
   return out;
 }
@@ -50,11 +50,17 @@ function main() {
   const { url, title, color, type } = parseArgs(process.argv);
 
   if (!url) {
-    console.error('Usage: node add-feed.js <feedUrl> [--title=<title>] [--color=<#rrggbb>] [--type=page|rss|atom|json]');
+    console.error(
+      'Usage: node add-feed.js <feedUrl> [--title=<title>] [--color=<#rrggbb>] [--type=page|rss|atom|json]',
+    );
     process.exit(1);
   }
-  try { new URL(url); }
-  catch { console.error(`Invalid URL: ${url}`); process.exit(1); }
+  try {
+    new URL(url);
+  } catch {
+    console.error(`Invalid URL: ${url}`);
+    process.exit(1);
+  }
 
   const site = siteRoot();
   const opmlPath = resolveOpmlPath(site);
@@ -97,8 +103,11 @@ function runBuild(site) {
 }
 
 function urlToLabel(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); }
-  catch { return url; }
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 function escape(s) {

@@ -31,20 +31,47 @@ test('read: the edges with their parts in order, the tips, the size', () => {
   assert.equal(r.w, 100);
   assert.equal(r.h, 200);
   assert.equal(r.edges.length, 6);
-  assert.deepStrictEqual(r.edges[0].parts.map((p) => p.pts), [[[50, 0], [50, 30]], [[50, 30], [50, 60]]]);
+  assert.deepStrictEqual(
+    r.edges[0].parts.map((p) => p.pts),
+    [
+      [
+        [50, 0],
+        [50, 30],
+      ],
+      [
+        [50, 30],
+        [50, 60],
+      ],
+    ],
+  );
   assert.equal(r.edges[0].parts[0].width, 6);
   assert.equal(r.edges[2].tip, 't1');
   assert.equal(r.edges[5].free, true);
   assert.deepStrictEqual(r.tips.get('t2'), { x: 80, y: 90, node: 3 });
   assert.equal(parseRoots('<html></html>'), null);
-  assert.equal(pathD([[1, 2], [3.14159, 4]]), 'M1,2L3.1,4');
+  assert.equal(
+    pathD([
+      [1, 2],
+      [3.14159, 4],
+    ]),
+    'M1,2L3.1,4',
+  );
 });
 
 test('the tree: a chain of edges from the crown to each tip', () => {
   const m = rootsModel(parseRoots(SVG));
-  assert.deepStrictEqual(m.chains.get('t1').map((e) => e.e), [0, 1, 2]);
-  assert.deepStrictEqual(m.chains.get('t3').map((e) => e.e), [0, 1, 4]);
-  assert.deepStrictEqual(m.chains.get('t2').map((e) => e.e), [0, 3]);
+  assert.deepStrictEqual(
+    m.chains.get('t1').map((e) => e.e),
+    [0, 1, 2],
+  );
+  assert.deepStrictEqual(
+    m.chains.get('t3').map((e) => e.e),
+    [0, 1, 4],
+  );
+  assert.deepStrictEqual(
+    m.chains.get('t2').map((e) => e.e),
+    [0, 3],
+  );
   assert.ok(!m.order.some((e) => e.free), 'a free edge is not in the tree');
 });
 
@@ -67,7 +94,11 @@ test("moved: an act's root bends over its last third, its tip by the whole move;
   // t1's root: 60 + 21.21 + 21.21 long; its last third starts at 68.3.
   const tip = bent.get(2)[0][1];
   assert.ok(Math.abs(tip[0] - 30) < 1e-9 && Math.abs(tip[1] - 86) < 1e-9, `the tip by the whole move (${tip})`);
-  assert.deepStrictEqual(bent.get(0), m.edges[0].parts.map((p) => p.pts), 'the trunk stays');
+  assert.deepStrictEqual(
+    bent.get(0),
+    m.edges[0].parts.map((p) => p.pts),
+    'the trunk stays',
+  );
   assert.deepStrictEqual(bent.get(1)[0][0], [50, 60], 'the fork at two thirds and above stays');
   const L = 60 + 2 * Math.hypot(15, 15);
   const w5 = easeRoot((60 + Math.hypot(15, 15)) / L);
@@ -75,12 +106,27 @@ test("moved: an act's root bends over its last third, its tip by the whole move;
   const n5 = bent.get(1)[0][1];
   assert.ok(Math.abs(n5[0] - (35 + 10 * w5)) < 1e-9, 'node 5 by its share');
   const side = bent.get(4)[0];
-  assert.ok(Math.abs(side[0][0] - (35 + 10 * w5)) < 1e-9 && Math.abs(side[1][0] - (35 + 10 * w5)) < 1e-9, 'the side root moves with node 5, whole');
-  assert.deepStrictEqual(bent.get(3), m.edges[3].parts.map((p) => p.pts), 'the other root stays');
-  assert.deepStrictEqual(bent.get(5), m.edges[5].parts.map((p) => p.pts), 'a free piece stays');
+  assert.ok(
+    Math.abs(side[0][0] - (35 + 10 * w5)) < 1e-9 && Math.abs(side[1][0] - (35 + 10 * w5)) < 1e-9,
+    'the side root moves with node 5, whole',
+  );
+  assert.deepStrictEqual(
+    bent.get(3),
+    m.edges[3].parts.map((p) => p.pts),
+    'the other root stays',
+  );
+  assert.deepStrictEqual(
+    bent.get(5),
+    m.edges[5].parts.map((p) => p.pts),
+    'a free piece stays',
+  );
   // Back where it was: nothing moves.
   const back = bentRoots(m, roots, new Map([['a', { dx: 0, dy: 0 }]]));
-  for (const e of m.edges) assert.deepStrictEqual(back.get(e.e), e.parts.map((p) => p.pts));
+  for (const e of m.edges)
+    assert.deepStrictEqual(
+      back.get(e.e),
+      e.parts.map((p) => p.pts),
+    );
 });
 
 test('the ease: nothing up to two thirds, all at the tip, smooth between', () => {
@@ -114,7 +160,8 @@ test('settings: rootsVector with a graph state image, and the acts with their an
 const { createFollow } = require('../src/lib/rootsVector');
 const run = (follow, targetAt, ms, dt = 16) => {
   const out = [];
-  for (let t = 0; t <= ms; t += dt) out.push({ t, at: follow.step(new Map([['a', targetAt(t)]]), t).get('a'), want: targetAt(t) });
+  for (let t = 0; t <= ms; t += dt)
+    out.push({ t, at: follow.step(new Map([['a', targetAt(t)]]), t).get('a'), want: targetAt(t) });
   return out;
 };
 
@@ -130,7 +177,8 @@ test('follow: a new act starts where it is; a jump is followed behind, never ove
   const f = createFollow(120);
   assert.deepStrictEqual(f.step(new Map([['a', { dx: 0, dy: 0 }]]), 0).get('a'), { dx: 0, dy: 0 });
   let prev = 0;
-  let at120 = null, at288 = null;
+  let at120 = null,
+    at288 = null;
   for (let t = 16; t <= 900; t += 16) {
     const x = f.step(new Map([['a', { dx: 100, dy: 0 }]]), t).get('a').dx;
     assert.ok(x >= prev - 1e-9 && x <= 100 + 1e-9, `at ${t}: ${x}`);
@@ -163,7 +211,13 @@ test('follow: an act dragged steadily is followed behind all the way, and caught
 
 test('follow: an act no longer asked for goes back to rest and is forgotten; settled says when all are there', () => {
   const f = createFollow(100);
-  f.step(new Map([['a', { dx: 40, dy: 20 }], ['b', { dx: 0, dy: 0 }]]), 0);
+  f.step(
+    new Map([
+      ['a', { dx: 40, dy: 20 }],
+      ['b', { dx: 0, dy: 0 }],
+    ]),
+    0,
+  );
   let out;
   for (let t = 16; t < 2000; t += 16) {
     out = f.step(new Map([['b', { dx: 0, dy: 0 }]]), t);

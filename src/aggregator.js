@@ -3,10 +3,17 @@
 const path = require('path');
 
 const { detectExplicitFeedColor, hashFeedColor } = require('./adapters/detectFeedColor');
-const { fetchText }       = require('./adapters/fetchText');
-const { readLastGood, writeLastGood, readSavedCopy, writeSavedCopy, copiesNewestFirst, DEFAULT_DIR: LAST_GOOD_DIR } = require('./adapters/lastGoodCopy');
-const { ColorCache }      = require('./lib/colorCache');
-const { runRtagzPhase }   = require('./lib/rtagz');
+const { fetchText } = require('./adapters/fetchText');
+const {
+  readLastGood,
+  writeLastGood,
+  readSavedCopy,
+  writeSavedCopy,
+  copiesNewestFirst,
+  DEFAULT_DIR: LAST_GOOD_DIR,
+} = require('./adapters/lastGoodCopy');
+const { ColorCache } = require('./lib/colorCache');
+const { runRtagzPhase } = require('./lib/rtagz');
 const { parseCardScale, parseItemCap, parseDefaultHidden } = require('./lib/opml');
 
 // The feed colours resolved so far, in post-pipe's own .feed-cache wherever
@@ -16,24 +23,33 @@ const DEFAULT_COLOR_CACHE = path.join(path.resolve(__dirname, '..'), '.feed-cach
 
 function resolveFeedDisplay(config = {}, feedMeta = {}, feedsMap = null) {
   const map = feedsMap && typeof feedsMap === 'object' ? feedsMap : (config.settings && config.settings.feeds) || {};
-  const keys = [
-    feedMeta.id,
-    config.id,
-    config.xmlUrl,
-    feedMeta.title,
-    config.title,
-  ].filter((k) => typeof k === 'string' && k);
+  const keys = [feedMeta.id, config.id, config.xmlUrl, feedMeta.title, config.title].filter(
+    (k) => typeof k === 'string' && k,
+  );
   let override = null;
   for (const k of keys) {
-    if (map[k] && typeof map[k] === 'object') { override = map[k]; break; }
+    if (map[k] && typeof map[k] === 'object') {
+      override = map[k];
+      break;
+    }
   }
   const rawScale = override && override.cardScale !== undefined ? override.cardScale : config.cardScale;
-  const rawCap = override && (override.itemCap !== undefined || override.maxItems !== undefined)
-    ? (override.itemCap !== undefined ? override.itemCap : override.maxItems)
-    : (config.itemCap !== undefined ? config.itemCap : config.maxItems);
-  const rawHidden = override && (override.defaultHidden !== undefined || override.hidden !== undefined)
-    ? (override.defaultHidden !== undefined ? override.defaultHidden : override.hidden)
-    : (config.defaultHidden !== undefined ? config.defaultHidden : config.hidden);
+  const rawCap =
+    override && (override.itemCap !== undefined || override.maxItems !== undefined)
+      ? override.itemCap !== undefined
+        ? override.itemCap
+        : override.maxItems
+      : config.itemCap !== undefined
+        ? config.itemCap
+        : config.maxItems;
+  const rawHidden =
+    override && (override.defaultHidden !== undefined || override.hidden !== undefined)
+      ? override.defaultHidden !== undefined
+        ? override.defaultHidden
+        : override.hidden
+      : config.defaultHidden !== undefined
+        ? config.defaultHidden
+        : config.hidden;
 
   return {
     cardScale: parseCardScale(rawScale),
@@ -79,10 +95,17 @@ async function loadEntry({ adapter, config }, options) {
   if (options.savedCopiesOnly && url) {
     const siteCopy = readSavedCopy(savedCopy);
     if (!siteCopy) {
-      const error = savedCopy ? `its saved copy ${savedCopy} is missing or is not a copy` : 'no savedCopy named on its outline';
+      const error = savedCopy
+        ? `its saved copy ${savedCopy} is missing or is not a copy`
+        : 'no savedCopy named on its outline';
       console.warn(`[aggregator] ${adapter.id}:${config.id}: ${error}, so it has no items this build`);
       return {
-        adapter, config, ok: false, error, items: [], feedMeta: { id: config.id, title: config.title },
+        adapter,
+        config,
+        ok: false,
+        error,
+        items: [],
+        feedMeta: { id: config.id, title: config.title },
         fetchedAt: null,
       };
     }
@@ -91,9 +114,16 @@ async function loadEntry({ adapter, config }, options) {
       return { adapter, config, ok: true, ...result, fetchedAt: siteCopy.fetchedAt || null };
     } catch (copyErr) {
       const error = describeError(copyErr);
-      console.warn(`[aggregator] ${adapter.id}:${config.id}: ${COPY_NAMES.site} could not be read (${error}), so it has no items this build`);
+      console.warn(
+        `[aggregator] ${adapter.id}:${config.id}: ${COPY_NAMES.site} could not be read (${error}), so it has no items this build`,
+      );
       return {
-        adapter, config, ok: false, error, items: [], feedMeta: { id: config.id, title: config.title },
+        adapter,
+        config,
+        ok: false,
+        error,
+        items: [],
+        feedMeta: { id: config.id, title: config.title },
         fetchedAt: null,
       };
     }
@@ -119,7 +149,9 @@ async function loadEntry({ adapter, config }, options) {
   } catch (err) {
     const error = describeError(err);
     if (options.saveCopies && savedCopy) {
-      console.warn(`[aggregator] ${adapter.id}:${config.id}: saved copy ${savedCopy} left as it was (the fetch failed)`);
+      console.warn(
+        `[aggregator] ${adapter.id}:${config.id}: saved copy ${savedCopy} left as it was (the fetch failed)`,
+      );
     }
     const siteCopy = url ? readSavedCopy(savedCopy) : null;
     if (url && savedCopy && !siteCopy) {
@@ -131,26 +163,49 @@ async function loadEntry({ adapter, config }, options) {
         const result = await adapter.load(config, { fetchText: async () => copy.body });
         const n = Array.isArray(result.items) ? result.items.length : 0;
         const where = copy.from === 'site' ? ` (${savedCopy})` : '';
-        console.warn(`[aggregator] ${adapter.id}:${config.id} failed: ${error}; its ${n} item(s) come from ${COPY_NAMES[copy.from]}${where}, fetched ${copy.fetchedAt || 'at an unknown time'}`);
+        console.warn(
+          `[aggregator] ${adapter.id}:${config.id} failed: ${error}; its ${n} item(s) come from ${COPY_NAMES[copy.from]}${where}, fetched ${copy.fetchedAt || 'at an unknown time'}`,
+        );
         if (copy.from === 'site' && copy.url && copy.url !== url) {
-          console.warn(`[aggregator] ${adapter.id}:${config.id}: that saved copy was fetched from ${copy.url}, not this outline's address; used because the outline names it`);
+          console.warn(
+            `[aggregator] ${adapter.id}:${config.id}: that saved copy was fetched from ${copy.url}, not this outline's address; used because the outline names it`,
+          );
         }
         // ok: its items are in the corpus (rosetta-tagz reads them as any
         // other feed's); stale says they are the copy's, not this build's.
         return {
-          adapter, config, ok: true, ...result,
-          stale: true, copyDate: copy.fetchedAt, copyFrom: copy.from, fetchedAt: copy.fetchedAt, error,
+          adapter,
+          config,
+          ok: true,
+          ...result,
+          stale: true,
+          copyDate: copy.fetchedAt,
+          copyFrom: copy.from,
+          fetchedAt: copy.fetchedAt,
+          error,
         };
       } catch (copyErr) {
-        console.warn(`[aggregator] ${adapter.id}:${config.id}: ${COPY_NAMES[copy.from]} could not be read either (${describeError(copyErr)})`);
+        console.warn(
+          `[aggregator] ${adapter.id}:${config.id}: ${COPY_NAMES[copy.from]} could not be read either (${describeError(copyErr)})`,
+        );
       }
     }
-    const none = copies.length === 0
-      ? 'no last good copy on this machine and no saved copy in the site'
-      : (copies.length === 1 ? 'its one copy could not be read' : 'neither copy could be read');
-    console.warn(`[aggregator] ${adapter.id}:${config.id} failed: ${error}${url ? `; ${none}, so it has no items this build` : ''}`);
+    const none =
+      copies.length === 0
+        ? 'no last good copy on this machine and no saved copy in the site'
+        : copies.length === 1
+          ? 'its one copy could not be read'
+          : 'neither copy could be read';
+    console.warn(
+      `[aggregator] ${adapter.id}:${config.id} failed: ${error}${url ? `; ${none}, so it has no items this build` : ''}`,
+    );
     return {
-      adapter, config, ok: false, error, items: [], feedMeta: { id: config.id, title: config.title },
+      adapter,
+      config,
+      ok: false,
+      error,
+      items: [],
+      feedMeta: { id: config.id, title: config.title },
       ...(url ? { fetchedAt: null } : { readAt: null }),
     };
   }
@@ -191,13 +246,21 @@ async function loadCorpus(entries, options = {}) {
   // others — hashing feeds in isolation once produced three greens 7 degrees
   // apart — so those are handed out one at a time, each avoiding the hues
   // already spoken for.
-  await Promise.all(results.map(async (r) => {
-    const feedId = r.feedMeta.id || r.config.id;
-    const cached = cache.get(feedId);
-    if (cached) { r.color = cached; return; }
-    if (options.savedCopiesOnly) { r.color = r.config.customColor || null; return; }
-    r.color = await detectExplicitFeedColor(r.feedMeta, r.config.customColor);
-  }));
+  await Promise.all(
+    results.map(async (r) => {
+      const feedId = r.feedMeta.id || r.config.id;
+      const cached = cache.get(feedId);
+      if (cached) {
+        r.color = cached;
+        return;
+      }
+      if (options.savedCopiesOnly) {
+        r.color = r.config.customColor || null;
+        return;
+      }
+      r.color = await detectExplicitFeedColor(r.feedMeta, r.config.customColor);
+    }),
+  );
 
   const taken = results.map((r) => r.color).filter(Boolean);
   for (const r of results) {
@@ -239,35 +302,37 @@ async function loadCorpus(entries, options = {}) {
   // also says so: error (what went wrong) and, when its cards come from a
   // copy, stale, copyDate (when that copy was fetched) and copyFrom ('site'
   // for the site's saved copy, 'engine' for this machine's last good copy).
-  const sources = results.map(({ adapter, config, feedMeta, color, items, ok, stale, copyDate, copyFrom, fetchedAt, readAt, error, display }) => {
-    const source = {
-      id: feedMeta.id || config.id,
-      title: feedMeta.title || config.title,
-      type: adapter.id,
-      color,
-      home_page_url: feedMeta.home_page_url || config.htmlUrl || null,
-      folder: config.folder || '',
-      prominence: config.prominence || 'secondary',
-      itemCount: items.length,
-      ok,
-    };
-    if (typeof config.xmlUrl === 'string' && config.xmlUrl) {
-      source.fetchedAt = fetchedAt || null;
-      source.feedUpdated = (feedMeta && feedMeta.feedUpdated) || null;
-    } else {
-      source.readAt = readAt || null;
-    }
-    if (display && display.cardScale !== null) source.cardScale = display.cardScale;
-    if (display && display.itemCap !== null) source.itemCap = display.itemCap;
-    if (display && display.defaultHidden) source.defaultHidden = true;
-    if (stale) {
-      source.stale = true;
-      source.copyDate = copyDate || null;
-      source.copyFrom = copyFrom || null;
-    }
-    if (error) source.error = error;
-    return source;
-  });
+  const sources = results.map(
+    ({ adapter, config, feedMeta, color, items, ok, stale, copyDate, copyFrom, fetchedAt, readAt, error, display }) => {
+      const source = {
+        id: feedMeta.id || config.id,
+        title: feedMeta.title || config.title,
+        type: adapter.id,
+        color,
+        home_page_url: feedMeta.home_page_url || config.htmlUrl || null,
+        folder: config.folder || '',
+        prominence: config.prominence || 'secondary',
+        itemCount: items.length,
+        ok,
+      };
+      if (typeof config.xmlUrl === 'string' && config.xmlUrl) {
+        source.fetchedAt = fetchedAt || null;
+        source.feedUpdated = (feedMeta && feedMeta.feedUpdated) || null;
+      } else {
+        source.readAt = readAt || null;
+      }
+      if (display && display.cardScale !== null) source.cardScale = display.cardScale;
+      if (display && display.itemCap !== null) source.itemCap = display.itemCap;
+      if (display && display.defaultHidden) source.defaultHidden = true;
+      if (stale) {
+        source.stale = true;
+        source.copyDate = copyDate || null;
+        source.copyFrom = copyFrom || null;
+      }
+      if (error) source.error = error;
+      return source;
+    },
+  );
 
   const stamped = results.flatMap(({ adapter, config, items, feedMeta, color, display }) => {
     const source = {
@@ -279,7 +344,7 @@ async function loadCorpus(entries, options = {}) {
     };
     if (display && display.cardScale !== null) source.cardScale = display.cardScale;
     if (display && display.defaultHidden) source.defaultHidden = true;
-    return items.map(item => ({ ...item, _source: source }));
+    return items.map((item) => ({ ...item, _source: source }));
   });
 
   stamped.sort((a, b) => {

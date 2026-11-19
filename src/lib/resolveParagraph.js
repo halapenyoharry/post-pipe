@@ -18,7 +18,7 @@ function resolveParagraph(paragraphTexts, { para, quote } = {}) {
   if (!Array.isArray(paragraphTexts) || paragraphTexts.length === 0) {
     return 0;
   }
-  const p = typeof para === 'number' ? para : (parseInt(para, 10) || 0);
+  const p = typeof para === 'number' ? para : parseInt(para, 10) || 0;
   const normQuote = normalize(quote);
 
   if (normQuote.length > 0) {

@@ -26,7 +26,16 @@ const DEFAULTS = {
   top: null,
   backdrop: { opacity: 1, opacityZoomedIn: 0.3, zoomForFloor: 2.5, keepAbove: 0 },
   reach: { enabled: false, tips: [], perContainer: 3, stopShort: 18, lagMs: 600, drawMs: 1800 },
-  byline: { text: '', href: '', opacity: { art: 0.35, graph: 0.56 }, size: 0.25, gap: 0.3, minSize: 0, case: 'lower', graphScale: null },
+  byline: {
+    text: '',
+    href: '',
+    opacity: { art: 0.35, graph: 0.56 },
+    size: 0.25,
+    gap: 0.3,
+    minSize: 0,
+    case: 'lower',
+    graphScale: null,
+  },
   startOn: 'remembered',
   snapMs: 420,
   title: null,
@@ -59,7 +68,12 @@ function titleLayoutConfig(layout) {
       .map((sp) => ({ text: sp.text, size: Math.max(0, num(sp.size, 0.05)), rise: num(sp.rise, 0) }));
     if (!spans.length) continue;
     const width = num(line.width, NaN);
-    out.push({ x: num(line.x, 0), y: num(line.y, 0), spans, width: Number.isFinite(width) && width > 0 ? width : null });
+    out.push({
+      x: num(line.x, 0),
+      y: num(line.y, 0),
+      spans,
+      width: Number.isFinite(width) && width > 0 ? width : null,
+    });
   }
   return { lines: out };
 }
@@ -133,11 +147,12 @@ function bylineConfig(b) {
   const o = b && typeof b === 'object' ? b : {};
   const d = DEFAULTS.byline;
   const op = o.opacity;
-  const opacity = op && typeof op === 'object'
-    ? { art: clamp01(num(op.art, d.opacity.art)), graph: clamp01(num(op.graph, d.opacity.graph)) }
-    : Number.isFinite(Number(op)) && op !== '' && op !== null
-      ? { art: clamp01(Number(op)), graph: clamp01(Number(op)) }
-      : { ...d.opacity };
+  const opacity =
+    op && typeof op === 'object'
+      ? { art: clamp01(num(op.art, d.opacity.art)), graph: clamp01(num(op.graph, d.opacity.graph)) }
+      : Number.isFinite(Number(op)) && op !== '' && op !== null
+        ? { art: clamp01(Number(op)), graph: clamp01(Number(op)) }
+        : { ...d.opacity };
   return {
     text: str(o.text),
     href: str(o.href),
@@ -146,8 +161,10 @@ function bylineConfig(b) {
     gap: Math.max(0, Math.min(2, num(o.gap, d.gap))),
     minSize: Math.max(0, num(o.minSize, d.minSize)),
     case: o.case === 'as-written' ? 'as-written' : 'lower',
-    graphScale: Number.isFinite(Number(o.graphScale)) && o.graphScale !== null && o.graphScale !== '' && Number(o.graphScale) > 0
-      ? Math.min(1, Number(o.graphScale)) : null,
+    graphScale:
+      Number.isFinite(Number(o.graphScale)) && o.graphScale !== null && o.graphScale !== '' && Number(o.graphScale) > 0
+        ? Math.min(1, Number(o.graphScale))
+        : null,
   };
 }
 
@@ -173,27 +190,29 @@ function bylineUnder(layout, box, byline, perPx, scale = null) {
   return {
     x: box.left + last.x * box.width,
     y: box.top + last.y * box.height + byline.gap * (fitted ? lastSize : titleSize),
-    size: scale ? Math.max(byline.minSize, scale * titleSize) : (fitted || Math.max(byline.minSize, byline.size * titleSize)),
+    size: scale
+      ? Math.max(byline.minSize, scale * titleSize)
+      : fitted || Math.max(byline.minSize, byline.size * titleSize),
     titleSize,
   };
 }
 
 // Tuning that is not a setting, in one place.
 const TUNING = {
-  pad: 16,               // px around the art in the art state
-  bylineSpace: 52,       // px kept under the art for the byline
-  bylineSize: 20,        // byline font size, px
-  rise: 0.18,            // the graph layer rises in from this share of the viewport height below
-  graphFrom: 0.2,        // the graph layer starts to show past this p
-  wheelIdleMs: 140,      // no wheel for this long and the page snaps
-  lineHeightPx: 40,      // a wheel's line (deltaMode 1) in px
-  onward: 0.22,          // past this share of the way, a let-go goes on to the other rest
-  flickPxPerMs: 0.35,    // a touch faster than this goes on, however short
-  minSnapMs: 140,        // the shortest snap
-  quietMs: 380,          // after a page move, the graph ignores wheels this long (trackpad momentum)
-  edgePx: 28,            // in the graph state, a wheel up within this of the top edge moves the page
-  reducedFadeMs: 200,    // reduced motion: the states swap in one crossfade this long
-  reducedWheelPx: 40,    // reduced motion: this much wheel or touch moves to the other state
+  pad: 16, // px around the art in the art state
+  bylineSpace: 52, // px kept under the art for the byline
+  bylineSize: 20, // byline font size, px
+  rise: 0.18, // the graph layer rises in from this share of the viewport height below
+  graphFrom: 0.2, // the graph layer starts to show past this p
+  wheelIdleMs: 140, // no wheel for this long and the page snaps
+  lineHeightPx: 40, // a wheel's line (deltaMode 1) in px
+  onward: 0.22, // past this share of the way, a let-go goes on to the other rest
+  flickPxPerMs: 0.35, // a touch faster than this goes on, however short
+  minSnapMs: 140, // the shortest snap
+  quietMs: 380, // after a page move, the graph ignores wheels this long (trackpad momentum)
+  edgePx: 28, // in the graph state, a wheel up within this of the top edge moves the page
+  reducedFadeMs: 200, // reduced motion: the states swap in one crossfade this long
+  reducedWheelPx: 40, // reduced motion: this much wheel or touch moves to the other state
 };
 
 const { reachConfig, backdropConfig, backdropOpacity } = require('./reach');
@@ -204,7 +223,10 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // A colour as a stylesheet takes it (#hex, rgb(), a name, var()), or ''.
 const colour = (v) => (typeof v === 'string' && v.trim() && !/[;{}<>]/.test(v) ? v.trim() : '');
 const lerp = (a, b, t) => (t === 1 ? b : a + (b - a) * t);
-const smooth = (x) => { const t = clamp01(x); return t * t * (3 - 2 * t); };
+const smooth = (x) => {
+  const t = clamp01(x);
+  return t * t * (3 - 2 * t);
+};
 
 // The art state's ground (opening.ground). 'dark' (the theme's dark paper,
 // and the page kept in dark mode) or 'paper' (the theme's paper), or an
@@ -239,8 +261,10 @@ function groundConfig(g) {
 // graph.artOffset, as before. Unset: null.
 function topConfig(t) {
   if (!t || typeof t !== 'object') return null;
-  const px = (v) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Math.max(0, Number(v)));
-  const art = px(t.art), graph = px(t.graph);
+  const px = (v) =>
+    v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Math.max(0, Number(v));
+  const art = px(t.art),
+    graph = px(t.graph);
   return art === null && graph === null ? null : { art, graph };
 }
 
@@ -255,7 +279,8 @@ function gripConfig(g) {
 
 // How tall the grip is: down to the bottom of the top bar's row (0 without
 // one) and extra below it, and never less than the slim strip it was.
-const gripHeight = (rowBottom, grip) => Math.max(12, Math.ceil((Number(rowBottom) || 0) + ((grip && grip.extra) ?? 16)));
+const gripHeight = (rowBottom, grip) =>
+  Math.max(12, Math.ceil((Number(rowBottom) || 0) + ((grip && grip.extra) ?? 16)));
 
 // The first row, as a share of the image's height, where the image has ink:
 // any pixel at least `threshold` opaque (0..255). Rows of RGBA bytes, w x h.
@@ -284,11 +309,16 @@ function lastInkRow(data, w, h, threshold = 64) {
 // { l, r }, its leftmost and rightmost inked columns as shares of its width
 // (r counted to the column's right edge); null without ink there.
 function inkSpan(data, w, h, from = 0, to = 1, threshold = 64) {
-  const y0 = Math.max(0, Math.floor(from * h)), y1 = Math.min(h, Math.ceil(to * h));
-  let l = w, r = -1;
+  const y0 = Math.max(0, Math.floor(from * h)),
+    y1 = Math.min(h, Math.ceil(to * h));
+  let l = w,
+    r = -1;
   for (let y = y0; y < y1; y += 1) {
     for (let x = 0, i = y * w * 4 + 3; x < w; x += 1, i += 4) {
-      if (data[i] >= threshold) { if (x < l) l = x; if (x > r) r = x; }
+      if (data[i] >= threshold) {
+        if (x < l) l = x;
+        if (x > r) r = x;
+      }
     }
   }
   return r < 0 ? null : { l: l / w, r: (r + 1) / w };
@@ -297,12 +327,17 @@ function inkSpan(data, w, h, from = 0, to = 1, threshold = 64) {
 // The widest single row of ink across rows from..to: { l, r, y }, shares of
 // the image's width and height; null without ink there.
 function widestInkRow(data, w, h, from = 0, to = 1, threshold = 64) {
-  const y0 = Math.max(0, Math.floor(from * h)), y1 = Math.min(h, Math.ceil(to * h));
+  const y0 = Math.max(0, Math.floor(from * h)),
+    y1 = Math.min(h, Math.ceil(to * h));
   let best = null;
   for (let y = y0; y < y1; y += 1) {
-    let l = -1, r = -1;
+    let l = -1,
+      r = -1;
     for (let x = 0, i = y * w * 4 + 3; x < w; x += 1, i += 4) {
-      if (data[i] >= threshold) { if (l < 0) l = x; r = x; }
+      if (data[i] >= threshold) {
+        if (l < 0) l = x;
+        r = x;
+      }
     }
     if (l >= 0 && (!best || r - l > best.r - best.l)) best = { l, r, y };
   }
@@ -317,7 +352,8 @@ function openingConfig(settings) {
   if (!o || o.enabled !== true) return null;
   if (o.mode !== undefined && o.mode !== 'two-state') return null;
   const art = o.art && typeof o.art === 'object' ? o.art : {};
-  let artState = str(art.artState), graphState = str(art.graphState);
+  let artState = str(art.artState),
+    graphState = str(art.graphState);
   const full = str(art.full);
   if (!(artState && graphState)) {
     if (!full) return null;
@@ -333,7 +369,10 @@ function openingConfig(settings) {
     // drawn in place of the image's roots, below backdrop.keepAbove; each
     // act's roots bend toward it when it is moved.
     art: {
-      artState, graphState, full, rootsVector: graphState ? str(art.rootsVector) : '',
+      artState,
+      graphState,
+      full,
+      rootsVector: graphState ? str(art.rootsVector) : '',
       // How far behind its act each act's roots follow it, in ms (the
       // roots' spring's time constant, createFollow); 0: at once.
       rootsFollowMs: Math.max(0, Math.min(2000, num(art.rootsFollowMs, 0))),
@@ -397,8 +436,10 @@ function actsOf(containers) {
   const out = [];
   for (const [key, c] of Object.entries(containers)) {
     if (!c || typeof c !== 'object' || key.startsWith('_')) continue;
-    const anchor = c.anchor && Number.isFinite(Number(c.anchor.x)) && Number.isFinite(Number(c.anchor.y))
-      ? { x: Number(c.anchor.x), y: Number(c.anchor.y) } : null;
+    const anchor =
+      c.anchor && Number.isFinite(Number(c.anchor.x)) && Number.isFinite(Number(c.anchor.y))
+        ? { x: Number(c.anchor.x), y: Number(c.anchor.y) }
+        : null;
     const rootTips = Array.isArray(c.rootTips) ? c.rootTips.filter((t) => typeof t === 'string' && t) : null;
     if (!anchor && !rootTips) continue;
     out.push({ id: key.startsWith('container:') ? key : `container:${key}`, anchor, rootTips });
@@ -413,7 +454,8 @@ function bandConfig(b) {
 
 function pivotOf(p) {
   if (!p || typeof p !== 'object') return null;
-  const x = num(p.x, NaN), y = num(p.y, NaN);
+  const x = num(p.x, NaN),
+    y = num(p.y, NaN);
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
@@ -486,10 +528,15 @@ function startState(config, { stored, hash } = {}) {
 //               of its top (align 'center', under the art, without a title),
 //               or its top left corner (align 'left', under the title: under
 //               'title'), between the two layouts' places as the page moves
-function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null, perPx = null } = {}, p = 0) {
+function coverGeometry(
+  config,
+  { vw, vh, art, bottom = 0, zoom = null, controls = 0, ink = null, perPx = null } = {},
+  p = 0,
+) {
   const t = clamp01(p);
   const T = TUNING;
-  const W = Math.max(1, (art && art.w) || 1), H = Math.max(1, (art && art.h) || 1);
+  const W = Math.max(1, (art && art.w) || 1),
+    H = Math.max(1, (art && art.h) || 1);
   const hasByline = Boolean(config && config.byline && config.byline.text);
   const below = hasByline ? T.bylineSpace : 0;
   const pad = Math.min(T.pad, vh * 0.03);
@@ -523,14 +570,13 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
     scale0 = Math.max(0.01, Math.min(byWidth, byCrown));
     left0 = vw / 2 - ((bush.l + bush.r) / 2) * W * scale0;
   }
-  const artTop0 = from === null
-    ? pad + Math.max(0, (room - H * scale0) / 2)
-    : from - inkArt * H * scale0;
+  const artTop0 = from === null ? pad + Math.max(0, (room - H * scale0) / 2) : from - inkArt * H * scale0;
   // The graph state keeps the art state's size, unless graph.rootsFit
   // 'width' puts the roots' widest row (ink.roots) edge to edge: never so
   // large that the image's ink, from the small plant (ink.graph) to its
   // foot (ink.bottom), does not fit under the top controls.
-  let scale1 = scale0, left1 = left0;
+  let scale1 = scale0,
+    left1 = left0;
   if (g.rootsFit === 'width') {
     const roots = (ink && ink.roots) || { l: 0, r: 1 };
     const byWidth = vw / (Math.max(0.01, roots.r - roots.l) * W);
@@ -543,21 +589,25 @@ function coverGeometry(config, { vw, vh, art, bottom = 0, zoom = null, controls 
   }
   // With opening.top.graph the graph state's plant (ink.graph of the canvas
   // down) sits that far under the top controls; otherwise artOffset.
-  const artTop1 = topCfg && topCfg.graph !== null && inkGraph !== null
-    ? Math.min(artTop0 - 1, Math.max(0, controls) + topCfg.graph - inkGraph * H * scale1)
-    : -g.artOffset * (H * scale1);
+  const artTop1 =
+    topCfg && topCfg.graph !== null && inkGraph !== null
+      ? Math.min(artTop0 - 1, Math.max(0, controls) + topCfg.graph - inkGraph * H * scale1)
+      : -g.artOffset * (H * scale1);
   const scale = lerp(scale0, scale1, t);
-  const width = W * scale, height = H * scale;
+  const width = W * scale,
+    height = H * scale;
   const top = lerp(artTop0, artTop1, t);
   const left = lerp(left0, left1, t);
   const show = smooth((t - T.graphFrom) / (1 - T.graphFrom));
   return {
     p: t,
-    vw, vh,
+    vw,
+    vh,
     art: { top, left, width, height, scale, opacity: 1 },
     roots: lerp(1, zoom ? backdropOpacity(bd, zoom.k, zoom.homeK) : bd.opacity, t),
     fade: { art: 1 - t, graph: t },
-    artTop0, artTop1,
+    artTop0,
+    artTop1,
     travel: Math.max(1, artTop0 - artTop1),
     graph: { opacity: show, shift: (1 - show) * T.rise * vh },
     // The graph itself is never hidden: it hangs from the roots in both
@@ -589,7 +639,8 @@ function bylineAt(config, box, t, perPx, fallback) {
   const per = title.fit === 'width' ? perPx : null;
   const a = bylineUnder(title.art, box, byline, per);
   const g = bylineUnder(title.graph, box, byline, per, byline.graphScale);
-  const from = a || g, to = g || a;
+  const from = a || g,
+    to = g || a;
   return {
     x: lerp(from.x, to.x, t),
     y: lerp(from.y, to.y, t),
@@ -617,27 +668,30 @@ const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) 
 //   tapArt(), tapTop()   to the graph; the cover handle, to the art
 //   go(state, { instant })   to a rest
 //   resize(travel)   px of travel for a whole scrub (the art's move)
-function createCover(config, {
-  start = 'art',
-  reducedMotion = false,
-  travel = 600,
-  now = () => Date.now(),
-  frame = (fn) => setTimeout(() => fn(), 16),
-  cancelFrame = (h) => clearTimeout(h),
-  setTimer = setTimeout,
-  clearTimer = clearTimeout,
-  onChange = () => {},
-  onRest = () => {},
-} = {}) {
+function createCover(
+  config,
+  {
+    start = 'art',
+    reducedMotion = false,
+    travel = 600,
+    now = () => Date.now(),
+    frame = (fn) => setTimeout(() => fn(), 16),
+    cancelFrame = (h) => clearTimeout(h),
+    setTimer = setTimeout,
+    clearTimer = clearTimeout,
+    onChange = () => {},
+    onRest = () => {},
+  } = {},
+) {
   const snapMs = config ? config.snapMs : DEFAULTS.snapMs;
   let p = start === 'graph' ? 1 : 0;
   let rest = start === 'graph' ? 'graph' : 'art';
-  let from = rest;          // the rest a scrub started from
-  let anim = null;          // { handle, target }
+  let from = rest; // the rest a scrub started from
+  let anim = null; // { handle, target }
   let wheelTimer = null;
   let reducedAcc = 0;
-  let quietUntil = 0;       // wheels inside the graph are the page's until then
-  let touch = null;         // { y, p, lastY, lastT, v }
+  let quietUntil = 0; // wheels inside the graph are the page's until then
+  let touch = null; // { y, p, lastY, lastT, v }
   let span = Math.max(120, travel);
 
   const valueOf = (s) => (s === 'graph' ? 1 : 0);
@@ -651,7 +705,10 @@ function createCover(config, {
   }
 
   function stop() {
-    if (anim) { cancelFrame(anim.handle); anim = null; }
+    if (anim) {
+      cancelFrame(anim.handle);
+      anim = null;
+    }
   }
 
   function settle(state) {
@@ -666,17 +723,27 @@ function createCover(config, {
   function animateTo(state, { ease = easeOut } = {}) {
     stop();
     const target = valueOf(state);
-    if (reducedMotion) { swap(state); return; }
+    if (reducedMotion) {
+      swap(state);
+      return;
+    }
     const p0 = p;
     const dist = Math.abs(target - p0);
-    if (dist < 1e-4 || snapMs === 0) { settle(state); return; }
+    if (dist < 1e-4 || snapMs === 0) {
+      settle(state);
+      return;
+    }
     const ms = Math.max(TUNING.minSnapMs, snapMs * dist);
     const t0 = now();
     anim = { target: state, handle: null };
     const step = () => {
       const k = Math.min(1, (now() - t0) / ms);
       set(lerp(p0, target, ease(k)));
-      if (k >= 1) { anim = null; settle(state); return; }
+      if (k >= 1) {
+        anim = null;
+        settle(state);
+        return;
+      }
       anim.handle = frame(step);
     };
     anim.handle = frame(step);
@@ -715,7 +782,10 @@ function createCover(config, {
 
   function go(state, { instant = false } = {}) {
     if (!STATES.includes(state)) return false;
-    if (instant) { settle(state); return true; }
+    if (instant) {
+      settle(state);
+      return true;
+    }
     if (rest === state && p === valueOf(state) && !anim) return false;
     animateTo(state, { ease: easeInOut });
     return true;
@@ -756,7 +826,10 @@ function createCover(config, {
   }
 
   function touchStart(y, t = now()) {
-    if (anim) { from = anim.target === 'graph' ? 'art' : 'graph'; stop(); }
+    if (anim) {
+      from = anim.target === 'graph' ? 'art' : 'graph';
+      stop();
+    }
     touch = { y, p, lastY: y, lastT: t, v: 0, total: 0 };
     reducedAcc = 0;
   }
@@ -786,7 +859,10 @@ function createCover(config, {
       return true;
     }
     const velocity = t - lastT > 120 ? 0 : v;
-    if (p === 0 || p === 1) { settle(p === 1 ? 'graph' : 'art'); return true; }
+    if (p === 0 || p === 1) {
+      settle(p === 1 ? 'graph' : 'art');
+      return true;
+    }
     letGo(velocity);
     return true;
   }
@@ -798,9 +874,15 @@ function createCover(config, {
   }
 
   return {
-    get p() { return p; },
-    get rest() { return rest; },
-    get moving() { return Boolean(anim) || (p > 0 && p < 1); },
+    get p() {
+      return p;
+    },
+    get rest() {
+      return rest;
+    },
+    get moving() {
+      return Boolean(anim) || (p > 0 && p < 1);
+    },
     wheel,
     touchStart,
     touchMove,
@@ -809,10 +891,15 @@ function createCover(config, {
     tapArt: () => go('graph'),
     tapTop: () => go('art'),
     go,
-    resize(px) { span = Math.max(120, px); },
+    resize(px) {
+      span = Math.max(120, px);
+    },
     dispose() {
       stop();
-      if (wheelTimer) { clearTimer(wheelTimer); wheelTimer = null; }
+      if (wheelTimer) {
+        clearTimer(wheelTimer);
+        wheelTimer = null;
+      }
     },
   };
 }
@@ -826,7 +913,31 @@ function pageKey(e) {
   return null;
 }
 
-module.exports = { REVEAL_MS, revealFactor, rootsBrightnessAt,
-  DEFAULTS, TUNING, STATES, TITLE_DEFAULTS, TITLE_FALLBACK,
-  openingConfig, bylineConfig, bylineText, groundConfig, topConfig, gripConfig, gripHeight, firstInkRow, lastInkRow, inkSpan, widestInkRow, titleConfig, titleLayout, fitTitle, startState, coverGeometry, createCover, pageKey,
+module.exports = {
+  REVEAL_MS,
+  revealFactor,
+  rootsBrightnessAt,
+  DEFAULTS,
+  TUNING,
+  STATES,
+  TITLE_DEFAULTS,
+  TITLE_FALLBACK,
+  openingConfig,
+  bylineConfig,
+  bylineText,
+  groundConfig,
+  topConfig,
+  gripConfig,
+  gripHeight,
+  firstInkRow,
+  lastInkRow,
+  inkSpan,
+  widestInkRow,
+  titleConfig,
+  titleLayout,
+  fitTitle,
+  startState,
+  coverGeometry,
+  createCover,
+  pageKey,
 };

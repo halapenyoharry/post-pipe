@@ -24,7 +24,8 @@
 const fs = require('fs');
 const { topicSlugs } = require('../src/lib/topicSlug');
 
-const USAGE = 'usage: node tools/topic-slugs.js [path/to/feed.json] [--json] [--found-tags text|tags]   (no path: the feed on stdin)';
+const USAGE =
+  'usage: node tools/topic-slugs.js [path/to/feed.json] [--json] [--found-tags text|tags]   (no path: the feed on stdin)';
 const FOUND_TAGS = ['text', 'tags'];
 
 function parseArgs(argv) {
@@ -72,7 +73,10 @@ function blockOf(card) {
 }
 
 // readStdin and stdinIsTTY are given by the tests; by default, this process's.
-function run(argv, { log = console.log, readStdin = () => fs.readFileSync(0, 'utf8'), stdinIsTTY = process.stdin.isTTY } = {}) {
+function run(
+  argv,
+  { log = console.log, readStdin = () => fs.readFileSync(0, 'utf8'), stdinIsTTY = process.stdin.isTTY } = {},
+) {
   const opt = parseArgs(argv);
   if (opt.error) {
     log(opt.error);

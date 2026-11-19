@@ -36,9 +36,18 @@ function copyAge(copyDate, now = Date.now()) {
   const ms = Math.max(0, at - t);
   const age = (short, span) => ({ ms, short, span, long: `${span} old` });
   if (ms < HOUR) return age('<1h', 'less than an hour');
-  if (ms < 2 * DAY) { const h = Math.floor(ms / HOUR); return age(`${h}h`, plural(h, 'hour')); }
-  if (ms < 14 * DAY) { const d = Math.floor(ms / DAY); return age(`${d}d`, plural(d, 'day')); }
-  if (ms < 60 * DAY) { const w = Math.floor(ms / (7 * DAY)); return age(`${w}w`, plural(w, 'week')); }
+  if (ms < 2 * DAY) {
+    const h = Math.floor(ms / HOUR);
+    return age(`${h}h`, plural(h, 'hour'));
+  }
+  if (ms < 14 * DAY) {
+    const d = Math.floor(ms / DAY);
+    return age(`${d}d`, plural(d, 'day'));
+  }
+  if (ms < 60 * DAY) {
+    const w = Math.floor(ms / (7 * DAY));
+    return age(`${w}w`, plural(w, 'week'));
+  }
   const m = Math.floor(ms / (30 * DAY));
   return age(`${m}mo`, plural(m, 'month'));
 }
@@ -63,7 +72,12 @@ function sourceStatus(source, now = Date.now()) {
     return { kind: 'stale', date, age, note: `Not fetched for this build${why}; these cards are from ${from}` };
   }
   if (source.ok === false) {
-    return { kind: 'failed', date: null, age: null, note: `Not fetched for this build${why}, and there is no earlier copy` };
+    return {
+      kind: 'failed',
+      date: null,
+      age: null,
+      note: `Not fetched for this build${why}, and there is no earlier copy`,
+    };
   }
   return null;
 }
@@ -78,7 +92,10 @@ function formatWhen(iso, { locale, timeZone } = {}) {
   const key = `${locale || ''}|${timeZone || ''}`;
   try {
     if (!formats.has(key)) {
-      formats.set(key, new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', ...(timeZone ? { timeZone } : {}) }));
+      formats.set(
+        key,
+        new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', ...(timeZone ? { timeZone } : {}) }),
+      );
     }
     return formats.get(key).format(new Date(t));
   } catch (_) {
@@ -120,7 +137,7 @@ function sourceLines(source, { now = Date.now(), locale, timeZone } = {}) {
     const at = when(source.copyDate);
     const from = at
       ? `${which || 'the copy'} of ${at}${status.age ? `, ${status.age.long}` : ''}`
-      : (which || 'an earlier copy');
+      : which || 'an earlier copy';
     lines.push(`Not fetched for this build${error ? ` (${error})` : ''}; these cards are from ${from}`);
     if (updated) lines.push(`The feed says it was updated ${updated}`);
     return lines;

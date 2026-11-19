@@ -5,7 +5,14 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  TURN_PX, QUIET_MS, SWIPE_PX, wheelPixels, createWheelTurn, touchIntent, touchTurn, followOffset,
+  TURN_PX,
+  QUIET_MS,
+  SWIPE_PX,
+  wheelPixels,
+  createWheelTurn,
+  touchIntent,
+  touchTurn,
+  followOffset,
 } = require('../src/lib/sideSwipe');
 
 // A run of wheel events 16 ms apart from time t0: each [deltaX, deltaY],
@@ -53,7 +60,17 @@ test('quiet between two short swipes starts the count again', () => {
   assert.deepStrictEqual(run(w, [[60, 0]], { t0: 400 }), []);
   // Close enough together, they are one gesture.
   const v = createWheelTurn();
-  assert.deepStrictEqual(run(v, [[60, 0], [60, 0]], { gap: 200 }), ['next']);
+  assert.deepStrictEqual(
+    run(
+      v,
+      [
+        [60, 0],
+        [60, 0],
+      ],
+      { gap: 200 },
+    ),
+    ['next'],
+  );
 });
 
 test('a vertical scroll never turns the card, however long, and its own sideways drift does not either', () => {
@@ -86,7 +103,17 @@ test('ctrl or meta held (a pinch, a zoom) is no part of a swipe', () => {
 test('a gesture that starts inside something that scrolls sideways is left to it, whole', () => {
   const w = createWheelTurn();
   // Starts in a wide table, then runs on outside it: still the table's.
-  assert.deepStrictEqual(run(w, [[40, 0], [40, 0]], { aside: true }), []);
+  assert.deepStrictEqual(
+    run(
+      w,
+      [
+        [40, 0],
+        [40, 0],
+      ],
+      { aside: true },
+    ),
+    [],
+  );
   assert.deepStrictEqual(run(w, times(10, [40, 0]), { t0: 32 }), []);
   assert.strictEqual(w.wheel({ deltaX: 40, deltaY: 0, aside: false }, 200).claim, false);
   // The next gesture, after quiet, starting on the text, turns.
@@ -132,7 +159,7 @@ test('a followed drag turns past 70 px, however slow; short of it the card goes 
   assert.strictEqual(touchTurn({ dx: -80, dy: 90, dt: 400, followed: true }), null);
 });
 
-test('without following, the quick flick of the reader\'s swipe still turns, as it always did', () => {
+test("without following, the quick flick of the reader's swipe still turns, as it always did", () => {
   assert.strictEqual(touchTurn({ dx: -80, dy: 20, dt: 300, followed: false }), 'next');
   assert.strictEqual(touchTurn({ dx: 80, dy: 0, dt: 700, followed: false }), 'prev');
   assert.strictEqual(touchTurn({ dx: -80, dy: 0, dt: 701, followed: false }), null, 'too slow');

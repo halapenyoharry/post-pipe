@@ -12,7 +12,14 @@
 // settings, viewState, and onNodeSelect.
 
 import { GraphViewer } from '../components/GraphViewer/GraphViewer';
-import { DEFAULT_VIEWS, viewById, viewLayout, siteViews as siteViewsIn, viewFromSearch, currentView } from '../lib/views';
+import {
+  DEFAULT_VIEWS,
+  viewById,
+  viewLayout,
+  siteViews as siteViewsIn,
+  viewFromSearch,
+  currentView,
+} from '../lib/views';
 
 export const VIEWS = [
   { id: 'cluster', label: 'cluster', component: GraphViewer, props: { layout: 'force' } },

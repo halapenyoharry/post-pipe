@@ -26,9 +26,12 @@
 const READER_WORDS = [50, 100, 250, 500, 'whole'];
 const READER_WORDS_RETIRED = { one: 'whole' };
 const isWordsChoice = (v) => READER_WORDS.includes(v);
-const wordsValue = (v) => (isWordsChoice(v) ? v
-  : typeof v === 'string' && Object.prototype.hasOwnProperty.call(READER_WORDS_RETIRED, v) ? READER_WORDS_RETIRED[v]
-    : null);
+const wordsValue = (v) =>
+  isWordsChoice(v)
+    ? v
+    : typeof v === 'string' && Object.prototype.hasOwnProperty.call(READER_WORDS_RETIRED, v)
+      ? READER_WORDS_RETIRED[v]
+      : null;
 
 const VERSION = 1;
 
@@ -46,7 +49,9 @@ function engineKeys(store) {
       const k = store.key(i);
       if (typeof k === 'string' && k.startsWith(STORAGE_PREFIX)) keys.push(k);
     }
-  } catch (_) { /* storage refused; nothing of ours is in it */ }
+  } catch (_) {
+    /* storage refused; nothing of ours is in it */
+  }
   return keys;
 }
 
@@ -60,12 +65,21 @@ async function forgetStorage(opts = {}) {
   const g = typeof globalThis !== 'undefined' ? globalThis : {};
   const pick = (name) => {
     if (opts[name] !== undefined) return opts[name];
-    try { return g[name] || null; } catch (_) { return null; }
+    try {
+      return g[name] || null;
+    } catch (_) {
+      return null;
+    }
   };
   const removed = [];
   for (const store of [pick('localStorage'), pick('sessionStorage')]) {
     for (const k of engineKeys(store)) {
-      try { store.removeItem(k); removed.push(k); } catch (_) { /* keep going */ }
+      try {
+        store.removeItem(k);
+        removed.push(k);
+      } catch (_) {
+        /* keep going */
+      }
     }
   }
   const idb = pick('indexedDB');
@@ -74,10 +88,17 @@ async function forgetStorage(opts = {}) {
       const dbs = await idb.databases();
       for (const db of dbs || []) {
         if (db && typeof db.name === 'string' && db.name.startsWith(STORAGE_PREFIX)) {
-          try { idb.deleteDatabase(db.name); removed.push('indexedDB:' + db.name); } catch (_) { /* keep going */ }
+          try {
+            idb.deleteDatabase(db.name);
+            removed.push('indexedDB:' + db.name);
+          } catch (_) {
+            /* keep going */
+          }
         }
       }
-    } catch (_) { /* not supported here */ }
+    } catch (_) {
+      /* not supported here */
+    }
   }
   return removed;
 }
@@ -88,18 +109,18 @@ function emptyState(corpusId, layoutVersion) {
     corpusId: corpusId || null,
     layoutVersion: layoutVersion || null,
     layout: 'force',
-    view: null,     // the view the reader chose (settings.views, src/lib/views.js); null means the site's first
+    view: null, // the view the reader chose (settings.views, src/lib/views.js); null means the site's first
     hiddenSources: [],
-    sourceColors: {},  // sourceId -> hex override, chosen from the pill's ring picker
-    graphColors: {},   // e.g. draft/published/tag/topology/placeholder -> hex override
+    sourceColors: {}, // sourceId -> hex override, chosen from the pill's ring picker
+    graphColors: {}, // e.g. draft/published/tag/topology/placeholder -> hex override
     colorProfileId: null, // which preset (if any) graphColors currently matches
     paragraphIndent: false,
     paragraphSpace: true,
-    readerAids: {},    // reading aids the reader chose: followAlong, boldStart, font, size, words
-    prefs: {},         // how the page looks: theme, mode, timeOfDay
-    nodes: {},      // id -> { x, y, w, h, pinned, t }
+    readerAids: {}, // reading aids the reader chose: followAlong, boldStart, font, size, words
+    prefs: {}, // how the page looks: theme, mode, timeOfDay
+    nodes: {}, // id -> { x, y, w, h, pinned, t }
     containers: {}, // id -> 'open' | 'closed' (reader's choice; absent means the site's default)
-    rotation: 0,    // degrees the reader turned the view
+    rotation: 0, // degrees the reader turned the view
     // The time axis is a thing the reader positions and keeps, not a mode they
     // re-enable every visit. Orientation lives here too: left-to-right is one
     // culture's reading order, not a property of time.
@@ -107,9 +128,9 @@ function emptyState(corpusId, layoutVersion) {
     // rather than being fixed here, so a fork that reads right-to-left is a
     // configuration rather than a patch.
     timeAxis: { on: false, x: 0, y: -1000 },
-    reading: {},    // id -> { scroll, seenAt, t }
-    bookmarks: [],  // array of { id, item, para, quote, note, t }
-    opening: {},    // { state: 'art' | 'graph' }: where this reader left the two-state page
+    reading: {}, // id -> { scroll, seenAt, t }
+    bookmarks: [], // array of { id, item, para, quote, note, t }
+    opening: {}, // { state: 'art' | 'graph' }: where this reader left the two-state page
   };
 }
 
@@ -123,9 +144,15 @@ function memoryBackend(initial) {
   let saved = initial ? clone(initial) : null;
   return {
     id: 'memory',
-    async load() { return clone(saved); },
-    async save(state) { saved = clone(state); },
-    async clear() { saved = null; },
+    async load() {
+      return clone(saved);
+    },
+    async save(state) {
+      saved = clone(state);
+    },
+    async clear() {
+      saved = null;
+    },
   };
 }
 
@@ -161,7 +188,11 @@ function localStorageBackend(key, storage) {
     },
     async clear() {
       if (!store) return;
-      try { store.removeItem(key); } catch (_) { /* nothing to remove */ }
+      try {
+        store.removeItem(key);
+      } catch (_) {
+        /* nothing to remove */
+      }
     },
   };
 }
@@ -187,7 +218,9 @@ function hostParamsBackend(api, field) {
         if (api && api.updateParameters) {
           api.updateParameters({ ...(api.getParameters ? api.getParameters() : {}), [key]: state });
         }
-      } catch (_) { /* host declined; keep running */ }
+      } catch (_) {
+        /* host declined; keep running */
+      }
     },
   };
 }
@@ -225,12 +258,18 @@ function createViewState(opts = {}) {
   function scheduleSave() {
     if (debounceMs <= 0) return flush();
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { saveTimer = null; flush(); }, debounceMs);
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      flush();
+    }, debounceMs);
     if (saveTimer && typeof saveTimer.unref === 'function') saveTimer.unref();
   }
 
   async function flush() {
-    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
     if (forgotten) return;
     pendingSave = backend.save(clone(state));
     await pendingSave;
@@ -334,10 +373,18 @@ function createViewState(opts = {}) {
   }
 
   return {
-    get state() { return state; },
-    get canUndo() { return past.length > 0; },
-    get canRedo() { return future.length > 0; },
-    get historyVersion() { return historyVersion; },
+    get state() {
+      return state;
+    },
+    get canUndo() {
+      return past.length > 0;
+    },
+    get canRedo() {
+      return future.length > 0;
+    },
+    get historyVersion() {
+      return historyVersion;
+    },
     backendId: backend.id,
 
     async ready() {
@@ -395,13 +442,28 @@ function createViewState(opts = {}) {
      */
     async forget(where) {
       forgotten = true;
-      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-      if (pendingSave) { try { await pendingSave; } catch (_) { /* gone anyway */ } }
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      if (pendingSave) {
+        try {
+          await pendingSave;
+        } catch (_) {
+          /* gone anyway */
+        }
+      }
       state = emptyState(state.corpusId, state.layoutVersion);
       past = [];
       future = [];
       gestureBase = null;
-      if (backend.clear) { try { await backend.clear(); } catch (_) { /* swept below */ } }
+      if (backend.clear) {
+        try {
+          await backend.clear();
+        } catch (_) {
+          /* swept below */
+        }
+      }
       const removed = await forgetStorage(where || {});
       notify();
       return removed;
@@ -417,12 +479,16 @@ function createViewState(opts = {}) {
 
     subscribe(fn) {
       listeners.push(fn);
-      return () => { listeners = listeners.filter((f) => f !== fn); };
+      return () => {
+        listeners = listeners.filter((f) => f !== fn);
+      };
     },
 
     // ── typed helpers ────────────────────────────────────────────────────────
 
-    nodeState(id) { return state.nodes[id] || null; },
+    nodeState(id) {
+      return state.nodes[id] || null;
+    },
 
     // `silent` marks a position the layout chose, not one the reader did.
     // The distinction is what lets a better layout replace its own old output
@@ -485,7 +551,11 @@ function createViewState(opts = {}) {
       });
     },
 
-    setLayout(layout) { update((s) => { s.layout = layout; }); },
+    setLayout(layout) {
+      update((s) => {
+        s.layout = layout;
+      });
+    },
 
     // The view the reader chose (an id from settings.views), and the layout
     // it draws with when it names one, in one step, so one undo takes both
@@ -539,7 +609,9 @@ function createViewState(opts = {}) {
     setRotation(angle, { transient = false, silent = false } = {}) {
       const deg = Number(angle) || 0;
       const apply = silent ? updateSilent : transient ? updateTransient : update;
-      apply((s) => { s.rotation = deg; });
+      apply((s) => {
+        s.rotation = deg;
+      });
     },
 
     // prefs: preference keys the reset also returns to the site's own (one
@@ -594,13 +666,19 @@ function createViewState(opts = {}) {
       });
     },
 
-    isHidden(sourceId) { return state.hiddenSources.indexOf(sourceId) !== -1; },
+    isHidden(sourceId) {
+      return state.hiddenSources.indexOf(sourceId) !== -1;
+    },
 
     // A color the reader chose for one feed's dot, from the pill's ring
     // picker — overrides whatever the build computed (theme-color/hash).
-    sourceColor(sourceId) { return (state.sourceColors || {})[sourceId] || null; },
+    sourceColor(sourceId) {
+      return (state.sourceColors || {})[sourceId] || null;
+    },
     setSourceColor(sourceId, color) {
-      update((s) => { s.sourceColors = { ...(s.sourceColors || {}), [sourceId]: color }; });
+      update((s) => {
+        s.sourceColors = { ...(s.sourceColors || {}), [sourceId]: color };
+      });
     },
 
     // The graph's own palette (draft/published/tag/topology/placeholder).
@@ -609,8 +687,12 @@ function createViewState(opts = {}) {
     // is purely cosmetic — which preset button Settings highlights as
     // active — and is cleared the moment a single key is nudged, since at
     // that point the palette is no longer exactly that preset.
-    graphColors() { return state.graphColors || {}; },
-    colorProfileId() { return state.colorProfileId || null; },
+    graphColors() {
+      return state.graphColors || {};
+    },
+    colorProfileId() {
+      return state.colorProfileId || null;
+    },
     setGraphColor(key, value) {
       update((s) => {
         s.graphColors = { ...(s.graphColors || {}), [key]: value };
@@ -618,19 +700,30 @@ function createViewState(opts = {}) {
       });
     },
     applyColorProfile(id, colors) {
-      update((s) => { s.graphColors = { ...colors }; s.colorProfileId = id; });
+      update((s) => {
+        s.graphColors = { ...colors };
+        s.colorProfileId = id;
+      });
     },
 
     // Paragraph style for every place text is read: the reader pane and an
     // open node's scrolling text. Two independent switches:
     // indent = book style first-line indent; space = gap between paragraphs.
-    paragraphIndent() { return state.paragraphIndent === true; },
-    setParagraphIndent(v) {
-      update((s) => { s.paragraphIndent = Boolean(v); });
+    paragraphIndent() {
+      return state.paragraphIndent === true;
     },
-    paragraphSpace() { return state.paragraphSpace !== false; },
+    setParagraphIndent(v) {
+      update((s) => {
+        s.paragraphIndent = Boolean(v);
+      });
+    },
+    paragraphSpace() {
+      return state.paragraphSpace !== false;
+    },
     setParagraphSpace(v) {
-      update((s) => { s.paragraphSpace = Boolean(v); });
+      update((s) => {
+        s.paragraphSpace = Boolean(v);
+      });
     },
     paragraphStyle() {
       if (state.paragraphIndent && !state.paragraphSpace) return 'indent';
@@ -668,8 +761,8 @@ function createViewState(opts = {}) {
           else delete s.readerAids.words;
           return;
         }
-        s.readerAids[key] = key === 'font' ? String(value || 'default')
-          : key === 'size' ? String(value || 'm') : Boolean(value);
+        s.readerAids[key] =
+          key === 'font' ? String(value || 'default') : key === 'size' ? String(value || 'm') : Boolean(value);
       });
     },
 
@@ -729,12 +822,20 @@ function createViewState(opts = {}) {
     setOpeningState(which) {
       if (which !== 'art' && which !== 'graph') return;
       if (state.opening && state.opening.state === which) return;
-      updateSilent((s) => { s.opening = { state: which, t: now() }; });
+      updateSilent((s) => {
+        s.opening = { state: which, t: now() };
+      });
     },
-    openingState() { return (state.opening && state.opening.state) || null; },
+    openingState() {
+      return (state.opening && state.opening.state) || null;
+    },
 
-    isSeen(id) { return Boolean(state.reading[id] && state.reading[id].seenAt); },
-    readingPosition(id) { return (state.reading[id] && state.reading[id].scroll) || 0; },
+    isSeen(id) {
+      return Boolean(state.reading[id] && state.reading[id].seenAt);
+    },
+    readingPosition(id) {
+      return (state.reading[id] && state.reading[id].scroll) || 0;
+    },
 
     // ── bookmarks ────────────────────────────────────────────────────────────
 
@@ -753,7 +854,7 @@ function createViewState(opts = {}) {
       const entry = {
         id,
         item,
-        para: typeof para === 'number' ? para : (parseInt(para, 10) || 0),
+        para: typeof para === 'number' ? para : parseInt(para, 10) || 0,
         quote: quote ? String(quote) : '',
         note: note ? String(note) : '',
         t: now(),
@@ -809,9 +910,7 @@ function createViewState(opts = {}) {
       update((s) => {
         for (const bucket of ['nodes', 'reading']) {
           const entries = Object.entries(s[bucket]);
-          const absent = entries
-            .filter(([id]) => !valid.has(itemOf(id)))
-            .sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
+          const absent = entries.filter(([id]) => !valid.has(itemOf(id))).sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
           for (const [id] of absent.slice(keep)) delete s[bucket][id];
         }
       });
@@ -833,6 +932,14 @@ module.exports = {
 
 // Browser global, for the static page which inlines this file the way it
 // inlines tts.js. Same module, no build step, no second copy.
-if (typeof window !== "undefined") {
-  window.ViewState = { createViewState, memoryBackend, localStorageBackend, hostParamsBackend, VERSION, STORAGE_PREFIX, forgetStorage };
+if (typeof window !== 'undefined') {
+  window.ViewState = {
+    createViewState,
+    memoryBackend,
+    localStorageBackend,
+    hostParamsBackend,
+    VERSION,
+    STORAGE_PREFIX,
+    forgetStorage,
+  };
 }

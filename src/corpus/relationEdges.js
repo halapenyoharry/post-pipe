@@ -48,12 +48,14 @@ const UNDIRECTED = new Set(['related', 'closeMatch', 'relatedMatch', 'exactMatch
 // adapter's, or one stood in for an entry of item.tags) labels nothing.
 function tagLabelByConcept(items, options = {}) {
   const containerTags = new Set(
-    (options.containment || []).map((c) => (c && c.tag !== undefined ? c.tag : null)).filter((t) => t !== null)
+    (options.containment || []).map((c) => (c && c.tag !== undefined ? c.tag : null)).filter((t) => t !== null),
   );
   // a container's tag resolved to its concept (src/lib/rtagz.js) is a
   // container's whatever label it shows
   const containerConcepts = new Set(
-    (options.containment || []).map((c) => (c && typeof c.concept === 'string' && c.concept ? c.concept : null)).filter((x) => x !== null)
+    (options.containment || [])
+      .map((c) => (c && typeof c.concept === 'string' && c.concept ? c.concept : null))
+      .filter((x) => x !== null),
   );
   const labelOf = new Map();
   for (const item of items || []) {
@@ -91,7 +93,10 @@ function relationEdges(rtagz, items, options = {}) {
     // whatever a later one weighs.
     let source = labelA;
     let target = labelB;
-    if (directed) { source = labelB; target = labelA; }
+    if (directed) {
+      source = labelB;
+      target = labelA;
+    }
     const key = directed
       ? `${r.type}\u0000${source}\u0000${target}`
       : `${r.type}\u0000${source < target ? source : target}\u0000${source < target ? target : source}`;
