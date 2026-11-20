@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-// Builds the test page (examples/site) from its saved copies without reaching
-// the network, serves examples/site/_site on a free local port, loads it in
-// headless Chrome at desktop (1280x800) and phone (390x844, 3x, touch) width,
-// waits for the graph to settle, and exits 1 on any page error, console error,
-// failed or 4xx/5xx request to the local server, or blank graph.
+// Builds the test page in a temporary folder copied from examples/site from its
+// saved copies without reaching the network, serves <temp>/_site on a free local
+// port, loads it in headless Chrome at desktop (1280x800) and phone (390x844,
+// 3x, touch) width, waits for the graph to settle, removes the temporary folder,
+// and exits 1 on any page error, console error, failed or 4xx/5xx request to the
+// local server, or blank graph.
 'use strict';
 
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const handler = require('serve-handler');
@@ -15,10 +17,10 @@ const { chromium } = require('playwright');
 
 const ENGINE_ROOT = path.resolve(__dirname, '..');
 const SITE_ROOT = path.join(ENGINE_ROOT, 'examples', 'site');
-const SITE_DIR = path.join(SITE_ROOT, '_site');
 const FORBIDDEN_PORTS = new Set([1420, 1421]);
 const SETTLE_MS = 6000;
 const BLANK_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+const GENERATED_SITE_FILES = new Set(['_site', 'cards.json', 'rtagz-ids.json', 'rtagz-queue.json']);
 
 const WIDTHS = [
   {
@@ -36,14 +38,30 @@ const WIDTHS = [
   },
 ];
 
-function buildTestPage() {
-  const env = { ...process.env, POSTPIPE_SAVED_COPIES: '1' };
-  delete env.POSTPIPE_SITE;
+function copyExampleSite(destDir) {
+  fs.cpSync(SITE_ROOT, destDir, {
+    recursive: true,
+    filter: (source) => {
+      const rel = path.relative(SITE_ROOT, source);
+      if (!rel) return true;
+      const firstPart = rel.split(/[\\/]/)[0];
+      return !GENERATED_SITE_FILES.has(firstPart);
+    },
+  });
+}
+
+function buildTestPage(targetDir) {
+  const siteRoot = targetDir || fs.mkdtempSync(path.join(os.tmpdir(), 'pp-smoke-'));
+  if (path.resolve(siteRoot) !== path.resolve(SITE_ROOT)) {
+    copyExampleSite(siteRoot);
+  }
+  const env = { ...process.env, POSTPIPE_SAVED_COPIES: '1', POSTPIPE_SITE: siteRoot };
   execFileSync(process.execPath, [path.join(ENGINE_ROOT, 'generate-index.js')], {
     cwd: ENGINE_ROOT,
     env,
     stdio: 'inherit',
   });
+  return siteRoot;
 }
 
 function listenOnFreePort(siteDir) {
@@ -166,34 +184,54 @@ async function checkWidth(browser, base, widthSpec) {
 }
 
 async function main() {
-  buildTestPage();
-  if (!fs.existsSync(path.join(SITE_DIR, 'index.html'))) {
-    console.error(`smoke: ${path.join(SITE_DIR, 'index.html')} was not built`);
-    process.exit(1);
-  }
-
-  const { server, base } = await listenOnFreePort(SITE_DIR);
-  let browser;
+  let siteDir;
   let allPassed = true;
   try {
-    browser = await launchBrowser();
-    for (const w of WIDTHS) {
-      const ok = await checkWidth(browser, base, w);
-      if (!ok) allPassed = false;
+    siteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-smoke-'));
+    buildTestPage(siteDir);
+    const siteOutputDir = path.join(siteDir, '_site');
+    if (!fs.existsSync(path.join(siteOutputDir, 'index.html'))) {
+      console.error(`smoke: ${path.join(siteOutputDir, 'index.html')} was not built`);
+      allPassed = false;
+      process.exitCode = 1;
+      return false;
     }
-  } finally {
-    if (browser) await browser.close();
-    await new Promise((r) => server.close(r));
-  }
 
-  if (!allPassed) process.exit(1);
+    const { server, base } = await listenOnFreePort(siteOutputDir);
+    let browser;
+    try {
+      browser = await launchBrowser();
+      for (const w of WIDTHS) {
+        const ok = await checkWidth(browser, base, w);
+        if (!ok) allPassed = false;
+      }
+    } finally {
+      if (browser) await browser.close();
+      await new Promise((r) => server.close(r));
+    }
+
+    if (!allPassed) process.exitCode = 1;
+    return allPassed;
+  } finally {
+    if (siteDir) {
+      if (process.env.PP_SMOKE_KEEP === '1') {
+        console.log(siteDir);
+      } else {
+        fs.rmSync(siteDir, { recursive: true, force: true });
+      }
+    }
+  }
 }
 
 if (require.main === module) {
-  main().catch((err) => {
-    console.error(`smoke: ${err && err.message ? err.message : err}`);
-    process.exit(1);
-  });
+  main()
+    .then((ok) => {
+      if (!ok) process.exit(1);
+    })
+    .catch((err) => {
+      console.error(`smoke: ${err && err.message ? err.message : err}`);
+      process.exit(1);
+    });
 }
 
 module.exports = {
