@@ -20,3 +20,14 @@ export { VIEWS, siteViews, viewById, viewLayout, viewFromSearch, currentView } f
 export { toolbarConfig } from './lib/toolbar';
 export { React, ReactDOM };
 export { isLinkItem, followLink, linkOf } from './lib/linkNode';
+export {
+  readerUrlStyle,
+  siteBasePath,
+  itemSlug,
+  parseReaderLocation,
+  articlePath,
+  articleAbsoluteUrl,
+  closedPath,
+  hasReaderRoute,
+  resolveReaderHref,
+} from './lib/readerUrl';

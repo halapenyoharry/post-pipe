@@ -33,6 +33,7 @@ import { getLOD, makeCardSizeFor } from './levelOfDetail';
 import { separateOpen } from './openOverlap';
 import { rootShape, rootPath, rootSegments } from './roots';
 import { layoutKey } from './layoutKey';
+import { siteBasePath } from '../../lib/readerUrl';
 import { fraction, anchorWorld, homeView, artPoint } from '../../lib/reach';
 import { ghostOf, jitterPoints } from '../../lib/sketch';
 import { config as todConfig, legibleOn, allBackgrounds } from '../../lib/timeOfDay';
@@ -4497,12 +4498,13 @@ export function GraphViewer({
       // the feed already gave us is what there is; reading the rest is what the
       // link is for.
       const filename = (d.url || '').split('/').pop();
+      const base = siteBasePath(window.location.pathname, window.SETTINGS);
       const tryFetch = async () => {
         let r;
         try {
           const isSameOrigin = d.url && new URL(d.url, window.location.href).origin === window.location.origin;
           if (!isSameOrigin && filename) {
-            r = await fetch('./' + filename);
+            r = await fetch(base + filename);
           }
         } catch (_) {}
         if (!r || !r.ok) {
@@ -4511,7 +4513,7 @@ export function GraphViewer({
           } catch (_) {}
         }
         if (!r || !r.ok) {
-          if (filename) r = await fetch('./' + filename);
+          if (filename) r = await fetch(base + filename);
         }
         if (!r || !r.ok) throw new Error('HTTP ' + (r ? r.status : 'failed'));
         return r.text();

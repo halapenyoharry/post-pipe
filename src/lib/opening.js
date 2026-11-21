@@ -16,6 +16,8 @@
 // at any p, the state a page starts on, and the state machine that turns
 // wheels, touches, keys and taps into p. Frames and the clock are injectable.
 
+const { hasReaderRoute } = require('./readerUrl');
+
 const DEFAULTS = {
   enabled: false,
   mode: 'two-state',
@@ -489,12 +491,12 @@ function revealFactor(hidden, at, now) {
 // state this reader left, or the art for a reader with no memory here.
 /**
  * @param {any} config
- * @param {{ stored?: string|null, hash?: string }} [opts]
+ * @param {{ stored?: string|null, hash?: string, pathname?: string, settings?: any }} [opts]
  * @returns {'art'|'graph'|string}
  */
-function startState(config, { stored, hash } = {}) {
+function startState(config, { stored, hash, pathname, settings } = {}) {
   if (!config) return 'graph';
-  if (typeof hash === 'string' && hash.startsWith('#read=')) return 'graph';
+  if (hasReaderRoute({ pathname, hash }, settings)) return 'graph';
   if (config.startOn === 'art' || config.startOn === 'graph') return config.startOn;
   return STATES.includes(stored) ? stored : 'art';
 }

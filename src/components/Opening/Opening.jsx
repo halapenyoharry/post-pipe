@@ -20,6 +20,7 @@ import {
 } from '../../lib/opening';
 import { artPoint, reachFor, createLag, reachShape, reachPath, backdropOpacity } from '../../lib/reach';
 import { parseRoots, rootsModel, actRoots, bentRoots, pathD, createFollow } from '../../lib/rootsVector';
+import { hasReaderRoute } from '../../lib/readerUrl';
 
 /**
  * Opening — the two-state page (settings.opening; off by default). The cover
@@ -171,7 +172,11 @@ function keysBelongElsewhere(e) {
     if (t.closest('[data-reader-panel], [role="dialog"], [role="menu"], [data-settings-panel]')) return true;
     if ((e.key === ' ' || e.key === 'Spacebar') && t.closest('button, a[href], summary, [role="button"]')) return true;
   }
-  if (typeof window !== 'undefined' && window.location.hash.startsWith('#read=')) return true;
+  if (
+    typeof window !== 'undefined' &&
+    hasReaderRoute({ pathname: window.location.pathname, hash: window.location.hash }, window.SETTINGS)
+  )
+    return true;
   if (typeof document !== 'undefined' && document.querySelector('[data-settings-panel]')) return true;
   return false;
 }
@@ -493,6 +498,8 @@ function Cover({ config, viewState, children }) {
       startState(config, {
         stored: viewState && viewState.openingState ? viewState.openingState() : null,
         hash: typeof window !== 'undefined' ? window.location.hash : '',
+        pathname: typeof window !== 'undefined' ? window.location.pathname : '/',
+        settings: typeof window !== 'undefined' ? window.SETTINGS : null,
       }),
     [config, viewState],
   );
@@ -1112,10 +1119,13 @@ function Cover({ config, viewState, children }) {
     window.addEventListener('keydown', onKey);
 
     // A link straight to a chapter goes to the graph.
-    const onHash = () => {
-      if (window.location.hash.startsWith('#read=')) machine.go('graph');
+    const onRoute = () => {
+      if (hasReaderRoute({ pathname: window.location.pathname, hash: window.location.hash }, window.SETTINGS)) {
+        machine.go('graph');
+      }
     };
-    window.addEventListener('hashchange', onHash);
+    window.addEventListener('hashchange', onRoute);
+    window.addEventListener('popstate', onRoute);
 
     // A drag on the art, or on the handle, scrubs. A tap that ends a drag
     // does not also count as a tap.
@@ -1194,7 +1204,8 @@ function Cover({ config, viewState, children }) {
       window.removeEventListener('pointerdown', onFirstDown, { capture: true });
       document.documentElement.removeAttribute('data-pp-cover-acts');
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('hashchange', onHash);
+      window.removeEventListener('hashchange', onRoute);
+      window.removeEventListener('popstate', onRoute);
       for (const s of surfaces) {
         s.removeEventListener('touchstart', onTouchStart);
         s.removeEventListener('touchmove', onTouchMove);

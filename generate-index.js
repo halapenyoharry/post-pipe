@@ -605,20 +605,49 @@ ${reactJs}
 // ── Vanilla Orchestrator ──
 (async function initApp() {
   try {
-    const res = await fetch('./feed.json?v=' + Date.now());
+    const PPC = window.PostPipeComponents || {};
+    const readerUrlStyle = PPC.readerUrlStyle || function (s) {
+      return s && s.reader && s.reader.urlStyle === 'path' ? 'path' : 'hash';
+    };
+    const siteBasePath = PPC.siteBasePath || function (p) {
+      var s = String(p || '/');
+      if (s.endsWith('/index.html')) return s.slice(0, -'index.html'.length) || '/';
+      return s.endsWith('/') ? s : (s.slice(0, s.lastIndexOf('/') + 1) || '/');
+    };
+    const FEED_BASE = siteBasePath(window.location.pathname, window.SETTINGS);
+    const res = await fetch(FEED_BASE + 'feed.json?v=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const feed = await res.json();
 
-    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, topBarOrder, resumeTarget, toolbarConfig, isLinkItem, followLink, React, ReactDOM } = window.PostPipeComponents;
+    const { GraphViewer, ReaderPanel, TTS, FeedZ, Settings, TimeOverlay, Toolbar, TimeOfDay, Theme, Opening, useContributions, topBarConfig, resolvePages, graphFeed, topBarOrder, resumeTarget, toolbarConfig, isLinkItem, followLink, React, ReactDOM } = PPC;
     // The registry of views (src/views/index.js) and the site's list of them
     // (settings.views, src/lib/views.js). Read guardedly so a page built
     // against an older bundle, without the registry, still mounts the graph.
-    const PPC = window.PostPipeComponents;
     const VIEWS = Array.isArray(PPC.VIEWS) ? PPC.VIEWS : [{ id: 'cluster', label: 'cluster', component: GraphViewer, props: { layout: 'force' } }];
     const siteViews = PPC.siteViews || function () { return VIEWS.slice(0, 1); };
     const viewById = PPC.viewById || function (list, id) { return list.find(function (v) { return v.id === id; }) || null; };
     const viewFromSearch = PPC.viewFromSearch || function () { return null; };
     const currentView = PPC.currentView || function (list) { return list[0] || null; };
+    const parseReaderLocation = PPC.parseReaderLocation || function (loc, items) {
+      var hash = (loc && loc.hash) || '';
+      if (!hash.startsWith('#read=')) return { item: null, paragraph: null, legacyHash: false };
+      var parts = hash.slice(6).split('&p=');
+      var id = decodeURIComponent(parts[0]);
+      var p = parts[1] ? parseInt(parts[1], 10) : null;
+      var item = (items || []).find(function (i) { return i.id === id || i.url === id; }) || null;
+      return { item: item, paragraph: (p !== null && !isNaN(p)) ? p : null, legacyHash: true };
+    };
+    const articlePath = PPC.articlePath || function (item, opts) {
+      var o = opts || {};
+      return (o.pathname || '') + (o.search || '') + '#read=' + encodeURIComponent(item.id) + (o.paragraph != null ? '&p=' + o.paragraph : '');
+    };
+    const closedPath = PPC.closedPath || function (opts) {
+      var o = opts || {};
+      return readerUrlStyle(o.settings) === 'path' ? siteBasePath(o.pathname, o.settings) + (o.search || '') : (o.pathname || '') + (o.search || '');
+    };
+    const hasReaderRoute = PPC.hasReaderRoute || function (loc) {
+      return !!(loc && typeof loc.hash === 'string' && loc.hash.startsWith('#read='));
+    };
     // The reading order in force (feed.flows, one per Flow preset the site
     // lists, and the reader's choice of them; src/lib/readingOrder.js), for
     // where the book starts a reader with no place yet. Read guardedly too:
@@ -658,7 +687,7 @@ ${reactJs}
     // After "Forget my usage" the page starts over at its first screen, as a
     // first-time visitor would see it: no hash, nothing remembered.
     window.addEventListener('postpipe:forgotten', function () {
-      window.location.replace(window.location.pathname + window.location.search);
+      window.location.replace(closedPath({ pathname: window.location.pathname, search: window.location.search, settings: window.SETTINGS }));
     });
 
     // Programs on the page can open and close containers:
@@ -722,58 +751,74 @@ ${reactJs}
 
       
       React.useEffect(function () {
-        function onHashChange() {
-          const hash = window.location.hash;
-          if (hash.startsWith('#read=')) {
-            const parts = hash.substring(6).split('&p=');
-            const id = parts[0];
-            const p = parts[1] ? parseInt(parts[1], 10) : null;
-            // The items are in feed.items (or feedData.items)
-            const items = typeof feed !== 'undefined' ? (feed.items || []) : (typeof feedData !== 'undefined' ? (feedData.items || []) : []);
-            const item = items.find(i => (i.id === decodeURIComponent(id)) || (i.url === decodeURIComponent(id)));
-            if (item && isLinkItem(item)) {
-              // A link node has no reader: the hash is dropped.
-              history.replaceState(null, '', window.location.pathname + window.location.search);
-            } else if (item) {
-              if (viewState) {
-                viewState.markSeen(item.id);
-              }
-              setSelectedArticle(item);
-              if (p !== null && !isNaN(p)) {
-                setTargetParagraph(p);
-              } else {
-                setTargetParagraph(null);
+        function syncFromLocation() {
+          const items = typeof feed !== 'undefined' ? (feed.items || []) : (typeof feedData !== 'undefined' ? (feedData.items || []) : []);
+          const parsed = parseReaderLocation({ pathname: window.location.pathname, hash: window.location.hash }, items, window.SETTINGS);
+          const item = parsed.item;
+          if (item && isLinkItem(item)) {
+            history.replaceState(null, '', closedPath({ pathname: window.location.pathname, search: window.location.search, settings: window.SETTINGS }));
+          } else if (item) {
+            if (viewState) viewState.markSeen(item.id);
+            if (readerUrlStyle(window.SETTINGS) === 'path') {
+              const nextUrl = articlePath(item, {
+                pathname: window.location.pathname,
+                search: window.location.search,
+                settings: window.SETTINGS,
+                paragraph: parsed.paragraph,
+              });
+              const curUrl = window.location.pathname + window.location.search + window.location.hash;
+              if (parsed.legacyHash || curUrl !== nextUrl) {
+                history.replaceState(null, '', nextUrl);
               }
             }
+            setSelectedArticle(item);
+            setTargetParagraph(parsed.paragraph !== null && !isNaN(parsed.paragraph) ? parsed.paragraph : null);
           } else {
             setSelectedArticle(null);
             setTargetParagraph(null);
           }
         }
-        window.addEventListener('hashchange', onHashChange);
-        onHashChange();
+        window.addEventListener('hashchange', syncFromLocation);
+        window.addEventListener('popstate', syncFromLocation);
+        syncFromLocation();
         // Escape and Reset layout both put the reader away.
         function onKeyDown(e) { if (e.key === 'Escape') closeReader(); }
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('graph:reset-layout', closeReader);
         return function () {
-          window.removeEventListener('hashchange', onHashChange);
+          window.removeEventListener('hashchange', syncFromLocation);
+          window.removeEventListener('popstate', syncFromLocation);
           window.removeEventListener('keydown', onKeyDown);
           window.removeEventListener('graph:reset-layout', closeReader);
         };
       }, [typeof feed !== 'undefined' ? feed : feedData, viewState]);
 
-      // The open chapter lives in the address as #read=<id>, so a link opens
-      // it. Every way of closing the reader clears it again; otherwise a
-      // reload (or a hard refresh) reopened a chapter the reader had closed.
+      // The open chapter lives in the address (#read=<id> or clean /<slug> when
+      // reader.urlStyle is 'path'). Closing clears it again so a reload stays
+      // on the graph.
       const selectedRef = React.useRef(null);
       selectedRef.current = selectedArticle;
       function closeReader() {
-        if (window.location.hash.startsWith('#read=')) {
-          history.replaceState(null, '', window.location.pathname + window.location.search);
+        if (hasReaderRoute({ pathname: window.location.pathname, hash: window.location.hash }, window.SETTINGS)) {
+          history.replaceState(null, '', closedPath({ pathname: window.location.pathname, search: window.location.search, settings: window.SETTINGS }));
         }
         setSelectedArticle(null);
         setTargetParagraph(null);
+      }
+      function openArticle(item, paragraph) {
+        if (!item) { closeReader(); return; }
+        if (isLinkItem(item)) { followLink(item); return; }
+        viewState.markSeen(item.id);
+        const target = articlePath(item, {
+          pathname: window.location.pathname,
+          search: window.location.search,
+          settings: window.SETTINGS,
+          paragraph: paragraph,
+        });
+        const cur = window.location.pathname + window.location.search + window.location.hash;
+        if (cur !== target) history.pushState(null, '', target);
+        setSelectedArticle(item);
+        setTargetParagraph(paragraph !== undefined && paragraph !== null && !isNaN(paragraph) ? Number(paragraph) : null);
       }
       function selectArticle(item) {
         if (!item) { closeReader(); return; }
@@ -781,11 +826,7 @@ ${reactJs}
         if (isLinkItem(item)) { followLink(item); return; }
         // Choosing the chapter that is already open closes it.
         if (selectedRef.current && selectedRef.current.id === item.id) { closeReader(); return; }
-        viewState.markSeen(item.id);
-        const target = '#read=' + encodeURIComponent(item.id);
-        if (window.location.hash !== target) history.pushState(null, '', target);
-        setSelectedArticle(item);
-        setTargetParagraph(null);
+        openArticle(item, null);
       }
   
       const hiddenSources = React.useMemo(function () {
@@ -960,7 +1001,7 @@ ${
           viewState: viewState,
           targetParagraph: targetParagraph,
           feedData: feed,
-          onNavigate: selectArticle,
+          onNavigate: openArticle,
           contributions: readers.list,
           contributionsConfig: readers.config
         })

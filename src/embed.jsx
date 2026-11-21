@@ -46,6 +46,7 @@ import { topBarConfig } from './lib/topBar';
 import { VIEWS, siteViews, viewById, viewFromSearch, currentView } from './views/index';
 import { autodiscoverEnabled } from './lib/feedAutodiscovery';
 import { groupByFolderEnabled } from './lib/sourceFolders';
+import { parseReaderLocation, articlePath, closedPath, hasReaderRoute, readerUrlStyle } from './lib/readerUrl';
 import './themes/sketchbook.css';
 
 // ── Default settings (mirrors settings.json structure) ───────────────────────
@@ -307,47 +308,63 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
 
   React.useEffect(
     function () {
-      function onHashChange() {
-        const hash = window.location.hash;
-        if (hash.startsWith('#read=')) {
-          const parts = hash.substring(6).split('&p=');
-          const id = parts[0];
-          const p = parts[1] ? parseInt(parts[1], 10) : null;
-          const items = typeof feedData !== 'undefined' ? feedData.items || [] : [];
-          const item = items.find((i) => i.id === decodeURIComponent(id) || i.url === decodeURIComponent(id));
-          if (item) {
-            if (viewState) viewState.markSeen(item.id);
-            setSelectedArticle(item);
-            setTargetParagraph(p !== null && !isNaN(p) ? p : null);
+      function syncFromLocation() {
+        const items = typeof feedData !== 'undefined' ? feedData.items || [] : [];
+        const parsed = parseReaderLocation(
+          { pathname: window.location.pathname, hash: window.location.hash },
+          items,
+          settings,
+        );
+        const item = parsed.item;
+        if (item) {
+          if (viewState) viewState.markSeen(item.id);
+          if (readerUrlStyle(settings) === 'path') {
+            const nextUrl = articlePath(item, {
+              pathname: window.location.pathname,
+              search: window.location.search,
+              settings,
+              paragraph: parsed.paragraph,
+            });
+            const curUrl = window.location.pathname + window.location.search + window.location.hash;
+            if (parsed.legacyHash || curUrl !== nextUrl) {
+              history.replaceState(null, '', nextUrl);
+            }
           }
+          setSelectedArticle(item);
+          setTargetParagraph(parsed.paragraph !== null && !isNaN(parsed.paragraph) ? parsed.paragraph : null);
         } else {
           setSelectedArticle(null);
           setTargetParagraph(null);
         }
       }
-      window.addEventListener('hashchange', onHashChange);
-      onHashChange();
+      window.addEventListener('hashchange', syncFromLocation);
+      window.addEventListener('popstate', syncFromLocation);
+      syncFromLocation();
 
-      const onKeyDown = (e) => {
-        if (e.key === 'Escape') {
-          history.replaceState(null, '', window.location.pathname + window.location.search);
-          window.dispatchEvent(new Event('hashchange'));
+      const clearToClosed = () => {
+        if (hasReaderRoute({ pathname: window.location.pathname, hash: window.location.hash }, settings)) {
+          history.replaceState(
+            null,
+            '',
+            closedPath({ pathname: window.location.pathname, search: window.location.search, settings }),
+          );
         }
+        syncFromLocation();
+      };
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') clearToClosed();
       };
       window.addEventListener('keydown', onKeyDown);
-      const onResetLayout = () => {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-        window.dispatchEvent(new Event('hashchange'));
-      };
-      window.addEventListener('graph:reset-layout', onResetLayout);
+      window.addEventListener('graph:reset-layout', clearToClosed);
 
       return function () {
-        window.removeEventListener('hashchange', onHashChange);
+        window.removeEventListener('hashchange', syncFromLocation);
+        window.removeEventListener('popstate', syncFromLocation);
         window.removeEventListener('keydown', onKeyDown);
-        window.removeEventListener('graph:reset-layout', onResetLayout);
+        window.removeEventListener('graph:reset-layout', clearToClosed);
       };
     },
-    [feedData, viewState],
+    [feedData, settings, viewState],
   );
 
   const hiddenSources = React.useMemo(() => {
@@ -458,19 +475,38 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         onNodeSelect={(article) => {
           if (!features.readerPanel) return;
           if (!article) {
-            history.replaceState(null, '', window.location.pathname + window.location.search);
-            window.dispatchEvent(new Event('hashchange'));
+            if (hasReaderRoute({ pathname: window.location.pathname, hash: window.location.hash }, settings)) {
+              history.replaceState(
+                null,
+                '',
+                closedPath({ pathname: window.location.pathname, search: window.location.search, settings }),
+              );
+            }
+            setSelectedArticle(null);
+            setTargetParagraph(null);
             return;
           }
           if (article && article.originalItem) {
             if (viewState) viewState.markSeen(article.originalItem.id);
-            const id = encodeURIComponent(article.originalItem.id);
-            if (window.location.hash === '#read=' + id) {
-              history.replaceState(null, '', window.location.pathname + window.location.search);
+            const target = articlePath(article.originalItem, {
+              pathname: window.location.pathname,
+              search: window.location.search,
+              settings,
+            });
+            const cur = window.location.pathname + window.location.search + window.location.hash;
+            if (cur === target) {
+              history.replaceState(
+                null,
+                '',
+                closedPath({ pathname: window.location.pathname, search: window.location.search, settings }),
+              );
+              setSelectedArticle(null);
+              setTargetParagraph(null);
             } else {
-              history.pushState(null, '', '#read=' + id);
+              history.pushState(null, '', target);
+              setSelectedArticle(article.originalItem);
+              setTargetParagraph(null);
             }
-            window.dispatchEvent(new Event('hashchange'));
           }
         }}
         hiddenSources={hiddenSources}
@@ -540,11 +576,15 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
         <ReaderPanel
           article={selectedArticle}
           onClose={() => {
-            if (window.location.hash.startsWith('#read=')) {
-              history.pushState(null, '', window.location.pathname + window.location.search);
-              window.dispatchEvent(new Event('hashchange'));
+            if (hasReaderRoute({ pathname: window.location.pathname, hash: window.location.hash }, settings)) {
+              history.pushState(
+                null,
+                '',
+                closedPath({ pathname: window.location.pathname, search: window.location.search, settings }),
+              );
             }
             setSelectedArticle(null);
+            setTargetParagraph(null);
           }}
           settings={settings}
           viewState={viewState}
@@ -552,11 +592,19 @@ function EmbedApp({ initialConfig, feedData, graphApiRef }) {
           feedData={feedData}
           contributions={readers.list}
           contributionsConfig={readers.config}
-          onNavigate={(item) => {
+          onNavigate={(item, paragraph) => {
             if (!item) return;
             if (viewState) viewState.markSeen(item.id);
-            history.pushState(null, '', '#read=' + encodeURIComponent(item.id));
-            window.dispatchEvent(new Event('hashchange'));
+            const target = articlePath(item, {
+              pathname: window.location.pathname,
+              search: window.location.search,
+              settings,
+              paragraph,
+            });
+            const cur = window.location.pathname + window.location.search + window.location.hash;
+            if (cur !== target) history.pushState(null, '', target);
+            setSelectedArticle(item);
+            setTargetParagraph(paragraph !== undefined && paragraph !== null && !isNaN(paragraph) ? paragraph : null);
           }}
         />
       )}

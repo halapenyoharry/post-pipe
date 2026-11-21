@@ -24,6 +24,7 @@ import { untaggedBecauseOf } from '../../lib/untaggedBecause';
 import { wrapText, provenanceLines } from '../../lib/provenance';
 import { wordsChoice, excerptHtml, cardProgress, cardScrollFor } from '../../lib/readerWords';
 import { createWheelTurn, touchIntent, touchTurn, followOffset } from '../../lib/sideSwipe';
+import { articleAbsoluteUrl, resolveReaderHref, siteBasePath } from '../../lib/readerUrl';
 
 // The words of the reader's own buttons for a cut card (provisional, Harold's
 // to keep or replace).
@@ -195,7 +196,7 @@ export function ReaderPanel({
       setShownWhole(wholeNext.current);
       setContentHtml(html);
     };
-    const out = itemHtml(item, feedData);
+    const out = itemHtml(item, feedData, settings);
     if (out && typeof out.then === 'function') out.then(arrive);
     else arrive(out);
   };
@@ -285,10 +286,14 @@ export function ReaderPanel({
   // beside it for a second.
   const handleCopyLinkToHere = async () => {
     if (!article) return;
-    const pId = getPersistentId(article);
     const topP = findTopVisibleParagraph();
-    let url = window.location.href.split('#')[0] + '#read=' + encodeURIComponent(pId);
-    if (topP !== null) url += '&p=' + topP;
+    const url = articleAbsoluteUrl(article, {
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      settings,
+      paragraph: topP,
+    });
     try {
       await navigator.clipboard.writeText(url);
     } catch (e) {
@@ -1005,7 +1010,13 @@ export function ReaderPanel({
 
         {showFrontmatter && <FrontmatterPanel article={article} settings={settings} />}
         {showMarks && bookmarksList(settings) && (
-          <BookmarkList viewState={viewState} feedData={feedData} itemId={pId} />
+          <BookmarkList
+            viewState={viewState}
+            feedData={feedData}
+            itemId={pId}
+            settings={settings}
+            onNavigate={onNavigate}
+          />
         )}
 
         {/* The text's own box: the scroll body, and the arrows that stay
@@ -1062,7 +1073,24 @@ export function ReaderPanel({
                 </div>
               )}
             </div>
-            <div ref={textRef} data-reader-text dangerouslySetInnerHTML={textInner} />
+            <div
+              ref={textRef}
+              data-reader-text
+              onClick={(e) => {
+                if (!onNavigate || !feedData || !Array.isArray(feedData.items)) return;
+                if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                const anchor = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+                if (!anchor || anchor.getAttribute('target') === '_blank') return;
+                const href = anchor.getAttribute('href');
+                if (!href) return;
+                const hit = resolveReaderHref(href, window.location.href, feedData.items, settings);
+                if (hit && hit.item && isReadable(hit.item)) {
+                  e.preventDefault();
+                  onNavigate(hit.item, hit.paragraph);
+                }
+              }}
+              dangerouslySetInnerHTML={textInner}
+            />
             {cut && (
               // The open card shows about the chosen number of words: the rest
               // shows here, in place (provisional words). The voice reads past it.
@@ -1152,7 +1180,7 @@ function escapeHtml(v) {
 // The HTML the reader shows for an item, by its kind (Substrate dispatch in
 // the reader, ARCHITECTURE.md). Text at hand comes back as a string; a
 // piece's own page, which has to be fetched, as a promise of one.
-function itemHtml(item, feedData) {
+function itemHtml(item, feedData, settings) {
   const kind = item.kind || 'essay';
 
   if (kind === 'placeholder' || item.substrate === 'placeholder') {
@@ -1177,7 +1205,7 @@ function itemHtml(item, feedData) {
   // carried, often a summary, and a link out to the piece itself.
   if (fromElsewhere(item)) return renderFeedItem(item);
 
-  if (kind === 'essay' || kind === 'multi') return fetchPage(item);
+  if (kind === 'essay' || kind === 'multi') return fetchPage(item, settings);
   if (kind === 'image') {
     const img = item.image
       ? `<img src="${item.image}" style="max-width:100%;height:auto;border-radius:4px;display:block;margin:0 auto;">`
@@ -1189,16 +1217,17 @@ function itemHtml(item, feedData) {
 
 // An essay's own page: fetched (first the sibling file beside the viewer when
 // the page is served from elsewhere), its h1 and its rights footer dropped.
-async function fetchPage(item) {
+async function fetchPage(item, settings) {
   try {
     const filename = (item.url || '').split('/').pop();
+    const base = siteBasePath(window.location.pathname, settings);
     let r;
     // If current origin differs from item.url (e.g. previewing on localhost),
     // try the local sibling file first
     try {
       const isSameOrigin = item.url && new URL(item.url, window.location.href).origin === window.location.origin;
       if (!isSameOrigin && filename) {
-        r = await fetch('./' + filename);
+        r = await fetch(base + filename);
       }
     } catch (_) {}
 
@@ -1210,7 +1239,7 @@ async function fetchPage(item) {
 
     if (!r || !r.ok) {
       if (filename) {
-        r = await fetch('./' + filename);
+        r = await fetch(base + filename);
       }
     }
 
