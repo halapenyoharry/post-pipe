@@ -1,8 +1,8 @@
 // untaggedBecause.js — the one line a card with no tagz carries, saying why.
 //
 // Written by the rosetta-tagz phase (src/lib/rtagz.js) onto every feed item
-// that ends a build with no tagz, as `untaggedBecause` (provisional name,
-// 2026-11-04, T46), from the facts rosetta-tagz reports in build.json's
+// that ends a build with no tagz, as `untaggedBecause` (2026-11-04,
+// T46), from the facts rosetta-tagz reports in build.json's
 // untagged entry (its reason codes and its queued candidates) and the site's
 // own rtagz switches. Nothing is guessed: each line is true of the build that
 // wrote it. The reader panel shows the line where the tag chips would be

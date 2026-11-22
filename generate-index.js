@@ -1113,8 +1113,8 @@ async function main() {
     `  cards: ${slugs.summary.known} known, ${slugs.summary.added} new${slugs.summary.suffixed ? ` (${slugs.summary.suffixed} suffixed)` : ''}${ledgerFile ? `; ledger ${path.relative(SITE_ROOT, ledgerFile)}${slugs.changed && prior.status !== 'unreadable' ? ' written' : ' unchanged'}` : '; no ledger (cards.ledger false)'}`,
   );
 
-  // Beside its slug, every card gets a topic slug (item.topicSlug,
-  // provisional; issue #39, src/lib/topicSlug.js): the literal best two
+  // Beside its slug, every card gets a topic slug (item.topicSlug;
+  // issue #39, src/lib/topicSlug.js): the literal best two
   // words for what it is about, computed over all of this build's items as
   // the corpus. It is not frozen: a card's topic slug may change from one
   // build to the next as the corpus changes. slug, slugSource and the cards

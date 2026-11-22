@@ -63,7 +63,7 @@
 // Nothing here is frozen. idf and the suffixes depend on the corpus, so a
 // card's topic slug may change from one build to the next as the cards
 // around it change. The build (generate-index.js) writes it on every item as
-// topicSlug (provisional) and keeps it out of the cards ledger.
+// topicSlug and keeps it out of the cards ledger.
 //
 // Pure, CommonJS, no dependency but cardSlug's slugify; it never imports
 // rosetta-tagz/lib/. It reads a card's tags and its tag references
@@ -798,15 +798,15 @@ function topicSlugs(items, options = {}) {
   return out;
 }
 
-// Whether the build gives each item its topicSlug (settings.cards.topicSlug,
-// provisional): on unless it is false.
+// Whether the build gives each item its topicSlug (settings.cards.topicSlug):
+// on unless it is false.
 function topicSlugOn(settings) {
   const cards = settings && settings.cards && typeof settings.cards === 'object' ? settings.cards : {};
   return cards.topicSlug !== false;
 }
 
 // The options a site's settings give the topic slug (d):
-// settings.cards.topicSlugFoundTags (provisional), 'tags' to count the tags
+// settings.cards.topicSlugFoundTags, 'tags' to count the tags
 // rosetta-tagz found as the card's own; anything else, or nothing, reads them
 // as text.
 function topicSlugOptions(settings) {

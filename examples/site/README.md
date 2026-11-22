@@ -13,7 +13,7 @@ The build writes its slug ledger (`cards.json`) and rosetta-tagz's ids (`rtagz-i
 
 ## Saved copies of the two feeds
 
-So that a build which cannot reach the feeds (a machine offline, a feed slow to answer, a fresh clone with nothing fetched yet) still shows cards, the example ships a copy of each feed in `saved/`: `saved/sciencedaily.json` and `saved/propublica.json`. Each outline in `feeds.opml` names its own with `savedCopy` (a path relative to the site; the name is provisional). A copy is the same JSON the engine keeps as its last good copy of a feed: `{ url, fetchedAt, body }`, `body` being the feed's text as fetched.
+So that a build which cannot reach the feeds (a machine offline, a feed slow to answer, a fresh clone with nothing fetched yet) still shows cards, the example ships a copy of each feed in `saved/`: `saved/sciencedaily.json` and `saved/propublica.json`. Each outline in `feeds.opml` names its own with `savedCopy` (a path relative to the site). A copy is the same JSON the engine keeps as its last good copy of a feed: `{ url, fetchedAt, body }`, `body` being the feed's text as fetched.
 
 - A build uses a copy only when its fetch of that feed fails. It then takes the newer, by `fetchedAt`, of the site's saved copy and the engine's last good copy (the one every good fetch leaves in the engine's `.feed-cache/last-good/` on the machine that builds). The source's pill shows the stale mark, and its popover says which copy the cards came from and when it was fetched; in `feed.json` the source carries `stale`, `copyDate`, `copyFrom` (`site` or `engine`) and `error`.
 - An ordinary build never writes the saved copies, so building does not change this folder's git.

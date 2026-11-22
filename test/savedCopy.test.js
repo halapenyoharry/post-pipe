@@ -1,5 +1,5 @@
 // The site's saved copy of a fetched feed (2026-11-05): a file in the site's
-// own folder, named on the feed's outline (savedCopy, provisional), holding
+// own folder, named on the feed's outline (savedCopy), holding
 // what an engine's last good copy holds ({ url, fetchedAt, body }). A build
 // uses it only when its fetch fails, taking the newer of it and the engine's
 // last good copy by fetchedAt, and the source says which (copyFrom). An
